@@ -83,6 +83,7 @@ namespace winrt::TerminalApp::implementation
             // there is an update available. This lets us test the system.
             co_await winrt::resume_after(std::chrono::seconds{ 3 });
             co_await wil::resume_foreground(strongThis->Dispatcher());
+            UpdateStatusText(RS_(L"AboutDialog_UpdateSimulated"));
             UpdatesAvailable(true);
 #else // release build, likely has a store context
             bool packageManagerAnswered{ false };
@@ -104,6 +105,9 @@ namespace winrt::TerminalApp::implementation
                         case PackageUpdateAvailability::Available:
                         case PackageUpdateAvailability::Required:
                         case PackageUpdateAvailability::NoUpdates:
+                            UpdateStatusText(availability == PackageUpdateAvailability::Required ?
+                                                 RS_(L"AboutDialog_UpdateFromPackageRequired") :
+                                                 RS_(L"AboutDialog_UpdateFromPackage"));
                             UpdatesAvailable(availability != PackageUpdateAvailability::NoUpdates);
                             packageManagerAnswered = true;
                             break;
@@ -131,6 +135,7 @@ namespace winrt::TerminalApp::implementation
                         const auto numUpdates = updates.Size();
                         if (numUpdates > 0)
                         {
+                            UpdateStatusText(RS_(L"AboutDialog_UpdateFromStore"));
                             UpdatesAvailable(true);
                         }
                     }

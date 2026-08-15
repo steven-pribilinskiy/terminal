@@ -847,8 +847,21 @@
   <data name="AboutDialog_CheckingForUpdatesLabel.Text" xml:space="preserve">
     <value>Checking for updates...</value>
   </data>
-  <data name="AboutDialog_UpdateAvailableLabel.Text" xml:space="preserve">
-    <value>An update is available.</value>
+  <data name="AboutDialog_UpdateFromPackage" xml:space="preserve">
+    <value>An app package (MSIX) update is available from this build's update source.</value>
+    <comment>Shown when the installed package's own update source, checked via the package manager, reports a newer version.</comment>
+  </data>
+  <data name="AboutDialog_UpdateFromPackageRequired" xml:space="preserve">
+    <value>A required app package (MSIX) update is available from this build's update source.</value>
+    <comment>As AboutDialog_UpdateFromPackage, but the publisher marked the update mandatory.</comment>
+  </data>
+  <data name="AboutDialog_UpdateFromStore" xml:space="preserve">
+    <value>An app update is available from the Microsoft Store.</value>
+    <comment>Shown when the Microsoft Store, rather than the package's own update source, reports a newer version.</comment>
+  </data>
+  <data name="AboutDialog_UpdateSimulated" xml:space="preserve">
+    <value>Simulated update (dev build). No update check was performed — dev builds always report one so the notification can be tested.</value>
+    <comment>Shown only in local developer builds, where the update check is a hardcoded stub rather than a real query.</comment>
   </data>
   <data name="AboutDialog_InstallUpdateButton.Content" xml:space="preserve">
     <value>Install now</value>

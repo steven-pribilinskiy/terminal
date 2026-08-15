@@ -18,6 +18,10 @@ namespace winrt::TerminalApp::implementation
         til::property_changed_event PropertyChanged;
         WINRT_OBSERVABLE_PROPERTY(bool, UpdatesAvailable, PropertyChanged.raise, false);
         WINRT_OBSERVABLE_PROPERTY(bool, CheckingForUpdates, PropertyChanged.raise, false);
+        // What kind of update was found, and which source reported it. "An update
+        // is available" on its own says neither, which is actively confusing in dev
+        // builds, where the answer is "none, this is a hardcoded stub".
+        WINRT_OBSERVABLE_PROPERTY(winrt::hstring, UpdateStatusText, PropertyChanged.raise);
 
     private:
         friend struct AboutDialogT<AboutDialog>; // for Xaml to bind events

@@ -43,9 +43,9 @@
                         VerticalAlignment="Center"
                         Orientation="Vertical"
                         Visibility="{x:Bind UpdatesAvailable, Mode=OneWay}">
-                <TextBlock>
-                    <Run x:Uid="AboutDialog_UpdateAvailableLabel" />
-                </TextBlock>
+                <TextBlock IsTextSelectionEnabled="True"
+                           Text="{x:Bind UpdateStatusText, Mode=OneWay}"
+                           TextWrapping="Wrap" />
                 <!-- <Button x:Uid="AboutDialog_InstallUpdateButton"
                         Margin="0" />-->
             </StackPanel>
