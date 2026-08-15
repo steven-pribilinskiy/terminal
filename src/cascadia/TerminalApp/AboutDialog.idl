@@ -9,6 +9,9 @@ namespace TerminalApp
 
         String ApplicationDisplayName { get; };
         String ApplicationVersion { get; };
+        String BuildCommit { get; };
+        String BuildBranch { get; };
+        String BuildTime { get; };
 
         Boolean CheckingForUpdates { get; };
         Boolean UpdatesAvailable { get; };

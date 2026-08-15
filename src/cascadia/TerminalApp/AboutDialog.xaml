@@ -24,8 +24,18 @@
             <Run AutomationProperties.HeadingLevel="1"
                  Text="{x:Bind ApplicationDisplayName}" /> <LineBreak />
             <Run x:Uid="AboutDialog_VersionLabel" />
-            <Run Text="{x:Bind ApplicationVersion}" />
+            <Run Text="{x:Bind ApplicationVersion}" /> <LineBreak />
+            <Run x:Uid="AboutDialog_CommitLabel" />
+            <Run FontFamily="Cascadia Mono, Consolas, monospace"
+                 Text="{x:Bind BuildCommit}" />
+            <Run Text="(" /><Run Text="{x:Bind BuildBranch}" /><Run Text=")" /> <LineBreak />
+            <Run x:Uid="AboutDialog_BuiltLabel" />
+            <Run Text="{x:Bind BuildTime}" />
         </TextBlock>
+
+        <HyperlinkButton x:Uid="AboutDialog_CopyBuildInfoButton"
+                         Margin="-12,0,0,0"
+                         Click="_CopyBuildInfoOnClick" />
 
         <StackPanel Orientation="Vertical">
             <StackPanel Padding="0,16,0,16"

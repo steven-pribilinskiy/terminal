@@ -14,6 +14,10 @@ namespace winrt::TerminalApp::implementation
 
         winrt::hstring ApplicationDisplayName();
         winrt::hstring ApplicationVersion();
+        winrt::hstring BuildCommit();
+        winrt::hstring BuildBranch();
+        winrt::hstring BuildTime();
+        winrt::hstring BuildInfoForClipboard();
 
         til::property_changed_event PropertyChanged;
         WINRT_OBSERVABLE_PROPERTY(bool, UpdatesAvailable, PropertyChanged.raise, false);
@@ -29,6 +33,7 @@ namespace winrt::TerminalApp::implementation
         std::chrono::system_clock::time_point _lastUpdateCheck{};
 
         void _ThirdPartyNoticesOnClick(const IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& eventArgs);
+        void _CopyBuildInfoOnClick(const IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& eventArgs);
         void _SendFeedbackOnClick(const IInspectable& sender, const Windows::UI::Xaml::Controls::ContentDialogButtonClickEventArgs& eventArgs);
         safe_void_coroutine _queueUpdateCheck();
     };

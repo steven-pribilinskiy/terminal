@@ -113,12 +113,17 @@
   <PropertyGroup>
     <BuildDependsOn>
       OCCallFeatureFlagGenerator;
+      OCCallBuildInfoGenerator;
       $(BuildDependsOn)
     </BuildDependsOn>
   </PropertyGroup>
 
   <Target Name="OCCallFeatureFlagGenerator">
     <MSBuild Projects="$(SolutionDir)\build\rules\GenerateFeatureFlags.proj" />
+  </Target>
+
+  <Target Name="OCCallBuildInfoGenerator">
+    <MSBuild Projects="$(SolutionDir)\build\rules\GenerateBuildInfo.proj" />
   </Target>
 
   <ItemDefinitionGroup>
