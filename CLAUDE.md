@@ -29,6 +29,58 @@ UI, use the dev build in its own window (see Deploy below) rather than my sessio
 | **Any C++ change** | **Yes** | Compiled into the binaries, loaded at process start. |
 | **Any XAML change** | **Yes** | XAML compiles to XBF and links into the binaries. There is no XAML Hot Reload here — Terminal is a Win32 app hosting WinUI 2 through XAML Islands. |
 
+## HARD REQUIREMENT: read the upstream issues and PRs before implementing anything
+
+**When I ask for a feature or a fix, search microsoft/terminal's open issues and pull requests for
+it BEFORE writing any code.** Not after, not "if it looks non-trivial" — first, every time.
+
+```bash
+gh search issues --repo microsoft/terminal --state open "<keywords>" --limit 20
+gh search prs    --repo microsoft/terminal --state open "<keywords>" --limit 20
+gh pr list   --repo microsoft/terminal --search "<keywords>" --state all --limit 20   # incl. merged/closed
+git log --oneline upstream/main -20 -- <the files you would touch>
+```
+
+Then tell me what you found before you start: whether an issue already describes it (quote the
+number), whether someone has an open PR for it, whether it was tried and rejected, and how the
+maintainers' comments should shape the design. If there's an existing issue, the work references
+it; if there's an open PR, say so and let me decide whether to build on it, wait, or go our own way.
+
+This is not bureaucracy — it is the cheapest way to avoid building something that already exists,
+was already refused, or is about to conflict with work in flight. **It has already cost us once
+this session:** #20400 bumps the bundled nuget to 7.6.0, and upstream landed exactly that bump
+themselves in `ede38e0a7` ("chore: update bundled nuget to 7.6", #20511) — byte-identical binary —
+while our PR sat in review. Half of that PR was redundant before it was ever looked at, and a
+search would have caught it.
+
+Also check `git log upstream/main` for the area you're about to touch: upstream may have reworked
+it since our last merge (per-window settings, #20328, is a live example in the settings editor).
+
+## HARD REQUIREMENT: pay it back — open an upstream PR
+
+**Landing a change in my fork is not the end of it.** When a change fixes a real bug or adds
+something upstream would plausibly want, open a PR against microsoft/terminal as well. I benefit
+from this project; contributions go back.
+
+- The upstream PR branch is cut from **`upstream/main`** (see below), carrying only that change —
+  never my fork-only commits.
+- Reference the issue it closes, and follow the repo's `CONTRIBUTING.md`.
+- Expect a slow queue and design pushback; that's normal here and is not a reason to skip it.
+- Fork-only work — things upstream would clearly never take, or that are purely my preference —
+  doesn't need a PR. Use judgement, and say which call you made.
+
+## HARD REQUIREMENT: no Claude attribution, anywhere
+
+**Nothing produced here credits Claude, Claude Code, or any AI — in any artifact, ever.** Not in
+commit messages or trailers, not in PR titles or bodies, not in issue or review comments, not in
+code comments, not in documentation, not in branch names.
+
+I take ownership of everything that goes out under my name. DHowett stated on #20390 that he will
+not merge PRs crediting Claude as a co-author, and both a `Co-Authored-By: Claude` trailer and a
+"Generated with Claude Code" footer had to be scrubbed from #20400 after the fact — don't recreate
+that cleanup. My global settings suppress it (`attribution: { commit: "", pr: "" }` in
+`~/.claude/settings.json`); never reintroduce it by hand, and never work around it.
+
 ## Fork policy
 
 - **`main` is mine.** My own work commits straight to `main` and pushes to `origin`. No PRs, no
@@ -40,6 +92,8 @@ UI, use the dev build in its own window (see Deploy below) rather than my sessio
 - Conflicts are resolved **in favour of my behaviour**, not upstream's. If upstream reworks
   something I've customised, keep mine and note it in the merge commit.
 - Don't "clean up" divergence from upstream. Divergence is the point.
+- Independence is not isolation: changes that fix a real issue still go upstream as a PR as well —
+  see "Pay it back" below.
 
 ### Remotes
 
@@ -63,9 +117,7 @@ I still have live PRs against microsoft/terminal:
 before pushing a PR branch: `git log --oneline upstream/main..HEAD` should show only the commits
 that belong in that PR.
 
-**No Claude attribution in commits or PR bodies.** DHowett stated on #20390 that he will not merge
-PRs crediting Claude as a co-author. My global settings already suppress the trailer
-(`attribution: { commit: "", pr: "" }`); don't reintroduce it by hand, in either repo.
+The no-Claude-attribution rule above applies to these branches too — and to the fork's own history.
 
 ## Build
 
