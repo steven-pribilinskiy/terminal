@@ -121,6 +121,22 @@
     <value>Terminal</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm}</comment>
   </data>
+  <data name="AppNameTest" xml:space="preserve">
+    <value>Terminal Test</value>
+    <comment>{Locked} The test build will never be seen in multiple languages</comment>
+  </data>
+  <data name="AppStoreNameTest" xml:space="preserve">
+    <value>Windows Terminal Test</value>
+    <comment>{Locked} The test build will never be seen in multiple languages</comment>
+  </data>
+  <data name="AppShortNameTest" xml:space="preserve">
+    <value>Terminal Test</value>
+    <comment>{Locked} The test build will never be seen in multiple languages</comment>
+  </data>
+  <data name="AppDescriptionTest" xml:space="preserve">
+    <value>The Windows Terminal, disposable verification slot</value>
+    <comment>{Locked} The test build will never be seen in multiple languages</comment>
+  </data>
   <data name="AppNameDev" xml:space="preserve">
     <value>Terminal Dev</value>
     <comment>{Locked} The dev build will never be seen in multiple languages</comment>
