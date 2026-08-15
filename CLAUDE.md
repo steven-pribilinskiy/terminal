@@ -137,7 +137,29 @@ Set-MsbuildDevEnvironment
 msbuild.exe .\OpenConsole.slnx /p:Configuration=Release /p:Platform=x64 /m /v:m
 ```
 
-Two traps, both hit for real:
+**Restore is TWO commands, not one.** `Invoke-OpenConsoleBuild` runs both, and skipping the second
+leaves every project failing with *"This project references NuGet package(s) that are missing on
+this computer"* — hundreds of `error :` lines that look like a broken merge and are nothing of the
+sort:
+
+```powershell
+.\dep\nuget\nuget.exe restore .\OpenConsole.slnx
+.\dep\nuget\nuget.exe restore .\dep\nuget\packages.config   # WIL, TAEF, CppWinRT live here
+```
+
+`NuGet.Config` pins `globalPackagesFolder` and `repositoryPath` to `.\packages`, relative to the
+config file, so **every worktree needs its own full restore** — nothing is shared with the main
+checkout.
+
+**Keep the build tree on a SHORT path.** Some package references expand through unnormalised
+`build\native\..\..\runtimes\...` segments, which pushes them past `MAX_PATH` (260). The linker then
+reports `LNK1104: cannot open file ...TerminalThemeHelpers.lib` for a file that is present and
+readable — it means "path too long", not "missing". A worktree under
+`%TEMP%\claude\<session>\scratchpad\` produced a 267-character reference and failed; the same
+worktree at `C:\wt-tm` produced 155 and linked. MSBuild also warns `MSB8029` about output
+directories under Temp. Put worktrees at a short root.
+
+Two more traps, both hit for real:
 
 - **`Invoke-OpenConsoleBuild -p:Configuration=Release` silently loses the switches.** PowerShell
   parses `-p:Configuration=Release` as the `-p:` parameter with value `Configuration=Release` and
