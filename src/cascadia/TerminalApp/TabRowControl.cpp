@@ -3,6 +3,7 @@
 
 #include "pch.h"
 #include "TabRowControl.h"
+#include "BuildInfo.h"
 
 #include "TabRowControl.g.cpp"
 
@@ -23,6 +24,38 @@ namespace winrt::TerminalApp::implementation
     TabRowControl::TabRowControl()
     {
         InitializeComponent();
+    }
+
+    winrt::hstring TabRowControl::SlotBadge()
+    {
+        return ::TerminalApp::BuildInfo::SlotBadge();
+    }
+
+    // Only the local Dev and Test slots get a badge. A normal install shows
+    // nothing, so this costs a real user no tab-row space.
+    bool TabRowControl::ShowSlotBadge()
+    {
+        return !SlotBadge().empty();
+    }
+
+    winrt::hstring TabRowControl::SlotBadgeTooltipTitle()
+    {
+        return winrt::Microsoft::Terminal::Settings::Model::CascadiaSettings::ApplicationDisplayName();
+    }
+
+    winrt::hstring TabRowControl::BuildCommit()
+    {
+        return ::TerminalApp::BuildInfo::Commit();
+    }
+
+    winrt::hstring TabRowControl::BuildBranch()
+    {
+        return ::TerminalApp::BuildInfo::Branch();
+    }
+
+    winrt::hstring TabRowControl::BuildTime()
+    {
+        return ::TerminalApp::BuildInfo::BuildTime();
     }
 
     // Method Description:

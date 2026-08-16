@@ -7,7 +7,7 @@
 #include "AboutDialog.g.cpp"
 
 #include <WtExeUtils.h>
-#include <TerminalBuildInfo.h>
+#include "BuildInfo.h"
 
 #include "../../types/inc/utils.hpp"
 #include "Utils.h"
@@ -42,69 +42,29 @@ namespace winrt::TerminalApp::implementation
         return CascadiaSettings::ApplicationVersion();
     }
 
-    // The commit this binary was built from, with a marker when the working tree
-    // had uncommitted changes -- in that case the hash alone doesn't identify it.
     winrt::hstring AboutDialog::BuildCommit()
     {
-#if TERMINAL_BUILD_DIRTY
-        return winrt::hstring{ TERMINAL_BUILD_COMMIT L"+dirty" };
-#else
-        return winrt::hstring{ TERMINAL_BUILD_COMMIT };
-#endif
+        return ::TerminalApp::BuildInfo::Commit();
     }
 
     winrt::hstring AboutDialog::BuildBranch()
     {
-        return winrt::hstring{ TERMINAL_BUILD_BRANCH };
+        return ::TerminalApp::BuildInfo::Branch();
     }
 
-    // "5 days ago (2026-08-10 15:56 UTC)" -- the relative part is what tells you
-    // at a glance whether the window predates the build you just made.
     winrt::hstring AboutDialog::BuildTime()
     {
-        const auto built{ std::chrono::system_clock::from_time_t(static_cast<std::time_t>(TERMINAL_BUILD_TIMESTAMP)) };
-        const auto elapsed{ std::chrono::system_clock::now() - built };
-        const auto seconds{ std::chrono::duration_cast<std::chrono::seconds>(elapsed).count() };
-
-        std::wstring relative;
-        if (seconds < 0)
-        {
-            // Clock skew, or a binary copied from a machine set ahead of this one.
-            relative = L"just now";
-        }
-        else if (seconds < 60)
-        {
-            relative = L"just now";
-        }
-        else if (seconds < 3600)
-        {
-            const auto n{ seconds / 60 };
-            relative = fmt::format(FMT_COMPILE(L"{} minute{} ago"), n, n == 1 ? L"" : L"s");
-        }
-        else if (seconds < 86400)
-        {
-            const auto n{ seconds / 3600 };
-            relative = fmt::format(FMT_COMPILE(L"{} hour{} ago"), n, n == 1 ? L"" : L"s");
-        }
-        else
-        {
-            const auto n{ seconds / 86400 };
-            relative = fmt::format(FMT_COMPILE(L"{} day{} ago"), n, n == 1 ? L"" : L"s");
-        }
-
-        return winrt::hstring{ fmt::format(FMT_COMPILE(L"{} ({})"), relative, TERMINAL_BUILD_TIMESTAMP_STRING) };
+        return ::TerminalApp::BuildInfo::BuildTime();
     }
 
     // One line with everything needed to identify this binary, for pasting into
     // a bug report.
     winrt::hstring AboutDialog::BuildInfoForClipboard()
     {
-        return winrt::hstring{ fmt::format(FMT_COMPILE(L"{} {} ({}, {}) built {}"),
+        return winrt::hstring{ fmt::format(FMT_COMPILE(L"{} {} {}"),
                                            ApplicationDisplayName(),
                                            ApplicationVersion(),
-                                           BuildCommit(),
-                                           BuildBranch(),
-                                           TERMINAL_BUILD_TIMESTAMP_STRING) };
+                                           ::TerminalApp::BuildInfo::OneLine()) };
     }
 
     void AboutDialog::_CopyBuildInfoOnClick(const IInspectable& /*sender*/, const Windows::UI::Xaml::RoutedEventArgs& /*eventArgs*/)

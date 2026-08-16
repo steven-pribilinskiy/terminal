@@ -11,5 +11,12 @@ namespace TerminalApp
         Boolean ShowElevationShield;
         Boolean ShowWorkspacesButton;
         String WorkspaceName;
+
+        String SlotBadge { get; };
+        Boolean ShowSlotBadge { get; };
+        String SlotBadgeTooltipTitle { get; };
+        String BuildCommit { get; };
+        String BuildBranch { get; };
+        String BuildTime { get; };
     }
 }

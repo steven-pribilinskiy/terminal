@@ -84,6 +84,43 @@
                         VerticalAlignment="Bottom"
                         Background="{ThemeResource CardStrokeColorDefaultBrush}" />
 
+                <!--
+                    Which local slot this window is (DEV / TEST). Right-aligned so it
+                    sits just inboard of the caption buttons, and hidden entirely on a
+                    normal install so it costs a real user nothing.
+                -->
+                <!--  x:Name must not collide with the SlotBadge property, or x:Bind resolves to this element.  -->
+                <Border x:Name="SlotBadgeBorder"
+                        Margin="0,4,8,6"
+                        Padding="6,1"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Background="{ThemeResource SystemControlBackgroundBaseLowBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="3"
+                        Visibility="{x:Bind ShowSlotBadge}">
+                    <TextBlock FontFamily="Cascadia Mono, Consolas, monospace"
+                               FontSize="10"
+                               FontWeight="SemiBold"
+                               Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                               Text="{x:Bind SlotBadge}" />
+                    <ToolTipService.ToolTip>
+                        <ToolTip Placement="Bottom">
+                            <TextBlock TextWrapping="Wrap">
+                                <Run FontWeight="SemiBold"
+                                     Text="{x:Bind SlotBadgeTooltipTitle}" /> <LineBreak />
+                                <Run x:Uid="AboutDialog_CommitLabel" />
+                                <Run FontFamily="Cascadia Mono, Consolas, monospace"
+                                     Text="{x:Bind BuildCommit}" />
+                                <Run Text="(" /><Run Text="{x:Bind BuildBranch}" /><Run Text=")" /> <LineBreak />
+                                <Run x:Uid="AboutDialog_BuiltLabel" />
+                                <Run Text="{x:Bind BuildTime}" />
+                            </TextBlock>
+                        </ToolTip>
+                    </ToolTipService.ToolTip>
+                </Border>
+
                 <mux:SplitButton x:Name="NewTabButton"
                                  x:Uid="NewTabSplitButton"
                                  Height="24"

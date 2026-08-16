@@ -21,6 +21,18 @@ namespace winrt::TerminalApp::implementation
         WINRT_OBSERVABLE_PROPERTY(bool, ShowElevationShield, PropertyChanged.raise, false);
         WINRT_OBSERVABLE_PROPERTY(bool, ShowWorkspacesButton, PropertyChanged.raise, true);
         WINRT_OBSERVABLE_PROPERTY(winrt::hstring, WorkspaceName, PropertyChanged.raise, L"");
+
+        // WINRT_OBSERVABLE_PROPERTY leaves the class in a non-public section, so
+        // anything declared after it has to reopen public access explicitly.
+    public:
+        // Which local slot this window is: DEV, TEST, or empty for a normal
+        // install (in which case the badge is hidden entirely).
+        winrt::hstring SlotBadge();
+        bool ShowSlotBadge();
+        winrt::hstring SlotBadgeTooltipTitle();
+        winrt::hstring BuildCommit();
+        winrt::hstring BuildBranch();
+        winrt::hstring BuildTime();
     };
 }
 
