@@ -349,6 +349,9 @@ namespace winrt::TerminalApp::implementation
         // Use raw WindowName() so unnamed windows show no text.
         _tabRow.WorkspaceName(_WindowProperties.WindowName());
 
+        _tabRow.PromoteRequested({ get_weak(), &TerminalPage::_PromoteSlotRequested });
+        RefreshPendingPromotion();
+
         // Rebuild the workspace flyout each time it opens so it always
         // reflects the latest set of persisted workspaces.
         _workspaceFlyout.Opening([weakThis{ get_weak() }](auto&&, auto&&) {

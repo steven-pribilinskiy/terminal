@@ -49,6 +49,11 @@ namespace winrt::TerminalApp::implementation
 
         til::typed_event<winrt::Windows::Foundation::IInspectable, winrt::TerminalApp::SettingsLoadEventArgs> SettingsChanged;
 
+        // A deploy has staged a build for the Dev slot, or taken one away.
+        // App-global because the marker is app-global; every window shows the
+        // same offer. See SlotPromotion.h.
+        til::typed_event<> PendingPromotionChanged;
+
     private:
         bool _isElevated{ false };
         bool _canDragDrop{ false };
@@ -61,6 +66,7 @@ namespace winrt::TerminalApp::implementation
         bool _loadedInitialSettings = false;
 
         std::shared_ptr<ThrottledFunc<>> _reloadSettings;
+        std::shared_ptr<ThrottledFunc<>> _notifyPendingPromotion;
 
         std::vector<Microsoft::Terminal::Settings::Model::SettingsLoadWarnings> _warnings{};
 
@@ -68,6 +74,8 @@ namespace winrt::TerminalApp::implementation
         // (C++ destroys members in reverse-declaration-order.)
         winrt::com_ptr<LanguageProfileNotifier> _languageProfileNotifier;
         wil::unique_folder_change_reader_nothrow _reader;
+        // Must be destroyed before _notifyPendingPromotion, which it invokes.
+        wil::unique_folder_change_reader_nothrow _slotReader;
 
         TerminalApp::ContentManager _contentManager{ winrt::make<implementation::ContentManager>() };
 
@@ -76,6 +84,7 @@ namespace winrt::TerminalApp::implementation
         [[nodiscard]] HRESULT _TryLoadSettings() noexcept;
         void _ProcessLazySettingsChanges();
         void _RegisterSettingsChange();
+        void _RegisterSlotPromotionChange();
 
         void _setupFolderPathEnvVar();
 

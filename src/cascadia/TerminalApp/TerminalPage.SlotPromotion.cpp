@@ -1,0 +1,181 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+//
+// The promote affordance for the local Dev slot: notice that a deploy has
+// staged a newer build, offer it, and - only if asked - hand the swap to a
+// detached helper.
+//
+// Why any of this exists: the Dev slot is where live sessions run, so a deploy
+// deliberately does not touch it. It registers the Test slot, stages the Dev
+// payload, and leaves the decision here, because only the person using the
+// windows knows whether losing them is acceptable right now.
+
+#include "pch.h"
+#include "TerminalPage.h"
+#include "SlotPromotion.h"
+#include "WindowListRequest.g.h"
+
+#include <LibraryResources.h>
+
+using namespace winrt;
+using namespace winrt::Windows::Foundation;
+using namespace winrt::Windows::UI::Xaml::Controls;
+
+namespace winrt::TerminalApp::implementation
+{
+    // Ask whether anything is staged, and put the answer in the tab row. Cheap
+    // enough to call whenever we might have missed a change; it reads one small
+    // file and returns nothing at all outside the Dev slot.
+    void TerminalPage::RefreshPendingPromotion()
+    {
+        if (!_tabRow)
+        {
+            return;
+        }
+
+        const auto pending{ ::TerminalApp::SlotPromotion::PendingPromotion() };
+        _tabRow.PromotionAvailable(pending.has_value());
+        _tabRow.PromotionDescription(pending ? pending->Describe() : hstring{});
+    }
+
+    // How much is about to be thrown away. The window count comes from the
+    // emperor, which is the only thing that can see all of them; the pane count
+    // is this window's, which is the one the user is looking at.
+    hstring TerminalPage::_describePromotionCost()
+    {
+        uint32_t windowCount{ 1 };
+        if (const auto request{ winrt::make<WindowListRequest>() })
+        {
+            RequestWindowList.raise(*this, request);
+            if (const auto entries{ request.Entries() }; entries && entries.Size() > 0)
+            {
+                windowCount = entries.Size();
+            }
+        }
+
+        uint32_t paneCount{ 0 };
+        for (const auto& tab : _tabs)
+        {
+            if (const auto tabImpl{ _GetTabImpl(tab) })
+            {
+                paneCount += gsl::narrow_cast<uint32_t>(std::max(0, tabImpl->GetLeafPaneCount()));
+            }
+        }
+
+        return hstring{ RS_fmt(L"PromoteSlotDialog_WindowsAndPanes", windowCount, paneCount) };
+    }
+
+    safe_void_coroutine TerminalPage::_PromoteSlotRequested(IInspectable /*sender*/, IInspectable /*args*/)
+    {
+        const auto weak{ get_weak() };
+
+        // Re-read rather than trusting what lit the button: the deploy may have
+        // run again, or been undone, since it appeared.
+        const auto pending{ ::TerminalApp::SlotPromotion::PendingPromotion() };
+        if (!pending)
+        {
+            RefreshPendingPromotion();
+            co_return;
+        }
+
+        ContentDialog dialog{};
+        dialog.Title(box_value(hstring{ RS_(L"PromoteSlotDialog_Title") }));
+        dialog.Content(box_value(hstring{ RS_fmt(L"PromoteSlotDialog_Body",
+                                                 std::wstring_view{ pending->Describe() },
+                                                 std::wstring_view{ _describePromotionCost() }) }));
+        dialog.PrimaryButtonText(RS_(L"PromoteSlotDialog_ApplyOnNextLaunch"));
+        dialog.SecondaryButtonText(RS_(L"PromoteSlotDialog_ApplyNow"));
+        dialog.CloseButtonText(RS_(L"PromoteSlotDialog_Cancel"));
+        // Default to the button that destroys nothing. The primary action here
+        // is disruptive enough that Enter must not be able to trigger the worst
+        // of it by accident.
+        dialog.DefaultButton(ContentDialogButton::Close);
+
+        auto presenter{ _dialogPresenter.get() };
+        if (!presenter)
+        {
+            co_return;
+        }
+
+        const auto result{ co_await presenter.ShowDialog(dialog) };
+
+        // ShowDialog blocks until dismissed, so `this` may be gone by now.
+        const auto strong{ weak.get() };
+        if (!strong)
+        {
+            co_return;
+        }
+
+        if (result == ContentDialogResult::None)
+        {
+            co_return;
+        }
+
+        const auto applyNow{ result == ContentDialogResult::Secondary };
+        if (!strong->_armPromotionHelper(applyNow))
+        {
+            co_return;
+        }
+
+        if (applyNow)
+        {
+            // The helper is now waiting on our process id. Quitting takes the
+            // normal path, so layouts persist exactly as they would on any
+            // other quit and come back when the new build starts.
+            strong->RequestQuit();
+        }
+    }
+
+    // Spawn the detached helper that performs the swap once we are gone.
+    //
+    // It has to be a separate process: re-registering a package identity from a
+    // different folder means removing the old registration first, and Windows
+    // will not remove a package that is still running. Nothing here can do that
+    // to itself.
+    //
+    // Returns false if the helper could not be started, in which case we must
+    // not quit - closing every window to accomplish nothing is the one outcome
+    // worse than not promoting.
+    bool TerminalPage::_armPromotionHelper(bool relaunch)
+    try
+    {
+        const auto helper{ std::filesystem::path{ ::TerminalApp::SlotPromotion::SlotRoot } / L"Promote-DevSlot.ps1" };
+        if (!std::filesystem::exists(helper))
+        {
+            LOG_HR_MSG(E_INVALIDARG, "control slot promotion: helper missing");
+            return false;
+        }
+
+        const auto args{ fmt::format(LR"(-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "{}" -WaitForPid {}{})",
+                                     helper.wstring(),
+                                     GetCurrentProcessId(),
+                                     relaunch ? L" -Relaunch" : L"") };
+
+        SHELLEXECUTEINFOW info{};
+        info.cbSize = sizeof(info);
+        info.fMask = SEE_MASK_NOASYNC | SEE_MASK_NOCLOSEPROCESS;
+        info.lpVerb = L"open";
+        info.lpFile = L"powershell.exe";
+        info.lpParameters = args.c_str();
+        // The helper outlives us on purpose - it cannot start work until we are
+        // gone - so SEE_MASK_NOASYNC matters: it keeps the launch from being
+        // torn down when this process begins exiting.
+        info.nShow = SW_HIDE;
+
+        if (!ShellExecuteExW(&info))
+        {
+            LOG_LAST_ERROR();
+            return false;
+        }
+        if (info.hProcess)
+        {
+            CloseHandle(info.hProcess);
+        }
+        return true;
+    }
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION();
+        return false;
+    }
+}

@@ -18,5 +18,9 @@ namespace TerminalApp
         String BuildCommit { get; };
         String BuildBranch { get; };
         String BuildTime { get; };
+
+        Boolean PromotionAvailable;
+        String PromotionDescription;
+        event Windows.Foundation.TypedEventHandler<Object, Object> PromoteRequested;
     }
 }

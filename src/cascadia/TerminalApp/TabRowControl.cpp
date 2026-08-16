@@ -58,6 +58,14 @@ namespace winrt::TerminalApp::implementation
         return ::TerminalApp::BuildInfo::BuildTime();
     }
 
+    // The button only ever asks. Everything about what promotion costs, and the
+    // decision itself, belongs to the dialog TerminalPage puts up in response.
+    void TabRowControl::OnPromoteSlotButtonClick(const winrt::Windows::Foundation::IInspectable& /*sender*/,
+                                                 const winrt::Windows::UI::Xaml::RoutedEventArgs& /*args*/)
+    {
+        PromoteRequested.raise(*this, nullptr);
+    }
+
     // Method Description:
     // - Bound in the Xaml editor to the [+] button.
     // Arguments:

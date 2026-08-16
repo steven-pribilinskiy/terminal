@@ -135,6 +135,11 @@ $info = [ordered]@{
 $infoPath = Join-Path $SlotRoot 'dev-pending.json'
 $info | ConvertTo-Json | Set-Content -Path $infoPath -Encoding UTF8
 
+# The promote button in a running Dev window shells out to this. It lives beside
+# the payloads rather than in the repo so the app has exactly one fixed path to
+# know, and so promotion still works from a checkout that has moved.
+Copy-Item "$PSScriptRoot\Promote-DevSlot.ps1" (Join-Path $SlotRoot 'Promote-DevSlot.ps1') -Force
+
 if (-not $StageOnly) {
     Write-Host '== registering Test slot ==' -ForegroundColor Cyan
 

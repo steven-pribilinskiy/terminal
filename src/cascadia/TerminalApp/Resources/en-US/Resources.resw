@@ -855,6 +855,46 @@
     <value>Built:</value>
     <comment>Heading for the date and time this build was produced</comment>
   </data>
+  <data name="PromoteSlotButton.Content" xml:space="preserve">
+    <value>UPDATE</value>
+    <comment>Label on a small button in the tab row, shown only in a local developer build when a newer build is waiting to replace it. Deliberately short; it sits beside a DEV badge.</comment>
+  </data>
+  <data name="PromoteSlotButton.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Promote the staged build into this slot</value>
+    <comment>Screen reader name for the UPDATE button in the tab row of a local developer build</comment>
+  </data>
+  <data name="PromoteSlotButton_TooltipTitle.Text" xml:space="preserve">
+    <value>A newer build is staged for this slot</value>
+    <comment>First line of the tooltip on the UPDATE button; the second line names the staged build</comment>
+  </data>
+  <data name="PromoteSlotDialog_Title" xml:space="preserve">
+    <value>Promote the staged build?</value>
+    <comment>Title of the dialog asking whether to replace the running local developer build with a newer one</comment>
+  </data>
+  <data name="PromoteSlotDialog_Body" xml:space="preserve">
+    <value>Staged: {0}
+
+Replacing this build closes every window running it — {1} right now. Everything in them ends with it, including sessions you have left working.
+
+Applying on next launch closes nothing now: the swap happens once you have closed this build yourself, and you get the new one the next time you start it.</value>
+    <comment>{locked="{0}"}{locked="{1}"}Body of the promote dialog. {0} describes the staged build, e.g. "a1b2c3d+dirty (main), 4 minutes ago". {1} is a count, e.g. "3 windows, 7 panes in this one".</comment>
+  </data>
+  <data name="PromoteSlotDialog_WindowsAndPanes" xml:space="preserve">
+    <value>{0} window(s), {1} pane(s) in this one</value>
+    <comment>{locked="{0}"}{locked="{1}"}Substituted into PromoteSlotDialog_Body. {0} is how many windows this build has open in total, {1} how many panes are in the window showing the dialog.</comment>
+  </data>
+  <data name="PromoteSlotDialog_ApplyOnNextLaunch" xml:space="preserve">
+    <value>Apply on next launch</value>
+    <comment>Button that stages the promotion without closing anything; it takes effect the next time this build starts</comment>
+  </data>
+  <data name="PromoteSlotDialog_ApplyNow" xml:space="preserve">
+    <value>Apply now</value>
+    <comment>Button that closes every window immediately and swaps the build</comment>
+  </data>
+  <data name="PromoteSlotDialog_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Button that dismisses the promote dialog without changing anything</comment>
+  </data>
   <data name="AboutDialog_CopyBuildInfoButton.Content" xml:space="preserve">
     <value>Copy build info</value>
     <comment>A button that copies the version, commit and build time to the clipboard</comment>

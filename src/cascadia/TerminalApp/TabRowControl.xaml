@@ -85,41 +85,78 @@
                         Background="{ThemeResource CardStrokeColorDefaultBrush}" />
 
                 <!--
-                    Which local slot this window is (DEV / TEST). Right-aligned so it
-                    sits just inboard of the caption buttons, and hidden entirely on a
-                    normal install so it costs a real user nothing.
+                    Which local slot this window is (DEV / TEST), and - in the Dev
+                    slot only - an offer to promote a newer build that a deploy has
+                    staged. Right-aligned so they sit just inboard of the caption
+                    buttons, and hidden entirely on a normal install so they cost a
+                    real user nothing.
                 -->
-                <!--  x:Name must not collide with the SlotBadge property, or x:Bind resolves to this element.  -->
-                <Border x:Name="SlotBadgeBorder"
-                        Margin="0,4,8,6"
-                        Padding="6,1"
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Center"
-                        Background="{ThemeResource SystemControlBackgroundBaseLowBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="3"
-                        Visibility="{x:Bind ShowSlotBadge}">
-                    <TextBlock FontFamily="Cascadia Mono, Consolas, monospace"
-                               FontSize="10"
-                               FontWeight="SemiBold"
-                               Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
-                               Text="{x:Bind SlotBadge}" />
-                    <ToolTipService.ToolTip>
-                        <ToolTip Placement="Bottom">
-                            <TextBlock TextWrapping="Wrap">
-                                <Run FontWeight="SemiBold"
-                                     Text="{x:Bind SlotBadgeTooltipTitle}" /> <LineBreak />
-                                <Run x:Uid="AboutDialog_CommitLabel" />
-                                <Run FontFamily="Cascadia Mono, Consolas, monospace"
-                                     Text="{x:Bind BuildCommit}" />
-                                <Run Text="(" /><Run Text="{x:Bind BuildBranch}" /><Run Text=")" /> <LineBreak />
-                                <Run x:Uid="AboutDialog_BuiltLabel" />
-                                <Run Text="{x:Bind BuildTime}" />
-                            </TextBlock>
-                        </ToolTip>
-                    </ToolTipService.ToolTip>
-                </Border>
+                <StackPanel Margin="0,4,8,6"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal"
+                            Spacing="6">
+
+                    <!--
+                        Deliberately a separate control rather than a state of the
+                        badge: the badge says what you are running, which is true at
+                        all times, and this says something is waiting, which is not.
+                        Collapsed unless there is something to promote, so the normal
+                        Dev window looks exactly as it did before.
+                    -->
+                    <Button x:Name="PromoteSlotButton"
+                            x:Uid="PromoteSlotButton"
+                            Padding="6,1"
+                            VerticalAlignment="Center"
+                            Click="OnPromoteSlotButtonClick"
+                            CornerRadius="3"
+                            FontFamily="Cascadia Mono, Consolas, monospace"
+                            FontSize="10"
+                            FontWeight="SemiBold"
+                            Style="{StaticResource AccentButtonStyle}"
+                            Visibility="{x:Bind PromotionAvailable, Mode=OneWay}">
+                        <ToolTipService.ToolTip>
+                            <ToolTip Placement="Bottom">
+                                <TextBlock TextWrapping="Wrap">
+                                    <Run x:Uid="PromoteSlotButton_TooltipTitle"
+                                         FontWeight="SemiBold" /> <LineBreak />
+                                    <Run FontFamily="Cascadia Mono, Consolas, monospace"
+                                         Text="{x:Bind PromotionDescription, Mode=OneWay}" />
+                                </TextBlock>
+                            </ToolTip>
+                        </ToolTipService.ToolTip>
+                    </Button>
+
+                    <!--  x:Name must not collide with the SlotBadge property, or x:Bind resolves to this element.  -->
+                    <Border x:Name="SlotBadgeBorder"
+                            Padding="6,1"
+                            VerticalAlignment="Center"
+                            Background="{ThemeResource SystemControlBackgroundBaseLowBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="3"
+                            Visibility="{x:Bind ShowSlotBadge}">
+                        <TextBlock FontFamily="Cascadia Mono, Consolas, monospace"
+                                   FontSize="10"
+                                   FontWeight="SemiBold"
+                                   Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                   Text="{x:Bind SlotBadge}" />
+                        <ToolTipService.ToolTip>
+                            <ToolTip Placement="Bottom">
+                                <TextBlock TextWrapping="Wrap">
+                                    <Run FontWeight="SemiBold"
+                                         Text="{x:Bind SlotBadgeTooltipTitle}" /> <LineBreak />
+                                    <Run x:Uid="AboutDialog_CommitLabel" />
+                                    <Run FontFamily="Cascadia Mono, Consolas, monospace"
+                                         Text="{x:Bind BuildCommit}" />
+                                    <Run Text="(" /><Run Text="{x:Bind BuildBranch}" /><Run Text=")" /> <LineBreak />
+                                    <Run x:Uid="AboutDialog_BuiltLabel" />
+                                    <Run Text="{x:Bind BuildTime}" />
+                                </TextBlock>
+                            </ToolTip>
+                        </ToolTipService.ToolTip>
+                    </Border>
+                </StackPanel>
 
                 <mux:SplitButton x:Name="NewTabButton"
                                  x:Uid="NewTabSplitButton"

@@ -177,6 +177,11 @@ namespace winrt::TerminalApp::implementation
         void PersistState();
         std::vector<IPaneContent> Panes() const;
 
+        // Promoting a staged build into the Dev slot. See
+        // TerminalPage.SlotPromotion.cpp. Public because TerminalWindow calls it
+        // when AppLogic notices the staged build change.
+        void RefreshPendingPromotion();
+
         // The control pipe. See TerminalPage.ControlPipe.cpp; UI thread only.
         Windows::Foundation::Collections::IVector<TerminalApp::ControlPipePaneInfo> ControlPipeListPanes(hstring containing);
         TerminalApp::ControlPipeCaptureResult ControlPipeCapturePane(uint32_t tabIndex, uint32_t paneId, int32_t lines);
@@ -298,6 +303,10 @@ namespace winrt::TerminalApp::implementation
         Windows::Foundation::Collections::IObservableVector<TerminalApp::Tab> _mruTabs;
         static winrt::com_ptr<Tab> _GetTabImpl(const TerminalApp::Tab& tab);
         std::shared_ptr<Pane> _controlPipeFindPane(uint32_t tabIndex, uint32_t paneId) const;
+
+        hstring _describePromotionCost();
+        bool _armPromotionHelper(bool relaunch);
+        safe_void_coroutine _PromoteSlotRequested(Windows::Foundation::IInspectable sender, Windows::Foundation::IInspectable args);
 
         void _UpdateTabIndices();
 

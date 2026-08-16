@@ -216,6 +216,14 @@ namespace winrt::TerminalApp::implementation
 
         AppLogic::Current()->SettingsChanged({ get_weak(), &TerminalWindow::UpdateSettingsHandler });
 
+        // App-global, but the offer is drawn per window, so every window listens.
+        AppLogic::Current()->PendingPromotionChanged([weakThis{ get_weak() }](auto&&, auto&&) {
+            if (const auto self{ weakThis.get() }; self && self->_root)
+            {
+                self->_root->RefreshPendingPromotion();
+            }
+        });
+
         _RefreshThemeRoutine();
 
         auto args = winrt::make_self<SystemMenuChangeArgs>(RS_(L"SettingsMenuItem"),

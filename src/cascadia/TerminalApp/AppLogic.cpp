@@ -5,6 +5,7 @@
 #include "AppLogic.h"
 #include "AppLogic.g.cpp"
 #include "SettingsLoadEventArgs.h"
+#include "SlotPromotion.h"
 
 #include <WtExeUtils.h>
 #include <wil/token_helpers.h>
@@ -145,6 +146,22 @@ namespace winrt::TerminalApp::implementation
                 if (auto self{ weakSelf.get() })
                 {
                     self->ReloadSettings();
+                }
+            });
+
+        // Debounced for the same reason as the settings reload: a deploy writes
+        // the marker as part of a burst of file activity in that directory.
+        _notifyPendingPromotion = std::make_shared<ThrottledFunc<>>(
+            DispatcherQueue::GetForCurrentThread(),
+            til::throttled_func_options{
+                .delay = std::chrono::milliseconds{ 250 },
+                .debounce = true,
+                .trailing = true,
+            },
+            [weakSelf = get_weak()]() {
+                if (auto self{ weakSelf.get() })
+                {
+                    self->PendingPromotionChanged.raise(nullptr, nullptr);
                 }
             });
 
@@ -310,6 +327,42 @@ namespace winrt::TerminalApp::implementation
             });
     }
 
+    // Watch for a deploy staging a new build for the Dev slot, so a window that
+    // was already open when the build finished can offer it without being
+    // restarted first - which would rather defeat the point.
+    //
+    // Same shape as _RegisterSettingsChange: watch the directory and filter by
+    // basename, because the marker is written by a script that may replace it
+    // rather than edit it in place. Only the Dev slot can be promoted into, so
+    // no other slot pays for the watch.
+    void AppLogic::_RegisterSlotPromotionChange()
+    {
+        if (!::TerminalApp::SlotPromotion::ThisSlotCanBePromoted())
+        {
+            return;
+        }
+
+        const std::filesystem::path root{ ::TerminalApp::SlotPromotion::SlotRoot };
+        std::error_code ec;
+        if (!std::filesystem::is_directory(root, ec))
+        {
+            // No slot root at all: this is a Dev-slot build on a machine that
+            // has never run the deploy script. Nothing to watch for.
+            return;
+        }
+
+        _slotReader.create(
+            root.c_str(),
+            false,
+            wil::FolderChangeEvents::FileName | wil::FolderChangeEvents::LastWriteTime,
+            [this, markerBasename = std::filesystem::path{ ::TerminalApp::SlotPromotion::PendingMarkerName }](wil::FolderChangeEvent, PCWSTR fileModified) {
+                if (std::filesystem::path{ fileModified }.filename() == markerBasename)
+                {
+                    _notifyPendingPromotion->Run();
+                }
+            });
+    }
+
     void AppLogic::_ApplyLanguageSettingChange() noexcept
     try
     {
@@ -392,6 +445,7 @@ namespace winrt::TerminalApp::implementation
         {
             // Register for directory change notification.
             _RegisterSettingsChange();
+            _RegisterSlotPromotionChange();
             return;
         }
 

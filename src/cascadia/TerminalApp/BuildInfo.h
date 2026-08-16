@@ -69,11 +69,12 @@ namespace TerminalApp::BuildInfo
         return winrt::hstring{ TERMINAL_BUILD_BRANCH };
     }
 
-    // "5 days ago" / "20 minutes ago" -- the part that tells you at a glance
-    // whether this window predates the build you just made.
-    inline std::wstring RelativeBuildAge()
+    // "5 days ago" / "20 minutes ago" for any unix timestamp. Shared so that a
+    // build staged on disk and the build we are running are described in the
+    // same words -- they get compared to each other by eye.
+    inline std::wstring RelativeAge(int64_t unixSeconds)
     {
-        const auto built{ std::chrono::system_clock::from_time_t(static_cast<std::time_t>(TERMINAL_BUILD_TIMESTAMP)) };
+        const auto built{ std::chrono::system_clock::from_time_t(static_cast<std::time_t>(unixSeconds)) };
         const auto seconds{ std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - built).count() };
 
         if (seconds < 60)
@@ -93,6 +94,13 @@ namespace TerminalApp::BuildInfo
         }
         const auto n{ seconds / 86400 };
         return fmt::format(FMT_COMPILE(L"{} day{} ago"), n, n == 1 ? L"" : L"s");
+    }
+
+    // How old the build we are running is -- the part that tells you at a
+    // glance whether this window predates the build you just made.
+    inline std::wstring RelativeBuildAge()
+    {
+        return RelativeAge(TERMINAL_BUILD_TIMESTAMP);
     }
 
     inline winrt::hstring BuildTime()
