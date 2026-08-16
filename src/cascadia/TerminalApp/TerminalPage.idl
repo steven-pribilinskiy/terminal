@@ -72,6 +72,44 @@ namespace TerminalApp
         Windows.Foundation.Collections.IVector<WindowListEntry> Entries { get; };
     }
 
+    // ------------------------------------------------------------------
+    // The control pipe (see doc/control-pipe.md). These are the types the
+    // named pipe server in WindowsTerminal.exe uses to reach into a window's
+    // panes. Everything here runs on the UI thread; the pipe threads only ever
+    // touch it through WindowEmperor's message window.
+    // ------------------------------------------------------------------
+
+    enum ControlPipeStatus
+    {
+        Ok = 0,
+        // The window/tab/pane triple doesn't name a live terminal pane.
+        NoSuchPane = 1,
+        // requireContains was not on the pane's screen; nothing was written.
+        NeedleGone = 2,
+        // The pane's connection has already closed; nothing was written.
+        Disconnected = 3
+    };
+
+    // Deliberately carries no pane text: enumerating panes is on the caller's
+    // polling path, and the text is what makes that expensive.
+    struct ControlPipePaneInfo
+    {
+        UInt32 TabIndex;
+        UInt32 PaneId;
+        String Title;
+        // Focused within its tab, and its tab is the active one.
+        Boolean Focused;
+        UInt32 ProcessId;
+        // The connection's session id, the same one WT_SESSION carries.
+        Guid SessionId;
+    };
+
+    struct ControlPipeCaptureResult
+    {
+        ControlPipeStatus Status;
+        String Text;
+    };
+
     [default_interface] runtimeclass TerminalPage : Windows.UI.Xaml.Controls.Page, Windows.UI.Xaml.Data.INotifyPropertyChanged, Microsoft.Terminal.UI.IDirectKeyListener
     {
         TerminalPage(WindowProperties properties, ContentManager manager);

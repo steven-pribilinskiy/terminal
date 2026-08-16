@@ -28,6 +28,7 @@ Author(s):
     X(bool, AlwaysShowNotificationIcon, "alwaysShowNotificationIcon", false)                                                       \
     X(winrt::Windows::Foundation::Collections::IVector<winrt::hstring>, DisabledProfileSources, "disabledProfileSources", nullptr) \
     X(bool, AllowHeadless, "compatibility.allowHeadless", false)                                                                   \
+    X(bool, ControlPipeEnabled, "controlPipe", true)                                                                               \
     X(bool, EnableColorSelection, "experimental.enableColorSelection", false)
 
 // Settings that are per-window (may vary by window name in the future)

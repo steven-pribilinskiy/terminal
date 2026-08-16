@@ -52,6 +52,8 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="AppHost.h" />
     <ClInclude Include="BaseWindow.h" />
+    <ClInclude Include="ControlPipeProtocol.h" />
+    <ClInclude Include="ControlPipeServer.h" />
     <ClInclude Include="IslandWindow.h" />
     <ClInclude Include="NonClientIslandWindow.h" />
     <ClInclude Include="VirtualDesktopUtils.h" />
@@ -63,6 +65,7 @@
     </ClCompile>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="AppHost.cpp" />
+    <ClCompile Include="ControlPipeServer.cpp" />
     <ClCompile Include="IslandWindow.cpp" />
     <ClCompile Include="NonClientIslandWindow.cpp" />
     <ClCompile Include="VirtualDesktopUtils.cpp" />

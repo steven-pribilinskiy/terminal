@@ -151,5 +151,13 @@ namespace TerminalApp
 
         void AttachContent(String content, UInt32 tabIndex);
         void SendContentToOther(RequestReceiveContentArgs args);
+
+        // The control pipe (see doc/control-pipe.md). Call these on the UI
+        // thread only. None of them focus, activate or otherwise disturb the
+        // window: a control client must be able to drive a minimised window in
+        // a background tab without the user noticing.
+        Windows.Foundation.Collections.IVector<ControlPipePaneInfo> ControlPipeListPanes(String containing);
+        ControlPipeCaptureResult ControlPipeCapturePane(UInt32 tabIndex, UInt32 paneId, Int32 lines);
+        ControlPipeStatus ControlPipeSendInput(UInt32 tabIndex, UInt32 paneId, String text, String requireContains);
     }
 }

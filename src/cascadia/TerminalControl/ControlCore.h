@@ -242,6 +242,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void SetReadOnlyMode(const bool readOnlyState);
 
         hstring ReadEntireBuffer() const;
+        hstring ReadViewportText(int32_t maxRows) const;
+        bool ViewportContains(const hstring& needle) const;
         Control::CommandHistoryContext CommandHistory() const;
         bool QuickFixesAvailable() const noexcept;
         void UpdateQuickFixes(const Windows::Foundation::Collections::IVector<hstring>& quickFixes);
@@ -312,6 +314,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         void _setupDispatcherAndCallbacks();
         void _closeConnection();
+
+        std::pair<til::CoordType, til::CoordType> _viewportRowRange(int32_t maxRows) const noexcept;
 
         bool _setFontSizeUnderLock(float fontSize);
         void _updateFont();

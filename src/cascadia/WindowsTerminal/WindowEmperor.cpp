@@ -389,6 +389,135 @@ AppHost* WindowEmperor::_mostRecentWindow() const noexcept
 // A Start Menu shortcut with the AUMID (separate from the taskbar pin) is also
 // required for toast routing; see
 // https://learn.microsoft.com/windows/apps/develop/notifications/app-notifications/send-local-toast-other-apps
+// Bring the control pipe up or take it down to match the `controlPipe` global
+// setting. Called at startup and again on every settings reload, so turning the
+// pipe off takes effect without a restart - the point of a kill switch is that
+// you can reach it in a hurry.
+void WindowEmperor::_setupControlPipe(bool enabled)
+{
+    _assertIsMainThread();
+
+    if (!enabled)
+    {
+        _controlPipe.reset();
+        return;
+    }
+
+    if (_controlPipe)
+    {
+        return;
+    }
+
+    auto server = std::make_unique<ControlPipeServer>(_window.get(), WM_CONTROL_PIPE_REQUEST);
+    if (server->Start())
+    {
+        _controlPipe = std::move(server);
+    }
+}
+
+// Runs on the UI thread, synchronously inside a pipe thread's SendMessage. Keep
+// it cheap: every millisecond spent here is a millisecond the user's typing
+// isn't being drawn.
+void WindowEmperor::_handleControlPipeRequest(ControlPipeExchange& exchange) const
+{
+    _assertIsMainThread();
+
+    const auto& request = *exchange.request;
+
+    switch (request.op)
+    {
+    case ControlPipe::Op::Ping:
+    {
+        for (const auto& host : _windows)
+        {
+            exchange.windows.push_back(host->Logic().WindowProperties().WindowId());
+        }
+        return;
+    }
+
+    case ControlPipe::Op::ListPanes:
+    {
+        const auto foreground = GetForegroundWindow();
+        const winrt::hstring containing{ request.containing };
+
+        for (const auto& host : _windows)
+        {
+            const auto logic = host->Logic();
+            const auto windowId = logic.WindowProperties().WindowId();
+            const auto window = host->GetWindow();
+            const auto windowFocused = window != nullptr && window->GetHandle() == foreground;
+
+            for (const auto& pane : logic.ControlPipeListPanes(containing))
+            {
+                ControlPipe::PaneEntry entry;
+                entry.address = { windowId, pane.TabIndex, pane.PaneId };
+                entry.title = std::wstring{ pane.Title };
+                entry.focused = pane.Focused;
+                entry.windowFocused = windowFocused;
+                entry.pid = pane.ProcessId;
+                entry.session = ::Microsoft::Console::Utils::GuidToString(pane.SessionId);
+                exchange.panes.push_back(std::move(entry));
+            }
+        }
+        return;
+    }
+
+    case ControlPipe::Op::CapturePane:
+    {
+        const auto host = GetWindowById(request.pane->window);
+        if (!host)
+        {
+            exchange.error = ControlPipe::Error::NoSuchPane;
+            return;
+        }
+
+        const auto result = host->Logic().ControlPipeCapturePane(request.pane->tab, request.pane->pane, request.lines);
+        if (result.Status != winrt::TerminalApp::ControlPipeStatus::Ok)
+        {
+            exchange.error = ControlPipe::Error::NoSuchPane;
+            return;
+        }
+
+        exchange.text = std::wstring{ result.Text };
+        return;
+    }
+
+    case ControlPipe::Op::SendInput:
+    {
+        const auto host = GetWindowById(request.pane->window);
+        if (!host)
+        {
+            exchange.error = ControlPipe::Error::NoSuchPane;
+            return;
+        }
+
+        const auto status = host->Logic().ControlPipeSendInput(request.pane->tab,
+                                                               request.pane->pane,
+                                                               winrt::hstring{ request.text },
+                                                               winrt::hstring{ request.requireContains });
+        switch (status)
+        {
+        case winrt::TerminalApp::ControlPipeStatus::Ok:
+            return;
+        case winrt::TerminalApp::ControlPipeStatus::NeedleGone:
+            exchange.error = ControlPipe::Error::NeedleGone;
+            return;
+        case winrt::TerminalApp::ControlPipeStatus::Disconnected:
+            exchange.error = ControlPipe::Error::Disconnected;
+            return;
+        case winrt::TerminalApp::ControlPipeStatus::NoSuchPane:
+        default:
+            exchange.error = ControlPipe::Error::NoSuchPane;
+            return;
+        }
+    }
+
+    default:
+        exchange.error = ControlPipe::Error::BadRequest;
+        return;
+    }
+}
+
 void WindowEmperor::_setupAumid(const std::wstring& aumid)
 {
     const auto ourExePath = wil::GetModuleFileNameW<std::wstring>(nullptr);
@@ -560,6 +689,7 @@ void WindowEmperor::HandleCommandlineArgs(int nCmdShow)
     _setupGlobalHotkeys();
     _checkWindowsForNotificationIcon();
     _setupSessionPersistence(_app.Logic().Settings().GlobalSettings().ShouldUsePersistedLayout());
+    _setupControlPipe(_app.Logic().Settings().GlobalSettings().ControlPipeEnabled());
 
     // When the settings change, we'll want to update our global hotkeys
     // and our notification icon based on the new settings.
@@ -570,6 +700,7 @@ void WindowEmperor::HandleCommandlineArgs(int nCmdShow)
             _setupGlobalHotkeys();
             _checkWindowsForNotificationIcon();
             _setupSessionPersistence(args.NewSettings().GlobalSettings().ShouldUsePersistedLayout());
+            _setupControlPipe(args.NewSettings().GlobalSettings().ControlPipeEnabled());
         }
     });
 
@@ -1204,6 +1335,14 @@ LRESULT WindowEmperor::_messageHandler(HWND window, UINT const message, WPARAM c
                     const auto props = host->Logic().WindowProperties();
                     result->emplace_back(WindowListEntry{ props.WindowId(), std::wstring{ props.WindowName() } });
                 }
+            }
+            return 0;
+        }
+        case WM_CONTROL_PIPE_REQUEST:
+        {
+            if (auto* exchange = reinterpret_cast<ControlPipeExchange*>(lParam))
+            {
+                _handleControlPipeRequest(*exchange);
             }
             return 0;
         }

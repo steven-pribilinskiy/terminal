@@ -1340,6 +1340,35 @@ namespace winrt::TerminalApp::implementation
         }
     }
 
+    // The control pipe. WindowEmperor calls these on the UI thread, once per
+    // window, on behalf of a pipe client. See doc/control-pipe.md.
+    winrt::Windows::Foundation::Collections::IVector<winrt::TerminalApp::ControlPipePaneInfo> TerminalWindow::ControlPipeListPanes(winrt::hstring containing)
+    {
+        if (!_root)
+        {
+            return winrt::single_threaded_vector<winrt::TerminalApp::ControlPipePaneInfo>();
+        }
+        return _root->ControlPipeListPanes(std::move(containing));
+    }
+
+    winrt::TerminalApp::ControlPipeCaptureResult TerminalWindow::ControlPipeCapturePane(uint32_t tabIndex, uint32_t paneId, int32_t lines)
+    {
+        if (!_root)
+        {
+            return { winrt::TerminalApp::ControlPipeStatus::NoSuchPane, {} };
+        }
+        return _root->ControlPipeCapturePane(tabIndex, paneId, lines);
+    }
+
+    winrt::TerminalApp::ControlPipeStatus TerminalWindow::ControlPipeSendInput(uint32_t tabIndex, uint32_t paneId, winrt::hstring text, winrt::hstring requireContains)
+    {
+        if (!_root)
+        {
+            return winrt::TerminalApp::ControlPipeStatus::NoSuchPane;
+        }
+        return _root->ControlPipeSendInput(tabIndex, paneId, std::move(text), std::move(requireContains));
+    }
+
     bool TerminalWindow::ShouldImmediatelyHandoffToElevated()
     {
         return _root != nullptr ? _root->ShouldImmediatelyHandoffToElevated(_settings) : false;

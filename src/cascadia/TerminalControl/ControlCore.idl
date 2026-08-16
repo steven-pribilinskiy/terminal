@@ -171,6 +171,8 @@ namespace Microsoft.Terminal.Control
         void EnablePainting();
 
         String ReadEntireBuffer();
+        String ReadViewportText(Int32 maxRows);
+        Boolean ViewportContains(String needle);
         CommandHistoryContext CommandHistory();
         Boolean QuickFixesAvailable { get; };
 

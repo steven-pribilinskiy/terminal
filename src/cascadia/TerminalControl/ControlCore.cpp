@@ -2406,6 +2406,97 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         return hstring{ str };
     }
 
+    // Returns the range of buffer rows that ReadViewportText and
+    // ViewportContains operate on: the rows of the live screen, ending at the
+    // bottom of the mutable viewport.
+    //
+    // This deliberately ignores where the user has scrolled to. A control
+    // client asking "what is this pane showing" wants the shell's current
+    // screen, the same way `tmux capture-pane` does; if it tracked the scroll
+    // position instead, scrolling the pane with the mouse would silently change
+    // the answer.
+    //
+    // maxRows <= 0 means "the whole viewport". A larger maxRows reaches up into
+    // the scrollback to make up the count.
+    std::pair<til::CoordType, til::CoordType> ControlCore::_viewportRowRange(int32_t maxRows) const noexcept
+    {
+        const auto bottom = _terminal->ViewEndIndex();
+        const auto rows = maxRows > 0 ? maxRows : (bottom - _terminal->ViewStartIndex() + 1);
+        const auto top = std::max(0, bottom - std::max(1, rows) + 1);
+        return { top, bottom };
+    }
+
+    // Read the text of the live screen, one output line per buffer row, so that
+    // what the caller sees is laid out the way it is laid out on screen -
+    // wrapping included. Trailing whitespace is trimmed from every row.
+    //
+    // Contrast with ReadEntireBuffer, which walks the whole scrollback from row
+    // 0 and rejoins wrapped rows.
+    hstring ControlCore::ReadViewportText(int32_t maxRows) const
+    {
+        const auto lock = _terminal->LockForReading();
+        const auto& textBuffer = _terminal->GetTextBuffer();
+        const auto [top, bottom] = _viewportRowRange(maxRows);
+
+        std::wstring str;
+        for (auto rowIndex = top; rowIndex <= bottom; rowIndex++)
+        {
+            const auto& row = textBuffer.GetRowByOffset(rowIndex);
+            const auto rowText = row.GetText();
+            if (const auto strEnd = rowText.find_last_not_of(UNICODE_SPACE); strEnd != decltype(rowText)::npos)
+            {
+                str.append(rowText.substr(0, strEnd + 1));
+            }
+
+            if (rowIndex != bottom)
+            {
+                str.push_back(L'\n');
+            }
+        }
+
+        return hstring{ str };
+    }
+
+    // Is `needle` somewhere on the live screen?
+    //
+    // This exists so that a control client can ask the question without us
+    // handing it the buffer: matching in here is both cheaper than a round trip
+    // and, for the "is this still the pane I found a moment ago" check, the only
+    // way to answer it atomically with whatever the caller does next.
+    //
+    // Unlike ReadViewportText, wrapped rows are rejoined before searching, so a
+    // needle that happens to straddle the right edge of the screen still
+    // matches.
+    bool ControlCore::ViewportContains(const hstring& needle) const
+    {
+        if (needle.empty())
+        {
+            return true;
+        }
+
+        const auto lock = _terminal->LockForReading();
+        const auto& textBuffer = _terminal->GetTextBuffer();
+        const auto [top, bottom] = _viewportRowRange(0);
+
+        std::wstring str;
+        for (auto rowIndex = top; rowIndex <= bottom; rowIndex++)
+        {
+            const auto& row = textBuffer.GetRowByOffset(rowIndex);
+            const auto rowText = row.GetText();
+            if (const auto strEnd = rowText.find_last_not_of(UNICODE_SPACE); strEnd != decltype(rowText)::npos)
+            {
+                str.append(rowText.substr(0, strEnd + 1));
+            }
+
+            if (!row.WasWrapForced())
+            {
+                str.push_back(L'\n');
+            }
+        }
+
+        return str.find(std::wstring_view{ needle }) != std::wstring::npos;
+    }
+
     // Get all of our recent commands. This will only really work if the user has enabled shell integration.
     Control::CommandHistoryContext ControlCore::CommandHistory() const
     {

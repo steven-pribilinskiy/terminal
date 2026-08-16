@@ -17,6 +17,8 @@ Abstract:
 
 #pragma once
 
+#include "ControlPipeServer.h"
+
 class AppHost;
 
 class WindowEmperor
@@ -29,6 +31,10 @@ public:
         WM_IDENTIFY_ALL_WINDOWS,
         WM_NOTIFY_FROM_NOTIFICATION_AREA,
         WM_GET_WINDOW_LIST,
+        // Sent (not posted) by a control pipe thread with a ControlPipeExchange*
+        // in LPARAM. Handled synchronously so the pane work happens on this
+        // thread and the answer is ready when SendMessage returns.
+        WM_CONTROL_PIPE_REQUEST,
     };
 
     // Used by WM_GET_WINDOW_LIST.  Callers allocate a vector on their
@@ -84,6 +90,8 @@ private:
     void _finalizeSessionPersistence() const;
     void _checkWindowsForNotificationIcon();
     void _setupAumid(const std::wstring& aumid);
+    void _setupControlPipe(bool enabled);
+    void _handleControlPipeRequest(ControlPipeExchange& exchange) const;
 
     wil::unique_hwnd _window;
     winrt::TerminalApp::App _app{ nullptr };
@@ -102,6 +110,7 @@ private:
     int32_t _messageBoxCount = 0;
     std::wstring _pendingAumidLnkPath;
     std::wstring _pendingAumid;
+    std::unique_ptr<ControlPipeServer> _controlPipe;
 
 #if 0 // #ifdef NDEBUG
     static constexpr void _assertIsMainThread() noexcept

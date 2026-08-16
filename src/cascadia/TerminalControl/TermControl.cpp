@@ -3737,6 +3737,14 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     {
         return _core.ReadEntireBuffer();
     }
+    hstring TermControl::ReadViewportText(int32_t maxRows) const
+    {
+        return _core.ReadViewportText(maxRows);
+    }
+    bool TermControl::ViewportContains(const hstring& needle) const
+    {
+        return _core.ViewportContains(needle);
+    }
     Control::CommandHistoryContext TermControl::CommandHistory() const
     {
         return _core.CommandHistory();

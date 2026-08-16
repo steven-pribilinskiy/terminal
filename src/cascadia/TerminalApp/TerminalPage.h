@@ -177,6 +177,11 @@ namespace winrt::TerminalApp::implementation
         void PersistState();
         std::vector<IPaneContent> Panes() const;
 
+        // The control pipe. See TerminalPage.ControlPipe.cpp; UI thread only.
+        Windows::Foundation::Collections::IVector<TerminalApp::ControlPipePaneInfo> ControlPipeListPanes(hstring containing);
+        TerminalApp::ControlPipeCaptureResult ControlPipeCapturePane(uint32_t tabIndex, uint32_t paneId, int32_t lines);
+        TerminalApp::ControlPipeStatus ControlPipeSendInput(uint32_t tabIndex, uint32_t paneId, hstring text, hstring requireContains);
+
         void ToggleFocusMode();
         void ToggleFullscreen();
         void ToggleAlwaysOnTop();
@@ -292,6 +297,7 @@ namespace winrt::TerminalApp::implementation
         Windows::Foundation::Collections::IObservableVector<TerminalApp::Tab> _tabs;
         Windows::Foundation::Collections::IObservableVector<TerminalApp::Tab> _mruTabs;
         static winrt::com_ptr<Tab> _GetTabImpl(const TerminalApp::Tab& tab);
+        std::shared_ptr<Pane> _controlPipeFindPane(uint32_t tabIndex, uint32_t paneId) const;
 
         void _UpdateTabIndices();
 
