@@ -12,6 +12,20 @@
 # maps an unrecognised branding to WT_BRANDING_DEV, so a Test build differs from
 # a Dev build only in its manifest. What you verify in wtt is byte-for-byte the
 # code that gets promoted into wtd.
+#
+# That is a property this repo has to actively maintain, not one it gets for
+# free. The two packaging passes below pass WindowsTerminalBranding on the
+# command line, which makes it a GLOBAL property, and MSBuild forwards global
+# properties to every ProjectReference -- so each pass genuinely recompiles the
+# C++ into the shared bin\ directory. Any build file that special-cases the
+# branding therefore has to list 'Test' wherever it lists 'Dev', or the two
+# passes quietly produce different binaries. It has happened: src\
+# common.build.post.props and src\host\proxy\Host.Proxy.vcxproj both omitted
+# 'Test' and the staged exes differed by 2,560 bytes. The check below is cheap;
+# run it if you touch anything branding-conditional.
+#
+#   (Get-FileHash C:\TerminalSlots\dev\WindowsTerminal.exe).Hash -eq
+#   (Get-FileHash C:\TerminalSlots\test\WindowsTerminal.exe).Hash
 [CmdletBinding()]
 Param(
     # Skip the solution build and just repackage/deploy what is already built.
@@ -63,7 +77,9 @@ $wapproj = "$Root\src\cascadia\CascadiaPackage\CascadiaPackage.wapproj"
 # brandings back to back can otherwise reuse the previous branding's manifest
 # against the current branding's alias stub, and MakeAppx rejects the mismatch
 # ("the file name wtt.exe ... doesn't exist in the package"). Clearing the
-# packaging intermediates is cheap -- no C++ is recompiled.
+# packaging intermediates is cheap; the C++ underneath does get revisited, but
+# with the branding conditions kept in sync it compiles to the same bytes and
+# so mostly comes back from the up-to-date check.
 $pkgObj = "$Root\src\cascadia\CascadiaPackage\obj"
 if (Test-Path $pkgObj) {
     Write-Host "== clearing packaging intermediates ==" -ForegroundColor DarkGray

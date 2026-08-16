@@ -74,7 +74,15 @@
     Hardening prevents the misuse of containers more strictly than Container Debug and Iterator Debug.
     Tombstoning prevents use-after-free by filling deleted pointers with a sentinel value.
   -->
-  <ItemDefinitionGroup Condition="'$(WindowsTerminalBranding)'=='Canary' or '$(WindowsTerminalBranding)'=='Dev' or '$(WindowsTerminalBranding)'==''">
+  <!--
+    'Test' must be listed alongside 'Dev' here. The Test slot is packaged from the
+    same compile as the Dev slot so that what gets verified in wtt is what gets
+    promoted into wtd, but CascadiaPackage.wapproj passes WindowsTerminalBranding
+    as a global property, which reaches every referenced C++ project. Omitting
+    'Test' therefore does not just skip a manifest - it recompiles the whole tree
+    without hardening, into the same output directory.
+  -->
+  <ItemDefinitionGroup Condition="'$(WindowsTerminalBranding)'=='Canary' or '$(WindowsTerminalBranding)'=='Dev' or '$(WindowsTerminalBranding)'=='Test' or '$(WindowsTerminalBranding)'==''">
     <ClCompile>
       <PreprocessorDefinitions>_MSVC_STL_HARDENING=1;_MSVC_STL_DESTRUCTOR_TOMBSTONES=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>

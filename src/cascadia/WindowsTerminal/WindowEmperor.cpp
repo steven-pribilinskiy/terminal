@@ -614,15 +614,23 @@ void WindowEmperor::HandleCommandlineArgs(int nCmdShow)
 #if defined(WT_BRANDING_RELEASE)
     windowClassName.append(L"Windows Terminal");
     unpackagedAumid = L"Microsoft.WindowsTerminal";
+    static constexpr auto brandingIdentifiesTheInstall = true;
 #elif defined(WT_BRANDING_PREVIEW)
     windowClassName.append(L"Windows Terminal Preview");
     unpackagedAumid = L"Microsoft.WindowsTerminalPreview";
+    static constexpr auto brandingIdentifiesTheInstall = true;
 #elif defined(WT_BRANDING_CANARY)
     windowClassName.append(L"Windows Terminal Canary");
     unpackagedAumid = L"Microsoft.WindowsTerminalCanary";
+    static constexpr auto brandingIdentifiesTheInstall = true;
 #else
     windowClassName.append(L"Windows Terminal Dev");
     unpackagedAumid = L"WindowsTerminalDev";
+    // Not a typo: this arm is not "the Dev build", it is "every branding we
+    // don't recognise". Branding.targets:7 tests the computed token for
+    // emptiness rather than the branding name, so the local Dev and Test slots
+    // both land here. See the packaged-identity block below.
+    static constexpr auto brandingIdentifiesTheInstall = false;
 #endif
     if (Utils::IsRunningElevated())
     {
@@ -639,6 +647,37 @@ void WindowEmperor::HandleCommandlineArgs(int nCmdShow)
         fmt::format_to(std::back_inserter(windowClassName), FMT_COMPILE(L" {:08x}"), hash);
         fmt::format_to(std::back_inserter(unpackagedAumid), FMT_COMPILE(L".{:08x}"), hash);
 #endif
+    }
+
+    // The local Dev and Test slots run byte-identical binaries on purpose - see
+    // BuildInfo.h - so nothing compiled in can tell them apart, and the exe-path
+    // hash above is skipped because both are packaged. Left alone, the Test slot
+    // computes the Dev slot's window class name; since that string is also the
+    // mutex name below, `wtt.exe` hands its command line to the running `wtd`
+    // and terminates, and you get a "Test" window that is really a Dev window
+    // running Dev code. Package identity is the one thing that does differ, so
+    // mix it in.
+    //
+    // Confined to the unrecognised-branding arm on purpose. Release, Preview and
+    // Canary already have distinct class names, and changing theirs would stop a
+    // freshly launched instance from finding an already-running one across an
+    // upgrade - single-instance handoff would break for real users.
+    if constexpr (!brandingIdentifiesTheInstall)
+    {
+        if (IsPackaged())
+        {
+            try
+            {
+                const std::wstring family{ winrt::Windows::ApplicationModel::Package::Current().Id().FamilyName() };
+                const auto hash = til::hash(family);
+#ifdef _WIN64
+                fmt::format_to(std::back_inserter(windowClassName), FMT_COMPILE(L" {:016x}"), hash);
+#else
+                fmt::format_to(std::back_inserter(windowClassName), FMT_COMPILE(L" {:08x}"), hash);
+#endif
+            }
+            CATCH_LOG();
+        }
     }
 
     {

@@ -71,7 +71,16 @@
       <PreprocessorDefinitions>PROXY_CLSID_IS={0x1D1852F4,0xADAD,0x42B6,{0x9A,0x43,0x94,0x37,0xAA,0xAD,0x77,0x17}};%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(WindowsTerminalBranding)'=='' or '$(WindowsTerminalBranding)'=='Dev'">
+  <!--
+    'Test' shares the Dev CLSID deliberately. The Test slot is packaged from the
+    same compile as the Dev slot, so it cannot have a proxy CLSID of its own -
+    it would need different binaries. Matching no arm at all is the one outcome
+    to avoid: that builds OpenConsoleProxy.dll with no PROXY_CLSID_IS override
+    into the shared output directory. The Test package declares no COM at all
+    (Package-Test.appxmanifest), so nothing registers this and the two slots
+    cannot fight over it.
+  -->
+  <ItemDefinitionGroup Condition="'$(WindowsTerminalBranding)'=='' or '$(WindowsTerminalBranding)'=='Dev' or '$(WindowsTerminalBranding)'=='Test'">
     <ClCompile>
       <PreprocessorDefinitions>PROXY_CLSID_IS={0xDEC4804D,0x56D1,0x4F73,{0x9F,0xBE,0x68,0x28,0xE7,0xC8,0x5C,0x56}};%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>

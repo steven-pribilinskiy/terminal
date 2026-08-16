@@ -5,6 +5,7 @@
 
 constexpr std::wstring_view WtExe{ L"wt.exe" };
 constexpr std::wstring_view WtdExe{ L"wtd.exe" };
+constexpr std::wstring_view WttExe{ L"wtt.exe" };
 constexpr std::wstring_view WindowsTerminalExe{ L"WindowsTerminal.exe" };
 constexpr std::wstring_view LocalAppDataAppsPath{ L"%LOCALAPPDATA%\\Microsoft\\WindowsApps\\" };
 constexpr std::wstring_view ElevateShimExe{ L"elevate-shim.exe" };
@@ -57,6 +58,33 @@ _TIL_INLINEPREFIX bool IsDevBuild()
 }
 
 // Function Description:
+// - The same question for the local Test slot, which is packaged as
+//   WindowsTerminalTest and aliased wtt.exe. It runs the very same binaries as
+//   the Dev slot on purpose, so this cannot be answered from a #define - only
+//   from package identity.
+// Return Value:
+// - true if we're running in the local Test slot package.
+_TIL_INLINEPREFIX bool IsTestBuild()
+{
+    static const auto isTestBuild = []() -> bool {
+        if (IsPackaged())
+        {
+            try
+            {
+                const auto package = winrt::Windows::ApplicationModel::Package::Current();
+                const auto id = package.Id();
+                const auto name = id.FullName();
+                return til::starts_with(name, L"WindowsTerminalTest");
+            }
+            CATCH_LOG();
+        }
+
+        return false;
+    }();
+    return isTestBuild;
+}
+
+// Function Description:
 // - Helper function for getting the path to the appropriate executable to use
 //   for this instance of the shell extension. If we're running the dev build,
 //   it should be a `wtd.exe`, but if we're preview or release, we want to make
@@ -87,8 +115,15 @@ _TIL_INLINEPREFIX const std::wstring& GetWtExePath()
                 const auto pfn = id.FamilyName();
                 if (!pfn.empty())
                 {
+                    // Each local slot renames the alias after itself
+                    // (CascadiaPackage.wapproj:19-21), so asking only "is this
+                    // the Dev build?" resolved the Test slot to a wt.exe that
+                    // has never existed there.
+                    const auto alias = IsDevBuild() ? WtdExe :
+                                       IsTestBuild() ? WttExe :
+                                                       WtExe;
                     const std::filesystem::path windowsAppsPath{ wil::ExpandEnvironmentStringsW<std::wstring>(LocalAppDataAppsPath.data()) };
-                    const auto wtPath = windowsAppsPath / std::wstring_view{ pfn } / (IsDevBuild() ? WtdExe : WtExe);
+                    const auto wtPath = windowsAppsPath / std::wstring_view{ pfn } / alias;
                     return wtPath;
                 }
             }
