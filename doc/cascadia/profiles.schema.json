@@ -2412,6 +2412,11 @@
           "description": "When set to true, a selection is immediately copied to your clipboard upon creation. When set to false, the selection persists and awaits further action.",
           "type": "boolean"
         },
+        "openLinksOnSingleClick": {
+          "default": true,
+          "description": "When set to true, clicking a link in the terminal opens it without holding Ctrl. The link opens on mouse release, and only if the click did not become a text selection, so dragging to select a URL still selects it rather than opening it. Ctrl+click continues to work either way.",
+          "type": "boolean"
+        },
         "focusFollowMouse": {
           "default": false,
           "description": "When set to true, the terminal will focus the pane on mouse hover.",

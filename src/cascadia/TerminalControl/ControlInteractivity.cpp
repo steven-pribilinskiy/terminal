@@ -272,6 +272,21 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         // GH#9396: we prioritize hyper-link over VT mouse events
         auto hyperlink = _core->GetHyperlink(terminalPosition.to_core_point());
+
+        // Plain click on a link, with openLinksOnSingleClick enabled. Do NOT open it
+        // here: a press is also the start of a selection drag, so opening on press
+        // would make it impossible to select text sitting inside a URL. Record it and
+        // let PointerReleased decide, once it knows whether a drag happened. This
+        // deliberately does not consume the event -- the normal selection handling
+        // below still runs.
+        _pendingSingleClickHyperlink.clear();
+        if (WI_IsFlagSet(buttonState, MouseButtonState::IsLeftButtonDown) &&
+            !ctrlEnabled &&
+            !hyperlink.empty() &&
+            _core->Settings().OpenLinksOnSingleClick())
+        {
+            _pendingSingleClickHyperlink = hyperlink;
+        }
         if (WI_IsFlagSet(buttonState, MouseButtonState::IsLeftButtonDown) &&
             ctrlEnabled &&
             !hyperlink.empty())
@@ -492,6 +507,18 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // Only a left click release when copy on select is active should perform a copy.
         // Right clicks and middle clicks should not need to do anything when released.
         const auto isLeftMouseRelease = pointerUpdateKind == WM_LBUTTONUP;
+
+        // A plain click on a link opens it, but only if this was a click rather than
+        // the start of a selection: no drag (the release is still over the same link)
+        // and nothing got selected. Otherwise selecting a URL would also launch it.
+        if (const auto pending = std::exchange(_pendingSingleClickHyperlink, {}); !pending.empty() && isLeftMouseRelease)
+        {
+            if (!_core->HasSelection() &&
+                _core->GetHyperlink(terminalPosition.to_core_point()) == pending)
+            {
+                _hyperlinkHandler(pending);
+            }
+        }
 
         if (_core->CopyOnSelect() &&
             isLeftMouseRelease &&

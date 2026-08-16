@@ -126,6 +126,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         Timestamp _lastMouseClickTimestamp;
         std::optional<Core::Point> _lastMouseClickPos;
         std::optional<Core::Point> _singleClickTouchdownPos;
+        // Link pressed without ctrl while openLinksOnSingleClick is on; opened on
+        // release, but only if it did not turn into a selection drag.
+        winrt::hstring _pendingSingleClickHyperlink;
         std::optional<Core::Point> _lastMouseClickPosNoSelection;
         // This field tracks whether the selection has changed meaningfully
         // since it was last copied. It's generally used to prevent copyOnSelect

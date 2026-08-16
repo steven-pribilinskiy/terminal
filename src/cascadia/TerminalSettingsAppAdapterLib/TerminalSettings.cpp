@@ -374,6 +374,7 @@ namespace winrt::Microsoft::Terminal::Settings
         _CopyFormatting = windowSettings.CopyFormatting();
         _FocusFollowMouse = windowSettings.FocusFollowMouse();
         _ScrollToZoom = windowSettings.ScrollToZoom();
+        _OpenLinksOnSingleClick = windowSettings.OpenLinksOnSingleClick();
         _ScrollToChangeOpacity = windowSettings.ScrollToChangeOpacity();
         _GraphicsAPI = windowSettings.GraphicsAPI();
         _DisablePartialInvalidation = windowSettings.DisablePartialInvalidation();
