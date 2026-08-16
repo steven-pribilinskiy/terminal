@@ -171,6 +171,50 @@ Two more traps, both hit for real:
   Restore with a current nuget instead — `nuget restore OpenConsole.slnx` from
   <https://dist.nuget.org/win-x86-commandline/latest/nuget.exe>.
 
+## The two slots: `wtd` (dev) and `wtt` (test)
+
+I run two locally-built Terminals side by side, and I refer to them by those names:
+
+| I say | Means | Alias | Payload | Purpose |
+|---|---|---|---|---|
+| "the dev build" | Dev slot | `wtd.exe` | `C:\TerminalSlots\dev` (staged), currently registered from `…\projects\terminal\src\cascadia\CascadiaPackage\AppPackages\loose` | where real work happens; restarting it is **my** call |
+| "the test build" | Test slot | `wtt.exe` | `C:\TerminalSlots\test` | disposable; replace and restart it as often as you like |
+
+**"Run the test build" means launch `wtt.exe`. It does not mean build anything.** If I want a
+rebuild first I will say so. Same for "run the dev build" → `wtd.exe`. `tools\Deploy-TerminalSlots.ps1`
+is what *produces* the slots (build → package both brandings → register Test → stage Dev); it is a
+separate, explicit request.
+
+Each slot has its own package identity, so each has its own settings:
+`%LOCALAPPDATA%\Packages\WindowsTerminal{Dev,Test}_8wekyb3d8bbwe\LocalState\settings.json`.
+
+### KNOWN BROKEN: `wtt` silently runs the *dev* binaries
+
+As of 2026-08-16, launching `wtt.exe` does **not** run the Test payload. It starts, hands its
+command line to the running `wtd` instance, and terminates — a new window appears in the **Dev**
+process, running Dev binaries. Nothing warns you; it looks like a successful launch.
+
+`WindowEmperor::HandleCommandlineArgs` (`src/cascadia/WindowsTerminal/WindowEmperor.cpp:485`)
+builds the single-instance identity — window class name *and* mutex — from the compile-time
+branding token, and `build/rules/Branding.targets:7` maps every unrecognised branding to
+`WT_BRANDING_DEV`. So Test binaries call themselves `"Windows Terminal Dev"`, exactly like the Dev
+slot; `acquireMutexOrAttemptHandoff` (:151) finds the Dev window, `SendMessageTimeoutW(WM_COPYDATA)`,
+then `TerminateProcess` (:543). The path/SID hash that would disambiguate two installs is appended
+only `if (!IsPackaged())` — both slots are packaged, so it never applies.
+
+This invalidates the premise `Deploy-TerminalSlots.ps1` is built on ("Test and Dev differ only in
+their manifest, so one compile serves both"). A working Test slot needs a real `WT_BRANDING_TEST`
+token and its own `windowClassName`, i.e. **separately compiled binaries** — which also means what
+you verify in `wtt` is no longer byte-for-byte what gets promoted to `wtd`. Secondary defect:
+`Package-Test.appxmanifest` declares **no** COM CLSIDs at all (Dev declares 7 — monarch proxy/stub,
+defterm delegation, shell extension), so defterm handoff would not work in the Test slot either;
+those GUIDs must also be distinct from Dev's or the two slots fight over the defterm registration.
+
+Diagnosing this class of bug: never trust "the launch succeeded". Diff visible top-level windows
+per PID across the launch and check `(Get-Process WindowsTerminal).Path` — a window that appeared
+under the *Dev* executable path is the tell. `Microsoft-Windows-AppModel-Runtime/Admin` shows the
+container being created and destroyed in the same second.
+
 ## Deploy the dev build
 
 The build produces an msix; registering it as a loose layout is the fast inner loop:
