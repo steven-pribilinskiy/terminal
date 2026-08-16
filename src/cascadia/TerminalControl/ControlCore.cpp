@@ -2408,7 +2408,16 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
     // Returns the range of buffer rows that ReadViewportText and
     // ViewportContains operate on: the rows of the live screen, ending at the
-    // bottom of the mutable viewport.
+    // last row that has anything on it.
+    //
+    // Anchoring on the last written row rather than on the bottom of the
+    // viewport is load bearing. A shell that has printed four lines into a
+    // thirty row pane leaves twenty-six blank rows underneath; counting `lines`
+    // rows up from the bottom of the viewport lands entirely inside that blank
+    // region, and per-row trimming then reduces the whole capture to "". The
+    // symptom is a capture that is correct for a full-screen TUI and empty for
+    // an ordinary shell prompt - and empty reads as "cannot tell", so a caller
+    // deciding whether it is safe to type never types.
     //
     // This deliberately ignores where the user has scrolled to. A control
     // client asking "what is this pane showing" wants the shell's current
@@ -2416,13 +2425,27 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     // position instead, scrolling the pane with the mouse would silently change
     // the answer.
     //
-    // maxRows <= 0 means "the whole viewport". A larger maxRows reaches up into
-    // the scrollback to make up the count.
-    std::pair<til::CoordType, til::CoordType> ControlCore::_viewportRowRange(int32_t maxRows) const noexcept
+    // maxRows <= 0 means "the whole viewport". Only a maxRows larger than the
+    // screen may reach up into the scrollback to make up the count.
+    std::pair<til::CoordType, til::CoordType> ControlCore::_viewportRowRange(const TextBuffer& textBuffer, int32_t maxRows) const
     {
-        const auto bottom = _terminal->ViewEndIndex();
-        const auto rows = maxRows > 0 ? maxRows : (bottom - _terminal->ViewStartIndex() + 1);
-        const auto top = std::max(0, bottom - std::max(1, rows) + 1);
+        const auto viewTop = _terminal->ViewStartIndex();
+        const auto viewBottom = _terminal->ViewEndIndex();
+        const auto viewHeight = std::max(1, viewBottom - viewTop + 1);
+
+        // Never past the bottom of the screen, and never above its top: content
+        // that has scrolled off is scrollback, and a screen showing nothing at
+        // all should say so rather than quietly answer with history.
+        auto bottom = std::min(textBuffer.GetLastNonSpaceCharacter().y, viewBottom);
+        bottom = std::max(bottom, viewTop);
+
+        const auto rows = std::max(1, maxRows > 0 ? maxRows : viewHeight);
+        auto top = std::max(0, bottom - rows + 1);
+        if (rows <= viewHeight)
+        {
+            top = std::max(top, viewTop);
+        }
+
         return { top, bottom };
     }
 
@@ -2436,7 +2459,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     {
         const auto lock = _terminal->LockForReading();
         const auto& textBuffer = _terminal->GetTextBuffer();
-        const auto [top, bottom] = _viewportRowRange(maxRows);
+        const auto [top, bottom] = _viewportRowRange(textBuffer, maxRows);
 
         std::wstring str;
         for (auto rowIndex = top; rowIndex <= bottom; rowIndex++)
@@ -2476,7 +2499,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         const auto lock = _terminal->LockForReading();
         const auto& textBuffer = _terminal->GetTextBuffer();
-        const auto [top, bottom] = _viewportRowRange(0);
+        const auto [top, bottom] = _viewportRowRange(textBuffer, 0);
 
         std::wstring str;
         for (auto rowIndex = top; rowIndex <= bottom; rowIndex++)

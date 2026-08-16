@@ -198,6 +198,7 @@ namespace ControlUnitTests
         pane.process = L"wsl.exe";
         pane.focused = true;
         pane.windowFocused = false;
+        pane.alive = true;
         pane.pid = 12345;
 
         const auto list = ControlPipe::ListPanesResponse({ pane });
@@ -205,7 +206,15 @@ namespace ControlUnitTests
         VERIFY_IS_TRUE(list.find(R"("id":"1.0.3")") != std::string::npos, NoThrowString().Format(L"%hs", list.c_str()));
         VERIFY_IS_TRUE(list.find(R"("focused":true)") != std::string::npos);
         VERIFY_IS_TRUE(list.find(R"("windowFocused":false)") != std::string::npos);
+        VERIFY_IS_TRUE(list.find(R"("alive":true)") != std::string::npos);
         VERIFY_IS_TRUE(list.find(R"("process":"wsl.exe")") != std::string::npos);
+
+        // A dead pane is still listed - its last screen is often the thing you
+        // wanted - but says so, rather than making a client discover it by
+        // attempting a write and reading back `disconnected`.
+        pane.alive = false;
+        const auto deadList = ControlPipe::ListPanesResponse({ pane });
+        VERIFY_IS_TRUE(deadList.find(R"("alive":false)") != std::string::npos, NoThrowString().Format(L"%hs", deadList.c_str()));
 
         // A capture full of newlines still has to arrive as one line on the
         // wire, with the newlines escaped rather than emitted.

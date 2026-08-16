@@ -454,6 +454,7 @@ void WindowEmperor::_handleControlPipeRequest(ControlPipeExchange& exchange) con
                 entry.title = std::wstring{ pane.Title };
                 entry.focused = pane.Focused;
                 entry.windowFocused = windowFocused;
+                entry.alive = pane.Alive;
                 entry.pid = pane.ProcessId;
                 entry.session = ::Microsoft::Console::Utils::GuidToString(pane.SessionId);
                 exchange.panes.push_back(std::move(entry));

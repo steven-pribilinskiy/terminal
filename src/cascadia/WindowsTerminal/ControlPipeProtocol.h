@@ -348,6 +348,9 @@ namespace ControlPipe
         bool focused{};
         // That pane's window is the OS foreground window.
         bool windowFocused{};
+        // The pane's process is still running. A dead pane can still be
+        // captured; writing to it answers `disconnected`.
+        bool alive{};
         uint32_t pid{};
         std::wstring session;
     };
@@ -393,6 +396,7 @@ namespace ControlPipe
             entry["title"] = details::Narrow(pane.title);
             entry["focused"] = pane.focused;
             entry["windowFocused"] = pane.windowFocused;
+            entry["alive"] = pane.alive;
             entry["pid"] = pane.pid;
             entry["process"] = details::Narrow(pane.process);
             // Not part of the original contract; additive, and it lets a client

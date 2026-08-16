@@ -109,6 +109,10 @@ namespace winrt::TerminalApp::implementation
                 if (const auto connection = control.Connection())
                 {
                     info.SessionId = connection.SessionId();
+                    // The same test send-input uses, so a client that checks
+                    // this first and a client that just writes and reads the
+                    // error can never disagree about a pane.
+                    info.Alive = connection.State() == ConnectionState::Connected;
 
                     if (const auto conpty = connection.try_as<ConptyConnection>())
                     {

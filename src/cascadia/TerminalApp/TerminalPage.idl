@@ -102,6 +102,10 @@ namespace TerminalApp
         UInt32 ProcessId;
         // The connection's session id, the same one WT_SESSION carries.
         Guid SessionId;
+        // False once the pane's process has exited. The pane is still listed
+        // and can still be captured - its last screen is often the interesting
+        // part - but a write to it would answer `disconnected`.
+        Boolean Alive;
     };
 
     struct ControlPipeCaptureResult

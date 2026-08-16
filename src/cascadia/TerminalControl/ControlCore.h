@@ -315,7 +315,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void _setupDispatcherAndCallbacks();
         void _closeConnection();
 
-        std::pair<til::CoordType, til::CoordType> _viewportRowRange(int32_t maxRows) const noexcept;
+        std::pair<til::CoordType, til::CoordType> _viewportRowRange(const TextBuffer& textBuffer, int32_t maxRows) const;
 
         bool _setFontSizeUnderLock(float fontSize);
         void _updateFont();

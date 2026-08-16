@@ -94,7 +94,7 @@ Unknown members in a request are ignored, so adding a field later doesn't break 
 ```json
 {"ok":true,"panes":[
   {"id":"1.0.3","window":1,"tab":0,"pane":3,"title":"stith - bash",
-   "focused":true,"windowFocused":false,"pid":12345,"process":"wsl.exe",
+   "focused":true,"windowFocused":false,"alive":true,"pid":12345,"process":"wsl.exe",
    "session":"{6f1a2b3c-....}"}
 ]}
 ```
@@ -108,6 +108,10 @@ Unknown members in a request are ignored, so adding a field later doesn't break 
 - `focused` — this pane has focus within its tab *and* its tab is the active tab.
   `windowFocused` — that window is the OS foreground window. Neither is a precondition for anything;
   they are reporting only.
+- `alive` — the pane's process is still running. A pane whose shell has exited stays listed, because
+  its last screen is usually the thing you wanted; it just reports `false`, and `pid` drops to 0 with
+  an empty `process`. It is the same test `send-input` applies, so a client that filters on this and
+  one that writes blindly and reads back `disconnected` can never disagree about a pane.
 - `session` is the connection's session id, the same GUID the shell sees in `WT_SESSION`. It is an
   addition to the original contract, and a client is free to ignore it.
 
@@ -118,15 +122,24 @@ Unknown members in a request are ignored, so adding a field later doesn't break 
 {"ok":true,"text":"line one\nline two\n..."}
 ```
 
-Returns the last `lines` rows ending at the bottom of the **viewport**, not the end of the
-scrollback; omit `lines` for the whole viewport. A `lines` larger than the viewport reaches up into
-the scrollback to make up the count. Rows come back the way they are laid out on screen — one output
-line per buffer row, **wrapping included** — with trailing whitespace trimmed per row and rows joined
-with `\n`. No escape sequences.
+Returns the last `lines` rows ending at **the last row that has anything on it**; omit `lines` for
+the whole viewport. Only a `lines` larger than the screen reaches up into the scrollback to make up
+the count. Rows come back the way they are laid out on screen — one output line per buffer row,
+**wrapping included** — with trailing whitespace trimmed per row and rows joined with `\n`. No escape
+sequences. A pane that genuinely shows nothing returns `""`.
 
 "Viewport" here means the live screen, the way `tmux capture-pane` does: it deliberately does *not*
 follow where the user has scrolled to, because otherwise scrolling the pane with the mouse would
 silently change what a client reads.
+
+**Anchoring on the last written row rather than on the bottom of the screen is load bearing**, and
+getting it wrong is subtle enough to be worth recording. A shell that has printed four lines into a
+thirty-row pane leaves twenty-six blank rows underneath. Counting `lines` rows *up from the bottom of
+the viewport* lands entirely inside that blank region, and the per-row trimming then reduces the
+whole capture to `""`. The result is a read path that looks correct whenever a pane is full — a
+full-screen TUI captures perfectly — and returns nothing for an ordinary shell prompt. Since an empty
+capture reads as "cannot tell", a client deciding whether it is safe to type would simply never type,
+silently, and indistinguishably from "no pane matched".
 
 ### send-input
 
