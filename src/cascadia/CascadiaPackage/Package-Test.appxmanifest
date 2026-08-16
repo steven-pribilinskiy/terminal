@@ -46,8 +46,9 @@
         <virtualization:ExcludedKey>HKEY_CURRENT_USER\Console\%%Startup</virtualization:ExcludedKey>
       </virtualization:ExcludedKeys>
     </virtualization:RegistryWriteVirtualization>
-    <!-- This slot is meant to be replaced while it is open, so do not defer. -->
-    <uap17:UpdateWhileInUse>defer</uap17:UpdateWhileInUse>
+    <!-- The Dev slot defers, so an update cannot pull the app out from under real
+         work. This slot exists to be replaced, so let it update while in use. -->
+    <uap17:UpdateWhileInUse>allow</uap17:UpdateWhileInUse>
   </Properties>
 
   <Dependencies>

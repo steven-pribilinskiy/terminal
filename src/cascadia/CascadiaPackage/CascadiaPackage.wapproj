@@ -19,6 +19,17 @@
     <OCExecutionAliasName Condition="'$(WindowsTerminalBranding)'=='' or '$(WindowsTerminalBranding)'=='Dev'">wtd</OCExecutionAliasName>
     <OCExecutionAliasName Condition="'$(WindowsTerminalBranding)'=='Test'">wtt</OCExecutionAliasName>
     <OCExecutionAliasName Condition="'$(OCExecutionAliasName)'==''">wt</OCExecutionAliasName>
+    <!-- Every branding otherwise writes to the same AppPackages folder, so building
+         Test would clobber the Dev msix. Promotion needs the same commit packaged
+         both ways at once, so the Test package gets its own output directory.
+
+         The intermediate directory has to be split for the same reason. Packaging
+         both brandings back to back with a shared obj\ mixes them: the generated
+         manifest is cached from the previous branding while the alias stub is
+         rebuilt for the current one, and MakeAppx then rejects the package because
+         the manifest declares wtd.exe while the payload contains wtt.exe. -->
+    <AppxPackageDir Condition="'$(WindowsTerminalBranding)'=='Test'">$(MSBuildThisFileDirectory)AppPackages\Test\</AppxPackageDir>
+    <IntermediateOutputPath Condition="'$(WindowsTerminalBranding)'=='Test'">$(MSBuildThisFileDirectory)obj\$(Platform)\$(Configuration)\Test\</IntermediateOutputPath>
   </PropertyGroup>
   <PropertyGroup>
     <ProjectGuid>CA5CAD1A-224A-4171-B13A-F16E576FDD12</ProjectGuid>
