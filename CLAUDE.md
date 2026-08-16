@@ -17,7 +17,8 @@ restart is needed.
 
 Report such work as **"built and installed, not yet verified — needs a Terminal restart"**, and
 say which behaviour the restart would let us confirm. If verification genuinely requires a running
-UI, use the dev build in its own window (see Deploy below) rather than my session's window.
+UI, use **the test build (`wtt`) in its own window** — never the dev build, and never my session's
+window. See "The two slots" below; that distinction is the single most important rule in this file.
 
 ### What actually needs a restart
 
@@ -171,88 +172,154 @@ Two more traps, both hit for real:
   Restore with a current nuget instead — `nuget restore OpenConsole.slnx` from
   <https://dist.nuget.org/win-x86-commandline/latest/nuget.exe>.
 
-## The two slots: `wtd` (dev) and `wtt` (test)
+## The two slots: `wtt` is yours to break, `wtd` is production
 
-I run two locally-built Terminals side by side, and I refer to them by those names:
+I run two locally-built Terminals side by side. **They are not two equivalent scratch installs.**
 
-| I say | Means | Alias | Payload | Purpose |
-|---|---|---|---|---|
-| "the dev build" | Dev slot | `wtd.exe` | `C:\TerminalSlots\dev` (staged), currently registered from `…\projects\terminal\src\cascadia\CascadiaPackage\AppPackages\loose` | where real work happens; restarting it is **my** call |
-| "the test build" | Test slot | `wtt.exe` | `C:\TerminalSlots\test` | disposable; replace and restart it as often as you like |
+| Slot | Alias | Payload | What it is |
+|---|---|---|---|
+| **Test** | `wtt.exe` | `C:\TerminalSlots\test` | **The only slot you build into, register, launch, restart or replace.** Disposable. Do it as often as you like, no confirmation needed. |
+| **Dev** | `wtd.exe` | `C:\TerminalSlots\dev` (staged) | **Production. It hosts my live agent sessions, including Claude Code sessions.** You never build into it, never register it, never launch it, never restart it, and never write to any directory it is registered from. |
 
-**"Run the test build" means launch `wtt.exe`. It does not mean build anything.** If I want a
-rebuild first I will say so. Same for "run the dev build" → `wtd.exe`. `tools\Deploy-TerminalSlots.ps1`
-is what *produces* the slots (build → package both brandings → register Test → stage Dev); it is a
-separate, explicit request.
+The Dev slot changes exactly one way: **I press promote**, in `wtd` itself. Promotion is my gesture.
+It is never a side effect of your build, and there is no situation in which you perform it for me.
+
+### "There's no dev build running" is NOT permission
+
+The Dev slot is production whether or not a window is open at that instant. An empty slot is not a
+free slot — it is the case where overwriting it does the *most* damage, because nothing fails, no
+DLL is locked, nothing warns you, and the next `wtd.exe` I launch silently runs your unverified
+code. **This has already happened once** (2026-08-16): I asked for a feature, the old version of
+this file pointed verification at the dev build, no `wtd` was running, and the deploy replaced the
+production payload. I only found out because a process listing showed my own live work running on
+it.
+
+If you catch yourself reasoning "nothing is running there, so it's safe" — that is precisely the
+inverted conclusion this section exists to prevent.
+
+### Never
+
+- Unpack, copy or `robocopy` into **any** directory `WindowsTerminalDev` is registered from —
+  today that is `…\src\cascadia\CascadiaPackage\AppPackages\loose`, historically the fast inner
+  loop, now a live grenade.
+- `Add-AppxPackage -Register` anything whose identity is `WindowsTerminalDev`.
+- `Start-Process wtd.exe` / `wtd.exe <args>` — launching it is my gesture too, and with the handoff
+  below a launch can land inside a process I am working in.
+- Kill a `WindowsTerminal.exe` whose path is under a Dev payload.
+- Run `tools\Register-DevSlot.ps1`.
+
+### Check before every deploy
+
+`-Register` is a silent no-op when the identity is already registered elsewhere, so *assume nothing*
+about where a slot points. One command, every time:
+
+```powershell
+Get-AppxPackage WindowsTerminalDev, WindowsTerminalTest | Select-Object Name, InstallLocation
+```
+
+If `WindowsTerminalDev`'s `InstallLocation` is the directory you were about to write to — **stop and
+tell me.** Do not "just this once" it.
 
 Each slot has its own package identity, so each has its own settings:
 `%LOCALAPPDATA%\Packages\WindowsTerminal{Dev,Test}_8wekyb3d8bbwe\LocalState\settings.json`.
 
-### KNOWN BROKEN: `wtt` silently runs the *dev* binaries
+**"Run the test build" means launch `wtt.exe`. It does not mean build anything.** If I want a
+rebuild first I will say so.
 
-As of 2026-08-16, launching `wtt.exe` does **not** run the Test payload. It starts, hands its
-command line to the running `wtd` instance, and terminates — a new window appears in the **Dev**
-process, running Dev binaries. Nothing warns you; it looks like a successful launch.
+## Deploy the test build
 
-`WindowEmperor::HandleCommandlineArgs` (`src/cascadia/WindowsTerminal/WindowEmperor.cpp:485`)
-builds the single-instance identity — window class name *and* mutex — from the compile-time
-branding token, and `build/rules/Branding.targets:7` maps every unrecognised branding to
-`WT_BRANDING_DEV`. So Test binaries call themselves `"Windows Terminal Dev"`, exactly like the Dev
-slot; `acquireMutexOrAttemptHandoff` (:151) finds the Dev window, `SendMessageTimeoutW(WM_COPYDATA)`,
-then `TerminateProcess` (:543). The path/SID hash that would disambiguate two installs is appended
-only `if (!IsPackaged())` — both slots are packaged, so it never applies.
-
-This invalidates the premise `Deploy-TerminalSlots.ps1` is built on ("Test and Dev differ only in
-their manifest, so one compile serves both"). A working Test slot needs a real `WT_BRANDING_TEST`
-token and its own `windowClassName`, i.e. **separately compiled binaries** — which also means what
-you verify in `wtt` is no longer byte-for-byte what gets promoted to `wtd`. Secondary defect:
-`Package-Test.appxmanifest` declares **no** COM CLSIDs at all (Dev declares 7 — monarch proxy/stub,
-defterm delegation, shell extension), so defterm handoff would not work in the Test slot either;
-those GUIDs must also be distinct from Dev's or the two slots fight over the defterm registration.
-
-Diagnosing this class of bug: never trust "the launch succeeded". Diff visible top-level windows
-per PID across the launch and check `(Get-Process WindowsTerminal).Path` — a window that appeared
-under the *Dev* executable path is the tell. `Microsoft-Windows-AppModel-Runtime/Admin` shows the
-container being created and destroyed in the same second.
-
-## Deploy the dev build
-
-The build produces an msix; registering it as a loose layout is the fast inner loop:
+`tools\Deploy-TerminalSlots.ps1` is the **only** sanctioned deploy path. It already encodes the
+doctrine above in its own header, and it is careful in ways a hand-rolled `makeappx`/`Add-AppxPackage`
+pair is not:
 
 ```powershell
-$pkg   = 'src\cascadia\CascadiaPackage\AppPackages\CascadiaPackage_0.0.1.0_x64_Test'
-$loose = 'src\cascadia\CascadiaPackage\AppPackages\loose'
-makeappx unpack /o /p "$pkg\CascadiaPackage_0.0.1.0_x64.msix" /d $loose
-Add-AppxPackage -Path "$loose\AppxManifest.xml" -Register -ForceUpdateFromAnyVersion
+.\tools\Deploy-TerminalSlots.ps1        # -NoBuild to skip the compile, -StageOnly to skip registering
 ```
 
-Launches as **`wtd.exe`** ("Windows Terminal Dev"). Release builds have no `_Debug` infix in the
-folder or msix name; Debug builds do.
+What it does, in order: build the solution once → package the Test branding → package the Dev
+branding → unpack both into `C:\TerminalSlots\{test,dev}` → write `C:\TerminalSlots\dev-pending.json`
+→ **register only Test**, preserving its `settings.json` across the re-registration and asserting the
+resulting `InstallLocation`.
 
-**A rebuild alone changes nothing**: the package is registered against `loose\`, which is a *copy*
-made by `makeappx unpack`. Rebuilding refreshes the `.msix`, not `loose\`. The full loop is close
-the dev window (it locks the DLLs) → rebuild → re-unpack → re-register → relaunch. Building the
-package **from Visual Studio** emits the loose layout directly and registers it, skipping the msix
-step — much faster (see `doc/building.md`).
+The Dev payload is *staged and left alone*. `dev-pending.json` (commit, branch, dirty, timestamp,
+payload path) is how the running `wtd` learns a newer build is waiting, so it can offer me the
+promotion when I have no sessions I mind losing.
 
-The dev build's settings live at
-`%LOCALAPPDATA%\Packages\WindowsTerminalDev_8wekyb3d8bbwe\LocalState\settings.json`, separate from
-my real Terminal's.
+The mechanics underneath — for understanding, **not** for you to run by hand — are `makeappx unpack`
+of the built `.msix` into the slot directory followed by
+`Add-AppxPackage -Path <slot>\AppxManifest.xml -Register`. Note that a rebuild alone changes nothing:
+the registration points at the *unpacked copy*, so refreshing the `.msix` without re-unpacking
+deploys nothing. Building the package from Visual Studio emits a loose layout directly (see
+`doc/building.md`) — that path is Dev-registered on this machine and is therefore off limits.
 
-### The dev build and my session share a process name
+### Promotion is my gesture
 
-**`Get-Process -Name 'WindowsTerminal'` matches BOTH the dev build and the Terminal my session is
-running in.** Selecting `-First 1` and sending it input is how you type into my live session.
-Always identify the dev build by executable path:
+`tools\Register-DevSlot.ps1` re-registers the Dev slot from `C:\TerminalSlots\dev`. It refuses to run
+while any process is live under the Dev payload — re-registering an identity from a different folder
+requires removing the old registration first, and Windows will not remove a running package. It
+refuses rather than terminating my windows, which is the correct instinct and the one you should
+share. **You do not run it.** Either I press promote in `wtd`, or I run it myself.
+
+### KNOWN BROKEN: `wtt` silently runs the *dev* binaries
+
+As of 2026-08-16, launching `wtt.exe` does **not** run the Test payload. It starts, hands its command
+line to the running `wtd` instance, and terminates — a new window appears in the **Dev** process,
+running Dev binaries. Nothing warns you; it looks like a successful launch. Until this is fixed,
+"verify in `wtt`" cannot actually be honoured while a `wtd` is running, and the honest report is
+**"built and staged into the test slot, not verified"**.
+
+`WindowEmperor::HandleCommandlineArgs` (`src/cascadia/WindowsTerminal/WindowEmperor.cpp:601`) builds
+the single-instance identity — window class name *and* mutex, the same string for both (`:667`) —
+from the compile-time branding token, and `build/rules/Branding.targets:7` maps every *unrecognised*
+branding to `WT_BRANDING_DEV`. That catch-all tests the resulting token for emptiness, not the
+branding name, so `Test` lands there with everything else. Test binaries therefore call themselves
+`"Windows Terminal Dev"`, exactly like the Dev slot; `acquireMutexOrAttemptHandoff` (`:151`) finds
+the Dev window, `SendMessageTimeoutW(WM_COPYDATA)` (`:187`), then `TerminateProcess` (`:672`). The
+exe-path hash that would disambiguate two installs is appended only `if (!IsPackaged())` (`:631`) —
+both slots are packaged, so it never applies. (The user-SID hash at `:644` *is* unconditional, but it
+is identical for both slots and so discriminates nothing here.)
+
+**The fix is not a new branding token.** `src/cascadia/TerminalApp/BuildInfo.h:1-10` already states
+the intended design — the slot is resolved *at runtime* from package identity, precisely so the two
+slots can stay byte-identical and a build verified in Test can be promoted into Dev unchanged. The
+single-instance identity should be derived the same way: when packaged, mix the package family name
+into `windowClassName`, confined to the Dev/Test catch-all arm so Release/Preview/Canary are
+untouched.
+
+**Byte-identity is already silently broken**, which must be repaired at the same time or the premise
+stays a fiction. `src/common.build.post.props:77` and `src/host/proxy/Host.Proxy.vcxproj:74` both
+enumerate `Canary`/`Dev`/`''` and omit `Test`, while `CascadiaPackage.wapproj` propagates
+`WindowsTerminalBranding=Test` as a *global* property into every referenced C++ project. So the Test
+packaging pass recompiles without `_MSVC_STL_HARDENING` and without `PROXY_CLSID_IS`, into the shared
+`bin\x64\Release`. Proof on disk: `C:\TerminalSlots\dev\WindowsTerminal.exe` is 638,464 bytes,
+`test\WindowsTerminal.exe` is 635,904.
+
+Secondary defects: `Package-Test.appxmanifest` declares **no** COM CLSIDs (Dev declares 7 — monarch
+proxy/stub, defterm delegation, shell extension), so no defterm handoff or Explorer verb in the Test
+slot. With byte-identical binaries it cannot have distinct ones, so that is an accepted limit of the
+test slot, not a bug to fix. And `WinRTUtils/inc/WtExeUtils.h:38-57` `IsDevBuild()` matches only
+`WindowsTerminalDev`, so in Test `GetWtExePath()` builds a path to a `wt.exe` that does not exist.
+
+Diagnosing this class of bug: never trust "the launch succeeded". Diff visible top-level windows per
+PID across the launch and check `(Get-Process WindowsTerminal).Path` — a window that appeared under
+the *Dev* executable path is the tell. `Microsoft-Windows-AppModel-Runtime/Admin` shows the container
+being created and destroyed in the same second.
+
+### Every locally-built Terminal shares one process name
+
+**`Get-Process -Name 'WindowsTerminal'` matches the test build, the dev build, *and* the Terminal my
+session is running in.** Selecting `-First 1` and sending it input is how you type into my live
+session. Always identify by executable path, and only ever target the test payload:
 
 ```powershell
 Get-Process -Name 'WindowsTerminal' | Where-Object {
-    $_.Path -like '*\AppPackages\loose\*' -and $_.MainWindowHandle -ne 0
+    $_.Path -like 'C:\TerminalSlots\test\*' -and $_.MainWindowHandle -ne 0
 }
 ```
 
-Then record pre-existing PIDs before launching, refuse any PID that already existed, and confirm
-the target window is foreground before sending a keystroke.
+Then record pre-existing PIDs before launching, refuse any PID that already existed, and confirm the
+target window is foreground before sending a keystroke. A process whose path is under a Dev payload
+or under `C:\Program Files\WindowsApps\` is off limits — read it if you must, never write to it.
 
 ## Driving the UI
 
