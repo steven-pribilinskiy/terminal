@@ -1,0 +1,82 @@
+#!/bin/sh
+#
+# Reject a commit that flips a file's line endings wholesale.
+#
+# This repo stores most sources CRLF (.gitattributes says `* -text`, so git
+# records bytes exactly as they are and normalises nothing). Any tool that
+# rewrites a file with Unix endings -- `sed -i`, `tr`, a stray redirect through
+# a POSIX utility -- therefore turns a three line change into a diff that
+# touches every line of the file. The change is invisible in review, buries the
+# real edit, and conflicts with everything upstream does to that file later.
+#
+# It is not hypothetical: `sed -i` on ControlCore.cpp turned a 41 line change
+# into 6,149. Hence a hook rather than a rule to remember.
+#
+# Enable (once per clone):   git config core.hooksPath tools/githooks
+#
+# The check is deliberately narrow. It only fires when a file that already had
+# predominantly CRLF endings arrives with none at all, or vice versa -- the
+# signature of a whole-file rewrite. Ordinary edits, new files and binaries are
+# never touched.
+
+crlf_profile() {
+    # $1: a path to read. Prints "<cr-count> <lf-count>".
+    cr=$(tr -cd '\r' < "$1" | wc -c | tr -d ' ')
+    lf=$(tr -cd '\n' < "$1" | wc -c | tr -d ' ')
+    printf '%s %s' "$cr" "$lf"
+}
+
+tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
+offenders=''
+
+# Only files modified in place can flip; added and deleted files have no
+# previous version to differ from.
+for path in $(git diff --cached --name-only --diff-filter=M); do
+    # Skip anything git considers binary.
+    if git diff --cached --numstat -- "$path" | head -1 | grep -q '^-'; then
+        continue
+    fi
+
+    git show "HEAD:$path" > "$tmpdir/old" 2>/dev/null || continue
+    git show ":$path" > "$tmpdir/new" 2>/dev/null || continue
+
+    set -- $(crlf_profile "$tmpdir/old"); old_cr=$1; old_lf=$2
+    set -- $(crlf_profile "$tmpdir/new"); new_cr=$1; new_lf=$2
+
+    [ "$old_lf" -eq 0 ] && continue
+    [ "$new_lf" -eq 0 ] && continue
+
+    # "Predominantly CRLF" = more than half the lines. A file that is already
+    # mixed is left alone; we are looking for a wholesale flip, not for tidiness.
+    if [ "$((old_cr * 2))" -gt "$old_lf" ] && [ "$new_cr" -eq 0 ]; then
+        offenders="$offenders  $path (was CRLF, now LF)
+"
+    elif [ "$old_cr" -eq 0 ] && [ "$((new_cr * 2))" -gt "$new_lf" ]; then
+        offenders="$offenders  $path (was LF, now CRLF)
+"
+    fi
+done
+
+if [ -n "$offenders" ]; then
+    printf '\nCommit refused: line endings were rewritten wholesale.\n\n%s\n' "$offenders"
+    cat <<'EOF'
+This turns a small change into a diff across the whole file. It is almost
+always `sed -i`, or another POSIX tool writing a file that was CRLF.
+
+To fix, restore the endings and re-stage. For a file that should be CRLF:
+
+  node -e "const f=process.argv[1],fs=require('fs');let s=fs.readFileSync(f,'latin1');fs.writeFileSync(f,s.replace(/\r\n/g,'\n').replace(/\n/g,'\r\n'),'latin1')" <path>
+  git add <path>
+
+Then check the diff is the size you expected:  git diff --cached --stat
+
+To edit files in place without this happening, use an editor that preserves
+existing endings rather than `sed -i`.
+
+If a flip really is intended, commit with --no-verify.
+EOF
+    exit 1
+fi
+
+exit 0

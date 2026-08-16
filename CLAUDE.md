@@ -30,6 +30,42 @@ window. See "The two slots" below; that distinction is the single most important
 | **Any C++ change** | **Yes** | Compiled into the binaries, loaded at process start. |
 | **Any XAML change** | **Yes** | XAML compiles to XBF and links into the binaries. There is no XAML Hot Reload here — Terminal is a Win32 app hosting WinUI 2 through XAML Islands. |
 
+## HARD REQUIREMENT: never edit a tracked file in place with `sed -i`
+
+`.gitattributes` here is `* -text`, so git stores bytes exactly as they are and normalises
+nothing. Most sources in this repo are **CRLF**. GNU tools write **LF**. So a `sed -i` — or `tr`,
+`awk > file`, any POSIX in-place rewrite — silently converts the entire file, and a three-line
+change becomes a diff that touches every line.
+
+**This is measured, not theoretical: a 41-line change to `ControlCore.cpp` committed as 6,149.**
+It buries the real edit, makes review impossible, and conflicts with everything upstream later
+does to that file.
+
+- **Use the Edit tool.** It preserves the file's existing endings.
+- If an edit genuinely has to be scripted, round-trip through `latin1` so bytes survive:
+  ```bash
+  node -e "const f=process.argv[1],fs=require('fs');let s=fs.readFileSync(f,'latin1');fs.writeFileSync(f,s.replace(/\r\n/g,'\n').replace(/\n/g,'\r\n'),'latin1')" <path>
+  ```
+- **`grep` cannot be trusted to see CR under git-bash.** In one session `grep -c $'\r'` reported
+  `0` for a CRLF file and `3086` for the same file after it had been converted to LF — wrong both
+  times, in both directions. Count bytes instead, which is unambiguous:
+  ```bash
+  cr=$(tr -cd '\r' < "$f" | wc -c); lf=$(tr -cd '\n' < "$f" | wc -c)   # cr == lf means CRLF
+  ```
+- **Look at `git show --stat` after every commit.** A file-sized diff for a small edit is this bug.
+  Not every file is CRLF (`TerminalPage.cpp` is LF upstream), so compare against what the file was,
+  never against an assumption.
+
+A `pre-commit` hook enforces this — it refuses a commit that flips a file's endings wholesale, and
+prints the repair. It lives in the repo so it survives a reclone, but `core.hooksPath` is local
+config, so **each fresh clone needs it enabled once**:
+
+```powershell
+git config core.hooksPath tools/githooks
+```
+
+`--no-verify` bypasses it, for the rare case where a flip is genuinely intended.
+
 ## HARD REQUIREMENT: read the upstream issues and PRs before implementing anything
 
 **When I ask for a feature or a fix, search microsoft/terminal's open issues and pull requests for
