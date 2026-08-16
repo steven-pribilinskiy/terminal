@@ -38,9 +38,9 @@ Author(s):
     X(hstring, WordDelimiters, "wordDelimiters", DEFAULT_WORD_DELIMITERS)                                                                                                                             \
     X(bool, CopyOnSelect, "copyOnSelect", false)                                                                                                                                                      \
     X(bool, FocusFollowMouse, "focusFollowMouse", false)                                                                                                                                              \
-    X(bool, ScrollToZoom, "experimental.scrollToZoom", true)                                                                                                                                          \
+    X(bool, ScrollToZoom, "experimental.scrollToZoom", false)                                                                                                                                         \
     X(bool, OpenLinksOnSingleClick, "openLinksOnSingleClick", true)                                                                                                                                   \
-    X(bool, ScrollToChangeOpacity, "experimental.scrollToChangeOpacity", true)                                                                                                                        \
+    X(bool, ScrollToChangeOpacity, "experimental.scrollToChangeOpacity", false)                                                                                                                       \
     X(winrt::Microsoft::Terminal::Control::GraphicsAPI, GraphicsAPI, "rendering.graphicsAPI")                                                                                                         \
     X(bool, DisablePartialInvalidation, "rendering.disablePartialInvalidation", false)                                                                                                                \
     X(bool, SoftwareRendering, "rendering.software", false)                                                                                                                                           \
@@ -77,7 +77,7 @@ Author(s):
     X(bool, EnableShellCompletionMenu, "experimental.enableShellCompletionMenu", false)                                                                                                               \
     X(bool, EnableUnfocusedAcrylic, "compatibility.enableUnfocusedAcrylic", true)                                                                                                                     \
     X(winrt::Windows::Foundation::Collections::IVector<Model::NewTabMenuEntry>, NewTabMenu, "newTabMenu", winrt::single_threaded_vector<Model::NewTabMenuEntry>({ Model::RemainingProfilesEntry{} })) \
-    X(hstring, SearchWebDefaultQueryUrl, "searchWebDefaultQueryUrl", L"https://www.bing.com/search?q=%22%s%22")                                                                                       \
+    X(hstring, SearchWebDefaultQueryUrl, "searchWebDefaultQueryUrl", L"https://www.google.com/search?q=%s")                                                                                           \
     X(bool, ShowTabsFullscreen, "showTabsFullscreen", false)
 
 // MTSM_GLOBAL_SETTINGS is the union of global-only and window settings.

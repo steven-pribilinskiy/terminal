@@ -2428,14 +2428,19 @@
           "type": "boolean"
         },
         "experimental.scrollToZoom": {
-          "default": true,
+          "default": false,
           "description": "When set to true, holding the Ctrl key while scrolling will increase or decrease the terminal font size.",
           "type": "boolean"
         },
         "experimental.scrollToChangeOpacity": {
-          "default": true,
+          "default": false,
           "description": "When set to true, holding the Ctrl and Shift keys while scrolling will change the window opacity.",
           "type": "boolean"
+        },
+        "searchWebDefaultQueryUrl": {
+          "default": "https://www.google.com/search?q=%s",
+          "description": "The URL the searchWeb action opens. %s is replaced with the selected text, URL-encoded.",
+          "type": "string"
         },
         "compatibility.allowHeadless": {
           "default": false,
