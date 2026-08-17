@@ -288,6 +288,14 @@
     <value>Automatically detect URLs and make them clickable</value>
     <comment>Header for a control to toggle whether the terminal should automatically detect URLs and make them clickable, or not.</comment>
   </data>
+  <data name="Globals_OpenLinksOnSingleClick.Header" xml:space="preserve">
+    <value>Open links with a single click, without holding Ctrl</value>
+    <comment>Header for a control to toggle whether clicking a link opens it without the Ctrl key being held, or not. {Locked="Ctrl"}</comment>
+  </data>
+  <data name="Globals_OpenLinksOnSingleClick.HelpText" xml:space="preserve">
+    <value>The link opens when the mouse button is released, and only if the click did not become a selection, so dragging across a URL still selects it. Ctrl+click opens links either way.</value>
+    <comment>{Locked="Ctrl"} Additional text presented near "Globals_OpenLinksOnSingleClick.Header".</comment>
+  </data>
   <data name="Globals_SearchWebDefaultQueryUrl.Header" xml:space="preserve">
     <value>Default URL to use for the "Search web" action</value>
     <comment>Header for a control to set the query URL when using the "search web" action.</comment>

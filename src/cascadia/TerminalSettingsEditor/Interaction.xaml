@@ -112,6 +112,13 @@
                               Style="{StaticResource ToggleSwitchInExpanderStyle}" />
             </local:SettingContainer>
 
+            <!--  Open Links On Single Click  -->
+            <local:SettingContainer x:Name="OpenLinksOnSingleClick"
+                                    x:Uid="Globals_OpenLinksOnSingleClick">
+                <ToggleSwitch IsOn="{x:Bind ViewModel.OpenLinksOnSingleClick, Mode=TwoWay}"
+                              Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+            </local:SettingContainer>
+
             <!--  Search Web Default Query URL  -->
             <local:SettingContainer x:Name="SearchWebDefaultQueryUrl"
                                     x:Uid="Globals_SearchWebDefaultQueryUrl"
