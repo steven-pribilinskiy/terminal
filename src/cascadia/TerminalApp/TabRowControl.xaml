@@ -79,20 +79,39 @@
 
         <mux:TabView.TabStripFooter>
             <Grid>
+                <!--
+                    Two columns, because a single cell is what made the badge
+                    invisible for as long as it existed. TabStripFooter is sized to
+                    its content, NOT stretched across the tab row, so it measured
+                    exactly the width of the new tab button; HorizontalAlignment
+                    ="Right" then right-aligned the badge INSIDE that button rather
+                    than against the caption buttons, and since the badge was
+                    declared first the button painted straight over it. Measured on
+                    a live window: badge x 476..512, button x 439..535.
+
+                    Giving each its own auto-width column makes the overlap
+                    impossible rather than merely unlikely, and the footer grows to
+                    fit both.
+                -->
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
                 <!--  Remove this border after WinUI 2.8  -->
-                <Border Height="1"
+                <Border Grid.ColumnSpan="2"
+                        Height="1"
                         VerticalAlignment="Bottom"
                         Background="{ThemeResource CardStrokeColorDefaultBrush}" />
 
                 <!--
                     Which local slot this window is (DEV / TEST), and - in the Dev
                     slot only - an offer to promote a newer build that a deploy has
-                    staged. Right-aligned so they sit just inboard of the caption
-                    buttons, and hidden entirely on a normal install so they cost a
-                    real user nothing.
+                    staged. Sits just outboard of the new tab button, and hidden
+                    entirely on a normal install so it costs a real user nothing.
                 -->
-                <StackPanel Margin="0,4,8,6"
-                            HorizontalAlignment="Right"
+                <StackPanel Grid.Column="1"
+                            Margin="4,4,8,6"
                             VerticalAlignment="Center"
                             Orientation="Horizontal"
                             Spacing="6">
@@ -160,6 +179,7 @@
 
                 <mux:SplitButton x:Name="NewTabButton"
                                  x:Uid="NewTabSplitButton"
+                                 Grid.Column="0"
                                  Height="24"
                                  Margin="0,4"
                                  Padding="0"
