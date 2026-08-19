@@ -43,6 +43,8 @@ namespace ControlUnitTests
         TEST_METHOD(GetMouseEventsInTest);
         TEST_METHOD(AltBufferClampMouse);
 
+        TEST_METHOD(SingleClickOpensLink);
+
         TEST_CLASS_SETUP(ClassSetup)
         {
             winrt::init_apartment(winrt::apartment_type::single_threaded);
@@ -1069,5 +1071,97 @@ namespace ControlUnitTests
                                       modifiers,
                                       cursorPosition1.to_core_point());
         VERIFY_ARE_EQUAL(0u, expectedOutput.size(), L"Validate we drained all the expected output");
+    }
+
+    // openLinksOnSingleClick: a plain click on a URL opens it. The interesting
+    // half is VT mouse mode - tmux and other multiplexers with `mouse on`, and
+    // full-screen apps generally. There the press and the release are forwarded
+    // to the app, and PointerReleased returns as soon as it has sent the event,
+    // so the link has to be handled before that or it never is. It never was:
+    // the click did nothing and ctrl+click stayed the only way to open a link
+    // inside a multiplexer.
+    void ControlInteractivityTests::SingleClickOpensLink()
+    {
+        WEX::TestExecution::DisableVerifyExceptions disableVerifyExceptions{};
+
+        auto [settings, conn] = _createSettingsAndConnection();
+        auto [core, interactivity] = _createCoreAndInteractivity(*settings, *conn);
+        _standardInit(core, interactivity);
+        auto& term{ *core->_terminal };
+
+        VERIFY_IS_TRUE(settings->OpenLinksOnSingleClick());
+        VERIFY_IS_TRUE(settings->DetectURLs());
+
+        auto opened = 0;
+        winrt::hstring lastUri;
+        interactivity->OpenHyperlink([&](auto&&, const Control::OpenHyperlinkEventArgs& args) {
+            ++opened;
+            lastUri = args.Uri();
+        });
+
+        Log::Comment(L" --- Put a URL on the third row, and park the cursor well below it ---");
+        // MockConnection loops back: the mouse reports this control sends to the
+        // "app" are written straight into the terminal. A report is CSI M plus
+        // three bytes, and CSI M is delete-line, so anything the mouse events
+        // land on is destroyed. Keep the cursor - and therefore the wreckage -
+        // on a row the test does not care about.
+        conn->WriteInput(winrt_wstring_to_array_view(L"\r\n\r\nhttps://example.com/\x1b[15;1H"));
+        {
+            // Nothing throttled runs in a unit test, so match the pattern
+            // locations by hand - GetHyperlink reads that tree.
+            const auto lock = term.LockForWriting();
+            term.UpdatePatternsUnderLock();
+        }
+
+        const auto modifiers = ControlKeyStates();
+        const auto leftMouseDown{ Control::MouseButtonState::IsLeftButtonDown };
+        const Control::MouseButtonState noButtons{};
+
+        // Column 5 of row 2: inside "https://example.com/". Derive the pixel
+        // position from the real font size rather than assuming one; the drag
+        // check below is measured in the same units.
+        const auto fontSize{ core->FontSizeInDips() };
+        const Core::Point onTheLink{ static_cast<int32_t>(5.f * fontSize.Width), static_cast<int32_t>(2.f * fontSize.Height) };
+        VERIFY_ARE_EQUAL(L"https://example.com/", core->GetHyperlink(Core::Point{ 5, 2 }));
+
+        Log::Comment(L" --- Click it: the link opens on release ---");
+        interactivity->PointerPressed(0, leftMouseDown, WM_LBUTTONDOWN, 1'000'000, modifiers, onTheLink);
+        VERIFY_ARE_EQUAL(0, opened, L"the press alone opens nothing - it may still become a drag");
+        interactivity->PointerReleased(0, noButtons, WM_LBUTTONUP, modifiers, onTheLink);
+        VERIFY_ARE_EQUAL(1, opened);
+        VERIFY_ARE_EQUAL(L"https://example.com/", lastUri);
+
+        Log::Comment(L" --- Enable VT mouse mode, as a multiplexer would ---");
+        term.Write(L"\x1b[?1000h");
+        VERIFY_IS_TRUE(core->IsVtMouseModeEnabled());
+
+        Log::Comment(L" --- The same click still opens the link ---");
+        interactivity->PointerPressed(0, leftMouseDown, WM_LBUTTONDOWN, 2'000'000, modifiers, onTheLink);
+        interactivity->PointerReleased(0, noButtons, WM_LBUTTONUP, modifiers, onTheLink);
+        VERIFY_ARE_EQUAL(2, opened);
+
+        Log::Comment(L" --- Dragging across the URL does not open it ---");
+        // In mouse mode the terminal makes no selection of its own, so only the
+        // movement tells a drag from a click. Release three cells to the right,
+        // still on the same URL.
+        const Core::Point furtherAlong{ static_cast<int32_t>(8.f * fontSize.Width), static_cast<int32_t>(2.f * fontSize.Height) };
+        interactivity->PointerPressed(0, leftMouseDown, WM_LBUTTONDOWN, 3'000'000, modifiers, onTheLink);
+        interactivity->PointerReleased(0, noButtons, WM_LBUTTONUP, modifiers, furtherAlong);
+        VERIFY_ARE_EQUAL(2, opened, L"a drag is not a click");
+
+        Log::Comment(L" --- A double-click opens it once, not twice ---");
+        interactivity->PointerPressed(0, leftMouseDown, WM_LBUTTONDOWN, 4'000'000, modifiers, onTheLink);
+        interactivity->PointerReleased(0, noButtons, WM_LBUTTONUP, modifiers, onTheLink);
+        VERIFY_ARE_EQUAL(3, opened);
+        interactivity->PointerPressed(0, leftMouseDown, WM_LBUTTONDOWN, 4'000'100, modifiers, onTheLink);
+        interactivity->PointerReleased(0, noButtons, WM_LBUTTONUP, modifiers, onTheLink);
+        VERIFY_ARE_EQUAL(3, opened, L"the second click of a double-click opens nothing");
+
+        Log::Comment(L" --- Nothing opens when the setting is off ---");
+        settings->OpenLinksOnSingleClick(false);
+        core->UpdateSettings(*settings, nullptr);
+        interactivity->PointerPressed(0, leftMouseDown, WM_LBUTTONDOWN, 5'000'000, modifiers, onTheLink);
+        interactivity->PointerReleased(0, noButtons, WM_LBUTTONUP, modifiers, onTheLink);
+        VERIFY_ARE_EQUAL(3, opened);
     }
 }

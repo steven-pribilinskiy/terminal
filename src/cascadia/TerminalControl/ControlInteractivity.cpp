@@ -285,7 +285,20 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             !hyperlink.empty() &&
             _core->Settings().OpenLinksOnSingleClick())
         {
-            _pendingSingleClickHyperlink = hyperlink;
+            // Only the first click of a multi-click sequence arms the link. Normally
+            // the double-click's word selection stops the second click from opening
+            // anything, but when the app has VT mouse mode on there is no selection,
+            // so without this a double-click on a URL would open it twice.
+            const auto isRepeatClick = _pendingSingleClickPos.has_value() &&
+                                       _pendingSingleClickPos == pixelPosition &&
+                                       timestamp >= _pendingSingleClickTimestamp &&
+                                       timestamp - _pendingSingleClickTimestamp <= _multiClickTimer;
+            _pendingSingleClickPos = pixelPosition;
+            _pendingSingleClickTimestamp = timestamp;
+            if (!isRepeatClick)
+            {
+                _pendingSingleClickHyperlink = hyperlink;
+            }
         }
         if (WI_IsFlagSet(buttonState, MouseButtonState::IsLeftButtonDown) &&
             ctrlEnabled &&
@@ -497,6 +510,39 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         _pointerPressedInBounds = false;
 
         const auto terminalPosition = _getTerminalPosition(til::point{ pixelPosition }, false);
+
+        // A plain click on a link opens it, but only if this was a click rather than
+        // the start of a selection: no drag, the release is still over the same link,
+        // and nothing got selected. Otherwise selecting a URL would also launch it.
+        //
+        // This runs *before* the VT mouse handling below, in the same spirit as
+        // GH#9396 prioritizing ctrl+click on a link over VT mouse events in
+        // PointerPressed. When the client app has mouse tracking on - tmux and other
+        // multiplexers with `mouse on`, and full-screen apps generally - the release
+        // below is forwarded to the app and returns, so a check placed after it would
+        // never run and the link would never open. The event is still forwarded, so
+        // the app sees the click as it always did.
+        if (const auto pending = std::exchange(_pendingSingleClickHyperlink, {});
+            !pending.empty() && pointerUpdateKind == WM_LBUTTONUP)
+        {
+            // In VT mouse mode the terminal makes no selection of its own, so
+            // HasSelection can't tell a click from a drag. Measure the movement
+            // since the press instead, with the same quarter-cell threshold
+            // PointerMoved uses to decide that a drag has begun.
+            const auto pressedAt = _pendingSingleClickPos.value_or(pixelPosition);
+            const auto dx = pixelPosition.X - pressedAt.X;
+            const auto dy = pixelPosition.Y - pressedAt.Y;
+            const auto w = _core->FontSizeInDips().Width;
+            const auto dragged = (dx * dx + dy * dy) >= (w * w / 16); // (w / 4)^2
+
+            if (!dragged &&
+                !_core->HasSelection() &&
+                _core->GetHyperlink(terminalPosition.to_core_point()) == pending)
+            {
+                _hyperlinkHandler(pending);
+            }
+        }
+
         // Short-circuit isReadOnly check to avoid warning dialog
         if (!_core->IsInReadOnlyMode() && _canSendVTMouseInput(modifiers))
         {
@@ -507,18 +553,6 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // Only a left click release when copy on select is active should perform a copy.
         // Right clicks and middle clicks should not need to do anything when released.
         const auto isLeftMouseRelease = pointerUpdateKind == WM_LBUTTONUP;
-
-        // A plain click on a link opens it, but only if this was a click rather than
-        // the start of a selection: no drag (the release is still over the same link)
-        // and nothing got selected. Otherwise selecting a URL would also launch it.
-        if (const auto pending = std::exchange(_pendingSingleClickHyperlink, {}); !pending.empty() && isLeftMouseRelease)
-        {
-            if (!_core->HasSelection() &&
-                _core->GetHyperlink(terminalPosition.to_core_point()) == pending)
-            {
-                _hyperlinkHandler(pending);
-            }
-        }
 
         if (_core->CopyOnSelect() &&
             isLeftMouseRelease &&

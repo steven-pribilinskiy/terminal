@@ -127,8 +127,13 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         std::optional<Core::Point> _lastMouseClickPos;
         std::optional<Core::Point> _singleClickTouchdownPos;
         // Link pressed without ctrl while openLinksOnSingleClick is on; opened on
-        // release, but only if it did not turn into a selection drag.
+        // release, but only if it did not turn into a selection drag. The position
+        // and time of that press let the release tell a click from a drag, and the
+        // first click of a double-click from the second, without relying on the
+        // selection - which an app with VT mouse mode on never gets to make.
         winrt::hstring _pendingSingleClickHyperlink;
+        std::optional<Core::Point> _pendingSingleClickPos;
+        Timestamp _pendingSingleClickTimestamp{ 0 };
         std::optional<Core::Point> _lastMouseClickPosNoSelection;
         // This field tracks whether the selection has changed meaningfully
         // since it was last copied. It's generally used to prevent copyOnSelect
