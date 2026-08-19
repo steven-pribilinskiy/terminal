@@ -58,18 +58,24 @@ Write-Log "promotion requested (waitForPid=$WaitForPid relaunch=$($Relaunch.IsPr
 # Purely so the banner can name the build being promoted. A missing or broken
 # marker is not a reason to refuse -- the payload on disk is what gets swapped,
 # and the marker only describes it.
-$staged = $null
+#
+# Never name anything here $staged: PowerShell variable names are
+# case-insensitive, so that assignment lands on the $Staged *path* parameter
+# above and every later Join-Path against it fails with "Cannot find drive. A
+# drive with the name '@{commit=...}' does not exist" -- which is how this
+# silently refused to promote anything at all.
+$markerInfo = $null
 $markerPath = Join-Path (Split-Path -Parent $Payload) 'dev-pending.json'
 if (Test-Path $markerPath) {
-    try { $staged = Get-Content $markerPath -Raw | ConvertFrom-Json } catch { $staged = $null }
+    try { $markerInfo = Get-Content $markerPath -Raw | ConvertFrom-Json } catch { $markerInfo = $null }
 }
 
 Write-Host ''
 Say 'Promoting the staged build into the Dev slot' ([ConsoleColor]::Cyan) -NoLog
 Say ("  payload : {0}" -f $Payload) -NoLog
-if ($staged) {
+if ($markerInfo) {
     Say ("  build   : {0}{1} ({2}), built {3}" -f `
-        $staged.commit, $(if ($staged.dirty) { '+dirty' } else { '' }), $staged.branch, $staged.timestampUtc) -NoLog
+        $markerInfo.commit, $(if ($markerInfo.dirty) { '+dirty' } else { '' }), $markerInfo.branch, $markerInfo.timestampUtc) -NoLog
 }
 Say ("  log     : {0}" -f $LogPath) -NoLog
 Write-Host ''
@@ -100,9 +106,21 @@ try {
     # Match on PATH, not process name: every slot and the real install all run
     # an executable called WindowsTerminal.exe.
     $installRoot = $pkg.InstallLocation
+
+    # "Apply on next launch" is the app spawning us against its own pid without
+    # asking for a relaunch: it is not quitting, and the whole promise of that
+    # button is that the swap happens whenever the user closes the build --
+    # tonight, tomorrow, whenever. A ten minute deadline turns that promise into
+    # a silent no-op for every session longer than ten minutes, which is nearly
+    # all of them. So that request waits for as long as it takes.
+    #
+    # Every other shape keeps the deadline: "apply now" is quitting immediately
+    # so ten minutes is generous, and a hand-run promotion has someone watching
+    # a console who deserves an answer rather than a process that never returns.
+    $deferred = ($WaitForPid -gt 0) -and (-not $Relaunch)
     $timeout  = [TimeSpan]::FromMinutes(10)
     $started  = Get-Date
-    $deadline = $started + $timeout
+    $deadline = if ($deferred) { $null } else { $started + $timeout }
 
     # Re-announced whenever the set changes rather than once at the top, so that
     # closing one window of several is visibly progress instead of silence.
@@ -122,7 +140,7 @@ try {
         if ($live.Count -eq 0) { break }
 
         $now = Get-Date
-        if ($now -gt $deadline) {
+        if ($deadline -and $now -gt $deadline) {
             if ($ticking) { Write-Host '' }
             Say ("Gave up: {0} process(es) still running after {1:N0} minutes (pids {2})." -f `
                 $live.Count, $timeout.TotalMinutes, ($live.Id -join ',')) ([ConsoleColor]::Red)
@@ -139,20 +157,26 @@ try {
             Say  'Windows will not unregister a package that is still running, so this' ([ConsoleColor]::DarkGray) -NoLog
             Say  'cannot close them for you. Close your Dev Terminal windows and it' ([ConsoleColor]::DarkGray) -NoLog
             Say  'continues on its own.' ([ConsoleColor]::DarkGray) -NoLog
-            Say ("Giving up at {0} if they are still open." -f $deadline.ToString('HH:mm:ss')) ([ConsoleColor]::DarkGray) -NoLog
+            if ($deadline) {
+                Say ("Giving up at {0} if they are still open." -f $deadline.ToString('HH:mm:ss')) ([ConsoleColor]::DarkGray) -NoLog
+            }
+            else {
+                Say 'This waits for as long as it takes; there is no deadline.' ([ConsoleColor]::DarkGray) -NoLog
+            }
         }
 
         # One rewritten line rather than a scrolling wall, so a ten minute wait
         # still reads as one thing happening; a sparse heartbeat when redirected.
+        $countdown = if ($deadline) { "{1:mm\:ss} until it gives up" } else { 'no deadline' }
         if ($rewrites) {
-            Write-Host ("`r    waiting - {0:mm\:ss} elapsed, {1:mm\:ss} until it gives up   " -f `
-                ($now - $started), ($deadline - $now)) -NoNewline
+            Write-Host ("`r    waiting - {0:mm\:ss} elapsed, $countdown   " -f `
+                ($now - $started), $(if ($deadline) { $deadline - $now } else { [TimeSpan]::Zero })) -NoNewline
             $ticking = $true
         }
         elseif (($now - $lastHeartbeat).TotalSeconds -ge 30) {
             $lastHeartbeat = $now
-            Write-Host ("    still waiting - {0:mm\:ss} elapsed, {1:mm\:ss} until it gives up" -f `
-                ($now - $started), ($deadline - $now))
+            Write-Host ("    still waiting - {0:mm\:ss} elapsed, $countdown" -f `
+                ($now - $started), $(if ($deadline) { $deadline - $now } else { [TimeSpan]::Zero }))
         }
 
         Start-Sleep -Milliseconds 500
