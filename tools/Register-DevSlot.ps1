@@ -13,7 +13,13 @@
 [CmdletBinding()]
 Param(
     # Register from somewhere else (e.g. a worktree's loose layout) instead.
-    [string]$Payload = 'C:\TerminalSlots\dev'
+    [string]$Payload = 'C:\TerminalSlots\dev',
+    # Deploy-TerminalSlots.ps1 stages the new build beside the live payload
+    # rather than over it -- the running Dev instance keeps its binaries open,
+    # so writing into the live payload leaves it half-replaced. If a staged
+    # build is waiting, it is moved into place here, once the slot is closed
+    # and unregistered. Point this at nothing to register the payload as-is.
+    [string]$Staged = 'C:\TerminalSlots\dev-staged'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,7 +29,10 @@ $FamilyName  = 'WindowsTerminalDev_8wekyb3d8bbwe'
 $Settings    = Join-Path $env:LOCALAPPDATA "Packages\$FamilyName\LocalState\settings.json"
 $Manifest    = Join-Path $Payload 'AppxManifest.xml'
 
-if (-not (Test-Path $Manifest)) { throw "No AppxManifest.xml under $Payload -- has the payload been staged?" }
+$haveStaged = $Staged -and (Test-Path (Join-Path $Staged 'AppxManifest.xml'))
+if (-not $haveStaged -and -not (Test-Path $Manifest)) {
+    throw "No AppxManifest.xml under $Staged or $Payload -- has the payload been staged?"
+}
 
 # Refuse while it is open. Match on path, not process name: the installed Terminal and
 # every other slot share the name WindowsTerminal.exe.
@@ -54,6 +63,17 @@ if ($existing) {
     Remove-AppxPackage -Package $existing.PackageFullName -PreserveApplicationData
 }
 
+# Swap only now: nothing runs out of the payload and nothing is registered from
+# it, so these are two renames on the same volume. The outgoing build is kept
+# under .previous until the registration below has been asserted.
+$previous = "$Payload.previous"
+if ($haveStaged) {
+    if (Test-Path $previous) { Remove-Item -Recurse -Force $previous }
+    if (Test-Path $Payload) { Move-Item -LiteralPath $Payload -Destination $previous -Force }
+    Write-Host "swapping in the staged build from $Staged"
+    Move-Item -LiteralPath $Staged -Destination $Payload -Force
+}
+
 Write-Host "registering from $Payload"
 Add-AppxPackage -Path $Manifest -Register
 
@@ -65,6 +85,8 @@ if (-not $now) { throw 'Registration reported success but the package is not reg
 if ($now.InstallLocation.TrimEnd('\') -ne $Payload.TrimEnd('\')) {
     throw "Registered from $($now.InstallLocation), expected $Payload."
 }
+
+if ($haveStaged -and (Test-Path $previous)) { Remove-Item -Recurse -Force $previous -ErrorAction SilentlyContinue }
 
 if ($backup -and -not (Test-Path $Settings)) {
     New-Item -ItemType Directory -Force -Path (Split-Path $Settings) | Out-Null

@@ -24,7 +24,12 @@ Param(
     [int]$WaitForPid = 0,
     # Start the Dev slot again once the swap is done.
     [switch]$Relaunch,
-    [string]$Payload = 'C:\TerminalSlots\dev'
+    [string]$Payload = 'C:\TerminalSlots\dev',
+    # Where Deploy-TerminalSlots.ps1 leaves the build waiting. It cannot write
+    # into $Payload: the running Dev instance holds its binaries open, so an
+    # unpack over the live payload replaces the unlocked files and then fails.
+    # The deploy therefore stages beside it and promotion moves it into place.
+    [string]$Staged = 'C:\TerminalSlots\dev-staged'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -70,7 +75,12 @@ Say ("  log     : {0}" -f $LogPath) -NoLog
 Write-Host ''
 
 try {
-    if (-not (Test-Path $Manifest)) { throw "no staged payload at $Payload" }
+    $stagedManifest = Join-Path $Staged 'AppxManifest.xml'
+    $haveStaged = Test-Path $stagedManifest
+    if (-not $haveStaged -and -not (Test-Path $Manifest)) {
+        throw "no payload to promote: neither $Staged nor $Payload has an AppxManifest.xml"
+    }
+    if ($haveStaged) { Say ("  staged  : {0}" -f $Staged) -NoLog }
 
     # Wait for the process that asked for this, then for anything else still
     # running under the slot -- other windows may outlive the one that asked.
@@ -164,6 +174,22 @@ try {
     Say ("Removing the old registration at {0}" -f $installRoot)
     Remove-AppxPackage -Package $pkg.PackageFullName -PreserveApplicationData
 
+    # Only now is the swap safe: nothing is running out of the payload and
+    # nothing is registered from it. Two renames on the same volume, so the
+    # window where the slot has no payload at all is a few milliseconds, and the
+    # outgoing build is kept until the new registration has been asserted -- if
+    # anything below fails, the previous payload is still on disk to go back to.
+    $previous = "$Payload.previous"
+    if ($haveStaged) {
+        if (Test-Path $previous) { Remove-Item -Recurse -Force $previous }
+        if (Test-Path $Payload) {
+            Move-Item -LiteralPath $Payload -Destination $previous -Force
+            Write-Log "moved the outgoing payload to $previous"
+        }
+        Say ("Swapping in the staged build from {0}" -f $Staged)
+        Move-Item -LiteralPath $Staged -Destination $Payload -Force
+    }
+
     Say ("Registering the Dev slot from {0}" -f $Manifest)
     Add-AppxPackage -Path $Manifest -Register
 
@@ -171,6 +197,10 @@ try {
     # elsewhere, so never trust it; assert where we actually landed.
     $landed = (Get-AppxPackage -Name $PackageName).InstallLocation
     if ($landed -ne $Payload) { throw "registration landed at '$landed', expected '$Payload'" }
+
+    if ($haveStaged -and (Test-Path $previous)) {
+        Remove-Item -Recurse -Force $previous -ErrorAction SilentlyContinue
+    }
     Say ("Promoted: {0} now runs from {1}" -f $PackageName, $Payload) ([ConsoleColor]::Green)
 
     if ($backup -and -not (Test-Path $localState)) {

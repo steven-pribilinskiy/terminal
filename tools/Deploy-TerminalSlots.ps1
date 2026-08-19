@@ -24,7 +24,7 @@
 # 'Test' and the staged exes differed by 2,560 bytes. The check below is cheap;
 # run it if you touch anything branding-conditional.
 #
-#   (Get-FileHash C:\TerminalSlots\dev\WindowsTerminal.exe).Hash -eq
+#   (Get-FileHash C:\TerminalSlots\dev-staged\WindowsTerminal.exe).Hash -eq
 #   (Get-FileHash C:\TerminalSlots\test\WindowsTerminal.exe).Hash
 [CmdletBinding()]
 Param(
@@ -39,7 +39,17 @@ $ErrorActionPreference = 'Stop'
 $Root      = Split-Path -Parent $PSScriptRoot
 $SlotRoot  = 'C:\TerminalSlots'
 $TestStage = Join-Path $SlotRoot 'test'
-$DevStage  = Join-Path $SlotRoot 'dev'
+# The Dev payload is staged BESIDE the live one, never over it. Two reasons, and
+# the first one is fatal on its own: the live payload's binaries are loaded by
+# the running Dev instance, so Windows refuses to overwrite them and the unpack
+# dies partway through -- having already replaced every file that wasn't locked.
+# That is the worst of both worlds: production left half-new, and the deploy
+# aborted before it registered Test. Second, "production changes only when I
+# press promote" is the whole doctrine here, and a deploy that rewrites the Dev
+# payload breaks it even when nothing is running. Promote-DevSlot.ps1 swaps this
+# directory into place once the Dev windows are closed.
+$DevLive   = Join-Path $SlotRoot 'dev'
+$DevStage  = Join-Path $SlotRoot 'dev-staged'
 $Config    = 'Release'
 $Platform  = 'x64'
 
@@ -97,10 +107,17 @@ Invoke-MsBuild @($wapproj, "/p:Configuration=$Config", "/p:Platform=$Platform",
                  '/p:WindowsTerminalBranding=Dev', "/p:SolutionDir=$Root\", '/m', '/v:m', '/nologo')
 
 function Expand-Slot {
-    Param([string]$MsixDir, [string]$Destination, [string]$Label)
+    Param([string]$MsixDir, [string]$Destination, [string]$Label, [switch]$Fresh)
     $msix = Get-ChildItem $MsixDir -Filter *.msix -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if (-not $msix) { throw "no .msix produced for $Label in $MsixDir" }
+
+    # unpack /o overwrites, it doesn't clean: a file dropped from the package
+    # stays behind forever. Only worth doing where the directory is ours to
+    # empty -- which is the staged payload, never a registered one.
+    if ($Fresh -and (Test-Path $Destination)) {
+        Remove-Item -Recurse -Force $Destination
+    }
 
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Destination) | Out-Null
     & $makeappx unpack /o /p $msix.FullName /d $Destination | Out-Null
@@ -110,7 +127,7 @@ function Expand-Slot {
 
 $pkgBase  = "$Root\src\cascadia\CascadiaPackage\AppPackages"
 $testMsix = Expand-Slot -MsixDir "$pkgBase\Test\CascadiaPackage_0.0.1.0_${Platform}_Test" -Destination $TestStage -Label 'Test'
-$devMsix  = Expand-Slot -MsixDir "$pkgBase\CascadiaPackage_0.0.1.0_${Platform}_Test"      -Destination $DevStage  -Label 'Dev'
+$devMsix  = Expand-Slot -MsixDir "$pkgBase\CascadiaPackage_0.0.1.0_${Platform}_Test"      -Destination $DevStage  -Label 'Dev' -Fresh
 
 # The running Dev instance reads this to decide whether a newer build is waiting.
 # It sits beside the payload rather than inside it, so staging needs no changes
@@ -184,6 +201,7 @@ if (-not $StageOnly) {
 Write-Host ''
 Write-Host "Test slot  : registered from $TestStage (run: wtt)" -ForegroundColor Green
 Write-Host "Dev slot   : staged at $DevStage -- NOT installed" -ForegroundColor Yellow
+Write-Host "             still running from $DevLive until you promote" -ForegroundColor Yellow
 Write-Host "Pending    : $infoPath" -ForegroundColor Yellow
 Write-Host "Build      : $($info.commit) on $($info.branch), built $($info.timestampUtc)"
 Write-Host ''
