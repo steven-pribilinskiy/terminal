@@ -378,7 +378,9 @@ private:
     size_t _taskbarState = 0;
     size_t _taskbarProgress = 0;
 
+    // Indices into the pattern list in Terminal::_getPatterns.
     size_t _hyperlinkPatternId = 0;
+    size_t _delimitedLinkPatternId = 1;
 
     std::wstring _answerbackMessage;
     std::wstring _workingDirectory;

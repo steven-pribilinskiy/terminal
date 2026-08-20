@@ -520,6 +520,33 @@ bool Terminal::ShouldSendAlternateScroll(const unsigned int uiButton,
 }
 
 // Method Description:
+// - Strips the angle brackets and the optional "|label" suffix off a delimited
+//   link, leaving just the URI:
+//     <https://example.com/pull/1|repo#1>  ->  https://example.com/pull/1
+//     <https://example.com/pull/1>         ->  https://example.com/pull/1
+// Arguments:
+// - match: the full text the delimited-link pattern matched
+// Return value:
+// - The URI portion of the match
+static std::wstring uriFromDelimitedLink(const std::wstring& match)
+{
+    std::wstring_view uri{ match };
+    if (uri.starts_with(L'<'))
+    {
+        uri.remove_prefix(1);
+    }
+    if (uri.ends_with(L'>'))
+    {
+        uri.remove_suffix(1);
+    }
+    if (const auto pipe = uri.find(L'|'); pipe != std::wstring_view::npos)
+    {
+        uri = uri.substr(0, pipe);
+    }
+    return std::wstring{ uri };
+}
+
+// Method Description:
 // - Given a coord, get the URI at that location
 // Arguments:
 // - The position relative to the viewport
@@ -543,6 +570,16 @@ std::wstring Terminal::GetHyperlinkAtBufferPosition(const til::point bufferPos)
     // Check cached interval tree (covers visible viewport +/- viewport height)
     if (const auto results = _patternIntervalTree.findOverlapping({ bufferPos.x + 1, bufferPos.y }, bufferPos); !results.empty())
     {
+        // A <uri|label> match encloses the bare-URI match found inside it, so it has
+        // to win: only it knows where the URI stops and the label begins. It's also
+        // the only match that covers the label itself, which is what you actually see.
+        for (const auto& result : results)
+        {
+            if (result.value == _delimitedLinkPatternId)
+            {
+                return uriFromDelimitedLink(buffer.GetPlainText(result.start, result.stop));
+            }
+        }
         for (const auto& result : results)
         {
             if (result.value == _hyperlinkPatternId)
@@ -580,15 +617,26 @@ std::optional<PointTree::interval> Terminal::GetHyperlinkIntervalFromViewportPos
     const auto results = _patternIntervalTree.findOverlapping({ bufferPos.x + 1, bufferPos.y }, bufferPos);
     if (results.size() > 0)
     {
+        const auto toViewport = [visStart](PointTree::interval interval) {
+            interval.start.y -= visStart;
+            interval.stop.y -= visStart;
+            return interval;
+        };
+
+        // Same precedence as GetHyperlinkAtBufferPosition: the delimited match encloses
+        // the bare-URI one, and highlighting the whole <uri|label> is what we want.
+        for (const auto& result : results)
+        {
+            if (result.value == _delimitedLinkPatternId)
+            {
+                return toViewport(result);
+            }
+        }
         for (const auto& result : results)
         {
             if (result.value == _hyperlinkPatternId)
             {
-                // Convert back to viewport-relative coordinates
-                auto interval = result;
-                interval.start.y -= visStart;
-                interval.stop.y -= visStart;
-                return interval;
+                return toViewport(result);
             }
         }
     }
@@ -1413,8 +1461,16 @@ static URegularExpressionInterner uregexInterner;
 
 PointTree Terminal::_getPatterns(til::CoordType beg, til::CoordType end) const
 {
-    static constexpr std::array<std::wstring_view, 1> patterns{
+    // The index of each pattern here is the value stored in the interval tree, so it
+    // has to stay in sync with _hyperlinkPatternId / _delimitedLinkPatternId.
+    static constexpr std::array<std::wstring_view, 2> patterns{
+        // A bare URI, as it appears in ordinary output.
         LR"(\b(?:https?|ftp|file)://[-A-Za-z0-9+&@#/%?=~_|$!:,.;]*[A-Za-z0-9+&@#/%=~_|$])",
+        // An angle-bracketed URI, optionally carrying a "|label" suffix - the form
+        // Slack and friends emit: <https://example.com/pull/1|repo#1>. The whole
+        // construct is clickable, and the URI is the part before the pipe. Labels may
+        // contain spaces but not a line break, so this can't run away past the row.
+        LR"(<(?:https?|ftp|file)://[^\s<>|]+(?:\|[^<>\n]{0,256})?>)",
     };
 
     if (!_detectURLs)
@@ -1437,7 +1493,7 @@ PointTree Terminal::_getPatterns(til::CoordType beg, til::CoordType end) const
             {
                 // PointTree uses half-open ranges and buffer-absolute coordinates.
                 const auto range = ICU::BufferRangeFromMatch(&text, re.get());
-                intervals.push_back(PointTree::interval(range.start, range.end, 0));
+                intervals.push_back(PointTree::interval(range.start, range.end, i));
             } while (uregex_findNext(re.get(), &status));
         }
     }

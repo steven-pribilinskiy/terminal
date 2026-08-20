@@ -52,6 +52,7 @@ class TerminalCoreUnitTests::TerminalBufferTests final
     TEST_METHOD(TestGetReverseTab);
 
     TEST_METHOD(TestURLPatternDetection);
+    TEST_METHOD(TestDelimitedURLPatternDetection);
 
     TEST_METHOD_SETUP(MethodSetup)
     {
@@ -703,5 +704,93 @@ void TerminalBufferTests::TestURLPatternDetection()
         VERIFY_IS_TRUE(interval.has_value(), L"Interval is found via viewport position.");
         VERIFY_ARE_EQUAL(interval->start.y, viewportRow, L"Interval start row is viewport-relative.");
         VERIFY_ARE_EQUAL(interval->start.x, 0, L"Interval starts at column 0.");
+    }
+}
+
+void TerminalBufferTests::TestDelimitedURLPatternDetection()
+{
+    using namespace std::string_view_literals;
+
+    // This is off by default; turn it on for the test.
+    auto originalDetectURLs = term->_detectURLs;
+    auto restoreDetectUrls = wil::scope_exit([&]() {
+        term->_detectURLs = originalDetectURLs;
+    });
+    term->_detectURLs = true;
+
+    auto& termSm = *term->_stateMachine;
+
+    // Writes `line` on a fresh row, refreshes the pattern tree, and returns that row's index.
+    const auto writeRow = [&](std::wstring_view line) {
+        termSm.ProcessString(L"\r\n");
+        termSm.ProcessString(line);
+        term->UpdatePatternsUnderLock();
+        return term->_mainBuffer->GetCursor().GetPosition().y;
+    };
+
+    {
+        Log::Comment(L"<uri|label> resolves to the uri from every column it covers");
+
+        constexpr auto Uri = L"https://github.com/cloudbeds/mfd/pull/9962"sv;
+        constexpr auto Link = L"<https://github.com/cloudbeds/mfd/pull/9962|mfd#9962>"sv;
+        const auto row = writeRow(Link);
+
+        for (auto x = 0; x < static_cast<til::CoordType>(Link.size()); x++)
+        {
+            const auto result = term->GetHyperlinkAtBufferPosition(til::point{ x, row });
+            VERIFY_ARE_EQUAL(result, Uri, L"Every column of the construct resolves to the uri, not the label.");
+        }
+
+        const auto after = term->GetHyperlinkAtBufferPosition(til::point{ static_cast<til::CoordType>(Link.size()), row });
+        VERIFY_IS_TRUE(after.empty(), L"Nothing is detected past the closing bracket.");
+
+        Log::Comment(L"The hover interval spans the whole construct, brackets included");
+        const auto visStart = term->_VisibleStartIndex();
+        const auto interval = term->GetHyperlinkIntervalFromViewportPosition(til::point{ 0, row - visStart });
+        VERIFY_IS_TRUE(interval.has_value(), L"An interval is found at the opening bracket.");
+        VERIFY_ARE_EQUAL(interval->start.x, 0, L"The interval starts at the opening bracket.");
+        // The tree stores half-open ranges, so stop is one past the closing bracket.
+        VERIFY_ARE_EQUAL(interval->stop.x, static_cast<til::CoordType>(Link.size()), L"The interval ends just past the closing bracket.");
+    }
+
+    {
+        Log::Comment(L"A bracketed uri with no label still works, and keeps its brackets off the uri");
+
+        constexpr auto Uri = L"https://www.contoso.com/a"sv;
+        const auto row = writeRow(L"<https://www.contoso.com/a>"sv);
+
+        VERIFY_ARE_EQUAL(term->GetHyperlinkAtBufferPosition(til::point{ 0, row }), Uri, L"The opening bracket resolves to the bare uri.");
+        VERIFY_ARE_EQUAL(term->GetHyperlinkAtBufferPosition(til::point{ 5, row }), Uri, L"Mid-uri resolves to the bare uri.");
+    }
+
+    {
+        Log::Comment(L"Labels may contain spaces");
+
+        constexpr auto Uri = L"https://www.contoso.com/b"sv;
+        constexpr auto Link = L"<https://www.contoso.com/b|click here please>"sv;
+        const auto row = writeRow(Link);
+
+        const auto atLabel = term->GetHyperlinkAtBufferPosition(til::point{ static_cast<til::CoordType>(Link.size()) - 3, row });
+        VERIFY_ARE_EQUAL(atLabel, Uri, L"A column inside a spaced label resolves to the uri.");
+    }
+
+    {
+        Log::Comment(L"An unterminated bracket doesn't swallow the rest of the row");
+
+        constexpr auto Uri = L"https://www.contoso.com/c"sv;
+        const auto row = writeRow(L"<https://www.contoso.com/c and then some prose"sv);
+
+        VERIFY_ARE_EQUAL(term->GetHyperlinkAtBufferPosition(til::point{ 1, row }), Uri, L"The bare-uri pattern still covers it.");
+        VERIFY_IS_TRUE(term->GetHyperlinkAtBufferPosition(til::point{ 40, row }).empty(), L"The prose after it is not part of any link.");
+    }
+
+    {
+        Log::Comment(L"A bare uri alongside a delimited one is unaffected");
+
+        constexpr auto Bare = L"https://www.contoso.com/d"sv;
+        const auto row = writeRow(L"<https://www.contoso.com/e|e> https://www.contoso.com/d"sv);
+
+        VERIFY_ARE_EQUAL(term->GetHyperlinkAtBufferPosition(til::point{ 0, row }), L"https://www.contoso.com/e", L"The delimited link resolves to its own uri.");
+        VERIFY_ARE_EQUAL(term->GetHyperlinkAtBufferPosition(til::point{ 30, row }), Bare, L"The trailing bare uri is untouched.");
     }
 }
