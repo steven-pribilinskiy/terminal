@@ -54,6 +54,8 @@ class TerminalCoreUnitTests::TerminalBufferTests final
     TEST_METHOD(TestURLPatternDetection);
     TEST_METHOD(TestDelimitedURLPatternDetection);
 
+    TEST_METHOD(TestURLPatternTrailingPunctuation);
+
     TEST_METHOD_SETUP(MethodSetup)
     {
         // STEP 1: Set up the Terminal
@@ -793,4 +795,46 @@ void TerminalBufferTests::TestDelimitedURLPatternDetection()
         VERIFY_ARE_EQUAL(term->GetHyperlinkAtBufferPosition(til::point{ 0, row }), L"https://www.contoso.com/e", L"The delimited link resolves to its own uri.");
         VERIFY_ARE_EQUAL(term->GetHyperlinkAtBufferPosition(til::point{ 30, row }), Bare, L"The trailing bare uri is untouched.");
     }
+}
+
+// A uri sitting in prose ends where the uri ends, not where the sentence does.
+void TerminalBufferTests::TestURLPatternTrailingPunctuation()
+{
+    using namespace std::string_view_literals;
+
+    auto originalDetectURLs = term->_detectURLs;
+    auto restoreDetectUrls = wil::scope_exit([&]() {
+        term->_detectURLs = originalDetectURLs;
+    });
+    term->_detectURLs = true;
+
+    auto& termSm = *term->_stateMachine;
+
+    const auto writeRow = [&](std::wstring_view line) {
+        termSm.ProcessString(L"\r\n");
+        termSm.ProcessString(line);
+        term->UpdatePatternsUnderLock();
+        return term->_mainBuffer->GetCursor().GetPosition().y;
+    };
+
+    // Column of the first 'h' of the uri, and one past the uri's last character.
+    const auto check = [&](std::wstring_view line, std::wstring_view uri, til::CoordType uriStart) {
+        const auto row = writeRow(line);
+        const auto end = uriStart + static_cast<til::CoordType>(uri.size());
+
+        VERIFY_ARE_EQUAL(term->GetHyperlinkAtBufferPosition(til::point{ uriStart, row }), uri);
+        VERIFY_ARE_EQUAL(term->GetHyperlinkAtBufferPosition(til::point{ end - 1, row }), uri);
+        VERIFY_IS_TRUE(term->GetHyperlinkAtBufferPosition(til::point{ end, row }).empty(),
+                       L"The punctuation after the uri is not part of it.");
+    };
+
+    Log::Comment(L"A markdown link in prose: the closing paren and full stop stay out of it");
+    check(L"and [`7155e890`](https://github.com/o/r/commit/13bb2623).", L"https://github.com/o/r/commit/13bb2623"sv, 17);
+
+    Log::Comment(L"A sentence-ending full stop stays out of it");
+    check(L"see https://www.contoso.com/a."sv, L"https://www.contoso.com/a"sv, 4);
+
+    Log::Comment(L"So does a comma, and a semicolon");
+    check(L"see https://www.contoso.com/b, then"sv, L"https://www.contoso.com/b"sv, 4);
+    check(L"see https://www.contoso.com/c; then"sv, L"https://www.contoso.com/c"sv, 4);
 }
