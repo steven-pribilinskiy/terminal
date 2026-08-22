@@ -975,6 +975,16 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             ScrollBar().Visibility(Visibility::Visible);
         }
 
+        // The hyperlink tooltip tells you which gesture opens the link, so it has
+        // to follow the setting that decides it. The XAML's x:Uid seeds the Run
+        // with the localized Ctrl+Click wording; keep a copy of that so turning the
+        // setting back off restores it in the user's language, and not in English.
+        if (_followLinkHintCtrlClick.empty())
+        {
+            _followLinkHintCtrlClick = HowToOpenRun().Text();
+        }
+        HowToOpenRun().Text(settings.OpenLinksOnSingleClick() ? RS_(L"HowToOpenRunSingleClick") : _followLinkHintCtrlClick);
+
         _interactivity.UpdateSettings();
         {
             const auto inputScope = settings.DefaultInputScope();

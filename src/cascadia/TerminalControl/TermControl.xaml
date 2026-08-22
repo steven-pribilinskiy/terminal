@@ -1275,13 +1275,52 @@
                             <ToolTipService.ToolTip>
                                 <ToolTip x:Name="LinkTip"
                                          Placement="Mouse">
+                                    <ToolTip.Template>
+                                        <!--
+                                            A copy of the default ToolTip template, whose content is
+                                            capped at 320px. That cap is a hardcoded local value on the
+                                            ContentPresenter, so it cannot be widened with a setter or a
+                                            theme resource; the whole template has to be restated. This
+                                            tooltip holds a URI, which the default width folds into a
+                                            tall unreadable stack.
+                                        -->
+                                        <ControlTemplate TargetType="ToolTip">
+                                            <ContentPresenter x:Name="LayoutRoot"
+                                                              MaxWidth="640"
+                                                              Padding="{TemplateBinding Padding}"
+                                                              Background="{TemplateBinding Background}"
+                                                              BackgroundSizing="OuterBorderEdge"
+                                                              BorderBrush="{TemplateBinding BorderBrush}"
+                                                              BorderThickness="{TemplateBinding BorderThickness}"
+                                                              Content="{TemplateBinding Content}"
+                                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                              ContentTransitions="{TemplateBinding ContentTransitions}"
+                                                              TextWrapping="Wrap">
+                                                <VisualStateManager.VisualStateGroups>
+                                                    <VisualStateGroup x:Name="OpenStates">
+                                                        <VisualState x:Name="Closed">
+                                                            <Storyboard>
+                                                                <FadeOutThemeAnimation TargetName="LayoutRoot" />
+                                                            </Storyboard>
+                                                        </VisualState>
+                                                        <VisualState x:Name="Opened">
+                                                            <Storyboard>
+                                                                <FadeInThemeAnimation TargetName="LayoutRoot" />
+                                                            </Storyboard>
+                                                        </VisualState>
+                                                    </VisualStateGroup>
+                                                </VisualStateManager.VisualStateGroups>
+                                            </ContentPresenter>
+                                        </ControlTemplate>
+                                    </ToolTip.Template>
                                     <TextBlock IsTextSelectionEnabled="True"
                                                TextWrapping="Wrap">
                                         <TextBlock.ContextFlyout>
                                             <mtu:TextMenuFlyout />
                                         </TextBlock.ContextFlyout>
                                         <Run x:Name="HoveredUri" /> <LineBreak />
-                                        <Run x:Uid="HowToOpenRun"
+                                        <Run x:Name="HowToOpenRun"
+                                             x:Uid="HowToOpenRun"
                                              FontStyle="Italic" />
                                     </TextBlock>
                                 </ToolTip>

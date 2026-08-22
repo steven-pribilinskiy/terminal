@@ -178,6 +178,10 @@
   <data name="HowToOpenRun.Text" xml:space="preserve">
     <value>Ctrl+Click to follow link</value>
   </data>
+  <data name="HowToOpenRunSingleClick" xml:space="preserve">
+    <value>Click to follow link</value>
+    <comment>Replaces HowToOpenRun.Text when links are set to open on a single click.</comment>
+  </data>
   <data name="TermControl_NoMatch" xml:space="preserve">
     <value>No results</value>
     <comment>Will be presented near the search box when Find operation returned no results.</comment>
