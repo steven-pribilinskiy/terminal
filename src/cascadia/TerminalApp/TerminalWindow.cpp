@@ -728,6 +728,15 @@ namespace winrt::TerminalApp::implementation
                 return layout.LaunchMode().Value();
             }
         }
+
+        // GH#12633: a remembered window brings back whether it was maximized,
+        // fullscreen or in focus mode along with its rect. RememberedGeometry()
+        // already yields nothing when the commandline asked for a launch mode.
+        if (const auto geometry = RememberedGeometry())
+        {
+            return geometry.LaunchMode();
+        }
+
         return valueFromCommandlineArgs.has_value() ?
                    valueFromCommandlineArgs.value() :
                    valueFromSettings;
@@ -795,6 +804,71 @@ namespace winrt::TerminalApp::implementation
                !hadPersistedPosition &&
                _currentWindowSettings().CenterOnLaunch() &&
                (_appArgs && !_appArgs->ParsedArgs().GetPosition().has_value());
+    }
+
+    // Method Description:
+    // - Should we save this window's position and size when it closes? This is
+    //   only about the _saving_ half - see RememberedGeometry() for whether we
+    //   should actually restore what we saved.
+    bool TerminalWindow::ShouldRememberGeometry()
+    {
+        return _currentWindowSettings().RememberWindowGeometry();
+    }
+
+    // Method Description:
+    // - GH#12633: The position and size this window was last closed at, if we
+    //   should reopen it there.
+    // - This is deliberately independent of the persisted-layout machinery: it
+    //   works with `firstWindowPreference` left at its default, and it doesn't
+    //   bring any tabs back with it.
+    // Return Value:
+    // - The remembered geometry, or nullptr if there is none or if something
+    //   with a stronger claim on our placement is in play.
+    WindowGeometry TerminalWindow::RememberedGeometry()
+    {
+        if (!ShouldRememberGeometry())
+        {
+            return nullptr;
+        }
+
+        // Tear-out: the drag operation decides where this window goes.
+        if (_contentBounds)
+        {
+            return nullptr;
+        }
+
+        // The quake window has a position of its own, derived from the monitor.
+        if (IsQuakeWindow())
+        {
+            return nullptr;
+        }
+
+        // A persisted layout or a workspace we're restoring carries its own
+        // geometry. Let that win, so the two mechanisms never fight over the
+        // same window.
+        if (const auto layout = LoadPersistedLayout())
+        {
+            if (layout.InitialPosition())
+            {
+                return nullptr;
+            }
+        }
+
+        // Anything the user asked for explicitly on the commandline wins.
+        if (_appArgs)
+        {
+            const auto& parsedArgs = _appArgs->ParsedArgs();
+            if (parsedArgs.GetPosition().has_value() ||
+                parsedArgs.GetSize().has_value() ||
+                parsedArgs.GetLaunchMode().has_value())
+            {
+                return nullptr;
+            }
+        }
+
+        // Geometry is remembered per window name. Unnamed windows all share the
+        // empty-string key, so the last unnamed window to close wins.
+        return ApplicationState::SharedInstance().LookupWindowGeometry(WindowProperties().WindowName());
     }
 
     // Method Description:

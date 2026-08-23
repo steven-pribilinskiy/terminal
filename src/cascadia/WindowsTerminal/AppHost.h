@@ -22,6 +22,8 @@ public:
     IslandWindow* GetWindow() const noexcept;
     winrt::TerminalApp::TerminalWindow Logic();
 
+    void PersistWindowGeometry() const;
+
     bool OnDirectKeyEvent(uint32_t vkey, uint8_t scanCode, bool down);
     void SetTaskbarProgress(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::Foundation::IInspectable& args);
     safe_void_coroutine HandleSummon(winrt::TerminalApp::SummonWindowBehavior args) const;
@@ -126,6 +128,7 @@ private:
                                  const winrt::Windows::UI::Xaml::Data::PropertyChangedEventArgs& args);
 
     void _initialResizeAndRepositionWindow(HWND hwnd, til::rect proposedRect, winrt::Microsoft::Terminal::Settings::Model::LaunchMode& launchMode);
+    bool _applyRememberedGeometry(HWND hwnd, winrt::Microsoft::Terminal::Settings::Model::LaunchMode& launchMode);
 
     void _resizeWindow(HWND hwnd, til::size newSize);
 

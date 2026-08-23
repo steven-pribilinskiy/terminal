@@ -728,7 +728,7 @@ void WindowEmperor::HandleCommandlineArgs(int nCmdShow)
     _createMessageWindow(windowClassName.c_str());
     _setupGlobalHotkeys();
     _checkWindowsForNotificationIcon();
-    _setupSessionPersistence(_app.Logic().Settings().GlobalSettings().ShouldUsePersistedLayout());
+    _setupSessionPersistence(_shouldPersistPeriodically(_app.Logic().Settings()));
     _setupControlPipe(_app.Logic().Settings().GlobalSettings().ControlPipeEnabled());
 
     // When the settings change, we'll want to update our global hotkeys
@@ -739,7 +739,7 @@ void WindowEmperor::HandleCommandlineArgs(int nCmdShow)
             _assertIsMainThread();
             _setupGlobalHotkeys();
             _checkWindowsForNotificationIcon();
-            _setupSessionPersistence(args.NewSettings().GlobalSettings().ShouldUsePersistedLayout());
+            _setupSessionPersistence(_shouldPersistPeriodically(args.NewSettings()));
             _setupControlPipe(args.NewSettings().GlobalSettings().ControlPipeEnabled());
         }
     });
@@ -1323,6 +1323,12 @@ LRESULT WindowEmperor::_messageHandler(HWND window, UINT const message, WPARAM c
                         // deterministic window count management.
                         const auto strong = *it;
 
+                        // GH#12633: Remember where this window was, so the next
+                        // one opened under this name lands in the same place.
+                        // This is independent of tab persistence - it happens
+                        // even when we're not keeping the layout at all.
+                        strong->PersistWindowGeometry();
+
                         // Before destroying a named window, persist its full
                         // tab/buffer state as a workspace so it can be restored later.
                         try
@@ -1495,6 +1501,17 @@ LRESULT WindowEmperor::_messageHandler(HWND window, UINT const message, WPARAM c
     return DefWindowProcW(window, message, wParam, lParam);
 }
 
+// The periodic save exists so a crash or a forced shutdown doesn't lose what we
+// would have written on the way out. That's worth doing for remembered window
+// geometry too, not just for persisted layouts.
+bool WindowEmperor::_shouldPersistPeriodically(const winrt::Microsoft::Terminal::Settings::Model::CascadiaSettings& settings)
+{
+    // rememberWindowGeometry is a window setting, so it lives on
+    // WindowSettings rather than on GlobalAppSettings.
+    return settings.GlobalSettings().ShouldUsePersistedLayout() ||
+           settings.WindowSettingsDefaults().RememberWindowGeometry();
+}
+
 void WindowEmperor::_setupSessionPersistence(bool enabled)
 {
     if (!enabled)
@@ -1511,6 +1528,14 @@ void WindowEmperor::_setupSessionPersistence(bool enabled)
 
 void WindowEmperor::_persistState(const ApplicationState& state) const
 {
+    // GH#12633: Window geometry is remembered independently of the layout, so
+    // this runs whatever `firstWindowPreference` says. Each window checks its
+    // own `rememberWindowGeometry` setting before writing anything.
+    for (const auto& w : _windows)
+    {
+        w->PersistWindowGeometry();
+    }
+
     // Calling an `ApplicationState` setter triggers a write to state.json.
     // With this if condition we avoid an unnecessary write when persistence is disabled.
     if (state.PersistedWindowLayouts())

@@ -561,6 +561,18 @@
     <value>When enabled, the window will be placed in the center of the screen when launched.</value>
     <comment>A description for what the "center on launch" setting does. Presented near "Globals_CenterOnLaunch.Header".</comment>
   </data>
+  <data name="Globals_RememberWindowGeometryRemembered" xml:space="preserve">
+    <value>Remembered</value>
+    <comment>Shorthand, explanatory text displayed when the user has enabled the feature indicated by "Globals_RememberWindowGeometry.Text".</comment>
+  </data>
+  <data name="Globals_RememberWindowGeometry.Text" xml:space="preserve">
+    <value>Remember position and size</value>
+    <comment>Header for a control to toggle whether the app should reopen each window where it was when it was last closed.</comment>
+  </data>
+  <data name="Globals_RememberWindowGeometry.[using:Windows.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>When enabled, each window's position, size and maximized state are saved when it closes, and restored the next time a window opens. Windows that have been given a name each remember their own. This takes precedence over the launch position, launch mode and "center on launch" settings above, but command line arguments still override it.</value>
+    <comment>A description for what the "remember position and size" setting does. Presented near "Globals_RememberWindowGeometry.Text".</comment>
+  </data>
   <data name="Globals_AlwaysOnTop.Header" xml:space="preserve">
     <value>Always on top</value>
     <comment>Header for a control to toggle if the app will always be presented on top of other windows, or is treated normally (when disabled).</comment>

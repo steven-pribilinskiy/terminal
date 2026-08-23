@@ -26,6 +26,23 @@ namespace Microsoft.Terminal.Settings.Model
         Windows.Foundation.IReference<LaunchMode> LaunchMode;
     };
 
+    // The remembered geometry of a single window, saved when the window closes
+    // and applied to the next window that opens under the same name. This is
+    // deliberately separate from WindowLayout: it stores a real window rect in
+    // physical pixels rather than a XAML content size, so that repeatedly
+    // closing and reopening a window doesn't make it creep.
+    runtimeclass WindowGeometry
+    {
+        WindowGeometry();
+
+        Int32 Left;
+        Int32 Top;
+        Int32 Width;
+        Int32 Height;
+        UInt32 Dpi;
+        LaunchMode LaunchMode;
+    };
+
     [default_interface] runtimeclass ApplicationState {
         static ApplicationState SharedInstance();
 
@@ -41,6 +58,9 @@ namespace Microsoft.Terminal.Settings.Model
         Boolean RenameWorkspace(String oldName, String newName);
         WindowLayout TakeWorkspace(String name);
         Windows.Foundation.Collections.IMapView<String, WindowLayout> AllPersistedWorkspaces();
+
+        void SaveWindowGeometry(String name, WindowGeometry geometry);
+        WindowGeometry LookupWindowGeometry(String name);
 
         String SettingsHash;
         Windows.Foundation.Collections.IVector<WindowLayout> PersistedWindowLayouts;

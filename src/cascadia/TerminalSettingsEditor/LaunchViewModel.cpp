@@ -61,7 +61,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         // unique view model members.
         PropertyChanged([this](auto&&, const PropertyChangedEventArgs& args) {
             const auto viewModelProperty{ args.PropertyName() };
-            if (viewModelProperty == L"CenterOnLaunch")
+            if (viewModelProperty == L"CenterOnLaunch" || viewModelProperty == L"RememberWindowGeometry")
             {
                 _NotifyChanges(L"LaunchParametersCurrentValue");
             }
@@ -226,6 +226,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         // Append the CenterOnLaunch part
         result = CenterOnLaunch() ? til::hstring_format(FMT_COMPILE(L"{}, {}"), result, RS_(L"Globals_CenterOnLaunchCentered")) : result;
+
+        // Remembered geometry overrides the position and launch mode above, so
+        // say so here rather than leaving the summary describing settings that
+        // aren't actually in effect.
+        result = RememberWindowGeometry() ? til::hstring_format(FMT_COMPILE(L"{}, {}"), result, RS_(L"Globals_RememberWindowGeometryRemembered")) : result;
         return result;
     }
 

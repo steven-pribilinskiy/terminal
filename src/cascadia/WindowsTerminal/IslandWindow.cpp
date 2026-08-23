@@ -1107,6 +1107,54 @@ void IslandWindow::_SetFullscreenPosition(const RECT& rcMonitor, const RECT& rcW
 }
 
 // Method Description:
+// - Slide a window rect so that it lies entirely within a monitor's work area,
+//   without changing its size.
+// Arguments:
+// - rc: the proposed window rect, in screen coordinates
+// - rcWork: the work area of the monitor we want the window to land on
+// - ncSize: the total non-client size of the window at its current DPI
+// Return Value:
+// - the adjusted rect
+// static
+RECT IslandWindow::ClampRectToWorkArea(RECT rc, const RECT& rcWork, const til::size& ncSize) noexcept
+{
+    auto rcWorkAdjusted = rcWork;
+
+    // GH#10199 - adjust the size of the "work" rect by the size of our borders.
+    // We want to make sure the window is restored within the bounds of the
+    // monitor we're on, but it's totally fine if the invisible borders are
+    // outside the monitor.
+    const auto halfWidth{ ncSize.width / 2 };
+    const auto halfHeight{ ncSize.height / 2 };
+
+    rcWorkAdjusted.left -= halfWidth;
+    rcWorkAdjusted.right += halfWidth;
+    rcWorkAdjusted.top -= halfHeight;
+    rcWorkAdjusted.bottom += halfHeight;
+
+    // Enforce that our position is entirely within the bounds of our work area.
+    // Prefer the top-left be on-screen rather than bottom-right (right before left, bottom before top).
+    if (rc.right > rcWorkAdjusted.right)
+    {
+        OffsetRect(&rc, rcWorkAdjusted.right - rc.right, 0);
+    }
+    if (rc.left < rcWorkAdjusted.left)
+    {
+        OffsetRect(&rc, rcWorkAdjusted.left - rc.left, 0);
+    }
+    if (rc.bottom > rcWorkAdjusted.bottom)
+    {
+        OffsetRect(&rc, 0, rcWorkAdjusted.bottom - rc.bottom);
+    }
+    if (rc.top < rcWorkAdjusted.top)
+    {
+        OffsetRect(&rc, 0, rcWorkAdjusted.top - rc.top);
+    }
+
+    return rc;
+}
+
+// Method Description:
 // - Called when exiting fullscreen, with the window's current monitor work area.
 // - The window is restored to its previous position, migrating that previous position to the
 //   window's current monitor (if the current work area or window DPI have changed).
@@ -1140,40 +1188,7 @@ void IslandWindow::_RestoreFullscreenPosition(const RECT& rcWork)
                rcWork.left - _rcWorkBeforeFullscreen.left,
                rcWork.top - _rcWorkBeforeFullscreen.top);
 
-    const til::size ncSize{ GetTotalNonClientExclusiveSize(dpiWindow) };
-
-    auto rcWorkAdjusted = rcWork;
-
-    // GH#10199 - adjust the size of the "work" rect by the size of our borders.
-    // We want to make sure the window is restored within the bounds of the
-    // monitor we're on, but it's totally fine if the invisible borders are
-    // outside the monitor.
-    const auto halfWidth{ ncSize.width / 2 };
-    const auto halfHeight{ ncSize.height / 2 };
-
-    rcWorkAdjusted.left -= halfWidth;
-    rcWorkAdjusted.right += halfWidth;
-    rcWorkAdjusted.top -= halfHeight;
-    rcWorkAdjusted.bottom += halfHeight;
-
-    // Enforce that our position is entirely within the bounds of our work area.
-    // Prefer the top-left be on-screen rather than bottom-right (right before left, bottom before top).
-    if (rcRestore.right > rcWorkAdjusted.right)
-    {
-        OffsetRect(&rcRestore, rcWorkAdjusted.right - rcRestore.right, 0);
-    }
-    if (rcRestore.left < rcWorkAdjusted.left)
-    {
-        OffsetRect(&rcRestore, rcWorkAdjusted.left - rcRestore.left, 0);
-    }
-    if (rcRestore.bottom > rcWorkAdjusted.bottom)
-    {
-        OffsetRect(&rcRestore, 0, rcWorkAdjusted.bottom - rcRestore.bottom);
-    }
-    if (rcRestore.top < rcWorkAdjusted.top)
-    {
-        OffsetRect(&rcRestore, 0, rcWorkAdjusted.top - rcRestore.top);
-    }
+    rcRestore = ClampRectToWorkArea(rcRestore, rcWork, GetTotalNonClientExclusiveSize(dpiWindow));
 
     // Show the window at the computed position.
     SetWindowPos(hWnd,

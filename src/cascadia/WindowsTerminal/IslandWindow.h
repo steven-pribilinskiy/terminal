@@ -40,6 +40,8 @@ public:
     virtual til::rect GetNonClientFrame(const UINT dpi) const noexcept;
     virtual til::size GetTotalNonClientExclusiveSize(const UINT dpi) const noexcept;
 
+    static RECT ClampRectToWorkArea(RECT rc, const RECT& rcWork, const til::size& ncSize) noexcept;
+
     virtual void Initialize();
 
     void SetCreateCallback(std::function<void(const HWND, const til::rect&)> pfn) noexcept;

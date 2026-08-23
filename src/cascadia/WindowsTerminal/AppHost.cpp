@@ -503,6 +503,135 @@ LaunchPosition AppHost::_GetWindowLaunchPosition()
 }
 
 // Method Description:
+// - GH#12633: Remember where this window is, so the next window opened under
+//   the same name can be put back here.
+// - We read the placement rather than the window rect on purpose: a maximized
+//   or minimized window's rect is its maximized/minimized rect, and what we
+//   want to store is the size it would restore to. The launch mode carries the
+//   maximized/fullscreen state separately.
+void AppHost::PersistWindowGeometry() const
+{
+    if (!_window || !_windowLogic || !_windowLogic.ShouldRememberGeometry())
+    {
+        return;
+    }
+
+    try
+    {
+        const auto hwnd = _window->GetHandle();
+        if (!hwnd)
+        {
+            return;
+        }
+
+        WINDOWPLACEMENT placement{ .length = sizeof(WINDOWPLACEMENT) };
+        if (!GetWindowPlacement(hwnd, &placement))
+        {
+            return;
+        }
+
+        auto rcNormal = placement.rcNormalPosition;
+
+        // rcNormalPosition is in workspace coordinates, which differ from
+        // screen coordinates by the work area's origin (i.e. by the taskbar).
+        // Convert it back so we store something we can hand to SetWindowPos.
+        MONITORINFO monitorInfo{ .cbSize = sizeof(MONITORINFO) };
+        if (GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &monitorInfo))
+        {
+            OffsetRect(&rcNormal,
+                       monitorInfo.rcWork.left - monitorInfo.rcMonitor.left,
+                       monitorInfo.rcWork.top - monitorInfo.rcMonitor.top);
+        }
+
+        auto mode = LaunchMode::DefaultMode;
+        WI_SetFlagIf(mode, LaunchMode::MaximizedMode, placement.showCmd == SW_SHOWMAXIMIZED);
+        WI_SetFlagIf(mode, LaunchMode::FullscreenMode, _windowLogic.Fullscreen());
+        WI_SetFlagIf(mode, LaunchMode::FocusMode, _windowLogic.FocusMode());
+
+        WindowGeometry geometry;
+        geometry.Left(rcNormal.left);
+        geometry.Top(rcNormal.top);
+        geometry.Width(rcNormal.right - rcNormal.left);
+        geometry.Height(rcNormal.bottom - rcNormal.top);
+        geometry.Dpi(_window->GetCurrentDpi());
+        geometry.LaunchMode(mode);
+
+        ApplicationState::SharedInstance().SaveWindowGeometry(_windowLogic.WindowProperties().WindowName(), geometry);
+    }
+    CATCH_LOG();
+}
+
+// Method Description:
+// - If we remembered where this window was last time, put it back there.
+// Return Value:
+// - true if we placed the window and the caller should skip the usual
+//   settings-driven placement, false to fall through to it.
+bool AppHost::_applyRememberedGeometry(const HWND hwnd, LaunchMode& launchMode)
+{
+    const auto geometry = _windowLogic.RememberedGeometry();
+    if (!geometry)
+    {
+        return false;
+    }
+
+    const auto storedDpi = geometry.Dpi() ? geometry.Dpi() : USER_DEFAULT_SCREEN_DPI;
+
+    RECT proposed{
+        geometry.Left(),
+        geometry.Top(),
+        geometry.Left() + geometry.Width(),
+        geometry.Top() + geometry.Height(),
+    };
+
+    if (proposed.right <= proposed.left || proposed.bottom <= proposed.top)
+    {
+        return false;
+    }
+
+    // Land on whichever monitor is nearest to where we used to be. If that
+    // monitor is gone, MONITOR_DEFAULTTONEAREST gives us a surviving one.
+    MONITORINFO monitorInfo{ .cbSize = sizeof(MONITORINFO) };
+    if (!GetMonitorInfo(MonitorFromRect(&proposed, MONITOR_DEFAULTTONEAREST), &monitorInfo))
+    {
+        return false;
+    }
+
+    UINT dpix = USER_DEFAULT_SCREEN_DPI;
+    UINT dpiy = USER_DEFAULT_SCREEN_DPI;
+    GetDpiForMonitor(MonitorFromRect(&proposed, MONITOR_DEFAULTTONEAREST), MDT_EFFECTIVE_DPI, &dpix, &dpiy);
+
+    // Keep the same logical size when the target monitor scales differently
+    // from the one we were saved on.
+    auto width = static_cast<LONG>(MulDiv(proposed.right - proposed.left, dpix, storedDpi));
+    auto height = static_cast<LONG>(MulDiv(proposed.bottom - proposed.top, dpiy, storedDpi));
+
+    // Don't restore a window bigger than the monitor it's landing on. This is
+    // the "saved on a 4K screen, reopened on a laptop panel" case.
+    const auto workWidth = monitorInfo.rcWork.right - monitorInfo.rcWork.left;
+    const auto workHeight = monitorInfo.rcWork.bottom - monitorInfo.rcWork.top;
+    width = std::min(width, workWidth);
+    height = std::min(height, workHeight);
+
+    proposed.right = proposed.left + width;
+    proposed.bottom = proposed.top + height;
+
+    proposed = IslandWindow::ClampRectToWorkArea(proposed, monitorInfo.rcWork, _window->GetTotalNonClientExclusiveSize(dpix));
+
+    LOG_LAST_ERROR_IF(!SetWindowPos(hwnd,
+                                    nullptr,
+                                    proposed.left,
+                                    proposed.top,
+                                    proposed.right - proposed.left,
+                                    proposed.bottom - proposed.top,
+                                    SWP_NOACTIVATE | SWP_NOZORDER));
+
+    launchMode = geometry.LaunchMode();
+
+    _window->RefreshCurrentDPI();
+    return true;
+}
+
+// Method Description:
 // - Callback for when the window is first being created (during WM_CREATE).
 //   Stash the proposed size for later. We'll need that once we're totally
 //   initialized, so that we can show the window in the right position *when we
@@ -538,6 +667,15 @@ void AppHost::_HandleCreateWindow(const HWND /* hwnd */, const til::rect& propos
 void AppHost::_initialResizeAndRepositionWindow(const HWND hwnd, til::rect proposedRect, LaunchMode& launchMode)
 {
     launchMode = _windowLogic.GetLaunchMode();
+
+    // GH#12633: If we remembered where this window was when it last closed,
+    // that's a complete answer for both position and size - we stored the whole
+    // window rect, so there's no client size to compute or non-client area to
+    // add back on here.
+    if (_applyRememberedGeometry(hwnd, launchMode))
+    {
+        return;
+    }
 
     // Acquire the actual initial position
     auto initialPos = _windowLogic.GetInitialPosition(proposedRect.left, proposedRect.top);

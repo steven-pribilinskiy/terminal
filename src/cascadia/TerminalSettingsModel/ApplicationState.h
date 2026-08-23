@@ -14,6 +14,7 @@ Abstract:
 
 #include "ApplicationState.g.h"
 #include "WindowLayout.g.h"
+#include "WindowGeometry.g.h"
 
 #include <inc/cppwinrt_utils.h>
 #include "JsonUtils.h"
@@ -44,6 +45,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
     X(FileSource::Local, Windows::Foundation::Collections::IVector<hstring>, AllowedCommandlines, "allowedCommandlines")                                                  \
     X(FileSource::Local, std::unordered_set<hstring>, DismissedBadges, "dismissedBadges")                                                                                 \
     X(FileSource::Local, Windows::Foundation::Collections::IMap<hstring COMMA Model::WindowLayout>, PersistedWorkspaces, "persistedWorkspaces")                           \
+    X(FileSource::Local, Windows::Foundation::Collections::IMap<hstring COMMA Model::WindowGeometry>, PersistedWindowGeometries, "persistedWindowGeometries")             \
     X(FileSource::Shared, bool, SSHFolderGenerated, "sshFolderGenerated", false)
 
     struct WindowLayout : WindowLayoutT<WindowLayout>
@@ -57,6 +59,25 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         WINRT_PROPERTY(winrt::Windows::Foundation::IReference<Model::LaunchMode>, LaunchMode, nullptr);
 
         friend ::Microsoft::Terminal::Settings::Model::JsonUtils::ConversionTrait<Model::WindowLayout>;
+    };
+
+    // The remembered position, size and launch mode of a window. Unlike
+    // WindowLayout::InitialSize (which is the XAML content size in DIPs, and
+    // gets the tab row added back on with hardcoded constants), this is the
+    // whole window rect in physical pixels, stored alongside the DPI it was
+    // captured at so it can be rescaled onto a different monitor.
+    struct WindowGeometry : WindowGeometryT<WindowGeometry>
+    {
+        WINRT_PROPERTY(int32_t, Left, 0);
+        WINRT_PROPERTY(int32_t, Top, 0);
+        WINRT_PROPERTY(int32_t, Width, 0);
+        WINRT_PROPERTY(int32_t, Height, 0);
+        // 96 is USER_DEFAULT_SCREEN_DPI; spelled out so this header doesn't
+        // depend on winuser.h.
+        WINRT_PROPERTY(uint32_t, Dpi, 96);
+        WINRT_PROPERTY(Model::LaunchMode, LaunchMode, Model::LaunchMode::DefaultMode);
+
+        friend ::Microsoft::Terminal::Settings::Model::JsonUtils::ConversionTrait<Model::WindowGeometry>;
     };
 
 #define COMMA ,
@@ -84,6 +105,9 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         bool RenameWorkspace(const hstring& oldName, const hstring& newName);
         Model::WindowLayout TakeWorkspace(const hstring& name);
         Windows::Foundation::Collections::IMapView<hstring, Model::WindowLayout> AllPersistedWorkspaces();
+
+        void SaveWindowGeometry(const hstring& name, const Model::WindowGeometry& geometry);
+        Model::WindowGeometry LookupWindowGeometry(const hstring& name);
 
         // State getters/setters
 #define MTSM_APPLICATION_STATE_GEN(source, type, name, key, ...) \
@@ -120,5 +144,6 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
 namespace winrt::Microsoft::Terminal::Settings::Model::factory_implementation
 {
     BASIC_FACTORY(WindowLayout)
+    BASIC_FACTORY(WindowGeometry)
     BASIC_FACTORY(ApplicationState);
 }

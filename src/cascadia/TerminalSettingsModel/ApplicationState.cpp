@@ -6,6 +6,7 @@
 #include "CascadiaSettings.h"
 #include "ApplicationState.g.cpp"
 #include "WindowLayout.g.cpp"
+#include "WindowGeometry.g.cpp"
 #include "ActionAndArgs.h"
 #include "JsonUtils.h"
 #include "FileUtils.h"
@@ -20,6 +21,12 @@ static constexpr std::string_view TabLayoutKey{ "tabLayout" };
 static constexpr std::string_view InitialPositionKey{ "initialPosition" };
 static constexpr std::string_view InitialSizeKey{ "initialSize" };
 static constexpr std::string_view LaunchModeKey{ "launchMode" };
+
+static constexpr std::string_view LeftKey{ "left" };
+static constexpr std::string_view TopKey{ "top" };
+static constexpr std::string_view WidthKey{ "width" };
+static constexpr std::string_view HeightKey{ "height" };
+static constexpr std::string_view DpiKey{ "dpi" };
 
 namespace Microsoft::Terminal::Settings::Model::JsonUtils
 {
@@ -60,6 +67,48 @@ namespace Microsoft::Terminal::Settings::Model::JsonUtils
         std::string TypeDescription() const
         {
             return "WindowLayout";
+        }
+    };
+
+    template<>
+    struct ConversionTrait<WindowGeometry>
+    {
+        WindowGeometry FromJson(const Json::Value& json)
+        {
+            auto geometry = winrt::make_self<implementation::WindowGeometry>();
+
+            GetValueForKey(json, LeftKey, geometry->_Left);
+            GetValueForKey(json, TopKey, geometry->_Top);
+            GetValueForKey(json, WidthKey, geometry->_Width);
+            GetValueForKey(json, HeightKey, geometry->_Height);
+            GetValueForKey(json, DpiKey, geometry->_Dpi);
+            GetValueForKey(json, LaunchModeKey, geometry->_LaunchMode);
+
+            return *geometry;
+        }
+
+        bool CanConvert(const Json::Value& json)
+        {
+            return json.isObject();
+        }
+
+        Json::Value ToJson(const WindowGeometry& val)
+        {
+            Json::Value json{ Json::objectValue };
+
+            SetValueForKey(json, LeftKey, val.Left());
+            SetValueForKey(json, TopKey, val.Top());
+            SetValueForKey(json, WidthKey, val.Width());
+            SetValueForKey(json, HeightKey, val.Height());
+            SetValueForKey(json, DpiKey, val.Dpi());
+            SetValueForKey(json, LaunchModeKey, val.LaunchMode());
+
+            return json;
+        }
+
+        std::string TypeDescription() const
+        {
+            return "WindowGeometry";
         }
     };
 }
@@ -448,6 +497,41 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
             _throttler();
         }
         return result;
+    }
+
+    // Method Description:
+    // - Remember the geometry of the window called `name`, so the next window
+    //   opened under that name can be placed there. Unnamed windows all share
+    //   the empty-string key, so the last unnamed window to close wins.
+    // - Unlike TakeWorkspace, looking a geometry up does not consume it: the
+    //   same remembered rect is reused every time until it is overwritten.
+    void ApplicationState::SaveWindowGeometry(const hstring& name, const Model::WindowGeometry& geometry)
+    {
+        {
+            const auto state = _state.lock();
+            if (!state->PersistedWindowGeometries || !*state->PersistedWindowGeometries)
+            {
+                state->PersistedWindowGeometries = winrt::single_threaded_map<hstring, Model::WindowGeometry>();
+            }
+            (*state->PersistedWindowGeometries).Insert(name, geometry);
+        }
+        _throttler();
+    }
+
+    // Return Value:
+    // - The geometry remembered for `name`, or nullptr if we've never seen it.
+    Model::WindowGeometry ApplicationState::LookupWindowGeometry(const hstring& name)
+    {
+        const auto state = _state.lock_shared();
+        if (state->PersistedWindowGeometries && *state->PersistedWindowGeometries)
+        {
+            const auto map = *state->PersistedWindowGeometries;
+            if (map.HasKey(name))
+            {
+                return map.Lookup(name);
+            }
+        }
+        return nullptr;
     }
 
     Windows::Foundation::Collections::IMapView<hstring, Model::WindowLayout> ApplicationState::AllPersistedWorkspaces()

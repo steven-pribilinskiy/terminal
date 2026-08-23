@@ -30,6 +30,11 @@ namespace SettingsModelUnitTests
         TEST_METHOD(TakeWorkspaceRemovesAndReturns);
         TEST_METHOD(TakeWorkspaceReturnsNullWhenMissing);
 
+        TEST_METHOD(SaveAndLookupWindowGeometry);
+        TEST_METHOD(LookupWindowGeometryReturnsNullWhenMissing);
+        TEST_METHOD(WindowGeometryIsKeyedByWindowName);
+        TEST_METHOD(WindowGeometryPersistsAcrossInstances);
+
     private:
         static std::filesystem::path _tempRoot()
         {
@@ -53,6 +58,18 @@ namespace SettingsModelUnitTests
             WindowLayout layout;
             layout.TabLayout(winrt::single_threaded_vector<ActionAndArgs>());
             return layout;
+        }
+
+        static WindowGeometry _makeGeometry(int32_t left = 120, int32_t top = 340)
+        {
+            WindowGeometry geometry;
+            geometry.Left(left);
+            geometry.Top(top);
+            geometry.Width(1280);
+            geometry.Height(800);
+            geometry.Dpi(144);
+            geometry.LaunchMode(LaunchMode::MaximizedMode);
+            return geometry;
         }
     };
 
@@ -134,5 +151,64 @@ namespace SettingsModelUnitTests
     {
         auto state = _make();
         VERIFY_IS_NULL(state->TakeWorkspace(L"missing"));
+    }
+
+    // GH#12633: remembered window geometry.
+
+    void ApplicationStateTests::SaveAndLookupWindowGeometry()
+    {
+        auto state = _make();
+        state->SaveWindowGeometry(L"", _makeGeometry());
+
+        const auto geometry = state->LookupWindowGeometry(L"");
+        VERIFY_IS_NOT_NULL(geometry);
+        VERIFY_ARE_EQUAL(120, geometry.Left());
+        VERIFY_ARE_EQUAL(340, geometry.Top());
+        VERIFY_ARE_EQUAL(1280, geometry.Width());
+        VERIFY_ARE_EQUAL(800, geometry.Height());
+        VERIFY_ARE_EQUAL(144u, geometry.Dpi());
+        VERIFY_ARE_EQUAL(LaunchMode::MaximizedMode, geometry.LaunchMode());
+
+        // Unlike TakeWorkspace, a lookup must not consume the entry — the same
+        // geometry is reused every time a window opens under that name.
+        VERIFY_IS_NOT_NULL(state->LookupWindowGeometry(L""));
+    }
+
+    void ApplicationStateTests::LookupWindowGeometryReturnsNullWhenMissing()
+    {
+        auto state = _make();
+        VERIFY_IS_NULL(state->LookupWindowGeometry(L"never-seen"));
+    }
+
+    void ApplicationStateTests::WindowGeometryIsKeyedByWindowName()
+    {
+        auto state = _make();
+        state->SaveWindowGeometry(L"", _makeGeometry(10, 20));
+        state->SaveWindowGeometry(L"named", _makeGeometry(900, 500));
+
+        VERIFY_ARE_EQUAL(10, state->LookupWindowGeometry(L"").Left());
+        VERIFY_ARE_EQUAL(900, state->LookupWindowGeometry(L"named").Left());
+    }
+
+    void ApplicationStateTests::WindowGeometryPersistsAcrossInstances()
+    {
+        const auto root = _tempRoot();
+        {
+            auto state = winrt::make_self<implementation::ApplicationState>(root);
+            state->SaveWindowGeometry(L"named", _makeGeometry(64, 96));
+            state->Flush();
+        }
+
+        // A second instance over the same directory has to read the geometry
+        // back out of state.json, which exercises the JSON conversion trait.
+        auto reloaded = winrt::make_self<implementation::ApplicationState>(root);
+        const auto geometry = reloaded->LookupWindowGeometry(L"named");
+        VERIFY_IS_NOT_NULL(geometry);
+        VERIFY_ARE_EQUAL(64, geometry.Left());
+        VERIFY_ARE_EQUAL(96, geometry.Top());
+        VERIFY_ARE_EQUAL(1280, geometry.Width());
+        VERIFY_ARE_EQUAL(800, geometry.Height());
+        VERIFY_ARE_EQUAL(144u, geometry.Dpi());
+        VERIFY_ARE_EQUAL(LaunchMode::MaximizedMode, geometry.LaunchMode());
     }
 }
