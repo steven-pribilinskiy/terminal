@@ -195,6 +195,14 @@ readable — it means "path too long", not "missing". A worktree under
 worktree at `C:\wt-tm` produced 155 and linked. MSBuild also warns `MSB8029` about output
 directories under Temp. Put worktrees at a short root.
 
+**Never run `git worktree prune` from WSL here, and do not believe `worktree list` when it says
+`prunable`.** A worktree added on the Windows side records a Windows-style path in
+`.git/worktrees/<name>/gitdir` (`C:/wt-tm/.git`), which does not resolve inside WSL — `/mnt/c/...`
+does. WSL git therefore reports *"gitdir file points to non-existent location"* for a worktree that
+is entirely live, and a prune deregisters it. The directory survives, so nothing looks broken until
+the next time you want that worktree. Check with Windows git (`/mnt/c/Program Files/Git/cmd/git.exe
+-C 'C:\<path>' status`) before acting on any prunable verdict.
+
 Two more traps, both hit for real:
 
 - **`Invoke-OpenConsoleBuild -p:Configuration=Release` silently loses the switches.** PowerShell
