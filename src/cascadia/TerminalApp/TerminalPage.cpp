@@ -3270,7 +3270,7 @@ namespace winrt::TerminalApp::implementation
     }
     CATCH_LOG();
 
-    safe_void_coroutine TerminalPage::_OpenHyperlinkHandler(const IInspectable /*sender*/, const Microsoft::Terminal::Control::OpenHyperlinkEventArgs eventArgs)
+    safe_void_coroutine TerminalPage::_OpenHyperlinkHandler(const IInspectable sender, const Microsoft::Terminal::Control::OpenHyperlinkEventArgs eventArgs)
     {
         try
         {
@@ -3300,7 +3300,13 @@ namespace winrt::TerminalApp::implementation
 
                 if (shouldLaunch)
                 {
-                    ShellExecuteW(nullptr, L"open", uriString.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+                    const auto distro = _GetWslDistroForControl(sender);
+                    const auto target = Utils::ResolveFileUriTarget(uriString, distro);
+                    const auto res = ShellExecuteW(nullptr, L"open", target.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+                    if (reinterpret_cast<INT_PTR>(res) <= 32)
+                    {
+                        _ShowCouldNotOpenDialog(RS_(L"InvalidUriText"), uriString);
+                    }
                 }
             }
             else
@@ -3313,6 +3319,123 @@ namespace winrt::TerminalApp::implementation
             LOG_CAUGHT_EXCEPTION();
             _ShowCouldNotOpenDialog(RS_(L"InvalidUriText"), eventArgs.Uri());
         }
+    }
+
+    std::wstring TerminalPage::_GetDefaultWslDistro()
+    {
+        wil::unique_hkey lxssKey;
+        if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Lxss", 0, KEY_READ, &lxssKey) == ERROR_SUCCESS)
+        {
+            std::wstring defaultGuid;
+            auto result = wil::AdaptFixedSizeToAllocatedResult<std::wstring, 256>(defaultGuid, [&](PWSTR value, size_t valueLength, size_t* valueLengthNeededWithNull) -> HRESULT {
+                auto length = gsl::narrow<DWORD>(valueLength * sizeof(wchar_t));
+                const auto status = RegQueryValueExW(lxssKey.get(), L"DefaultDistribution", 0, nullptr, reinterpret_cast<BYTE*>(value), &length);
+                *valueLengthNeededWithNull = (length + sizeof(wchar_t) - 1) / sizeof(wchar_t);
+                return status == ERROR_MORE_DATA ? S_OK : HRESULT_FROM_WIN32(status);
+            });
+
+            if (result == S_OK)
+            {
+                wil::unique_hkey distroKey;
+                if (RegOpenKeyExW(lxssKey.get(), defaultGuid.c_str(), 0, KEY_READ, &distroKey) == ERROR_SUCCESS)
+                {
+                    std::wstring distroName;
+                    result = wil::AdaptFixedSizeToAllocatedResult<std::wstring, 256>(distroName, [&](PWSTR value, size_t valueLength, size_t* valueLengthNeededWithNull) -> HRESULT {
+                        auto length = gsl::narrow<DWORD>(valueLength * sizeof(wchar_t));
+                        const auto status = RegQueryValueExW(distroKey.get(), L"DistributionName", 0, nullptr, reinterpret_cast<BYTE*>(value), &length);
+                        *valueLengthNeededWithNull = (length + sizeof(wchar_t) - 1) / sizeof(wchar_t);
+                        return status == ERROR_MORE_DATA ? S_OK : HRESULT_FROM_WIN32(status);
+                    });
+
+                    if (result == S_OK)
+                    {
+                        return distroName;
+                    }
+                }
+            }
+        }
+        return {};
+    }
+
+    std::wstring TerminalPage::_GetWslDistroForControl(const IInspectable& sender) const
+    {
+        Profile profile{ nullptr };
+        if (const auto termControl = sender.try_as<TermControl>())
+        {
+            for (const auto& tab : _tabs)
+            {
+                if (const auto tabImpl{ _GetTabImpl(tab) })
+                {
+                    if (const auto& rootPane = tabImpl->GetRootPane())
+                    {
+                        rootPane->WalkTree([&](const auto& pane) {
+                            if (pane->GetTerminalControl() == termControl)
+                            {
+                                profile = pane->GetProfile();
+                            }
+                        });
+                        if (profile)
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (profile)
+        {
+            const std::wstring cmd{ profile.Commandline() };
+            if (!cmd.empty())
+            {
+                int argc = 0;
+                wil::unique_hlocal_ptr<PWSTR[]> argv{ CommandLineToArgvW(cmd.c_str(), &argc) };
+                if (argv)
+                {
+                    for (int i = 0; i < argc; ++i)
+                    {
+                        const std::wstring_view arg{ argv.get()[i] };
+                        if (arg == L"-d" || arg == L"--distribution")
+                        {
+                            if (i + 1 < argc)
+                            {
+                                return std::wstring{ argv.get()[i + 1] };
+                            }
+                        }
+                        else if (til::starts_with_insensitive_ascii(arg, L"-d=") || til::starts_with_insensitive_ascii(arg, L"--distribution="))
+                        {
+                            const auto eqPos = arg.find(L'=');
+                            return std::wstring{ arg.substr(eqPos + 1) };
+                        }
+                    }
+                }
+            }
+        }
+
+        return _GetDefaultWslDistro();
+    }
+
+    bool TerminalPage::_IsLocalHostname(const std::wstring_view host) noexcept
+    {
+        if (til::equals_insensitive_ascii(host, L"localhost") || til::equals_insensitive_ascii(host, L"127.0.0.1") || host == L"::1")
+        {
+            return true;
+        }
+
+        wchar_t buffer[256];
+        DWORD size = static_cast<DWORD>(std::size(buffer));
+        if (GetComputerNameExW(ComputerNameDnsHostname, buffer, &size) && til::equals_insensitive_ascii(host, std::wstring_view{ buffer, size }))
+        {
+            return true;
+        }
+
+        size = static_cast<DWORD>(std::size(buffer));
+        if (GetComputerNameExW(ComputerNameNetBIOS, buffer, &size) && til::equals_insensitive_ascii(host, std::wstring_view{ buffer, size }))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     // Method Description:
@@ -3365,12 +3488,11 @@ namespace winrt::TerminalApp::implementation
                 return true;
             }
 
-            // TODO: by the OSC 8 spec, if a hostname (other than localhost) is provided, we _should_ be
-            // comparing that value against what is returned by GetComputerNameExW and making sure they match.
-            // However, ShellExecute does not seem to be happy with file URIs of the form
-            //          file://{hostname}/path/to/file.ext
-            // and so while we could do the hostname matching, we do not know how to actually open the URI
-            // if its given in that form. So for now we ignore all hostnames other than localhost
+            if (_IsLocalHostname(host))
+            {
+                return true;
+            }
+
             return false;
         }
 

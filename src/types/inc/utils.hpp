@@ -133,6 +133,10 @@ namespace Microsoft::Console::Utils
     // Same deal, but in TerminalPage::_evaluatePathForCwd
     std::wstring EvaluateStartingDirectory(std::wstring_view cwd, std::wstring_view startingDirectory);
 
+    // Used in TerminalPage::_OpenHyperlinkHandler to resolve file:// URIs (such as POSIX
+    // /home/... or /mnt/... paths emitted from WSL) to launchable Windows/UNC targets.
+    std::wstring ResolveFileUriTarget(std::wstring_view uriString, std::wstring_view profileDistro);
+
     bool IsWindows11() noexcept;
 
     bool IsLikelyToBeEmojiOrSymbolIcon(std::wstring_view text) noexcept;

@@ -34,6 +34,7 @@ class UtilsTests
     TEST_METHOD(TestDontTrimTrailingWhitespace);
 
     TEST_METHOD(TestEvaluateStartingDirectory);
+    TEST_METHOD(TestResolveFileUriTarget);
 
     void _VerifyXTermColorResult(const std::wstring_view wstr, DWORD colorValue);
     void _VerifyXTermColorInvalid(const std::wstring_view wstr);
@@ -618,3 +619,36 @@ void UtilsTests::TestEvaluateStartingDirectory()
         test(L"/dev", cwd, L"/dev");
     }
 }
+
+void UtilsTests::TestResolveFileUriTarget()
+{
+    // Non-file URIs are unchanged
+    VERIFY_ARE_EQUAL(LR"(https://github.com/microsoft/terminal)", ResolveFileUriTarget(LR"(https://github.com/microsoft/terminal)", L"Ubuntu"));
+    VERIFY_ARE_EQUAL(LR"(http://localhost:8080/)", ResolveFileUriTarget(LR"(http://localhost:8080/)", L"Ubuntu"));
+
+    // Standard Windows drive file URIs
+    VERIFY_ARE_EQUAL(LR"(C:\Users\steve\file.txt)", ResolveFileUriTarget(LR"(file:///C:/Users/steve/file.txt)", L"Ubuntu"));
+    VERIFY_ARE_EQUAL(LR"(C:\Program Files\App\doc.md)", ResolveFileUriTarget(LR"(file:///C:/Program%20Files/App/doc.md)", L"Ubuntu"));
+    VERIFY_ARE_EQUAL(LR"(D:\data\test.cpp)", ResolveFileUriTarget(LR"(file://localhost/D:/data/test.cpp)", L"Ubuntu"));
+
+    // Explicit WSL UNC URIs
+    VERIFY_ARE_EQUAL(LR"(\\wsl.localhost\Ubuntu\home\stevenp\test.md)", ResolveFileUriTarget(LR"(file://wsl.localhost/Ubuntu/home/stevenp/test.md)", L"Ubuntu"));
+    VERIFY_ARE_EQUAL(LR"(\\wsl$\Debian\etc\hosts)", ResolveFileUriTarget(LR"(file://wsl$/Debian/etc/hosts)", L"Ubuntu"));
+    VERIFY_ARE_EQUAL(LR"(\\wsl.localhost\Ubuntu\home\stevenp\my plan.md)", ResolveFileUriTarget(LR"(file://wsl.localhost/Ubuntu/home/stevenp/my%20plan.md)", L"Ubuntu"));
+
+    // /mnt/<letter>/ Windows mounted drives in WSL
+    VERIFY_ARE_EQUAL(LR"(C:\Users\steve\file.txt)", ResolveFileUriTarget(LR"(file:///mnt/c/Users/steve/file.txt)", L"Ubuntu"));
+    VERIFY_ARE_EQUAL(LR"(D:\projects\code.rs)", ResolveFileUriTarget(LR"(file:///mnt/d/projects/code.rs)", L"Ubuntu"));
+    VERIFY_ARE_EQUAL(LR"(C:\)", ResolveFileUriTarget(LR"(file:///mnt/c)", L"Ubuntu"));
+    VERIFY_ARE_EQUAL(LR"(C:\)", ResolveFileUriTarget(LR"(file:///mnt/c/)", L"Ubuntu"));
+
+    // POSIX / WSL paths with profile distro
+    VERIFY_ARE_EQUAL(LR"(\\wsl.localhost\Ubuntu\home\stevenp\test.md)", ResolveFileUriTarget(LR"(file:///home/stevenp/test.md)", L"Ubuntu"));
+    VERIFY_ARE_EQUAL(LR"(\\wsl.localhost\Debian\etc\fstab)", ResolveFileUriTarget(LR"(file:///etc/fstab)", L"Debian"));
+    VERIFY_ARE_EQUAL(LR"(\\wsl.localhost\Ubuntu\home\stevenp\my plan.md)", ResolveFileUriTarget(LR"(file:///home/stevenp/my%20plan.md)", L"Ubuntu"));
+    VERIFY_ARE_EQUAL(LR"(\\wsl.localhost\Ubuntu\home\stevenp\test.md)", ResolveFileUriTarget(LR"(file://localhost/home/stevenp/test.md)", L"Ubuntu"));
+
+    // POSIX paths without distro return local path representation
+    VERIFY_ARE_EQUAL(LR"(\home\stevenp\test.md)", ResolveFileUriTarget(LR"(file:///home/stevenp/test.md)", L""));
+}
+

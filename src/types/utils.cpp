@@ -9,6 +9,7 @@
 
 #include "inc/colorTable.hpp"
 
+#include <shlwapi.h>
 #include <icu.h>
 
 using namespace Microsoft::Console;
@@ -1328,3 +1329,71 @@ bool Utils::IsLikelyToBeEmojiOrSymbolIcon(std::wstring_view text) noexcept
     }
     return off == gsl::narrow_cast<int32_t>(text.size());
 }
+
+std::wstring Utils::ResolveFileUriTarget(std::wstring_view uriString, std::wstring_view profileDistro)
+{
+    if (!til::starts_with_insensitive_ascii(uriString, L"file://"))
+    {
+        return std::wstring{ uriString };
+    }
+
+    std::wstring buffer;
+    DWORD bufferLen = MAX_PATH;
+    buffer.resize(bufferLen);
+    const std::wstring rawUri{ uriString };
+    auto hr = PathCreateFromUrlW(rawUri.c_str(), buffer.data(), &bufferLen, 0);
+    if (hr == E_POINTER)
+    {
+        buffer.resize(bufferLen);
+        hr = PathCreateFromUrlW(rawUri.c_str(), buffer.data(), &bufferLen, 0);
+    }
+
+    if (FAILED(hr) || bufferLen == 0)
+    {
+        return std::wstring{ uriString };
+    }
+
+    buffer.resize(bufferLen);
+    const std::wstring_view path{ buffer };
+
+    // 1. Windows drive path (e.g. C:\foo\bar)
+    if (path.size() >= 2 && iswalpha(path[0]) && path[1] == L':')
+    {
+        return buffer;
+    }
+
+    // 2. UNC path (e.g. \\wsl.localhost\Ubuntu\... or \\server\share\...)
+    if (path.size() >= 2 && path[0] == L'\\' && path[1] == L'\\')
+    {
+        return buffer;
+    }
+
+    // 3. /mnt/<letter>/... mounted Windows path (represented as \mnt\<letter>\... by PathCreateFromUrl)
+    if (path.size() >= 6 &&
+        til::starts_with_insensitive_ascii(path, LR"(\mnt\)") &&
+        iswalpha(path[5]) &&
+        (path.size() == 6 || path[6] == L'\\'))
+    {
+        std::wstring winPath;
+        winPath.push_back(towupper(path[5]));
+        winPath.push_back(L':');
+        if (path.size() > 6)
+        {
+            winPath.append(path.substr(6));
+        }
+        else
+        {
+            winPath.push_back(L'\\');
+        }
+        return winPath;
+    }
+
+    // 4. POSIX / WSL path (starts with \)
+    if (!path.empty() && path[0] == L'\\' && !profileDistro.empty())
+    {
+        return fmt::format(LR"(\\wsl.localhost\{}{})", profileDistro, path);
+    }
+
+    return buffer;
+}
+
