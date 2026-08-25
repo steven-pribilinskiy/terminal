@@ -350,6 +350,7 @@ namespace winrt::TerminalApp::implementation
         _tabRow.WorkspaceName(_WindowProperties.WindowName());
 
         _tabRow.PromoteRequested({ get_weak(), &TerminalPage::_PromoteSlotRequested });
+        _tabRow.CopyBuildInfoRequested({ get_weak(), &TerminalPage::_CopyBuildInfoRequested });
         RefreshPendingPromotion();
 
         // Rebuild the workspace flyout each time it opens so it always

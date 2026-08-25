@@ -307,6 +307,7 @@ namespace winrt::TerminalApp::implementation
         hstring _describePromotionCost();
         bool _armPromotionHelper(bool relaunch);
         safe_void_coroutine _PromoteSlotRequested(Windows::Foundation::IInspectable sender, Windows::Foundation::IInspectable args);
+        void _CopyBuildInfoRequested(const Windows::Foundation::IInspectable& sender, const Windows::Foundation::IInspectable& args);
 
         void _UpdateTabIndices();
 
@@ -348,6 +349,7 @@ namespace winrt::TerminalApp::implementation
         std::shared_ptr<Toast> _actionSavedToast{ nullptr };
         std::shared_ptr<Toast> _actionSaveFailedToast{ nullptr };
         std::shared_ptr<Toast> _windowCwdToast{ nullptr };
+        std::shared_ptr<Toast> _buildInfoCopiedToast{ nullptr };
 
         winrt::Windows::UI::Xaml::Controls::TextBox::LayoutUpdated_revoker _renamerLayoutUpdatedRevoker;
         int _renamerLayoutCount{ 0 };

@@ -12,6 +12,7 @@
 
 #include "pch.h"
 #include "TerminalPage.h"
+#include "BuildInfo.h"
 #include "SlotPromotion.h"
 #include "WindowListRequest.g.h"
 
@@ -177,5 +178,40 @@ namespace winrt::TerminalApp::implementation
     {
         LOG_CAUGHT_EXCEPTION();
         return false;
+    }
+
+    // The badge says which build this window is; this puts that answer on the
+    // clipboard, because the place you need it is a bug report or a message to
+    // someone else, and reading it off a tooltip to retype it is the whole
+    // friction. Same text the About dialog copies -- see BuildInfo::ClipboardText.
+    void TerminalPage::_CopyBuildInfoRequested(const IInspectable& /*sender*/, const IInspectable& /*args*/)
+    {
+        using namespace winrt::Windows::ApplicationModel::DataTransfer;
+        using namespace winrt::Microsoft::Terminal::Settings::Model;
+
+        DataPackage package;
+        package.SetText(::TerminalApp::BuildInfo::ClipboardText(CascadiaSettings::ApplicationDisplayName(),
+                                                                CascadiaSettings::ApplicationVersion()));
+        Clipboard::SetContent(package);
+
+        // The badge does not change when clicked, so without a confirmation a
+        // successful copy and a dead button look identical.
+        if (_buildInfoCopiedToast == nullptr)
+        {
+            if (auto tip{ FindName(L"BuildInfoCopiedToast").try_as<winrt::Microsoft::UI::Xaml::Controls::TeachingTip>() })
+            {
+                _buildInfoCopiedToast = std::make_shared<Toast>(tip);
+                // IsLightDismissEnabled == true is bugged in Xaml Islands: another
+                // window opening a tip dismisses this one immediately (MUX#4382).
+                tip.IsLightDismissEnabled(false);
+                tip.Closed({ get_weak(), &TerminalPage::_FocusActiveControl });
+            }
+        }
+        _UpdateTeachingTipTheme(BuildInfoCopiedToast().try_as<winrt::Windows::UI::Xaml::FrameworkElement>());
+
+        if (_buildInfoCopiedToast != nullptr)
+        {
+            _buildInfoCopiedToast->Open();
+        }
     }
 }

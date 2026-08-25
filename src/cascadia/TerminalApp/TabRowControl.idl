@@ -22,5 +22,6 @@ namespace TerminalApp
         Boolean PromotionAvailable;
         String PromotionDescription;
         event Windows.Foundation.TypedEventHandler<Object, Object> PromoteRequested;
+        event Windows.Foundation.TypedEventHandler<Object, Object> CopyBuildInfoRequested;
     }
 }

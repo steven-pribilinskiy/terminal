@@ -146,13 +146,33 @@
                         </ToolTipService.ToolTip>
                     </Button>
 
-                    <!--  x:Name must not collide with the SlotBadge property, or x:Bind resolves to this element.  -->
-                    <Border x:Name="SlotBadgeBorder"
+                    <!--
+                        A Button rather than the Border this used to be, because it
+                        is now a click target: the Border gave no hover, no focus
+                        rect and no automation peer, so the only way to discover the
+                        copy was to be told about it, and a keyboard could not reach
+                        it at all.
+
+                        MinWidth/MinHeight are the catch. The default Button style
+                        sets both to 32, where a Border has neither, so adopting the
+                        style without clearing them grows the badge and shoves the
+                        new tab button sideways. Zeroed here, with the Border's own
+                        padding, radius and brushes carried over unchanged, so the
+                        box is byte-for-byte what it was and only the states are new.
+
+                        x:Name must not collide with the SlotBadge property, or
+                        x:Bind resolves to this element.
+                    -->
+                    <Button x:Name="SlotBadgeButton"
+                            x:Uid="SlotBadgeButton"
+                            MinWidth="0"
+                            MinHeight="0"
                             Padding="6,1"
                             VerticalAlignment="Center"
                             Background="{ThemeResource SystemControlBackgroundBaseLowBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1"
+                            Click="OnSlotBadgeClick"
                             CornerRadius="3"
                             Visibility="{x:Bind ShowSlotBadge}">
                         <TextBlock FontFamily="Cascadia Mono, Consolas, monospace"
@@ -170,11 +190,13 @@
                                          Text="{x:Bind BuildCommit}" />
                                     <Run Text="(" /><Run Text="{x:Bind BuildBranch}" /><Run Text=")" /> <LineBreak />
                                     <Run x:Uid="AboutDialog_BuiltLabel" />
-                                    <Run Text="{x:Bind BuildTime}" />
+                                    <Run Text="{x:Bind BuildTime}" /> <LineBreak />
+                                    <Run x:Uid="SlotBadgeButton_TooltipHint"
+                                         FontStyle="Italic" />
                                 </TextBlock>
                             </ToolTip>
                         </ToolTipService.ToolTip>
-                    </Border>
+                    </Button>
                 </StackPanel>
 
                 <mux:SplitButton x:Name="NewTabButton"

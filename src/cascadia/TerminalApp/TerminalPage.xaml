@@ -206,6 +206,16 @@
                          x:Load="False"
                          IsLightDismissEnabled="True" />
 
+        <!--
+            Confirms that clicking the slot badge put something on the clipboard.
+            Without it the click is indistinguishable from a click that did
+            nothing, since the badge itself does not change.
+        -->
+        <mux:TeachingTip x:Name="BuildInfoCopiedToast"
+                         x:Uid="BuildInfoCopiedToast"
+                         x:Load="False"
+                         IsLightDismissEnabled="True" />
+
         <mux:TeachingTip x:Name="ActionSavedToast"
                          x:Uid="ActionSavedToast"
                          Title="Action Saved"

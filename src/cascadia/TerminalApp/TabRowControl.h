@@ -17,8 +17,12 @@ namespace winrt::TerminalApp::implementation
         void OnNewTabButtonDrop(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::DragEventArgs& e);
         void OnNewTabButtonDragOver(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::DragEventArgs& e);
         void OnPromoteSlotButtonClick(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::RoutedEventArgs& args);
+        void OnSlotBadgeClick(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::RoutedEventArgs& args);
 
         til::typed_event<> PromoteRequested;
+        // The badge reports the intent; TerminalPage owns the clipboard and the
+        // toast, the same split PromoteRequested uses.
+        til::typed_event<> CopyBuildInfoRequested;
 
         til::property_changed_event PropertyChanged;
         WINRT_OBSERVABLE_PROPERTY(bool, ShowElevationShield, PropertyChanged.raise, false);

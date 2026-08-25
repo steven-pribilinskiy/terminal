@@ -57,14 +57,12 @@ namespace winrt::TerminalApp::implementation
         return ::TerminalApp::BuildInfo::BuildTime();
     }
 
-    // One line with everything needed to identify this binary, for pasting into
-    // a bug report.
+    // Everything needed to identify this binary, for pasting into a bug report.
+    // The text itself lives in BuildInfo so this and the tab row badge cannot copy
+    // different things -- they are the two places you reach for the same answer.
     winrt::hstring AboutDialog::BuildInfoForClipboard()
     {
-        return winrt::hstring{ fmt::format(FMT_COMPILE(L"{} {} {}"),
-                                           ApplicationDisplayName(),
-                                           ApplicationVersion(),
-                                           ::TerminalApp::BuildInfo::OneLine()) };
+        return ::TerminalApp::BuildInfo::ClipboardText(ApplicationDisplayName(), ApplicationVersion());
     }
 
     void AboutDialog::_CopyBuildInfoOnClick(const IInspectable& /*sender*/, const Windows::UI::Xaml::RoutedEventArgs& /*eventArgs*/)

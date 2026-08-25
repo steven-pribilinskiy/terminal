@@ -867,6 +867,18 @@
     <value>A newer build is staged for this slot</value>
     <comment>First line of the tooltip on the UPDATE button; the second line names the staged build</comment>
   </data>
+  <data name="SlotBadgeButton.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Copy this build's details to the clipboard</value>
+    <comment>Screen reader name for the DEV/TEST badge in the tab row of a local developer build. The badge is a button; clicking it copies the build's commit, branch, build time and file path.</comment>
+  </data>
+  <data name="SlotBadgeButton_TooltipHint.Text" xml:space="preserve">
+    <value>Click to copy</value>
+    <comment>Last line of the tooltip on the DEV/TEST badge, telling the reader the badge is clickable. The lines above it show the commit, branch and build time.</comment>
+  </data>
+  <data name="BuildInfoCopiedToast.Title" xml:space="preserve">
+    <value>Build info copied</value>
+    <comment>Brief confirmation shown after clicking the DEV/TEST badge in the tab row, which copies the build's details to the clipboard</comment>
+  </data>
   <data name="PromoteSlotDialog_Title" xml:space="preserve">
     <value>Promote the staged build?</value>
     <comment>Title of the dialog asking whether to replace the running local developer build with a newer one</comment>

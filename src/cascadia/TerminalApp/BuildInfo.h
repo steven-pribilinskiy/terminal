@@ -117,4 +117,43 @@ namespace TerminalApp::BuildInfo
                                            Branch(),
                                            TERMINAL_BUILD_TIMESTAMP_STRING) };
     }
+
+    // The binary that is actually running. A commit alone does not say WHICH
+    // install you are looking at -- the slots are unpacked copies of the same
+    // build, so when two of them disagree the path is the thing that tells them
+    // apart. GetModuleFileNameW is right packaged or not, and needs no package API.
+    inline winrt::hstring ExePath()
+    {
+        // Grow rather than assume MAX_PATH: the API truncates and (since Windows
+        // 2000) sets ERROR_INSUFFICIENT_BUFFER instead of failing, so a long path
+        // would otherwise be silently reported as a shorter one that does not exist.
+        std::wstring path(MAX_PATH, L'\0');
+        for (;;)
+        {
+            const auto written{ ::GetModuleFileNameW(nullptr, path.data(), static_cast<DWORD>(path.size())) };
+            if (written == 0)
+            {
+                return winrt::hstring{};
+            }
+            if (written < path.size())
+            {
+                path.resize(written);
+                return winrt::hstring{ path };
+            }
+            path.resize(path.size() * 2);
+        }
+    }
+
+    // What goes on the clipboard: the one-liner, then the binary's absolute path
+    // on its own line. Shared by the About dialog and the tab row badge so the two
+    // copy the same bytes -- CRLF because this is Windows clipboard text and a lone
+    // LF pastes as one run-on line in Notepad and most edit controls.
+    inline winrt::hstring ClipboardText(const winrt::hstring& displayName, const winrt::hstring& version)
+    {
+        return winrt::hstring{ fmt::format(FMT_COMPILE(L"{} {} {}\r\n{}"),
+                                           displayName,
+                                           version,
+                                           OneLine(),
+                                           ExePath()) };
+    }
 }

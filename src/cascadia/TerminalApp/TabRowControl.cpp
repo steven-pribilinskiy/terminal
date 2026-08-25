@@ -66,6 +66,15 @@ namespace winrt::TerminalApp::implementation
         PromoteRequested.raise(*this, nullptr);
     }
 
+    // The badge already says which build this is; clicking it puts that answer
+    // somewhere you can paste it. Only asks, for the same reason the promote
+    // button only asks: the clipboard and the confirmation are TerminalPage's.
+    void TabRowControl::OnSlotBadgeClick(const winrt::Windows::Foundation::IInspectable& /*sender*/,
+                                         const winrt::Windows::UI::Xaml::RoutedEventArgs& /*args*/)
+    {
+        CopyBuildInfoRequested.raise(*this, nullptr);
+    }
+
     // Method Description:
     // - Bound in the Xaml editor to the [+] button.
     // Arguments:
