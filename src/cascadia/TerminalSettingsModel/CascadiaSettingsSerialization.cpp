@@ -573,8 +573,49 @@ bool SettingsLoader::AddDynamicProfileFolders()
     if (sshProfilesGenerated && !state->SSHFolderGenerated())
     {
         SshHostGenerator sshGenerator;
+        const auto sshNamespace = sshGenerator.GetNamespace();
+
+        // Check if userSettings.globals->NewTabMenu() already contains a folder or matchProfiles entry for SSH
+        bool hasSshEntry = false;
+        std::function<void(const Model::NewTabMenuEntry&)> checkEntry = [&](const Model::NewTabMenuEntry& entry) {
+            if (entry.Type() == NewTabMenuEntryType::MatchProfiles)
+            {
+                if (const auto matchEntry{ entry.try_as<Model::MatchProfilesEntry>() })
+                {
+                    if (matchEntry.Source() == sshNamespace)
+                    {
+                        hasSshEntry = true;
+                    }
+                }
+            }
+            else if (entry.Type() == NewTabMenuEntryType::Folder)
+            {
+                if (const auto folderEntry{ entry.try_as<Model::FolderEntry>() })
+                {
+                    for (const auto& nestedEntry : folderEntry.RawEntries())
+                    {
+                        checkEntry(nestedEntry);
+                    }
+                }
+            }
+        };
+
+        if (const auto& menu = userSettings.globals->NewTabMenu())
+        {
+            for (const auto& entry : menu)
+            {
+                checkEntry(entry);
+            }
+        }
+
+        if (hasSshEntry)
+        {
+            state->SSHFolderGenerated(true);
+            return false;
+        }
+
         auto matchProfilesEntry = make_self<implementation::MatchProfilesEntry>();
-        matchProfilesEntry->Source(hstring{ sshGenerator.GetNamespace() });
+        matchProfilesEntry->Source(hstring{ sshNamespace });
 
         auto folderEntry = make_self<implementation::FolderEntry>();
         folderEntry->Name(L"SSH");

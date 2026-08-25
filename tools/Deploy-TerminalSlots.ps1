@@ -169,13 +169,18 @@ if (-not $StageOnly) {
     # doc/building.md removes the package first for the same reason.
     $existing = Get-AppxPackage -Name 'WindowsTerminalTest' -ErrorAction SilentlyContinue
 
-    # Removing a package deletes its app data, and the Test slot's settings.json is
-    # worth keeping across deploys -- it is where the slot gets configured to look
-    # like anything other than a bare default profile.
-    $testLocalState = "$env:LOCALAPPDATA\Packages\WindowsTerminalTest_8wekyb3d8bbwe\LocalState\settings.json"
+    # Removing a package deletes its app data. The Test slot's settings.json and
+    # state.json are worth keeping across deploys so customizations and migration state persist.
+    $testLocalStateDir = "$env:LOCALAPPDATA\Packages\WindowsTerminalTest_8wekyb3d8bbwe\LocalState"
+    $testLocalStateSettings = Join-Path $testLocalStateDir 'settings.json'
+    $testLocalStateState = Join-Path $testLocalStateDir 'state.json'
     $savedSettings = $null
-    if (Test-Path $testLocalState) {
-        $savedSettings = Get-Content $testLocalState -Raw -ErrorAction SilentlyContinue
+    $savedState = $null
+    if (Test-Path $testLocalStateSettings) {
+        $savedSettings = Get-Content $testLocalStateSettings -Raw -ErrorAction SilentlyContinue
+    }
+    if (Test-Path $testLocalStateState) {
+        $savedState = Get-Content $testLocalStateState -Raw -ErrorAction SilentlyContinue
     }
 
     if ($existing) {
@@ -190,11 +195,16 @@ if (-not $StageOnly) {
         throw "Test slot did not register from $TestStage (still: $($now.InstallLocation))"
     }
 
-    if ($savedSettings) {
-        $dir = Split-Path -Parent $testLocalState
-        New-Item -ItemType Directory -Force -Path $dir | Out-Null
-        Set-Content -Path $testLocalState -Value $savedSettings -Encoding UTF8
-        Write-Host '   restored Test slot settings.json' -ForegroundColor DarkGray
+    if ($savedSettings -or $savedState) {
+        New-Item -ItemType Directory -Force -Path $testLocalStateDir | Out-Null
+        if ($savedSettings) {
+            Set-Content -Path $testLocalStateSettings -Value $savedSettings -Encoding UTF8
+            Write-Host '   restored Test slot settings.json' -ForegroundColor DarkGray
+        }
+        if ($savedState) {
+            Set-Content -Path $testLocalStateState -Value $savedState -Encoding UTF8
+            Write-Host '   restored Test slot state.json' -ForegroundColor DarkGray
+        }
     }
 }
 
