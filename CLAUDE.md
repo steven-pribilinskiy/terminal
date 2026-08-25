@@ -250,11 +250,16 @@ inverted conclusion this section exists to prevent.
 about where a slot points. One command, every time:
 
 ```powershell
-Get-AppxPackage WindowsTerminalDev, WindowsTerminalTest | Select-Object Name, InstallLocation
+Get-AppxPackage -Name 'WindowsTerminal*' | Select-Object Name, InstallLocation
 ```
 
 If `WindowsTerminalDev`'s `InstallLocation` is the directory you were about to write to — **stop and
 tell me.** Do not "just this once" it.
+
+The two-name form (`Get-AppxPackage Dev, Test`) reads better and **throws under Windows PowerShell
+5.1** — `-Name` is `[string]` there, not `[string[]]`, so it dies with a parameter-binding error
+before checking anything. A mandated check that errors is a check that gets skipped, and 5.1 is what
+`powershell.exe` still resolves to. The wildcard works in both shells.
 
 Each slot has its own package identity, so each has its own settings:
 `%LOCALAPPDATA%\Packages\WindowsTerminal{Dev,Test}_8wekyb3d8bbwe\LocalState\settings.json`.
@@ -269,8 +274,13 @@ doctrine above in its own header, and it is careful in ways a hand-rolled `makea
 pair is not:
 
 ```powershell
-.\tools\Deploy-TerminalSlots.ps1        # -NoBuild to skip the compile, -StageOnly to skip registering
+pwsh -File .\tools\Deploy-TerminalSlots.ps1   # -NoBuild skips the compile, -StageOnly skips registering
 ```
+
+**`pwsh`, not `powershell`.** `OpenConsole.psm1` is `#requires -Version 7.0`, so under 5.1 the deploy
+dies importing it — before building, packaging or registering anything. From WSL that is the default
+you get, and piping the run through `tail` hides it further: the pipeline reports `tail`'s exit code,
+so a deploy that never started reads as success.
 
 What it does, in order: build the solution once → package the Test branding → package the Dev
 branding → unpack both into `C:\TerminalSlots\{test,dev}` → write `C:\TerminalSlots\dev-pending.json`
