@@ -83,28 +83,30 @@ number), whether someone has an open PR for it, whether it was tried and rejecte
 maintainers' comments should shape the design. If there's an existing issue, the work references
 it; if there's an open PR, say so and let me decide whether to build on it, wait, or go our own way.
 
-This is not bureaucracy — it is the cheapest way to avoid building something that already exists,
-was already refused, or is about to conflict with work in flight. **It has already cost us once
-this session:** #20400 bumps the bundled nuget to 7.6.0, and upstream landed exactly that bump
-themselves in `ede38e0a7` ("chore: update bundled nuget to 7.6", #20511) — byte-identical binary —
-while our PR sat in review. Half of that PR was redundant before it was ever looked at, and a
-search would have caught it.
+This is not bureaucracy — it is the cheapest way to avoid building something that already exists or
+was already refused, and it still pays now that nothing goes back: what upstream has already done
+arrives here on the next merge, so building it again means writing a conflict for myself. **It has
+cost us once already:** work went into bumping the bundled nuget to 7.6.0 while upstream landed the
+identical bump themselves (`ede38e0a7`, "chore: update bundled nuget to 7.6") — a byte-identical
+binary, redundant before anyone looked at it, and one search would have caught it.
 
 Also check `git log upstream/main` for the area you're about to touch: upstream may have reworked
 it since our last merge (per-window settings, #20328, is a live example in the settings editor).
 
-## HARD REQUIREMENT: pay it back — open an upstream PR
+## HARD REQUIREMENT: never open a pull request against microsoft/terminal
 
-**Landing a change in my fork is not the end of it.** When a change fixes a real bug or adds
-something upstream would plausibly want, open a PR against microsoft/terminal as well. I benefit
-from this project; contributions go back.
+**This fork sends nothing upstream. Do not open, reopen, or prepare a PR against
+microsoft/terminal — not for a bug fix, not for something they would obviously want, not "ready if
+you want it later".** Do not cut a branch off `upstream/main` for that purpose, and do not ask me
+whether this one is worth sending. It never is; that is what changed.
 
-- The upstream PR branch is cut from **`upstream/main`** (see below), carrying only that change —
-  never my fork-only commits.
-- Reference the issue it closes, and follow the repo's `CONTRIBUTING.md`.
-- Expect a slow queue and design pushback; that's normal here and is not a reason to skip it.
-- Fork-only work — things upstream would clearly never take, or that are purely my preference —
-  doesn't need a PR. Use judgement, and say which call you made.
+An earlier version of this file made the opposite a hard requirement, so treat any instinct to "pay
+it back" as a stale rule rather than a judgement call. Landing a change on `main` is the end of it.
+
+This is one-directional, not a break: upstream is still **merged in** for their bug and security
+fixes (see "Fork policy"), and their issues and PRs are still **read** before implementing anything
+(see above) — knowing a thing was already tried, already exists, or was rejected is worth as much
+when you are the only consumer. What stops is anything that pushes work outward.
 
 ## HARD REQUIREMENT: no Claude attribution, anywhere
 
@@ -112,11 +114,12 @@ from this project; contributions go back.
 commit messages or trailers, not in PR titles or bodies, not in issue or review comments, not in
 code comments, not in documentation, not in branch names.
 
-I take ownership of everything that goes out under my name. DHowett stated on #20390 that he will
-not merge PRs crediting Claude as a co-author, and both a `Co-Authored-By: Claude` trailer and a
-"Generated with Claude Code" footer had to be scrubbed from #20400 after the fact — don't recreate
-that cleanup. My global settings suppress it (`attribution: { commit: "", pr: "" }` in
-`~/.claude/settings.json`); never reintroduce it by hand, and never work around it.
+I take ownership of everything that goes out under my name. The rule stands on that alone — it was
+also what upstream required, and now that nothing goes upstream it is unchanged, because the history
+of this fork is mine and is read by me. A `Co-Authored-By: Claude` trailer and a "Generated with
+Claude Code" footer have both had to be scrubbed after the fact here; don't recreate that cleanup.
+My global settings suppress it (`attribution: { commit: "", pr: "" }` in `~/.claude/settings.json`);
+never reintroduce it by hand, and never work around it.
 
 ## Fork policy
 
@@ -129,8 +132,7 @@ that cleanup. My global settings suppress it (`attribution: { commit: "", pr: ""
 - Conflicts are resolved **in favour of my behaviour**, not upstream's. If upstream reworks
   something I've customised, keep mine and note it in the merge commit.
 - Don't "clean up" divergence from upstream. Divergence is the point.
-- Independence is not isolation: changes that fix a real issue still go upstream as a PR as well —
-  see "Pay it back" below.
+- Nothing goes back — see "never open a pull request" above. Upstream is a source, not a destination.
 
 ### Remotes
 
@@ -142,17 +144,14 @@ upstream  https://github.com/microsoft/terminal.git             (fetch only)
 `upstream`'s push URL is deliberately set to `DISABLED_no_pushes_to_microsoft` so a stray
 `git push upstream` fails loudly instead of attempting to write to Microsoft's repo.
 
-### Open upstream PRs — branch them off `upstream/main`, never off `main`
+### No open upstream PRs, and no branches cut for one
 
-I still have live PRs against microsoft/terminal:
+There are none, and there will be none. The two that existed (separate light & dark colour schemes
+in the Settings UI; the bundled nuget bump) were closed unmerged, and their work either lives on
+`main` or is abandoned deliberately.
 
-- **#20390** — separate light & dark colour schemes in the Settings UI (`feature/16984-colorscheme-pair-ui`)
-- **#20400** — bundled nuget 7.6.0 + refreshed CLI build guidance (`dev/steven/update-cli-build-guidance`)
-
-**Any branch intended for an upstream PR must be based on `upstream/main`.** Branching one off my
-`main` would drag every fork-only commit — *including this CLAUDE.md* — into the PR diff. Check
-before pushing a PR branch: `git log --oneline upstream/main..HEAD` should show only the commits
-that belong in that PR.
+So there is no longer any reason to branch off `upstream/main`. A branch here is for my own work in
+progress and is cut from `main` like any other.
 
 The no-Claude-attribution rule above applies to these branches too — and to the fork's own history.
 
@@ -203,9 +202,11 @@ Two more traps, both hit for real:
   strips the prefix, so MSBuild receives a bare `Configuration=Release` and dies with
   `MSB1008: Only one project can be specified`. Call `msbuild.exe` directly with `/p:` switches, or
   pass `--%` to stop PowerShell parsing.
-- **Restore fails on `main` until #20400 lands.** The bundled `dep/nuget/nuget.exe` is 4.1.0 (2017),
-  which predates `.slnx`: `Invalid input 'OpenConsole.slnx'. The file type was not recognized.`
-  Restore with a current nuget instead — `nuget restore OpenConsole.slnx` from
+- **Restore fails with the bundled nuget, permanently.** `dep/nuget/nuget.exe` is 4.1.0 (2017),
+  which predates `.slnx`: `Invalid input 'OpenConsole.slnx'. The file type was not recognized.` The
+  PR that would have bumped it was closed unmerged and nothing goes upstream now, so this is the
+  steady state rather than a wait — either bump the bundled copy on `main` as fork-only work, or
+  restore with a current nuget: `nuget restore OpenConsole.slnx` from
   <https://dist.nuget.org/win-x86-commandline/latest/nuget.exe>.
 
 ## The two slots: `wtt` is yours to break, `wtd` is production
