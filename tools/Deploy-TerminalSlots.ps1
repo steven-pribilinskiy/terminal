@@ -31,7 +31,18 @@ Param(
     # Skip the solution build and just repackage/deploy what is already built.
     [switch]$NoBuild,
     # Stage the Dev payload but do not register the Test slot either.
-    [switch]$StageOnly
+    [switch]$StageOnly,
+    # How many projects MSBuild may compile at once. 0 means one per core.
+    #
+    # Worth turning down when the machine is short of COMMIT rather than cores.
+    # Every parallel cl.exe reserves virtual memory for its precompiled header,
+    # and this repo uses a PCH everywhere, so a wide build multiplies that
+    # reservation by the core count. Past the commit limit it fails as
+    # "C3859: Failed to create virtual memory for PCH ... the paging file is too
+    # small", which reads like a disk problem and is really "too many compilers
+    # at once". A desktop with a big WSL VM resident is the usual way to get
+    # there: cores stay free while commit does not.
+    [int]$MaxCpuCount = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -68,6 +79,11 @@ if (-not (Get-Command msbuild.exe -ErrorAction SilentlyContinue)) {
     }
 }
 
+# `/m` with no number is one project per core. $MaxCpuCount replaces it when the
+# caller wants fewer -- see the parameter above for why cores are not the
+# constraint that runs out first.
+$ParallelSwitch = if ($MaxCpuCount -gt 0) { "/m:$MaxCpuCount" } else { '/m' }
+
 function Invoke-MsBuild {
     Param([string[]]$Arguments)
     & msbuild.exe @Arguments
@@ -76,7 +92,7 @@ function Invoke-MsBuild {
 
 if (-not $NoBuild) {
     Write-Host '== building solution ==' -ForegroundColor Cyan
-    Invoke-MsBuild @("$Root\OpenConsole.slnx", "/p:Configuration=$Config", "/p:Platform=$Platform", '/m', '/v:m', '/nologo')
+    Invoke-MsBuild @("$Root\OpenConsole.slnx", "/p:Configuration=$Config", "/p:Platform=$Platform", $ParallelSwitch, '/v:m', '/nologo')
 }
 
 # The wapproj is built directly for each branding, so SolutionDir has to be passed
@@ -98,13 +114,13 @@ if (Test-Path $pkgObj) {
 
 Write-Host '== packaging Test slot ==' -ForegroundColor Cyan
 Invoke-MsBuild @($wapproj, "/p:Configuration=$Config", "/p:Platform=$Platform",
-                 '/p:WindowsTerminalBranding=Test', "/p:SolutionDir=$Root\", '/m', '/v:m', '/nologo')
+                 '/p:WindowsTerminalBranding=Test', "/p:SolutionDir=$Root\", $ParallelSwitch, '/v:m', '/nologo')
 
 if (Test-Path $pkgObj) { Remove-Item -Recurse -Force $pkgObj -ErrorAction SilentlyContinue }
 
 Write-Host '== packaging Dev slot (staged, not installed) ==' -ForegroundColor Cyan
 Invoke-MsBuild @($wapproj, "/p:Configuration=$Config", "/p:Platform=$Platform",
-                 '/p:WindowsTerminalBranding=Dev', "/p:SolutionDir=$Root\", '/m', '/v:m', '/nologo')
+                 '/p:WindowsTerminalBranding=Dev', "/p:SolutionDir=$Root\", $ParallelSwitch, '/v:m', '/nologo')
 
 function Expand-Slot {
     Param([string]$MsixDir, [string]$Destination, [string]$Label, [switch]$Fresh)
