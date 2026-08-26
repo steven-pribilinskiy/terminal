@@ -355,8 +355,11 @@ namespace winrt::TerminalApp::implementation
             root.c_str(),
             false,
             wil::FolderChangeEvents::FileName | wil::FolderChangeEvents::LastWriteTime,
-            [this, markerBasename = std::filesystem::path{ ::TerminalApp::SlotPromotion::PendingMarkerName }](wil::FolderChangeEvent, PCWSTR fileModified) {
-                if (std::filesystem::path{ fileModified }.filename() == markerBasename)
+            [this](wil::FolderChangeEvent, PCWSTR fileModified) {
+                // Any producer's marker, not one fixed name: a fetched CI build
+                // writes its own, and matching only the local deploy's would
+                // leave that one unnoticed until something else refreshed.
+                if (::TerminalApp::SlotPromotion::IsPendingMarkerName(std::filesystem::path{ fileModified }.filename()))
                 {
                     _notifyPendingPromotion->Run();
                 }

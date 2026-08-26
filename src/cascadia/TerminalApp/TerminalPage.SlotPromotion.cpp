@@ -113,7 +113,11 @@ namespace winrt::TerminalApp::implementation
         }
 
         const auto applyNow{ result == ContentDialogResult::Secondary };
-        if (!strong->_armPromotionHelper(applyNow))
+        // Hand the helper the payload we actually offered. It has its own
+        // defaults for being run by hand, and those name the local deploy's
+        // directory -- so leaving it to guess would quietly promote a local
+        // build when the dialog described a fetched one.
+        if (!strong->_armPromotionHelper(applyNow, *pending))
         {
             co_return;
         }
@@ -137,7 +141,7 @@ namespace winrt::TerminalApp::implementation
     // Returns false if the helper could not be started, in which case we must
     // not quit - closing every window to accomplish nothing is the one outcome
     // worse than not promoting.
-    bool TerminalPage::_armPromotionHelper(bool relaunch)
+    bool TerminalPage::_armPromotionHelper(bool relaunch, const ::TerminalApp::SlotPromotion::StagedBuild& staged)
     try
     {
         const auto helper{ std::filesystem::path{ ::TerminalApp::SlotPromotion::SlotRoot } / L"Promote-DevSlot.ps1" };
@@ -147,9 +151,11 @@ namespace winrt::TerminalApp::implementation
             return false;
         }
 
-        const auto args{ fmt::format(LR"(-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "{}" -WaitForPid {}{})",
+        const auto args{ fmt::format(LR"(-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "{}" -WaitForPid {} -Staged "{}" -Marker "{}"{})",
                                      helper.wstring(),
                                      GetCurrentProcessId(),
+                                     std::wstring_view{ staged.Payload },
+                                     staged.MarkerPath.wstring(),
                                      relaunch ? L" -Relaunch" : L"") };
 
         SHELLEXECUTEINFOW info{};

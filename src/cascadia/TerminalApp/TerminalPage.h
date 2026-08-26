@@ -28,6 +28,13 @@ namespace TerminalAppLocalTests
     class SettingsTests;
 }
 
+// Only named by reference here; the definition is in SlotPromotion.h, which
+// TerminalPage.SlotPromotion.cpp includes.
+namespace TerminalApp::SlotPromotion
+{
+    struct StagedBuild;
+}
+
 namespace Microsoft::Terminal::Core
 {
     class ControlKeyStates;
@@ -305,7 +312,7 @@ namespace winrt::TerminalApp::implementation
         std::shared_ptr<Pane> _controlPipeFindPane(uint32_t tabIndex, uint32_t paneId) const;
 
         hstring _describePromotionCost();
-        bool _armPromotionHelper(bool relaunch);
+        bool _armPromotionHelper(bool relaunch, const ::TerminalApp::SlotPromotion::StagedBuild& staged);
         safe_void_coroutine _PromoteSlotRequested(Windows::Foundation::IInspectable sender, Windows::Foundation::IInspectable args);
         void _CopyBuildInfoRequested(const Windows::Foundation::IInspectable& sender, const Windows::Foundation::IInspectable& args);
 

@@ -25,11 +25,21 @@ Param(
     # Start the Dev slot again once the swap is done.
     [switch]$Relaunch,
     [string]$Payload = 'C:\TerminalSlots\dev',
-    # Where Deploy-TerminalSlots.ps1 leaves the build waiting. It cannot write
-    # into $Payload: the running Dev instance holds its binaries open, so an
-    # unpack over the live payload replaces the unlocked files and then fails.
-    # The deploy therefore stages beside it and promotion moves it into place.
-    [string]$Staged = 'C:\TerminalSlots\dev-staged'
+    # Where the build is waiting. It cannot be written into $Payload: the running
+    # Dev instance holds its binaries open, so an unpack over the live payload
+    # replaces the unlocked files and then fails. Producers stage beside it and
+    # promotion moves it into place.
+    #
+    # More than one thing stages builds -- a local deploy into dev-staged, a
+    # fetched CI build into dev-staged-ci -- so the Terminal passes the one it
+    # actually offered. This default is for running the script by hand, and it
+    # names the local deploy's directory.
+    [string]$Staged = 'C:\TerminalSlots\dev-staged',
+    # The marker describing $Staged, cleared once the swap succeeds. Passed for
+    # the same reason as $Staged: deleting a hardcoded name would clear some
+    # other producer's marker and leave the promoted one still advertising
+    # itself, which keeps the button lit in the build you just installed.
+    [string]$Marker = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -65,7 +75,7 @@ Write-Log "promotion requested (waitForPid=$WaitForPid relaunch=$($Relaunch.IsPr
 # drive with the name '@{commit=...}' does not exist" -- which is how this
 # silently refused to promote anything at all.
 $markerInfo = $null
-$markerPath = Join-Path (Split-Path -Parent $Payload) 'dev-pending.json'
+$markerPath = if ($Marker) { $Marker } else { Join-Path (Split-Path -Parent $Payload) 'dev-pending.json' }
 if (Test-Path $markerPath) {
     try { $markerInfo = Get-Content $markerPath -Raw | ConvertFrom-Json } catch { $markerInfo = $null }
 }
@@ -234,9 +244,10 @@ try {
     }
 
     # The marker described the payload we just promoted; it is no longer
-    # pending, and leaving it would keep the button lit in the new build.
-    $pending = Join-Path (Split-Path -Parent $Payload) 'dev-pending.json'
-    if (Test-Path $pending) { Remove-Item $pending -Force }
+    # pending, and leaving it would keep the button lit in the new build. Only
+    # this one: another producer's marker may describe a build that is still
+    # genuinely newer, and the Terminal decides that by timestamp.
+    if (Test-Path $markerPath) { Remove-Item $markerPath -Force }
 
     if ($Relaunch) {
         Say 'Relaunching the Dev slot (wtd.exe)'
