@@ -1,0 +1,88 @@
+# The notebook's build path. The desktop builds locally with
+# tools\Deploy-TerminalSlots.ps1, which is incremental and therefore always
+# faster; this exists so a machine that should not be compiling Terminal does not
+# have to.
+#
+# It produces exactly what a local deploy stages -- the unpacked Dev payload and
+# its marker -- so tools\Fetch-CIBuild.ps1 can drop the result into a slot and the
+# UPDATE button in wtd treats it like any other staged build.
+name: Build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'doc/**'
+      - 'samples/**'
+      - '**/*.md'
+  workflow_dispatch:
+
+# Successive pushes make the earlier runs pointless: they are building a commit
+# nobody is going to install. Cancel them rather than paying for both and waiting
+# behind the one that is already stale.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # Windows Server 2025, which carries Visual Studio Enterprise 2026 18.9,
+    # MSVC 14.51 and Windows SDK 10.0.26100. This repo requires VS >= 18.6 and
+    # that SDK; VS 2022 cannot build it at all, so the older images are no use.
+    runs-on: windows-latest
+    timeout-minutes: 180
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # The checked-in dep\nuget\nuget.exe is 4.1.0 (2017) and predates .slnx:
+      # restoring with it fails with "Invalid input 'OpenConsole.slnx'. The file
+      # type was not recognized." Upstream installs a current nuget for the same
+      # reason rather than bumping the bundled copy.
+      #
+      # No `nuget-version` input: it already defaults to `latest`.
+      - uses: NuGet/setup-nuget@v4
+
+      # NuGet.Config pins both globalPackagesFolder and repositorypath to
+      # .\packages, so the whole restore lands in one self-contained folder.
+      # This is the only part of the build worth caching: obj\ is far past the
+      # 10 GB per-repository cache limit, and a fresh checkout's timestamps make
+      # MSBuild rebuild everything regardless of what was restored.
+      - uses: actions/cache@v6
+        with:
+          path: packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('NuGet.Config', 'dep/nuget/packages.config', 'build/packages.config') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      # One step, because Set-MsbuildDevEnvironment edits PATH for the process it
+      # runs in and GitHub gives each step its own.
+      #
+      # The build itself is the same script the desktop runs, so the two paths
+      # cannot drift: whatever is verified locally is what CI produces. -StageOnly
+      # skips registering the Test slot, which a runner could not do anyway
+      # without Developer Mode, and stops before touching anything but disk.
+      - name: Restore and build
+        shell: pwsh
+        run: |
+          Import-Module .\tools\OpenConsole.psm1 -Force
+          Set-MsbuildDevEnvironment
+          nuget restore .\dep\nuget\packages.config -SolutionDirectory .
+          nuget restore .\build\packages.config -SolutionDirectory .
+          msbuild .\OpenConsole.slnx /t:Restore /p:Configuration=Release /p:Platform=x64 /v:m /nologo
+          .\tools\Deploy-TerminalSlots.ps1 -StageOnly
+
+      # Unpacked rather than the .msix: it is 17 MB either way, and shipping the
+      # layout means the machine that installs it needs no Windows SDK to unpack
+      # one. The marker rides along so the fetcher does not have to reconstruct
+      # the commit, branch and timestamp from anywhere else.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dev-payload
+          path: |
+            C:\TerminalSlots\dev-staged
+            C:\TerminalSlots\dev-pending.json
+          if-no-files-found: error
+          retention-days: 14

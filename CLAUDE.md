@@ -203,8 +203,17 @@ is entirely live, and a prune deregisters it. The directory survives, so nothing
 the next time you want that worktree. Check with Windows git (`/mnt/c/Program Files/Git/cmd/git.exe
 -C 'C:\<path>' status`) before acting on any prunable verdict.
 
-Two more traps, both hit for real:
+Three more traps, all hit for real:
 
+- **A full-width build can run the machine out of COMMIT, and says so as a disk error.**
+  `error C3859: Failed to create virtual memory for PCH ... the system returned code 1455: The
+  paging file is too small` plus `C1076: compiler limit: internal heap limit reached`. Every
+  parallel `cl.exe` reserves virtual memory for its precompiled header and this repo uses a PCH
+  everywhere, so `/m` multiplies that by the core count. Nothing about the message points at
+  parallelism, and the machine looks fine — cores idle, RAM free. Check the commit limit, not free
+  memory (`Get-Counter '\Memory\Committed Bytes','\Memory\Commit Limit'`); a large resident WSL VM
+  is the usual way to get within a few GB of it while 100 GB of RAM reads as available. Build
+  narrower rather than tuning the pagefile: `Deploy-TerminalSlots.ps1 -MaxCpuCount 6`.
 - **`Invoke-OpenConsoleBuild -p:Configuration=Release` silently loses the switches.** PowerShell
   parses `-p:Configuration=Release` as the `-p:` parameter with value `Configuration=Release` and
   strips the prefix, so MSBuild receives a bare `Configuration=Release` and dies with
@@ -275,6 +284,42 @@ Each slot has its own package identity, so each has its own settings:
 
 **"Run the test build" means launch `wtt.exe`. It does not mean build anything.** If I want a
 rebuild first I will say so.
+
+## Two ways a build reaches the Dev slot
+
+Which one depends on the machine, not the change:
+
+| Machine | Build | Stages into | Marker |
+|---|---|---|---|
+| **desktop** | `tools\Deploy-TerminalSlots.ps1` — local, incremental, always faster | `dev-staged` | `dev-pending.json` |
+| **notebook** | `.github/workflows/build.yml` → `tools\Fetch-CIBuild.ps1` | `dev-staged-ci` | `dev-pending-ci.json` |
+
+Both end in the same state — an unpacked payload plus a marker — and the Terminal reads **every**
+`dev-pending*.json` and offers the newest. Separate markers rather than one shared file because the
+two producers run on different machines and know nothing about each other; one file would be a race
+with no owner. `SlotPromotion.h` is the only place that decides which wins.
+
+The CI workflow runs the same `Deploy-TerminalSlots.ps1 -StageOnly`, so the two paths cannot drift:
+what you verify locally is what CI produces. It cancels superseded runs
+(`concurrency: cancel-in-progress`), because a run for a commit you have already pushed past is
+building something nobody will install.
+
+On the notebook, `tools\Install-CIBuildPoller.ps1` registers a Scheduled Task that keeps the newest
+successful build staged, so UPDATE appears without remembering to fetch anything. It never installs
+— promotion is still the gesture.
+
+**A CI build and a local build of the same commit are different compiles**, so the promotion offer
+suppresses "same commit, both clean" rather than comparing timestamps alone. Without that, a CI
+build of the commit you are running is always newer than your copy of it and the button never goes
+away, however often you press it.
+
+### Two inherited workflows are disabled, deliberately
+
+`Publish to WinGet` (on `release: published`, submits to `microsoft/winget-pkgs`) and `Spell
+checking` (every push, against an expect-list that suits upstream's content). Both are **disabled in
+repo settings rather than deleted**, so an upstream merge never conflicts over them and re-enabling
+is one command. The winget one matters most: publishing a release here would otherwise open a PR
+against Microsoft from a fork whose whole policy is that nothing goes upstream.
 
 ## Deploy the test build
 
