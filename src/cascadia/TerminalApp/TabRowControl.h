@@ -45,6 +45,7 @@ namespace winrt::TerminalApp::implementation
         winrt::hstring BuildCommit();
         winrt::hstring BuildBranch();
         winrt::hstring BuildTime();
+        winrt::hstring BuildExePath();
     };
 }
 

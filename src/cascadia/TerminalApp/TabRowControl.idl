@@ -18,6 +18,7 @@ namespace TerminalApp
         String BuildCommit { get; };
         String BuildBranch { get; };
         String BuildTime { get; };
+        String BuildExePath { get; };
 
         Boolean PromotionAvailable;
         String PromotionDescription;

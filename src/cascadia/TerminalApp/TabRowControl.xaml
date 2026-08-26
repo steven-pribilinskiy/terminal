@@ -191,6 +191,8 @@
                                     <Run Text="(" /><Run Text="{x:Bind BuildBranch}" /><Run Text=")" /> <LineBreak />
                                     <Run x:Uid="AboutDialog_BuiltLabel" />
                                     <Run Text="{x:Bind BuildTime}" /> <LineBreak />
+                                    <Run FontFamily="Cascadia Mono, Consolas, monospace"
+                                         Text="{x:Bind BuildExePath}" /> <LineBreak />
                                     <Run x:Uid="SlotBadgeButton_TooltipHint"
                                          FontStyle="Italic" />
                                 </TextBlock>

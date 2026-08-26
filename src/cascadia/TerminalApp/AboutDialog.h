@@ -17,6 +17,7 @@ namespace winrt::TerminalApp::implementation
         winrt::hstring BuildCommit();
         winrt::hstring BuildBranch();
         winrt::hstring BuildTime();
+        winrt::hstring BuildExePath();
         winrt::hstring BuildInfoForClipboard();
 
         til::property_changed_event PropertyChanged;

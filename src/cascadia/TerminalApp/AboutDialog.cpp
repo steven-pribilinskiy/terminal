@@ -57,6 +57,11 @@ namespace winrt::TerminalApp::implementation
         return ::TerminalApp::BuildInfo::BuildTime();
     }
 
+    winrt::hstring AboutDialog::BuildExePath()
+    {
+        return ::TerminalApp::BuildInfo::ExePath();
+    }
+
     // Everything needed to identify this binary, for pasting into a bug report.
     // The text itself lives in BuildInfo so this and the tab row badge cannot copy
     // different things -- they are the two places you reach for the same answer.

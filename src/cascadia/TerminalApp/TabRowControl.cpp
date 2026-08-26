@@ -58,6 +58,11 @@ namespace winrt::TerminalApp::implementation
         return ::TerminalApp::BuildInfo::BuildTime();
     }
 
+    winrt::hstring TabRowControl::BuildExePath()
+    {
+        return ::TerminalApp::BuildInfo::ExePath();
+    }
+
     // The button only ever asks. Everything about what promotion costs, and the
     // decision itself, belongs to the dialog TerminalPage puts up in response.
     void TabRowControl::OnPromoteSlotButtonClick(const winrt::Windows::Foundation::IInspectable& /*sender*/,
