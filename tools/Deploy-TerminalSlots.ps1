@@ -82,17 +82,32 @@ if (-not (Get-Command msbuild.exe -ErrorAction SilentlyContinue)) {
 # `/m` with no number is one project per core. $MaxCpuCount replaces it when the
 # caller wants fewer -- see the parameter above for why cores are not the
 # constraint that runs out first.
+#
+# CL_MPCount has to be capped alongside it. `/m` bounds how many PROJECTS build
+# at once; MultiProcessorCompilation independently forks one cl.exe per core
+# INSIDE each project, so `/m:4` on a 32-core machine can still be 128 compilers
+# and still exhausts commit ("C3859: Failed to create virtual memory for PCH").
+# Measured on this machine: a full rebuild died at both `/m` and `/m:4`, and
+# survived at `/m:2 /p:CL_MPCount=2`.
+#
+# Kept as two scalars rather than one array: an array nested in the @(...) that
+# builds each argument list gets flattened to a single "/m:6 /p:CL_MPCount=6"
+# token, which msbuild rejects with "MSB1030: Maximum CPU count is not valid".
 $ParallelSwitch = if ($MaxCpuCount -gt 0) { "/m:$MaxCpuCount" } else { '/m' }
+$ClMpSwitch = if ($MaxCpuCount -gt 0) { "/p:CL_MPCount=$MaxCpuCount" } else { '' }
 
 function Invoke-MsBuild {
     Param([string[]]$Arguments)
-    & msbuild.exe @Arguments
-    if ($LASTEXITCODE -ne 0) { throw "msbuild failed ($LASTEXITCODE): $($Arguments -join ' ')" }
+    # Drop empties so an unset optional switch (see $ClMpSwitch) does not reach
+    # msbuild as a blank argument.
+    $effective = @($Arguments | Where-Object { $_ })
+    & msbuild.exe @effective
+    if ($LASTEXITCODE -ne 0) { throw "msbuild failed ($LASTEXITCODE): $($effective -join ' ')" }
 }
 
 if (-not $NoBuild) {
     Write-Host '== building solution ==' -ForegroundColor Cyan
-    Invoke-MsBuild @("$Root\OpenConsole.slnx", "/p:Configuration=$Config", "/p:Platform=$Platform", $ParallelSwitch, '/v:m', '/nologo')
+    Invoke-MsBuild @("$Root\OpenConsole.slnx", "/p:Configuration=$Config", "/p:Platform=$Platform", $ParallelSwitch, $ClMpSwitch, '/v:m', '/nologo')
 }
 
 # The wapproj is built directly for each branding, so SolutionDir has to be passed
@@ -114,13 +129,13 @@ if (Test-Path $pkgObj) {
 
 Write-Host '== packaging Test slot ==' -ForegroundColor Cyan
 Invoke-MsBuild @($wapproj, "/p:Configuration=$Config", "/p:Platform=$Platform",
-                 '/p:WindowsTerminalBranding=Test', "/p:SolutionDir=$Root\", $ParallelSwitch, '/v:m', '/nologo')
+                 '/p:WindowsTerminalBranding=Test', "/p:SolutionDir=$Root\", $ParallelSwitch, $ClMpSwitch, '/v:m', '/nologo')
 
 if (Test-Path $pkgObj) { Remove-Item -Recurse -Force $pkgObj -ErrorAction SilentlyContinue }
 
 Write-Host '== packaging Dev slot (staged, not installed) ==' -ForegroundColor Cyan
 Invoke-MsBuild @($wapproj, "/p:Configuration=$Config", "/p:Platform=$Platform",
-                 '/p:WindowsTerminalBranding=Dev', "/p:SolutionDir=$Root\", $ParallelSwitch, '/v:m', '/nologo')
+                 '/p:WindowsTerminalBranding=Dev', "/p:SolutionDir=$Root\", $ParallelSwitch, $ClMpSwitch, '/v:m', '/nologo')
 
 function Expand-Slot {
     Param([string]$MsixDir, [string]$Destination, [string]$Label, [switch]$Fresh)
@@ -145,59 +160,65 @@ $pkgBase  = "$Root\src\cascadia\CascadiaPackage\AppPackages"
 $testMsix = Expand-Slot -MsixDir "$pkgBase\Test\CascadiaPackage_0.0.1.0_${Platform}_Test" -Destination $TestStage -Label 'Test'
 $devMsix  = Expand-Slot -MsixDir "$pkgBase\CascadiaPackage_0.0.1.0_${Platform}_Test"      -Destination $DevStage  -Label 'Dev' -Fresh
 
-# Launches the just-unpacked Test exe directly (not through the wtt alias) and
-# watches whether it reaches a window. Test and Dev are the SAME binary (see
-# header comment), so a build that cannot start is caught here rather than by
-# promoting it into the slot that hosts live sessions.
+# Starts the registered Test slot and waits for a window. Test and Dev are the
+# SAME binary (see header comment), so a build that cannot start is caught here
+# rather than by promoting it into the slot that hosts live sessions.
 #
-# Found the hard way on 2026-08-27: every locally built slot was aborting in
-# ucrtbase (0xC0000409) before painting a single window, and nothing in the
-# deploy noticed -- it reported success and staged the corpse for promotion.
-# A build that has never been started is not a build that works.
+# Found the hard way on 2026-08-27: an incremental build left XAML/IDL artifacts
+# inconsistent with 8fef97d22's new interfaces, and every locally built slot
+# aborted (0xC0000409) inside AppHost::Initialize before painting a window. The
+# deploy noticed nothing -- it reported success and staged the corpse for
+# promotion. A build that has never been started is not a build that works.
+#
+# It MUST launch through the wtt alias, not the payload exe. Running
+# <payload>\WindowsTerminal.exe directly gives the process no package identity,
+# so activating the TerminalApp.App WinRT class fails with 0x80040154
+# REGDB_E_CLASSNOTREG -- for a perfectly healthy build. Probing the exe path
+# directly reports every build as broken.
 #
 # $null means "not tested", not "passed" -- see the caller.
 function Test-SlotBoot {
     Param(
-        [string]$ExePath,
-        [int]$TimeoutSeconds = 15
+        [string]$PayloadDir,
+        [int]$TimeoutSeconds = 30
     )
 
     # WindowEmperor's single-instance identity is shared by Dev and Test (the
     # WT_BRANDING_DEV catch-all in WindowEmperor.cpp -- KNOWN BROKEN as of
-    # 2026-08-16). If any packaged Terminal is already running, our launch will
-    # hand its command line off to it and self-terminate almost immediately,
-    # before ever reaching the code we're trying to exercise. That looks
-    # identical to a startup crash, so rather than risk a false failure (or a
-    # false pass) this just declines to test.
+    # 2026-08-16). If any packaged Terminal is already running, our launch hands
+    # its command line off to that one and exits, which looks exactly like a
+    # startup crash. Rather than risk a false verdict either way, decline.
     if (Get-Process -Name 'WindowsTerminal' -ErrorAction SilentlyContinue) {
         Write-Host '   skipping boot check: another Terminal instance is already running' -ForegroundColor DarkYellow
-        Write-Host '   (wtt would hand off to it instead of booting on its own -- see WindowEmperor.cpp KNOWN BROKEN)' -ForegroundColor DarkYellow
+        Write-Host '   (wtt would hand off to it instead of starting -- see WindowEmperor.cpp KNOWN BROKEN)' -ForegroundColor DarkYellow
         return $null
     }
 
-    Write-Host '   launching it to confirm it survives startup...' -ForegroundColor DarkGray
-    $proc = Start-Process -FilePath $ExePath -PassThru
+    Write-Host '   starting wtt to confirm it reaches a window...' -ForegroundColor DarkGray
+    # The alias is a stub that exits immediately; the real process is separate,
+    # so find it by payload path rather than by the PID we started.
+    Start-Process 'wtt.exe' -ErrorAction Stop
+
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-    $gotWindow = $false
-    while ((Get-Date) -lt $deadline) {
+    $winner = $null
+    while ((Get-Date) -lt $deadline -and -not $winner) {
         Start-Sleep -Milliseconds 250
-        $live = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
-        if (-not $live) { break }
-        if ($live.MainWindowHandle -ne [IntPtr]::Zero) { $gotWindow = $true; break }
+        $winner = Get-Process -Name 'WindowsTerminal' -ErrorAction SilentlyContinue |
+            Where-Object { $_.Path -like "$PayloadDir\*" -and $_.MainWindowHandle -ne 0 } |
+            Select-Object -First 1
     }
 
-    if (Get-Process -Id $proc.Id -ErrorAction SilentlyContinue) {
-        # Still alive: it either got a window (good) or it's hung without one
-        # (bad -- e.g. the MoAppHang class of WER report seen on 2026-08-27).
-        Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-        return $gotWindow
+    if ($winner) {
+        Stop-Process -Id $winner.Id -Force -ErrorAction SilentlyContinue
+        return $true
     }
 
-    # Nothing else was running when we launched, so an early exit here can't be
-    # the single-instance handoff -- it's a real crash. Check Windows Error
-    # Reporting (Get-WinEvent -LogName Application, event IDs 1000/1001) for
-    # the fault.
-    Write-Host "   it exited on its own (code $($proc.ExitCode)) before creating a window" -ForegroundColor DarkYellow
+    # Nothing else was running when we started, so this is the build's own
+    # failure: it either aborted or hung before creating a window. Check
+    # Get-WinEvent -LogName Application (event ID 1000/1001) for the fault.
+    Get-Process -Name 'WindowsTerminal' -ErrorAction SilentlyContinue |
+        Where-Object { $_.Path -like "$PayloadDir\*" } |
+        ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
     return $false
 }
 
@@ -274,14 +295,23 @@ if (-not $StageOnly) {
     }
 
     Write-Host '== verifying it boots ==' -ForegroundColor Cyan
-    $script:bootOk = Test-SlotBoot -ExePath (Join-Path $TestStage 'WindowsTerminal.exe')
+    $script:bootOk = Test-SlotBoot -PayloadDir $TestStage
     if ($bootOk -eq $false) {
         # Test stays registered on purpose -- 'wtt' now reproduces the crash for
         # you. What does NOT happen is dev-pending.json getting written or
         # updated below, so this build is never offered for promotion into wtd:
         # whatever was staged from an earlier, working deploy (if anything)
         # stays the promotion candidate instead.
-        throw 'Test slot registered, but the binary crashed or hung before creating a window -- not staging it for Dev promotion. Reproduce with wtt, check Get-WinEvent -LogName Application (event ID 1000/1001) for the fault.'
+        throw @'
+Test slot registered, but it crashed or hung before creating a window -- NOT
+staging it for Dev promotion. Reproduce with wtt; check Get-WinEvent -LogName
+Application (event ID 1000/1001) for the fault.
+
+If the fault is an abort (0xC0000409) inside AppHost::Initialize, suspect stale
+incremental artifacts rather than the source: a changed .idl/.xaml can leave
+generated interfaces inconsistent across DLLs that msbuild considers up to date.
+A full solution build (not an incremental one) is what clears it.
+'@
     }
     Write-Host $(if ($bootOk) { '   confirmed: it reached a window' } else { '   not verified -- see above; staging anyway' }) -ForegroundColor $(if ($bootOk) { 'Green' } else { 'DarkYellow' })
 }
