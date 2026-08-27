@@ -145,6 +145,62 @@ $pkgBase  = "$Root\src\cascadia\CascadiaPackage\AppPackages"
 $testMsix = Expand-Slot -MsixDir "$pkgBase\Test\CascadiaPackage_0.0.1.0_${Platform}_Test" -Destination $TestStage -Label 'Test'
 $devMsix  = Expand-Slot -MsixDir "$pkgBase\CascadiaPackage_0.0.1.0_${Platform}_Test"      -Destination $DevStage  -Label 'Dev' -Fresh
 
+# Launches the just-unpacked Test exe directly (not through the wtt alias) and
+# watches whether it reaches a window. Test and Dev are the SAME binary (see
+# header comment), so a build that cannot start is caught here rather than by
+# promoting it into the slot that hosts live sessions.
+#
+# Found the hard way on 2026-08-27: every locally built slot was aborting in
+# ucrtbase (0xC0000409) before painting a single window, and nothing in the
+# deploy noticed -- it reported success and staged the corpse for promotion.
+# A build that has never been started is not a build that works.
+#
+# $null means "not tested", not "passed" -- see the caller.
+function Test-SlotBoot {
+    Param(
+        [string]$ExePath,
+        [int]$TimeoutSeconds = 15
+    )
+
+    # WindowEmperor's single-instance identity is shared by Dev and Test (the
+    # WT_BRANDING_DEV catch-all in WindowEmperor.cpp -- KNOWN BROKEN as of
+    # 2026-08-16). If any packaged Terminal is already running, our launch will
+    # hand its command line off to it and self-terminate almost immediately,
+    # before ever reaching the code we're trying to exercise. That looks
+    # identical to a startup crash, so rather than risk a false failure (or a
+    # false pass) this just declines to test.
+    if (Get-Process -Name 'WindowsTerminal' -ErrorAction SilentlyContinue) {
+        Write-Host '   skipping boot check: another Terminal instance is already running' -ForegroundColor DarkYellow
+        Write-Host '   (wtt would hand off to it instead of booting on its own -- see WindowEmperor.cpp KNOWN BROKEN)' -ForegroundColor DarkYellow
+        return $null
+    }
+
+    Write-Host '   launching it to confirm it survives startup...' -ForegroundColor DarkGray
+    $proc = Start-Process -FilePath $ExePath -PassThru
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $gotWindow = $false
+    while ((Get-Date) -lt $deadline) {
+        Start-Sleep -Milliseconds 250
+        $live = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
+        if (-not $live) { break }
+        if ($live.MainWindowHandle -ne [IntPtr]::Zero) { $gotWindow = $true; break }
+    }
+
+    if (Get-Process -Id $proc.Id -ErrorAction SilentlyContinue) {
+        # Still alive: it either got a window (good) or it's hung without one
+        # (bad -- e.g. the MoAppHang class of WER report seen on 2026-08-27).
+        Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+        return $gotWindow
+    }
+
+    # Nothing else was running when we launched, so an early exit here can't be
+    # the single-instance handoff -- it's a real crash. Check Windows Error
+    # Reporting (Get-WinEvent -LogName Application, event IDs 1000/1001) for
+    # the fault.
+    Write-Host "   it exited on its own (code $($proc.ExitCode)) before creating a window" -ForegroundColor DarkYellow
+    return $false
+}
+
 # The running Dev instance reads this to decide whether a newer build is waiting.
 # It sits beside the payload rather than inside it, so staging needs no changes
 # to the packaging itself.
@@ -166,12 +222,6 @@ $info = [ordered]@{
     payload      = $DevStage
 }
 $infoPath = Join-Path $SlotRoot 'dev-pending.json'
-$info | ConvertTo-Json | Set-Content -Path $infoPath -Encoding UTF8
-
-# The promote button in a running Dev window shells out to this. It lives beside
-# the payloads rather than in the repo so the app has exactly one fixed path to
-# know, and so promotion still works from a checkout that has moved.
-Copy-Item "$PSScriptRoot\Promote-DevSlot.ps1" (Join-Path $SlotRoot 'Promote-DevSlot.ps1') -Force
 
 if (-not $StageOnly) {
     Write-Host '== registering Test slot ==' -ForegroundColor Cyan
@@ -222,13 +272,36 @@ if (-not $StageOnly) {
             Write-Host '   restored Test slot state.json' -ForegroundColor DarkGray
         }
     }
+
+    Write-Host '== verifying it boots ==' -ForegroundColor Cyan
+    $script:bootOk = Test-SlotBoot -ExePath (Join-Path $TestStage 'WindowsTerminal.exe')
+    if ($bootOk -eq $false) {
+        # Test stays registered on purpose -- 'wtt' now reproduces the crash for
+        # you. What does NOT happen is dev-pending.json getting written or
+        # updated below, so this build is never offered for promotion into wtd:
+        # whatever was staged from an earlier, working deploy (if anything)
+        # stays the promotion candidate instead.
+        throw 'Test slot registered, but the binary crashed or hung before creating a window -- not staging it for Dev promotion. Reproduce with wtt, check Get-WinEvent -LogName Application (event ID 1000/1001) for the fault.'
+    }
+    Write-Host $(if ($bootOk) { '   confirmed: it reached a window' } else { '   not verified -- see above; staging anyway' }) -ForegroundColor $(if ($bootOk) { 'Green' } else { 'DarkYellow' })
 }
+else {
+    Write-Host '== -StageOnly: Test slot not (re)registered, boot not verified ==' -ForegroundColor DarkYellow
+    $script:bootOk = $null
+}
+
+$info | ConvertTo-Json | Set-Content -Path $infoPath -Encoding UTF8
+
+# The promote button in a running Dev window shells out to this. It lives beside
+# the payloads rather than in the repo so the app has exactly one fixed path to
+# know, and so promotion still works from a checkout that has moved.
+Copy-Item "$PSScriptRoot\Promote-DevSlot.ps1" (Join-Path $SlotRoot 'Promote-DevSlot.ps1') -Force
 
 Write-Host ''
 Write-Host "Test slot  : registered from $TestStage (run: wtt)" -ForegroundColor Green
 Write-Host "Dev slot   : staged at $DevStage -- NOT installed" -ForegroundColor Yellow
 Write-Host "             still running from $DevLive until you promote" -ForegroundColor Yellow
-Write-Host "Pending    : $infoPath" -ForegroundColor Yellow
+Write-Host "Pending    : $infoPath$(if (-not $bootOk) { ' (boot unverified)' })" -ForegroundColor Yellow
 Write-Host "Build      : $($info.commit) on $($info.branch), built $($info.timestampUtc)"
 Write-Host ''
 Write-Host 'The Dev slot is intentionally left alone. Promote it from the About' -ForegroundColor DarkGray
