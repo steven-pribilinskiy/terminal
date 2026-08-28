@@ -213,7 +213,11 @@ Three more traps, all hit for real:
   parallelism, and the machine looks fine — cores idle, RAM free. Check the commit limit, not free
   memory (`Get-Counter '\Memory\Committed Bytes','\Memory\Commit Limit'`); a large resident WSL VM
   is the usual way to get within a few GB of it while 100 GB of RAM reads as available. Build
-  narrower rather than tuning the pagefile: `Deploy-TerminalSlots.ps1 -MaxCpuCount 6`.
+  narrower rather than tuning the pagefile: `Deploy-TerminalSlots.ps1 -MaxCpuCount 6`. **`/m` alone
+  does not bound it** — `/m` limits how many *projects* build at once, while
+  `MultiProcessorCompilation` forks one `cl.exe` per core *inside* each, so `/m:4` on 32 cores is
+  still up to 128 compilers. A full rebuild here died at both `/m` and `/m:4` and survived at
+  `/m:2 /p:CL_MPCount=2`; `-MaxCpuCount` now caps both.
 - **`Invoke-OpenConsoleBuild -p:Configuration=Release` silently loses the switches.** PowerShell
   parses `-p:Configuration=Release` as the `-p:` parameter with value `Configuration=Release` and
   strips the prefix, so MSBuild receives a bare `Configuration=Release` and dies with
@@ -225,6 +229,19 @@ Three more traps, all hit for real:
   steady state rather than a wait — either bump the bundled copy on `main` as fork-only work, or
   restore with a current nuget: `nuget restore OpenConsole.slnx` from
   <https://dist.nuget.org/win-x86-commandline/latest/nuget.exe>.
+
+### When something you built will not run
+
+Read [`doc/troubleshooting.md`](doc/troubleshooting.md) **before** you start bisecting or reading
+code. It covers the slot-specific failures and, more usefully, the tests that produce confident
+wrong answers — a payload exe launched directly has no package identity and aborts with
+`REGDB_E_CLASSNOTREG` however healthy the build is; an "incremental rebuild" that never relinked the
+exe has tested nothing; a pipeline's `$LASTEXITCODE` belongs to the last command, not to msbuild.
+Every one of those sent an investigation down the wrong path on 2026-08-27.
+
+The headline rule from that day: **after changing a `.idl` or a `.xaml`, do not trust an incremental
+build.** Stale generated interfaces across DLLs msbuild thinks are up to date abort inside
+`AppHost::Initialize` before any window appears. Build the whole solution, or verify it starts.
 
 ## The two slots: `wtt` is yours to break, `wtd` is production
 
@@ -337,9 +354,17 @@ you get, and piping the run through `tail` hides it further: the pipeline report
 so a deploy that never started reads as success.
 
 What it does, in order: build the solution once → package the Test branding → package the Dev
-branding → unpack both into `C:\TerminalSlots\{test,dev}` → write `C:\TerminalSlots\dev-pending.json`
-→ **register only Test**, preserving its `settings.json` across the re-registration and asserting the
-resulting `InstallLocation`.
+branding → unpack Test into `C:\TerminalSlots\test` and Dev into `C:\TerminalSlots\dev-staged` →
+**register only Test**, preserving its `settings.json` across the re-registration and asserting the
+resulting `InstallLocation` → **start `wtt` and wait for a window** → only then write
+`C:\TerminalSlots\dev-pending.json`.
+
+That last check is not ceremony. A build can compile, package, register and deploy perfectly and
+still abort before it ever paints a window, and without starting it nothing notices — the deploy
+reports success and stages the corpse for promotion into the slot running my sessions. It has
+happened (2026-08-27). When it fails, Test stays registered so `wtt` reproduces it, and the marker
+is simply never written, leaving the previous staged build as the promotion candidate. See
+[`doc/troubleshooting.md`](doc/troubleshooting.md).
 
 The Dev payload is *staged and left alone*. `dev-pending.json` (commit, branch, dirty, timestamp,
 payload path) is how the running `wtd` learns a newer build is waiting, so it can offer me the
