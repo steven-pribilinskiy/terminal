@@ -385,50 +385,43 @@ requires removing the old registration first, and Windows will not remove a runn
 refuses rather than terminating my windows, which is the correct instinct and the one you should
 share. **You do not run it.** Either I press promote in `wtd`, or I run it myself.
 
-### KNOWN BROKEN: `wtt` silently runs the *dev* binaries
+### FIXED: `wtt` used to silently run the *dev* binaries
 
-As of 2026-08-16, launching `wtt.exe` does **not** run the Test payload. It starts, hands its command
-line to the running `wtd` instance, and terminates — a new window appears in the **Dev** process,
-running Dev binaries. Nothing warns you; it looks like a successful launch. Until this is fixed,
-"verify in `wtt`" cannot actually be honoured while a `wtd` is running, and the honest report is
-**"built and staged into the test slot, not verified"**.
+**This was broken from 2026-08-16 and is fixed. Both halves were verified again on 2026-08-28 —
+don't reintroduce the workarounds it used to need.**
 
-`WindowEmperor::HandleCommandlineArgs` (`src/cascadia/WindowsTerminal/WindowEmperor.cpp:601`) builds
-the single-instance identity — window class name *and* mutex, the same string for both (`:667`) —
-from the compile-time branding token, and `build/rules/Branding.targets:7` maps every *unrecognised*
-branding to `WT_BRANDING_DEV`. That catch-all tests the resulting token for emptiness, not the
-branding name, so `Test` lands there with everything else. Test binaries therefore call themselves
-`"Windows Terminal Dev"`, exactly like the Dev slot; `acquireMutexOrAttemptHandoff` (`:151`) finds
-the Dev window, `SendMessageTimeoutW(WM_COPYDATA)` (`:187`), then `TerminateProcess` (`:672`). The
-exe-path hash that would disambiguate two installs is appended only `if (!IsPackaged())` (`:631`) —
-both slots are packaged, so it never applies. (The user-SID hash at `:644` *is* unconditional, but it
-is identical for both slots and so discriminates nothing here.)
+The bug: the single-instance identity (window class name *and* mutex) came from the compile-time
+branding token, and `build/rules/Branding.targets:7` maps every *unrecognised* branding to
+`WT_BRANDING_DEV`. `Test` landed in that catch-all, so Test binaries called themselves
+`"Windows Terminal Dev"`; `wtt.exe` found the running `wtd` window, handed off over `WM_COPYDATA` and
+terminated, and the "Test" window you got was a Dev window running Dev code.
 
-**The fix is not a new branding token.** `src/cascadia/TerminalApp/BuildInfo.h:1-10` already states
-the intended design — the slot is resolved *at runtime* from package identity, precisely so the two
-slots can stay byte-identical and a build verified in Test can be promoted into Dev unchanged. The
-single-instance identity should be derived the same way: when packaged, mix the package family name
-into `windowClassName`, confined to the Dev/Test catch-all arm so Release/Preview/Canary are
-untouched.
+The fix (`a98921578`) is where `BuildInfo.h` said it should be — runtime package identity, not a new
+branding token. `WindowEmperor::HandleCommandlineArgs` now mixes the package family name into
+`windowClassName` when packaged, confined to the unrecognised-branding arm so Release/Preview/Canary
+keep their handoff across upgrades. The two slots therefore have distinct single-instance identities
+while staying byte-identical.
 
-**Byte-identity is already silently broken**, which must be repaired at the same time or the premise
-stays a fiction. `src/common.build.post.props:77` and `src/host/proxy/Host.Proxy.vcxproj:74` both
-enumerate `Canary`/`Dev`/`''` and omit `Test`, while `CascadiaPackage.wapproj` propagates
-`WindowsTerminalBranding=Test` as a *global* property into every referenced C++ project. So the Test
-packaging pass recompiles without `_MSVC_STL_HARDENING` and without `PROXY_CLSID_IS`, into the shared
-`bin\x64\Release`. Proof on disk: `C:\TerminalSlots\dev\WindowsTerminal.exe` is 638,464 bytes,
-`test\WindowsTerminal.exe` is 635,904.
+Byte-identity, which that premise depends on, is also repaired: the Test and Dev packaging passes now
+produce the same bytes. Checked 2026-08-28 — `C:\TerminalSlots\test\WindowsTerminal.exe` and the
+staged Dev payload had identical SHA-256 and both were 805,376 bytes. Re-check it with the one-liner
+in `Deploy-TerminalSlots.ps1`'s header whenever you touch anything branding-conditional.
 
-Secondary defects: `Package-Test.appxmanifest` declares **no** COM CLSIDs (Dev declares 7 — monarch
-proxy/stub, defterm delegation, shell extension), so no defterm handoff or Explorer verb in the Test
-slot. With byte-identical binaries it cannot have distinct ones, so that is an accepted limit of the
-test slot, not a bug to fix. And `WinRTUtils/inc/WtExeUtils.h:38-57` `IsDevBuild()` matches only
-`WindowsTerminalDev`, so in Test `GetWtExePath()` builds a path to a `wt.exe` that does not exist.
+**What this means in practice: `wtt` can be started and verified while a `wtd` is running.** A boot
+check only has to decline when a process is already running under *its own* payload; guarding on "any
+`WindowsTerminal` process" would skip verification whenever a Dev window is open — nearly always —
+and quietly make the check never run. `Deploy-TerminalSlots.ps1` gets this right; keep it that way.
 
-Diagnosing this class of bug: never trust "the launch succeeded". Diff visible top-level windows per
-PID across the launch and check `(Get-Process WindowsTerminal).Path` — a window that appeared under
-the *Dev* executable path is the tell. `Microsoft-Windows-AppModel-Runtime/Admin` shows the container
-being created and destroyed in the same second.
+Two real limits remain, neither worth fixing: `Package-Test.appxmanifest` declares fewer COM
+registrations than `Package-Dev.appxmanifest`, so no defterm handoff or Explorer verb in the Test
+slot — with byte-identical binaries it cannot have distinct ones, so that is an accepted limit rather
+than a bug. And `WinRTUtils/inc/WtExeUtils.h` `IsDevBuild()` still matches only `WindowsTerminalDev`,
+so in Test `GetWtExePath()` builds a path to a `wt.exe` that does not exist.
+
+Diagnosing this class of bug: never trust "the launch succeeded". Check `(Get-Process
+WindowsTerminal).Path` — a window that appeared under the *Dev* executable path is the tell.
+`Microsoft-Windows-AppModel-Runtime/Admin` shows the container being created and destroyed in the
+same second.
 
 ### Every locally-built Terminal shares one process name
 

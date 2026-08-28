@@ -49,6 +49,54 @@ so a build that cannot start can no longer be staged for promotion into the slot
 that hosts live sessions. If it fails, Test stays registered so `wtt` reproduces
 it for you.
 
+## The Dev slot went *backwards* after pressing promote
+
+What you see: you promote, `wtd` relaunches, and the tab row or About dialog now
+names an older commit than the one you were running.
+
+`C:\TerminalSlots\promote-dev.log` is the record and it names the payload, so
+start there:
+
+```
+08:41:57Z promotion requested (waitForPid=38916 relaunch=True payload=C:\TerminalSlots\dev)
+08:41:59Z Swapping in the staged build from C:\TerminalSlots\dev-staged-ci
+```
+
+`waitForPid` set with `relaunch=True` is the in-app button; `waitForPid=0` is a
+hand-run promotion.
+
+### Why it happened on 2026-08-28
+
+`SlotPromotion::DiffersFromRunning()` returned `true` for **any** commit
+mismatch, before it ever reached its timestamp comparison. A different commit is
+not evidence of being newer — it is just as easily older. A stale
+`dev-pending-ci.json` describing an Aug-26 CI build was therefore offered to a
+window running a newer local build, and promoting it installed the older one
+over the newer. The function's own comment claimed an older marker "never
+advertises itself as new", which the code did not implement.
+
+It is now `IsNewerThanRunning()`, and build time is checked first and
+unconditionally: a payload built before the running build is never offered,
+whatever commit it names.
+
+### Checking what is on offer
+
+Every `dev-pending*.json` in `C:\TerminalSlots` is a candidate — one per
+producer (`dev-pending.json` from a local deploy, `dev-pending-ci.json` from
+`Fetch-CIBuild.ps1`), by design, because the producers run on different machines
+and know nothing about each other. Compare each marker's `timestampUtc` against
+the running build before promoting:
+
+```powershell
+Get-ChildItem C:\TerminalSlots -Filter 'dev-pending*.json' |
+    ForEach-Object { $_.Name; Get-Content $_.FullName | ConvertFrom-Json |
+                     Select-Object commit, branch, timestampUtc, payload }
+```
+
+A marker describing a build older than the one you are running is stale.
+Promotion consumes only the marker it used, so another producer's marker
+survives on purpose — it may still describe something genuinely newer.
+
 ## Diagnosing a startup abort without a debugger
 
 There is no `cdb.exe`/WinDbg on this machine, and WER keeps only `Report.wer`

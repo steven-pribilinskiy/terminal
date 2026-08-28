@@ -183,14 +183,17 @@ function Test-SlotBoot {
         [int]$TimeoutSeconds = 30
     )
 
-    # WindowEmperor's single-instance identity is shared by Dev and Test (the
-    # WT_BRANDING_DEV catch-all in WindowEmperor.cpp -- KNOWN BROKEN as of
-    # 2026-08-16). If any packaged Terminal is already running, our launch hands
-    # its command line off to that one and exits, which looks exactly like a
-    # startup crash. Rather than risk a false verdict either way, decline.
-    if (Get-Process -Name 'WindowsTerminal' -ErrorAction SilentlyContinue) {
-        Write-Host '   skipping boot check: another Terminal instance is already running' -ForegroundColor DarkYellow
-        Write-Host '   (wtt would hand off to it instead of starting -- see WindowEmperor.cpp KNOWN BROKEN)' -ForegroundColor DarkYellow
+    # Only a process under THIS payload can take our handoff. The packaged
+    # window class mixes in the package family name (WindowEmperor.cpp), so a
+    # running Dev slot has a different single-instance identity and ignores us.
+    # Guarding on "any WindowsTerminal" would skip the check whenever a Dev
+    # window is open -- which is nearly always, and would quietly make this
+    # verification never run at all.
+    $mine = @(Get-Process -Name 'WindowsTerminal' -ErrorAction SilentlyContinue |
+              Where-Object { $_.Path -like "$PayloadDir\*" })
+    if ($mine) {
+        Write-Host '   skipping boot check: a Test slot process is already running' -ForegroundColor DarkYellow
+        Write-Host "   (wtt would hand off to pid $($mine[0].Id) instead of starting)" -ForegroundColor DarkYellow
         return $null
     }
 

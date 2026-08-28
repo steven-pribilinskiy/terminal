@@ -133,34 +133,45 @@ namespace TerminalApp::SlotPromotion
         return std::nullopt;
     }
 
-    // Is the staged payload a different build from the one this process is
+    // Is the staged payload a build worth offering over the one this process is
     // running?
     //
     // Commit alone is not enough: rebuilding the same commit with uncommitted
     // changes -- which is most of what a working session does -- produces a
-    // genuinely different binary at the same commit hash. So the timestamp is
-    // the tiebreak, and it is compared with > rather than != so that an older
-    // marker left behind by a previous deploy never advertises itself as new.
-    inline bool DiffersFromRunning(const StagedBuild& staged) noexcept
+    // genuinely different binary at the same commit hash. Build TIME is what
+    // orders two builds; the commit only tells us whether they are the same
+    // source.
+    inline bool IsNewerThanRunning(const StagedBuild& staged) noexcept
     {
-        const auto sameCommit{ !staged.CommitFull.empty() &&
-                               staged.CommitFull == winrt::hstring{ TERMINAL_BUILD_COMMIT_FULL } };
+        // A build made before the one we are running is history, not an update,
+        // whatever commit it names. This is compared first and unconditionally,
+        // because a different commit is NOT evidence of being newer: it is just
+        // as easily older.
+        //
+        // Getting this wrong cost a real downgrade on 2026-08-28. A stale
+        // dev-pending-ci.json describing an Aug-26 CI build was offered to a
+        // window running a newer local build, and promoting it installed the
+        // older one over the newer. The previous version of this function
+        // returned true for any commit mismatch before ever reaching the
+        // timestamp rule -- while its own comment claimed the opposite.
+        if (staged.Timestamp <= static_cast<int64_t>(TERMINAL_BUILD_TIMESTAMP))
+        {
+            return false;
+        }
 
         // Same commit, and neither side carries uncommitted changes: this is a
         // second compile of source we are already running. Without this the
-        // timestamp rule below would offer it, and keep offering it -- a CI
-        // build of the commit you are on is always newer than your copy of it,
-        // so the button would never go away no matter how often you pressed it.
+        // rule above would offer it, and keep offering it -- a CI build of the
+        // commit you are on is always newer than your copy of it, so the button
+        // would never go away no matter how often you pressed it.
+        const auto sameCommit{ !staged.CommitFull.empty() &&
+                               staged.CommitFull == winrt::hstring{ TERMINAL_BUILD_COMMIT_FULL } };
         if (sameCommit && !staged.Dirty && TERMINAL_BUILD_DIRTY == 0)
         {
             return false;
         }
 
-        if (!staged.CommitFull.empty() && !sameCommit)
-        {
-            return true;
-        }
-        return staged.Timestamp > static_cast<int64_t>(TERMINAL_BUILD_TIMESTAMP);
+        return true;
     }
 
     // Only the Dev slot can be promoted into, so only the Dev slot offers it.
@@ -226,7 +237,7 @@ namespace TerminalApp::SlotPromotion
 
         for (auto& staged : ReadAllStaged())
         {
-            if (DiffersFromRunning(staged))
+            if (IsNewerThanRunning(staged))
             {
                 return staged;
             }
