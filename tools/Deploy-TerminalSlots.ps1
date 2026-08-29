@@ -61,6 +61,9 @@ $TestStage = Join-Path $SlotRoot 'test'
 # directory into place once the Dev windows are closed.
 $DevLive   = Join-Path $SlotRoot 'dev'
 $DevStage  = Join-Path $SlotRoot 'dev-staged'
+# Test is unpacked here and swapped into $TestStage during registration, for the
+# same reason the Dev payload is staged beside the live one -- see Expand-Slot.
+$TestStageNew = Join-Path $SlotRoot 'test-staged'
 $Config    = 'Release'
 $Platform  = 'x64'
 
@@ -157,8 +160,20 @@ function Expand-Slot {
 }
 
 $pkgBase  = "$Root\src\cascadia\CascadiaPackage\AppPackages"
-$testMsix = Expand-Slot -MsixDir "$pkgBase\Test\CascadiaPackage_0.0.1.0_${Platform}_Test" -Destination $TestStage -Label 'Test'
-$devMsix  = Expand-Slot -MsixDir "$pkgBase\CascadiaPackage_0.0.1.0_${Platform}_Test"      -Destination $DevStage  -Label 'Dev' -Fresh
+
+# NEITHER slot is unpacked over in place. Overwriting a registered payload fails
+# with `0x800704c8 - the requested operation cannot be performed on a file with a
+# user-mapped section open`: something in the shell keeps the package's
+# resources.pri mapped, and a mapped file can be opened but not truncated. It is
+# not tied to the app running -- it was hit on 2026-08-29 with no Test process
+# alive at all, and it outlived unpinning the app from the taskbar.
+#
+# Renaming the folder is unaffected (measured), so both slots unpack to a staging
+# directory and the registration block swaps the folder into place. That also
+# gets `-Fresh` semantics for Test for free: a file dropped from the package no
+# longer lingers in the payload forever.
+$testMsix = Expand-Slot -MsixDir "$pkgBase\Test\CascadiaPackage_0.0.1.0_${Platform}_Test" -Destination $TestStageNew -Label 'Test' -Fresh
+$devMsix  = Expand-Slot -MsixDir "$pkgBase\CascadiaPackage_0.0.1.0_${Platform}_Test"      -Destination $DevStage     -Label 'Dev'  -Fresh
 
 # Starts the registered Test slot and waits for a window. Test and Dev are the
 # SAME binary (see header comment), so a build that cannot start is caught here
@@ -278,12 +293,25 @@ if (-not $StageOnly) {
         Remove-AppxPackage -Package $existing.PackageFullName -ErrorAction Stop
     }
 
+    # Swap the freshly unpacked payload into place now that nothing is registered
+    # from it. A rename works even when a file inside the outgoing folder still
+    # has a mapped section, which is why the unpack could not simply overwrite --
+    # see Expand-Slot. The outgoing copy is kept until the new registration has
+    # been asserted, so a failure below has something to go back to.
+    $testPrevious = "$TestStage.previous"
+    if (Test-Path $testPrevious) { Remove-Item -Recurse -Force $testPrevious -ErrorAction SilentlyContinue }
+    if (Test-Path $TestStage) { Move-Item -LiteralPath $TestStage -Destination $testPrevious -Force }
+    Move-Item -LiteralPath $TestStageNew -Destination $TestStage -Force
+
     Add-AppxPackage -Path (Join-Path $TestStage 'AppxManifest.xml') -Register -ForceUpdateFromAnyVersion
 
     $now = Get-AppxPackage -Name 'WindowsTerminalTest' -ErrorAction SilentlyContinue
     if (-not $now -or (Resolve-Path $now.InstallLocation).Path -ne (Resolve-Path $TestStage).Path) {
         throw "Test slot did not register from $TestStage (still: $($now.InstallLocation))"
     }
+
+    # Only now is the outgoing payload safe to drop.
+    if (Test-Path $testPrevious) { Remove-Item -Recurse -Force $testPrevious -ErrorAction SilentlyContinue }
 
     if ($savedSettings -or $savedState) {
         New-Item -ItemType Directory -Force -Path $testLocalStateDir | Out-Null
