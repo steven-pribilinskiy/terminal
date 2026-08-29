@@ -3,11 +3,14 @@
 
 #include "pch.h"
 #include "Jumplist.h"
+#include "JumplistIconCache.h"
 
 #include <ShObjIdl.h>
 #include <Propkey.h>
 
 #include <WtExeUtils.h>
+
+#include "../../types/inc/utils.hpp"
 
 using namespace winrt::Microsoft::Terminal::Settings::Model;
 
@@ -86,16 +89,36 @@ void Jumplist::_updateProfiles(IObjectCollection* jumplistItems, winrt::Windows:
     // updated often, and there likely isn't a huge amount of items to add.
     THROW_IF_FAILED(jumplistItems->Clear());
 
+    // Qualified: `TerminalApp` alone resolves to the WinRT projection namespace
+    // here, not to ours. Same reason AppLogic.cpp writes ::TerminalApp::SlotPromotion.
+    ::TerminalApp::JumplistIconCache iconCache;
+
     for (const auto& profile : profiles)
     {
         // Craft the arguments following "wt.exe"
         auto args = fmt::format(FMT_COMPILE(L"-p {}"), to_hstring(profile.Guid()));
 
+        std::wstring normalizedIconPath{ profile.Icon().Resolved() };
+
+        // A glyph or emoji resolves to itself (by design -- see
+        // MediaResourceSupport.h), and neither SetIconLocation nor
+        // DestListLogoUri can draw one, so the entry would come out blank.
+        // Rasterize it to an .ico and point at that instead. On failure we
+        // leave the string alone; _createShellLink falls back to our own icon.
+        if (::Microsoft::Console::Utils::IsLikelyToBeEmojiOrSymbolIcon(normalizedIconPath))
+        {
+            if (auto rasterized{ iconCache.Ensure(normalizedIconPath) })
+            {
+                normalizedIconPath = std::move(*rasterized);
+            }
+        }
+
         // Create the shell link object for the profile
-        const auto normalizedIconPath{ profile.Icon().Resolved() };
         const auto shLink = _createShellLink(profile.Name(), normalizedIconPath, args);
         THROW_IF_FAILED(jumplistItems->AddObject(shLink.get()));
     }
+
+    iconCache.PruneUnused();
 }
 
 // Method Description:
@@ -135,10 +158,19 @@ winrt::com_ptr<IShellLinkW> Jumplist::_createShellLink(const std::wstring_view n
             THROW_IF_FAILED(sh->SetIconLocation(iconPath.data(), *iconIndex));
         }
     }
-    else if (til::ends_with(path, L"exe") || til::ends_with(path, L"dll"))
+    else if (til::ends_with(path, L"exe") || til::ends_with(path, L"dll") || til::ends_with(path, L"ico"))
     {
-        // We have a binary path but no index/id. Default to 0
+        // A binary or an .ico, but no index/id. Default to 0. (.ico is what
+        // JumplistIconCache hands back for a rasterized glyph -- SetIconLocation
+        // reads it directly, so it does not need the logo-URI path below.)
         THROW_IF_FAILED(sh->SetIconLocation(path.data(), 0));
+    }
+    else if (::Microsoft::Console::Utils::IsLikelyToBeEmojiOrSymbolIcon(path))
+    {
+        // Rasterizing this glyph failed upstream in _updateProfiles. Neither
+        // branch above applies and DestListLogoUri would silently draw nothing,
+        // so use our own icon: a Terminal logo beats an empty square.
+        THROW_IF_FAILED(sh->SetIconLocation(module.data(), 0));
     }
     else
     {
