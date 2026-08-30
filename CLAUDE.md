@@ -155,45 +155,62 @@ progress and is cut from `main` like any other.
 
 The no-Claude-attribution rule above applies to these branches too — and to the fork's own history.
 
-## Build
+## HARD REQUIREMENT: builds happen in CI, never on this machine
 
-**Prerequisites are strict and the failure messages don't name them.** VS 2026 ≥ 18.6 (v145
-toolset) and the Windows 11 SDK 10.0.26100 — VS 2022 cannot build `main`. Set a machine up with the
-repo's own config rather than by hand:
+**Do not build this repo locally. No `msbuild`, no `Invoke-OpenConsoleBuild`, no
+`Deploy-TerminalSlots.ps1` run by hand, no Visual Studio build.** Push the commit and let
+`.github/workflows/build.yml` produce the payload.
 
-```powershell
-winget configure .config\configuration.winget    # VS 2026 Community + Developer Mode + PowerShell 7
-```
+The reason is disk, and it is not marginal: a warm local build tree here was **40.7 GB** —
+33.9 GB of it in the eight `obj\` directories, 5.5 GB in `bin\`, the rest in `packages\` and
+`AppPackages\`. Every full build re-earns that, and `NuGet.Config` pins `globalPackagesFolder` and
+`repositoryPath` to `.\packages` relative to the config file, so **every worktree pays it again**;
+nothing is shared with the main checkout. CI has a clean machine and a package cache keyed on the
+lockfiles, and it costs this disk nothing.
 
-Build (x64 Release):
-
-```powershell
-Import-Module .\tools\OpenConsole.psm1
-Set-MsbuildDevEnvironment
-msbuild.exe .\OpenConsole.slnx /p:Configuration=Release /p:Platform=x64 /m /v:m
-```
-
-**Restore is TWO commands, not one.** `Invoke-OpenConsoleBuild` runs both, and skipping the second
-leaves every project failing with *"This project references NuGet package(s) that are missing on
-this computer"* — hundreds of `error :` lines that look like a broken merge and are nothing of the
-sort:
+If a local tree ever reappears, deleting these reclaims all of it and loses nothing tracked:
 
 ```powershell
-.\dep\nuget\nuget.exe restore .\OpenConsole.slnx
-.\dep\nuget\nuget.exe restore .\dep\nuget\packages.config   # WIL, TAEF, CppWinRT live here
+Get-ChildItem . -Recurse -Directory -Filter obj | Remove-Item -Recurse -Force
+Remove-Item .\bin, .\packages, .\src\cascadia\CascadiaPackage\AppPackages -Recurse -Force
 ```
 
-`NuGet.Config` pins `globalPackagesFolder` and `repositoryPath` to `.\packages`, relative to the
-config file, so **every worktree needs its own full restore** — nothing is shared with the main
-checkout.
+### Getting a build
 
-**Keep the build tree on a SHORT path.** Some package references expand through unnormalised
-`build\native\..\..\runtimes\...` segments, which pushes them past `MAX_PATH` (260). The linker then
-reports `LNK1104: cannot open file ...TerminalThemeHelpers.lib` for a file that is present and
-readable — it means "path too long", not "missing". A worktree under
-`%TEMP%\claude\<session>\scratchpad\` produced a 267-character reference and failed; the same
-worktree at `C:\wt-tm` produced 155 and linked. MSBuild also warns `MSB8029` about output
-directories under Temp. Put worktrees at a short root.
+Push to `main`, then let `tools\Fetch-CIBuild.ps1` drop the newest successful run into the Dev
+staging slot (`dev-staged-ci`) — or let the Scheduled Task do it for you (see below). Promotion into
+Dev is still my gesture, unchanged.
+
+**Two things this currently costs, both worth fixing in `build.yml` before relying on it.** CI has
+no test step at all — it restores, builds, packages and uploads, and that is the whole workflow — so
+with local builds off **nothing runs the unit tests anywhere**. And CI ships only the Dev payload,
+so `wtt` cannot be refreshed either (see "Deploy the test build").
+
+Until both are fixed, the honest report for a code change is *"pushed, CI green — compiles and
+packages; no tests run, UI behaviour not verified"*, naming the behaviour a `wtt` run would have
+confirmed. Do not describe a change as verified because CI went green: green currently means only
+that it compiled.
+
+### The build tooling stays in the tree — CI needs it
+
+`tools\Deploy-TerminalSlots.ps1` is not local-only scaffolding: `build.yml` calls it directly
+(`-StageOnly`), which is exactly why the two paths cannot drift. `OpenConsole.slnx`, the `.vcxproj`
+tree, `NuGet.Config`, `dep\nuget\packages.config` and `tools\OpenConsole.psm1` are all on CI's
+critical path too, and `tools\Fetch-CIBuild.ps1` / `Install-CIBuildPoller.ps1` are how a CI build
+reaches this machine at all. **Deleting any of them breaks CI, saves kilobytes, and — for the files
+inherited from upstream — writes a permanent merge conflict.** Leave them alone.
+
+One trap survives the move to CI, because it is about the repo and not the machine: `dep/nuget/nuget.exe`
+is 4.1.0 (2017) and predates `.slnx` (*"Invalid input 'OpenConsole.slnx'. The file type was not
+recognized."*). That is why `build.yml` installs a current nuget with `NuGet/setup-nuget` instead of
+using the bundled copy. The PR that would have bumped it was closed unmerged and nothing goes
+upstream now, so this is the steady state, not a wait.
+
+The local-build traps that no longer apply here — `MAX_PATH` on long worktree paths, the COMMIT
+exhaustion that reports itself as `C3859: ... the paging file is too small`, and
+`Invoke-OpenConsoleBuild` silently eating `-p:` switches — are recorded in
+[`doc/troubleshooting.md`](doc/troubleshooting.md) rather than here, so they cost nothing to read
+every session.
 
 **Never run `git worktree prune` from WSL here, and do not believe `worktree list` when it says
 `prunable`.** A worktree added on the Windows side records a Windows-style path in
@@ -202,33 +219,6 @@ does. WSL git therefore reports *"gitdir file points to non-existent location"* 
 is entirely live, and a prune deregisters it. The directory survives, so nothing looks broken until
 the next time you want that worktree. Check with Windows git (`/mnt/c/Program Files/Git/cmd/git.exe
 -C 'C:\<path>' status`) before acting on any prunable verdict.
-
-Three more traps, all hit for real:
-
-- **A full-width build can run the machine out of COMMIT, and says so as a disk error.**
-  `error C3859: Failed to create virtual memory for PCH ... the system returned code 1455: The
-  paging file is too small` plus `C1076: compiler limit: internal heap limit reached`. Every
-  parallel `cl.exe` reserves virtual memory for its precompiled header and this repo uses a PCH
-  everywhere, so `/m` multiplies that by the core count. Nothing about the message points at
-  parallelism, and the machine looks fine — cores idle, RAM free. Check the commit limit, not free
-  memory (`Get-Counter '\Memory\Committed Bytes','\Memory\Commit Limit'`); a large resident WSL VM
-  is the usual way to get within a few GB of it while 100 GB of RAM reads as available. Build
-  narrower rather than tuning the pagefile: `Deploy-TerminalSlots.ps1 -MaxCpuCount 6`. **`/m` alone
-  does not bound it** — `/m` limits how many *projects* build at once, while
-  `MultiProcessorCompilation` forks one `cl.exe` per core *inside* each, so `/m:4` on 32 cores is
-  still up to 128 compilers. A full rebuild here died at both `/m` and `/m:4` and survived at
-  `/m:2 /p:CL_MPCount=2`; `-MaxCpuCount` now caps both.
-- **`Invoke-OpenConsoleBuild -p:Configuration=Release` silently loses the switches.** PowerShell
-  parses `-p:Configuration=Release` as the `-p:` parameter with value `Configuration=Release` and
-  strips the prefix, so MSBuild receives a bare `Configuration=Release` and dies with
-  `MSB1008: Only one project can be specified`. Call `msbuild.exe` directly with `/p:` switches, or
-  pass `--%` to stop PowerShell parsing.
-- **Restore fails with the bundled nuget, permanently.** `dep/nuget/nuget.exe` is 4.1.0 (2017),
-  which predates `.slnx`: `Invalid input 'OpenConsole.slnx'. The file type was not recognized.` The
-  PR that would have bumped it was closed unmerged and nothing goes upstream now, so this is the
-  steady state rather than a wait — either bump the bundled copy on `main` as fork-only work, or
-  restore with a current nuget: `nuget restore OpenConsole.slnx` from
-  <https://dist.nuget.org/win-x86-commandline/latest/nuget.exe>.
 
 ### When something you built will not run
 
@@ -245,11 +235,12 @@ build.** Stale generated interfaces across DLLs msbuild thinks are up to date ab
 
 ## The two slots: `wtt` is yours to break, `wtd` is production
 
-I run two locally-built Terminals side by side. **They are not two equivalent scratch installs.**
+I run two Terminals built from this repo side by side. **They are not two equivalent scratch
+installs.**
 
 | Slot | Alias | Payload | What it is |
 |---|---|---|---|
-| **Test** | `wtt.exe` | `C:\TerminalSlots\test` | **The only slot you build into, register, launch, restart or replace.** Disposable. Do it as often as you like, no confirmation needed. |
+| **Test** | `wtt.exe` | `C:\TerminalSlots\test` | **The only slot you may register, launch, restart or replace.** Disposable, no confirmation needed. Whatever is there now is whatever was last deployed — CI has no path to it yet, so it does not refresh on its own. |
 | **Dev** | `wtd.exe` | `C:\TerminalSlots\dev` (staged) | **Production. It hosts my live agent sessions, including Claude Code sessions.** You never build into it, never register it, never launch it, never restart it, and never write to any directory it is registered from. |
 
 The Dev slot changes exactly one way: **I press promote**, in `wtd` itself. Promotion is my gesture.
@@ -302,33 +293,31 @@ Each slot has its own package identity, so each has its own settings:
 **"Run the test build" means launch `wtt.exe`. It does not mean build anything.** If I want a
 rebuild first I will say so.
 
-## Two ways a build reaches the Dev slot
+## How a build reaches the Dev slot
 
-Which one depends on the machine, not the change:
+One way now, on every machine:
 
-| Machine | Build | Stages into | Marker |
-|---|---|---|---|
-| **desktop** | `tools\Deploy-TerminalSlots.ps1` — local, incremental, always faster | `dev-staged` | `dev-pending.json` |
-| **notebook** | `.github/workflows/build.yml` → `tools\Fetch-CIBuild.ps1` | `dev-staged-ci` | `dev-pending-ci.json` |
+| Build | Stages into | Marker |
+|---|---|---|
+| `.github/workflows/build.yml` → `tools\Fetch-CIBuild.ps1` | `dev-staged-ci` | `dev-pending-ci.json` |
 
-Both end in the same state — an unpacked payload plus a marker — and the Terminal reads **every**
-`dev-pending*.json` and offers the newest. Separate markers rather than one shared file because the
-two producers run on different machines and know nothing about each other; one file would be a race
-with no owner. `SlotPromotion.h` is the only place that decides which wins.
+`tools\Install-CIBuildPoller.ps1` registers a Scheduled Task that keeps the newest successful build
+staged, so UPDATE appears without remembering to fetch anything. It never installs — promotion is
+still the gesture. **Run it on the desktop too**; it was previously a notebook-only convenience and
+is now the whole delivery path.
 
-The CI workflow runs the same `Deploy-TerminalSlots.ps1 -StageOnly`, so the two paths cannot drift:
-what you verify locally is what CI produces. It cancels superseded runs
+CI runs `Deploy-TerminalSlots.ps1 -StageOnly`, so the payload is produced by the same script that
+used to run here — the staging, the byte-identity between the Test and Dev packages, and the
+`dev-pending` contract are all unchanged. It cancels superseded runs
 (`concurrency: cancel-in-progress`), because a run for a commit you have already pushed past is
 building something nobody will install.
 
-On the notebook, `tools\Install-CIBuildPoller.ps1` registers a Scheduled Task that keeps the newest
-successful build staged, so UPDATE appears without remembering to fetch anything. It never installs
-— promotion is still the gesture.
-
-**A CI build and a local build of the same commit are different compiles**, so the promotion offer
-suppresses "same commit, both clean" rather than comparing timestamps alone. Without that, a CI
-build of the commit you are running is always newer than your copy of it and the button never goes
-away, however often you press it.
+The Terminal still reads **every** `dev-pending*.json` and offers the newest, and `SlotPromotion.h`
+is still the only place that decides which wins. The local-build marker `dev-pending.json` simply
+stops being written; a stale one left over from before is superseded on timestamp like any other.
+The promotion offer also suppresses "same commit, both clean" rather than comparing timestamps
+alone — that guard was written because a CI build of the commit you are already running is always
+newer than your copy of it, and without it the button never goes away however often you press it.
 
 ### Two inherited workflows are disabled, deliberately
 
@@ -340,31 +329,32 @@ against Microsoft from a fork whose whole policy is that nothing goes upstream.
 
 ## Deploy the test build
 
-`tools\Deploy-TerminalSlots.ps1` is the **only** sanctioned deploy path. It already encodes the
-doctrine above in its own header, and it is careful in ways a hand-rolled `makeappx`/`Add-AppxPackage`
-pair is not:
+**Open gap, know it before you plan around it: CI does not deliver a Test build.** `build.yml`
+uploads only `C:\TerminalSlots\dev-staged` and `dev-pending.json` (the `dev-payload` artifact), and
+`tools\Fetch-CIBuild.ps1` only ever writes `dev-staged-ci`. The Test payload that `-StageOnly`
+produces on the runner is thrown away with the workspace, and a runner could not register it anyway
+without Developer Mode. So with local builds off, **`wtt` cannot be refreshed at all**, and any task
+whose verification needs a running UI has nowhere to run.
 
-```powershell
-pwsh -File .\tools\Deploy-TerminalSlots.ps1   # -NoBuild skips the compile, -StageOnly skips registering
-```
+Until CI carries the Test payload too, verification stops at what CI itself proves: the build
+compiles, the packages are produced, and the unit tests it runs pass. Say so plainly — *"pushed, CI
+green, UI behaviour not verified"* — rather than implying a `wtt` run happened.
 
-**`pwsh`, not `powershell`.** `OpenConsole.psm1` is `#requires -Version 7.0`, so under 5.1 the deploy
-dies importing it — before building, packaging or registering anything. From WSL that is the default
-you get, and piping the run through `tail` hides it further: the pipeline reports `tail`'s exit code,
-so a deploy that never started reads as success.
+`tools\Deploy-TerminalSlots.ps1` remains the only sanctioned way to produce a payload; it is simply
+CI that runs it now. Its doctrine is worth knowing because CI inherits all of it: build the solution
+once → package the Test branding → package the Dev branding → unpack Test into
+`C:\TerminalSlots\test` and Dev into `C:\TerminalSlots\dev-staged` → **register only Test**,
+preserving its `settings.json` across the re-registration and asserting the resulting
+`InstallLocation` → **start `wtt` and wait for a window** → only then write `dev-pending.json`.
+Under `-StageOnly`, which is what CI uses, the last two steps are skipped — so **a CI payload has
+never been started even once**, and the boot check that catches a build which packages perfectly and
+then dies before painting a window (2026-08-27) is not protecting you any more.
 
-What it does, in order: build the solution once → package the Test branding → package the Dev
-branding → unpack Test into `C:\TerminalSlots\test` and Dev into `C:\TerminalSlots\dev-staged` →
-**register only Test**, preserving its `settings.json` across the re-registration and asserting the
-resulting `InstallLocation` → **start `wtt` and wait for a window** → only then write
-`C:\TerminalSlots\dev-pending.json`.
-
-That last check is not ceremony. A build can compile, package, register and deploy perfectly and
-still abort before it ever paints a window, and without starting it nothing notices — the deploy
-reports success and stages the corpse for promotion into the slot running my sessions. It has
-happened (2026-08-27). When it fails, Test stays registered so `wtt` reproduces it, and the marker
-is simply never written, leaving the previous staged build as the promotion candidate. See
-[`doc/troubleshooting.md`](doc/troubleshooting.md).
+If it ever runs here again: **`pwsh`, not `powershell`.** `OpenConsole.psm1` is
+`#requires -Version 7.0`, so under 5.1 the deploy dies importing it — before building, packaging or
+registering anything. From WSL that is the default you get, and piping the run through `tail` hides
+it further: the pipeline reports `tail`'s exit code, so a deploy that never started reads as
+success. See [`doc/troubleshooting.md`](doc/troubleshooting.md).
 
 The Dev payload is *staged and left alone*. `dev-pending.json` (commit, branch, dirty, timestamp,
 payload path) is how the running `wtd` learns a newer build is waiting, so it can offer me the
@@ -423,7 +413,7 @@ WindowsTerminal).Path` — a window that appeared under the *Dev* executable pat
 `Microsoft-Windows-AppModel-Runtime/Admin` shows the container being created and destroyed in the
 same second.
 
-### Every locally-built Terminal shares one process name
+### Every Terminal built from this repo shares one process name
 
 **`Get-Process -Name 'WindowsTerminal'` matches the test build, the dev build, *and* the Terminal my
 session is running in.** Selecting `-First 1` and sending it input is how you type into my live

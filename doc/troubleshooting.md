@@ -201,3 +201,50 @@ Note the limitation that made this insufficient on its own here: a
 separate-desktop launch is still an *unpackaged* launch, so it hits the
 identity trap above. It is a good way to smoke-test a binary, not a substitute
 for starting the registered slot.
+
+## Local build traps, retained for reference
+
+Builds happen in CI now (see the build section of `CLAUDE.md`), so none of these
+should bite in day-to-day work. They are kept because they each cost a real
+investigation, and because a one-off local build — bisecting, or reproducing
+something CI cannot — will meet them again.
+
+### `LNK1104: cannot open file ...` on a file that is plainly there
+
+It means "path too long", not "missing". Some package references expand through
+unnormalised `build\native\..\..\runtimes\...` segments, which pushes them past
+`MAX_PATH` (260). A worktree under `%TEMP%\claude\<session>\scratchpad\`
+produced a 267-character reference and failed to link; the same worktree at
+`C:\wt-tm` produced 155 and linked. MSBuild also warns `MSB8029` about output
+directories under Temp. Keep any build tree on a short root.
+
+### `Invoke-OpenConsoleBuild -p:Configuration=Release` silently loses the switches
+
+PowerShell parses `-p:Configuration=Release` as the cmdlet's own `-p:` parameter
+with the value `Configuration=Release`, strips the prefix, and MSBuild receives a
+bare `Configuration=Release` — then dies with `MSB1008: Only one project can be
+specified`. Call `msbuild.exe` directly with `/p:` switches, or pass `--%` to
+stop PowerShell parsing the rest of the line.
+
+### Building a single project needs `SolutionDir`
+
+`.vcxproj` files here import `$(SolutionDir)src\common.build.pre.props`, which is
+empty when msbuild is pointed at a project rather than the solution:
+`MSB4019: The imported project "...\src\common.build.pre.props" was not found`.
+Pass it explicitly, with the trailing separator:
+`msbuild .\src\types\lib\types.vcxproj /p:SolutionDir=C:\Users\steve\projects\terminal\`.
+
+### A build tree is expensive
+
+A warm tree here measured 40.7 GB: 33.9 GB across the eight `obj\` directories,
+5.5 GB in `bin\`, plus `packages\` and `AppPackages\`. `NuGet.Config` pins
+`globalPackagesFolder` and `repositoryPath` to `.\packages` relative to itself, so
+every worktree pays the whole cost again. Nothing under those paths is tracked:
+
+```powershell
+Get-ChildItem . -Recurse -Directory -Filter obj | Remove-Item -Recurse -Force
+Remove-Item .\bin, .\packages, .\src\cascadia\CascadiaPackage\AppPackages -Recurse -Force
+```
+
+See also "Builds that die on memory, not on code" above, which is the other cost
+of building wide on this machine.
