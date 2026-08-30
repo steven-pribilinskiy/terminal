@@ -137,6 +137,10 @@ namespace Microsoft::Console::Utils
     // /home/... or /mnt/... paths emitted from WSL) to launchable Windows/UNC targets.
     std::wstring ResolveFileUriTarget(std::wstring_view uriString, std::wstring_view profileDistro);
 
+    // Drops a URI's #fragment. Also used in TerminalPage::_OpenHyperlinkHandler, before
+    // the URI is validated, so that the safety checks see the target that will be opened.
+    std::wstring_view StripUriFragment(std::wstring_view uriString) noexcept;
+
     bool IsWindows11() noexcept;
 
     bool IsLikelyToBeEmojiOrSymbolIcon(std::wstring_view text) noexcept;

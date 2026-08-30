@@ -1330,6 +1330,97 @@ bool Utils::IsLikelyToBeEmojiOrSymbolIcon(std::wstring_view text) noexcept
     return off == gsl::narrow_cast<int32_t>(text.size());
 }
 
+std::wstring_view Utils::StripUriFragment(std::wstring_view uriString) noexcept
+{
+    // Everything from the first '#' onwards is the fragment (RFC 3986 3.5). A '#'
+    // that is genuinely part of a path has to arrive percent-encoded as %23, so a
+    // literal one is always the delimiter and never part of the name.
+    if (const auto pos = uriString.find(L'#'); pos != std::wstring_view::npos)
+    {
+        return uriString.substr(0, pos);
+    }
+    return uriString;
+}
+
+// PathCreateFromUrl unescapes %XX one byte at a time and widens each byte on its own,
+// so a UTF-8 encoded name arrives mojibaked: %C3%A9 comes back as "Ã©" rather than "é",
+// and the path then doesn't exist. Decode the escapes that cannot be ASCII here instead,
+// as UTF-8, and hand PathCreateFromUrl everything else untouched -- %20, %23 and %2F
+// still have to reach it escaped or they turn back into structural delimiters. Every
+// byte of a UTF-8 multi-byte sequence is >= 0x80, so a run of such escapes is exactly
+// one sequence and nothing below 0x80 is ever consumed.
+static std::wstring _decodeNonAsciiEscapes(std::wstring_view uriString)
+{
+    static constexpr auto hexValue = [](wchar_t wch) noexcept -> int {
+        if (wch >= L'0' && wch <= L'9')
+        {
+            return wch - L'0';
+        }
+        if (wch >= L'a' && wch <= L'f')
+        {
+            return wch - L'a' + 10;
+        }
+        if (wch >= L'A' && wch <= L'F')
+        {
+            return wch - L'A' + 10;
+        }
+        return -1;
+    };
+
+    std::wstring result;
+    result.reserve(uriString.size());
+
+    for (size_t i = 0; i < uriString.size();)
+    {
+        std::string utf8;
+        auto runEnd = i;
+        while (runEnd + 2 < uriString.size() && uriString[runEnd] == L'%')
+        {
+            const auto hi = hexValue(uriString[runEnd + 1]);
+            const auto lo = hexValue(uriString[runEnd + 2]);
+            if (hi < 0 || lo < 0)
+            {
+                break;
+            }
+
+            const auto byte = gsl::narrow_cast<unsigned char>((hi << 4) | lo);
+            if (byte < 0x80)
+            {
+                break;
+            }
+
+            utf8.push_back(gsl::narrow_cast<char>(byte));
+            runEnd += 3;
+        }
+
+        if (utf8.empty())
+        {
+            result.push_back(uriString[i]);
+            ++i;
+            continue;
+        }
+
+        // MB_ERR_INVALID_CHARS: a run that isn't valid UTF-8 is left exactly as it
+        // was, so PathCreateFromUrl keeps doing whatever it did with it before.
+        const auto length = gsl::narrow_cast<int>(utf8.size());
+        const auto required = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8.data(), length, nullptr, 0);
+        if (required > 0)
+        {
+            const auto offset = result.size();
+            result.resize(offset + gsl::narrow_cast<size_t>(required));
+            MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8.data(), length, result.data() + offset, required);
+        }
+        else
+        {
+            result.append(uriString.substr(i, runEnd - i));
+        }
+
+        i = runEnd;
+    }
+
+    return result;
+}
+
 std::wstring Utils::ResolveFileUriTarget(std::wstring_view uriString, std::wstring_view profileDistro)
 {
     if (!til::starts_with_insensitive_ascii(uriString, L"file://"))
@@ -1340,7 +1431,9 @@ std::wstring Utils::ResolveFileUriTarget(std::wstring_view uriString, std::wstri
     std::wstring buffer;
     DWORD bufferLen = MAX_PATH;
     buffer.resize(bufferLen);
-    const std::wstring rawUri{ uriString };
+    // The shell cannot act on a fragment and PathCreateFromUrl keeps one in the path,
+    // turning a perfectly good target into a file that doesn't exist. GH#14116.
+    const auto rawUri = _decodeNonAsciiEscapes(StripUriFragment(uriString));
     auto hr = PathCreateFromUrlW(rawUri.c_str(), buffer.data(), &bufferLen, 0);
     if (hr == E_POINTER)
     {

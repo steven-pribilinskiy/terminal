@@ -35,6 +35,7 @@ class UtilsTests
 
     TEST_METHOD(TestEvaluateStartingDirectory);
     TEST_METHOD(TestResolveFileUriTarget);
+    TEST_METHOD(TestStripUriFragment);
 
     void _VerifyXTermColorResult(const std::wstring_view wstr, DWORD colorValue);
     void _VerifyXTermColorInvalid(const std::wstring_view wstr);
@@ -650,5 +651,56 @@ void UtilsTests::TestResolveFileUriTarget()
 
     // POSIX paths without distro return local path representation
     VERIFY_ARE_EQUAL(LR"(\home\stevenp\test.md)", ResolveFileUriTarget(LR"(file:///home/stevenp/test.md)", L""));
+
+    // Fragments are dropped. The shell cannot act on one, and PathCreateFromUrl leaves it
+    // sitting in the path, which turns a good target into a file that does not exist.
+    VERIFY_ARE_EQUAL(LR"(\\wsl.localhost\Ubuntu\home\stevenp\.config\pintle\routes.yaml)", ResolveFileUriTarget(LR"(file:///home/stevenp/.config/pintle/routes.yaml#L6-L7)", L"Ubuntu"));
+    VERIFY_ARE_EQUAL(LR"(C:\Users\steve\file.txt)", ResolveFileUriTarget(LR"(file:///C:/Users/steve/file.txt#L12)", L"Ubuntu"));
+    VERIFY_ARE_EQUAL(LR"(\\wsl.localhost\Ubuntu\etc\hosts)", ResolveFileUriTarget(LR"(file://wsl.localhost/Ubuntu/etc/hosts#L1)", L"Ubuntu"));
+    VERIFY_ARE_EQUAL(LR"(C:\Users\steve\file.txt)", ResolveFileUriTarget(LR"(file:///mnt/c/Users/steve/file.txt#L3)", L"Ubuntu"));
+
+    // Queries are dropped by PathCreateFromUrl itself. Pinned here so it stays that way.
+    VERIFY_ARE_EQUAL(LR"(\\wsl.localhost\Ubuntu\home\stevenp\test.md)", ResolveFileUriTarget(LR"(file:///home/stevenp/test.md?plain=1)", L"Ubuntu"));
+
+    // An escaped '#' is part of the file's name, not a fragment delimiter.
+    VERIFY_ARE_EQUAL(LR"(\\wsl.localhost\Ubuntu\home\stevenp\a#b.txt)", ResolveFileUriTarget(LR"(file:///home/stevenp/a%23b.txt)", L"Ubuntu"));
+
+    // Percent escapes are UTF-8, not one code unit per byte. Left to PathCreateFromUrl,
+    // %C3%A9 would come back as the two characters "\u00C3\u00A9" instead of "\u00E9".
+    VERIFY_ARE_EQUAL(L"\\\\wsl.localhost\\Ubuntu\\home\\stevenp\\\u00E9.txt", ResolveFileUriTarget(L"file:///home/stevenp/%C3%A9.txt", L"Ubuntu"));
+    VERIFY_ARE_EQUAL(L"\\\\wsl.localhost\\Ubuntu\\home\\stevenp\\\u4E2D\u6587.txt", ResolveFileUriTarget(L"file:///home/stevenp/%E4%B8%AD%E6%96%87.txt", L"Ubuntu"));
+    VERIFY_ARE_EQUAL(L"C:\\Users\\steve\\caf\u00E9 menu.txt", ResolveFileUriTarget(L"file:///C:/Users/steve/caf%C3%A9%20menu.txt", L"Ubuntu"));
+
+    // A literal non-ASCII character is already what we want and passes through untouched.
+    VERIFY_ARE_EQUAL(L"\\\\wsl.localhost\\Ubuntu\\home\\stevenp\\\u00E9.txt", ResolveFileUriTarget(L"file:///home/stevenp/\u00E9.txt", L"Ubuntu"));
+
+    // Escapes below 0x80 keep their structural meaning and are still PathCreateFromUrl's
+    // to decode -- decoding %20 or %2F ourselves would hand it a different path.
+    VERIFY_ARE_EQUAL(LR"(\\wsl.localhost\Ubuntu\home\stevenp\my plan.md)", ResolveFileUriTarget(LR"(file:///home/stevenp/my%20plan.md)", L"Ubuntu"));
+
+    // A run that is not valid UTF-8 is left exactly as it was, so the old behaviour stands.
+    VERIFY_ARE_EQUAL(L"\\\\wsl.localhost\\Ubuntu\\home\\stevenp\\\u00FF.txt", ResolveFileUriTarget(L"file:///home/stevenp/%FF.txt", L"Ubuntu"));
+}
+
+void UtilsTests::TestStripUriFragment()
+{
+    const auto strip = [](std::wstring_view uri) { return std::wstring{ StripUriFragment(uri) }; };
+
+    VERIFY_ARE_EQUAL(LR"(file:///home/stevenp/routes.yaml)", strip(LR"(file:///home/stevenp/routes.yaml#L6-L7)"));
+    VERIFY_ARE_EQUAL(LR"(file:///home/stevenp/routes.yaml)", strip(LR"(file:///home/stevenp/routes.yaml)"));
+    VERIFY_ARE_EQUAL(LR"(file:///home/stevenp/routes.yaml)", strip(LR"(file:///home/stevenp/routes.yaml#)"));
+
+    // Everything from the first '#' is the fragment, a second one included.
+    VERIFY_ARE_EQUAL(LR"(file:///a)", strip(LR"(file:///a#b#c)"));
+
+    // A '#' belonging to the file's name has to arrive escaped, and must survive.
+    VERIFY_ARE_EQUAL(LR"(file:///home/x/a%23b.txt)", strip(LR"(file:///home/x/a%23b.txt)"));
+
+    // Nothing here is file:// specific; other schemes keep their fragments because the
+    // caller only reaches for this when the scheme is file.
+    VERIFY_ARE_EQUAL(LR"(https://example.com/page)", strip(LR"(https://example.com/page#section)"));
+
+    VERIFY_ARE_EQUAL(L"", strip(L""));
+    VERIFY_ARE_EQUAL(L"", strip(L"#L1"));
 }
 
