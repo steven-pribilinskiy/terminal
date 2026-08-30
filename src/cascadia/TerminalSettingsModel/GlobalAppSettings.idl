@@ -131,6 +131,7 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(Boolean, FocusFollowMouse);
         INHERITABLE_SETTING(Boolean, ScrollToZoom);
         INHERITABLE_SETTING(Boolean, OpenLinksOnSingleClick);
+        INHERITABLE_SETTING(Int32, HyperlinkTooltipMaxWidth);
         INHERITABLE_SETTING(Boolean, ScrollToChangeOpacity);
         INHERITABLE_SETTING(Boolean, TrimBlockSelection);
         INHERITABLE_SETTING(Boolean, DetectURLs);

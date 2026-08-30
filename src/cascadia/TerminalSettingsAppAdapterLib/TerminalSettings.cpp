@@ -375,6 +375,7 @@ namespace winrt::Microsoft::Terminal::Settings
         _FocusFollowMouse = windowSettings.FocusFollowMouse();
         _ScrollToZoom = windowSettings.ScrollToZoom();
         _OpenLinksOnSingleClick = windowSettings.OpenLinksOnSingleClick();
+        _HyperlinkTooltipMaxWidth = windowSettings.HyperlinkTooltipMaxWidth();
         _ScrollToChangeOpacity = windowSettings.ScrollToChangeOpacity();
         _GraphicsAPI = windowSettings.GraphicsAPI();
         _DisablePartialInvalidation = windowSettings.DisablePartialInvalidation();

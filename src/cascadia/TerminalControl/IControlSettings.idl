@@ -57,6 +57,7 @@ namespace Microsoft.Terminal.Control
         Boolean FocusFollowMouse { get; };
         Boolean ScrollToZoom { get; };
         Boolean OpenLinksOnSingleClick { get; };
+        Int32 HyperlinkTooltipMaxWidth { get; };
         Boolean ScrollToChangeOpacity { get; };
 
         String Commandline { get; };

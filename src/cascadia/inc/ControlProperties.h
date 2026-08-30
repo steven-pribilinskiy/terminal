@@ -44,6 +44,7 @@
     X(bool, FocusFollowMouse, false)                                                                              \
     X(bool, ScrollToZoom, true)                                                                                   \
     X(bool, OpenLinksOnSingleClick, true)                                                                         \
+    X(int32_t, HyperlinkTooltipMaxWidth, 640)                                                                     \
     X(bool, ScrollToChangeOpacity, true)                                                                          \
     X(winrt::Windows::Foundation::IReference<winrt::Microsoft::Terminal::Core::Color>, TabColor, nullptr)         \
     X(winrt::Windows::Foundation::IReference<winrt::Microsoft::Terminal::Core::Color>, StartingTabColor, nullptr) \

@@ -40,6 +40,7 @@ Author(s):
     X(bool, FocusFollowMouse, "focusFollowMouse", false)                                                                                                                                              \
     X(bool, ScrollToZoom, "experimental.scrollToZoom", false)                                                                                                                                         \
     X(bool, OpenLinksOnSingleClick, "openLinksOnSingleClick", true)                                                                                                                                   \
+    X(int32_t, HyperlinkTooltipMaxWidth, "hyperlink.tooltipMaxWidth", 640)                                                                                                                            \
     X(bool, ScrollToChangeOpacity, "experimental.scrollToChangeOpacity", false)                                                                                                                       \
     X(winrt::Microsoft::Terminal::Control::GraphicsAPI, GraphicsAPI, "rendering.graphicsAPI")                                                                                                         \
     X(bool, DisablePartialInvalidation, "rendering.disablePartialInvalidation", false)                                                                                                                \

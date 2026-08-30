@@ -2427,6 +2427,12 @@
           "description": "When set to true, clicking a link in the terminal opens it without holding Ctrl. The link opens on mouse release, and only if the click did not become a text selection, so dragging to select a URL still selects it rather than opening it. Ctrl+click continues to work either way.",
           "type": "boolean"
         },
+        "hyperlink.tooltipMaxWidth": {
+          "default": 640,
+          "description": "How wide, in device-independent pixels, the hyperlink hover tooltip may grow before its URI wraps. The platform's own tooltip caps content at 320, which folds an ordinary link into four or five lines. Set to 0 for no maximum.",
+          "minimum": 0,
+          "type": "integer"
+        },
         "focusFollowMouse": {
           "default": false,
           "description": "When set to true, the terminal will focus the pane on mouse hover.",

@@ -985,6 +985,14 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
         HowToOpenRun().Text(settings.OpenLinksOnSingleClick() ? RS_(L"HowToOpenRunSingleClick") : _followLinkHintCtrlClick);
 
+        // The template restated in the XAML takes the content's cap from the ToolTip
+        // itself, so this is the whole of hyperlink.tooltipMaxWidth. Zero or less means
+        // "don't wrap at all", which is only sensible on a very wide window but is the
+        // honest reading of "no maximum".
+        const auto tooltipMaxWidth = settings.HyperlinkTooltipMaxWidth();
+        LinkTip().MaxWidth(tooltipMaxWidth > 0 ? static_cast<double>(tooltipMaxWidth) :
+                                                 std::numeric_limits<double>::infinity());
+
         _interactivity.UpdateSettings();
         {
             const auto inputScope = settings.DefaultInputScope();

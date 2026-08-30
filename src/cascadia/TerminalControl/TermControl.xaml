@@ -1274,6 +1274,7 @@
                                 BorderBrush="Transparent">
                             <ToolTipService.ToolTip>
                                 <ToolTip x:Name="LinkTip"
+                                         MaxWidth="640"
                                          Placement="Mouse">
                                     <ToolTip.Template>
                                         <!--
@@ -1283,10 +1284,15 @@
                                             theme resource; the whole template has to be restated. This
                                             tooltip holds a URI, which the default width folds into a
                                             tall unreadable stack.
+
+                                            Restating it is also what makes the cap configurable: the
+                                            ContentPresenter takes its width from the ToolTip, which
+                                            _ApplySettings sets from hyperlink.tooltipMaxWidth. The 640
+                                            above is the default, and applies before that first runs.
                                         -->
                                         <ControlTemplate TargetType="ToolTip">
                                             <ContentPresenter x:Name="LayoutRoot"
-                                                              MaxWidth="640"
+                                                              MaxWidth="{TemplateBinding MaxWidth}"
                                                               Padding="{TemplateBinding Padding}"
                                                               Background="{TemplateBinding Background}"
                                                               BackgroundSizing="OuterBorderEdge"
