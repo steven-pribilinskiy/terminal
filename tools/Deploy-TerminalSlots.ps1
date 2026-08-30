@@ -320,8 +320,28 @@ if (-not $StageOnly) {
             Write-Host '   restored Test slot settings.json' -ForegroundColor DarkGray
         }
         if ($savedState) {
-            Set-Content -Path $testLocalStateState -Value $savedState -Encoding UTF8
-            Write-Host '   restored Test slot state.json' -ForegroundColor DarkGray
+            # Restore state.json WITHOUT settingsHash. The jump list is rebuilt
+            # only when that hash changes (AppLogic::_ProcessLazySettingsChanges),
+            # and the jump list lives shell-side, so it outlives the package --
+            # while the rasterized icons it points at live in LocalState, which
+            # unregistering just deleted. Carrying the hash across a deploy would
+            # leave the shell holding a list of paths to files that no longer
+            # exist. Dropping it costs one rebuild on next launch and also cures
+            # the staleness that let a jump list survive several builds.
+            #
+            # -AsHashtable is required: state.json can carry a property whose
+            # name is the empty string, which ConvertFrom-Json rejects outright.
+            # If it will not parse at all, restore it verbatim rather than lose it.
+            try {
+                $stateObj = $savedState | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+                $stateObj.Remove('settingsHash') | Out-Null
+                Set-Content -Path $testLocalStateState -Value ($stateObj | ConvertTo-Json -Depth 20) -Encoding UTF8
+                Write-Host '   restored Test slot state.json (settingsHash dropped to refresh the jump list)' -ForegroundColor DarkGray
+            }
+            catch {
+                Set-Content -Path $testLocalStateState -Value $savedState -Encoding UTF8
+                Write-Host "   restored Test slot state.json verbatim (could not parse: $($_.Exception.Message))" -ForegroundColor DarkYellow
+            }
         }
     }
 
