@@ -8,6 +8,7 @@
 
 #include "DefaultTerminal.h"
 #include "FileUtils.h"
+#include "RemoteIconCache.h"
 
 #include <VersionHelpers.h>
 #include <WtExeUtils.h>
@@ -564,6 +565,25 @@ static void _resolveSingleMediaResourceInner(Model::OriginTag origin, std::wstri
             if (til::starts_with_insensitive_ascii(scheme, L"http") ||
                 (til::equals_insensitive_ascii(scheme, L"ms-appx") && !resourceUri.Domain().empty()))
             {
+                // An http(s) icon is kept as a local copy, because nothing that
+                // draws an icon -- XAML, the shell, the jump list -- can take a
+                // URL. See RemoteIconCache.h for why fragments ship these at all.
+                //
+                // Deliberately never blocking: a cached file is used at once, a
+                // missing one starts a background fetch and falls through to the
+                // decay below, so the real icon arrives on a later reload.
+                // Settings load is on the startup path.
+                if (til::starts_with_insensitive_ascii(scheme, L"http"))
+                {
+                    namespace MTSM = winrt::Microsoft::Terminal::Settings::Model;
+                    if (const auto cached{ MTSM::TryGetCachedRemoteIcon(resourcePath) })
+                    {
+                        resource.Resolve(winrt::hstring{ *cached });
+                        return;
+                    }
+                    MTSM::RequestRemoteIcon(resourcePath);
+                }
+
                 // http(s) URLs (WSL Distro AppX fragments) and ms-appx://APPLICATION/ (Julia) URLs decay to fragment-relative paths
                 const auto path{ resourceUri.Path() };
                 const std::wstring_view pathView{ path };
