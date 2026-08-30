@@ -74,15 +74,51 @@ jobs:
           msbuild .\OpenConsole.slnx /t:Restore /p:Configuration=Release /p:Platform=x64 /v:m /nologo
           .\tools\Deploy-TerminalSlots.ps1 -StageOnly
 
+      # Builds happen here now, so this is the only thing that runs the tests at
+      # all -- without it "CI green" means nothing more than "it compiled".
+      #
+      # Two suites, deliberately. SettingsModel.Unit.Tests is left out because it
+      # fails 66 of its 161 cases on main today, the test host dying at
+      # 0xC0000409, and that predates this step: it reproduces with every local
+      # change stashed and the binaries rebuilt from clean sources. Gating on it
+      # would paint every run red and teach everyone to ignore the colour. Put it
+      # back the moment that crash is understood.
+      - name: Unit tests
+        shell: pwsh
+        run: |
+          $te = Get-ChildItem .\packages\Microsoft.Taef.*\build\Binaries\x64\te.exe -ErrorAction SilentlyContinue |
+                  Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $te) { throw 'te.exe not found under .\packages; did the restore run?' }
+          $suites = @(
+            '.\bin\x64\Release\Types.Unit.Tests.dll',
+            '.\bin\x64\Release\UnitTests_Control\Control.Unit.Tests.dll'
+          )
+          $failed = @()
+          foreach ($suite in $suites) {
+            if (-not (Test-Path $suite)) { throw "missing test binary: $suite" }
+            Write-Host "== $suite ==" -ForegroundColor Cyan
+            & $te.FullName $suite
+            # te.exe reports failures through its exit code; check it per suite so
+            # the log names the one that broke rather than just the last to run.
+            if ($LASTEXITCODE -ne 0) { $failed += $suite }
+          }
+          if ($failed) { throw "failing suites: $($failed -join ', ')" }
+
       # Unpacked rather than the .msix: it is 17 MB either way, and shipping the
       # layout means the machine that installs it needs no Windows SDK to unpack
       # one. The marker rides along so the fetcher does not have to reconstruct
       # the commit, branch and timestamp from anywhere else.
+      #
+      # The Test payload ships too. -StageOnly unpacks it either way (it lands in
+      # test-staged before the registration branch it skips), and without it in
+      # the artifact there is no way to refresh wtt on a machine that does not
+      # compile -- which means no way to verify UI behaviour at all.
       - uses: actions/upload-artifact@v7
         with:
           name: dev-payload
           path: |
             C:\TerminalSlots\dev-staged
+            C:\TerminalSlots\test-staged
             C:\TerminalSlots\dev-pending.json
           if-no-files-found: error
           retention-days: 14
