@@ -179,7 +179,7 @@ Remove-Item .\bin, .\packages, .\src\cascadia\CascadiaPackage\AppPackages -Recur
 
 Push to `main`, then let `tools\Fetch-CIBuild.ps1` drop the newest successful run into the Dev
 staging slot (`dev-staged-ci`) — or let the Scheduled Task do it for you (see below). Promotion into
-Dev is still my gesture, unchanged.
+Dev is still my gesture by default — see "The two slots" for the narrow exception.
 
 **Two things this currently costs, both worth fixing in `build.yml` before relying on it.** CI has
 no test step at all — it restores, builds, packages and uploads, and that is the whole workflow — so
@@ -246,6 +246,19 @@ installs.**
 The Dev slot changes exactly one way: **I press promote**, in `wtd` itself. Promotion is my gesture.
 It is never a side effect of your build, and there is no situation in which you perform it for me.
 
+**Exception (added 2026-08-31):** you may run the promote helper (`tools\Promote-DevSlot.ps1`, deployed
+alongside the payload at `C:\TerminalSlots\Promote-DevSlot.ps1`) yourself, without asking first, when
+you've verified via process-tree inspection — not by assuming an empty slot is a safe slot — that
+either **(a)** no `WindowsTerminal.exe` is currently running under the Dev payload at all, or **(b)**
+exactly one is running, with exactly one tab/pane, whose foreground process resolves to a session
+multiplexer (`shefrd`, `herdr`, `tmux`, `screen`, `zellij`) rather than a raw shell — because in that
+case the real work lives in the multiplexer's own persistent server, not the window, and closing it
+loses nothing. Multiple windows, multiple tabs/panes, or a bare shell/REPL/build still require asking
+first, unchanged; an ambiguous process tree counts as "still require asking," not as case (b). State
+what you found and why you judged it safe every time you use this — a past verified case is not a
+standing green light, and I might be sitting right in front of the window in question, in which case
+just staging the build and letting me promote it myself is simpler than any of this.
+
 ### "There's no dev build running" is NOT permission
 
 The Dev slot is production whether or not a window is open at that instant. An empty slot is not a
@@ -267,7 +280,8 @@ inverted conclusion this section exists to prevent.
 - `Add-AppxPackage -Register` anything whose identity is `WindowsTerminalDev`.
 - `Start-Process wtd.exe` / `wtd.exe <args>` — launching it is my gesture too, and with the handoff
   below a launch can land inside a process I am working in.
-- Kill a `WindowsTerminal.exe` whose path is under a Dev payload.
+- Kill a `WindowsTerminal.exe` whose path is under a Dev payload — except under the narrow, verified
+  exception above.
 - Run `tools\Register-DevSlot.ps1`.
 
 ### Check before every deploy
@@ -373,7 +387,14 @@ deploys nothing. Building the package from Visual Studio emits a loose layout di
 while any process is live under the Dev payload — re-registering an identity from a different folder
 requires removing the old registration first, and Windows will not remove a running package. It
 refuses rather than terminating my windows, which is the correct instinct and the one you should
-share. **You do not run it.** Either I press promote in `wtd`, or I run it myself.
+share. **You do not run it, full stop — no exception.** Either I press promote in `wtd`, or I run it
+myself.
+
+This is a different script from the one the exception two sections up names. `tools\Register-DevSlot.ps1`
+is the raw, low-level re-registration — it is what `Promote-DevSlot.ps1` calls internally once a window
+is already gone, and running it directly bypasses the swap, the settings backup, and the wait. The
+exception covers only `Promote-DevSlot.ps1` — the actual button handler, which never force-closes a
+window and simply waits (or gives up) when one is still open.
 
 ### FIXED: `wtt` used to silently run the *dev* binaries
 
