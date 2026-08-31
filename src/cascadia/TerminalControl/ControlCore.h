@@ -159,6 +159,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void ClearQuickFix();
 
         void OpenCWD();
+        void CopyTextToClipboard(const winrt::hstring& text);
 
 #pragma region ICoreState
         const size_t TaskbarState() const noexcept;

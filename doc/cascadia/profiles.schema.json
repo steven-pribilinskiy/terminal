@@ -2433,6 +2433,23 @@
           "minimum": 0,
           "type": "integer"
         },
+        "hyperlink.tooltipShowDelay": {
+          "default": 250,
+          "description": "How long, in milliseconds, the pointer must rest on a link before its tooltip appears.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "hyperlink.tooltipHideDelay": {
+          "default": 400,
+          "description": "How long, in milliseconds, the link tooltip stays up after the pointer leaves the link. This is the grace period that lets you move the pointer onto the tooltip to use its buttons, so setting it to 0 makes them unreachable by mouse.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "hyperlink.tooltipActions": {
+          "default": true,
+          "description": "When set to true, the link tooltip carries buttons for opening the link, copying it, and — for file:// links — copying the resolved path or revealing it in File Explorer.",
+          "type": "boolean"
+        },
         "focusFollowMouse": {
           "default": false,
           "description": "When set to true, the terminal will focus the pane on mouse hover.",

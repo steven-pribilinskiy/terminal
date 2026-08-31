@@ -1490,3 +1490,202 @@ std::wstring Utils::ResolveFileUriTarget(std::wstring_view uriString, std::wstri
     return buffer;
 }
 
+static constexpr std::wstring_view LxssKeyPath{ L"Software\\Microsoft\\Windows\\CurrentVersion\\Lxss" };
+
+// Reads a string value out of an open registry key, or an empty string if it isn't there.
+static std::wstring _readRegString(HKEY key, const wchar_t* valueName)
+{
+    std::wstring value;
+    const auto result = wil::AdaptFixedSizeToAllocatedResult<std::wstring, 256>(value, [&](PWSTR buffer, size_t bufferLength, size_t* bufferLengthNeededWithNull) -> HRESULT {
+        auto length = gsl::narrow<DWORD>(bufferLength * sizeof(wchar_t));
+        const auto status = RegQueryValueExW(key, valueName, 0, nullptr, reinterpret_cast<BYTE*>(buffer), &length);
+        *bufferLengthNeededWithNull = (length + sizeof(wchar_t) - 1) / sizeof(wchar_t);
+        return status == ERROR_MORE_DATA ? S_OK : HRESULT_FROM_WIN32(status);
+    });
+
+    return result == S_OK ? value : std::wstring{};
+}
+
+// Resolves an Lxss registration GUID to the distro's name. That GUID is both the subkey name
+// under Lxss and the value wsl.exe takes as --distribution-id, so this one lookup answers
+// "the default distro" and "the distro this profile launches".
+std::wstring Utils::WslDistroById(const std::wstring& distroId)
+{
+    wil::unique_hkey lxssKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, LxssKeyPath.data(), 0, KEY_READ, &lxssKey) != ERROR_SUCCESS)
+    {
+        return {};
+    }
+
+    wil::unique_hkey distroKey;
+    if (RegOpenKeyExW(lxssKey.get(), distroId.c_str(), 0, KEY_READ, &distroKey) != ERROR_SUCCESS)
+    {
+        return {};
+    }
+
+    return _readRegString(distroKey.get(), L"DistributionName");
+}
+
+std::wstring Utils::DefaultWslDistro()
+{
+    wil::unique_hkey lxssKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, LxssKeyPath.data(), 0, KEY_READ, &lxssKey) != ERROR_SUCCESS)
+    {
+        return {};
+    }
+
+    const auto defaultGuid = _readRegString(lxssKey.get(), L"DefaultDistribution");
+    return defaultGuid.empty() ? std::wstring{} : Utils::WslDistroById(defaultGuid);
+}
+
+// ...\ubuntu.exe -> "ubuntu". Lowercased and stripped of the separators distro names are
+// written with, so that a launcher's name can be compared against a registration's:
+// ubuntu2404.exe and "Ubuntu-24.04" both come out as "ubuntu2404".
+static std::wstring _normalizedLauncherName(std::wstring_view exePath)
+{
+    auto name = exePath;
+    if (const auto slash = name.find_last_of(L"\\/"); slash != std::wstring_view::npos)
+    {
+        name = name.substr(slash + 1);
+    }
+    if (til::ends_with_insensitive_ascii(name, L".exe"))
+    {
+        name = name.substr(0, name.size() - 4);
+    }
+
+    std::wstring normalized;
+    normalized.reserve(name.size());
+    for (const auto wch : name)
+    {
+        if (wch != L'-' && wch != L'.' && wch != L'_')
+        {
+            normalized.push_back(towlower(wch));
+        }
+    }
+    return normalized;
+}
+
+// Matches a launcher against the registered distros: ubuntu.exe -> "Ubuntu". A distro's own
+// Store package contributes a Terminal profile that names nothing but its launcher -- Ubuntu's
+// fragment is `"commandline": "ubuntu.exe"` -- with no -d to parse and no WSL path translation
+// style declared, so the name is the only tell that profile has. It is also a better answer
+// than the default distro, which would only be right by luck.
+static std::wstring _wslDistroMatchingLauncher(std::wstring_view exePath)
+{
+    const auto wanted = _normalizedLauncherName(exePath);
+    // wsl.exe and bash.exe are WSL launchers too, but they name no distro of their own.
+    if (wanted.empty() || wanted == L"wsl" || wanted == L"bash")
+    {
+        return {};
+    }
+
+    wil::unique_hkey lxssKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, LxssKeyPath.data(), 0, KEY_READ, &lxssKey) != ERROR_SUCCESS)
+    {
+        return {};
+    }
+
+    for (DWORD i = 0;; ++i)
+    {
+        // Lxss subkeys are registration GUIDs, so this is generously sized.
+        wchar_t subKey[64]{};
+        auto subKeyLength = gsl::narrow_cast<DWORD>(std::size(subKey));
+        if (RegEnumKeyExW(lxssKey.get(), i, subKey, &subKeyLength, nullptr, nullptr, nullptr, nullptr) != ERROR_SUCCESS)
+        {
+            break;
+        }
+
+        wil::unique_hkey distroKey;
+        if (RegOpenKeyExW(lxssKey.get(), subKey, 0, KEY_READ, &distroKey) != ERROR_SUCCESS)
+        {
+            continue;
+        }
+
+        auto distroName = _readRegString(distroKey.get(), L"DistributionName");
+        if (!distroName.empty() && _normalizedLauncherName(distroName) == wanted)
+        {
+            return distroName;
+        }
+    }
+
+    return {};
+}
+
+std::wstring Utils::WslDistroForCommandline(std::wstring_view commandline, const bool declaresWslPathTranslation)
+{
+    int argc = 0;
+    wil::unique_hlocal_ptr<PWSTR[]> argv;
+    if (!commandline.empty())
+    {
+        const std::wstring cmd{ commandline };
+        argv.reset(CommandLineToArgvW(cmd.c_str(), &argc));
+    }
+
+    std::wstring_view exePath;
+    if (argv && argc > 0)
+    {
+        exePath = argv.get()[0];
+    }
+
+    const auto launcherDistro = _wslDistroMatchingLauncher(exePath);
+
+    // Is this pane WSL at all? Only then may a bare POSIX path be read as one of its own.
+    // Ungated, the default distro gets guessed for every pane, so a Windows program printing
+    // file:///etc/hosts into a PowerShell tab would silently open
+    // \\wsl.localhost\<default distro>\etc\hosts. Drive letters, /mnt/<letter>/ and explicit
+    // \\wsl.localhost\ UNC paths are unaffected either way -- they resolve without needing to
+    // know the distro at all.
+    //
+    // Three tells, because no single one covers every WSL profile: the generator and the
+    // fragments WSL itself ships declare the path translation style, a distro's own Store
+    // package contributes a profile that only names its launcher, and a hand-written profile
+    // may just invoke wsl.exe.
+    if (launcherDistro.empty() &&
+        _normalizedLauncherName(exePath) != L"wsl" &&
+        !declaresWslPathTranslation)
+    {
+        return {};
+    }
+
+    // An explicit distro on the commandline beats both the launcher and the default.
+    for (int i = 0; i < argc; ++i)
+    {
+        const std::wstring_view arg{ argv.get()[i] };
+        if (arg == L"-d" || arg == L"--distribution")
+        {
+            if (i + 1 < argc)
+            {
+                return std::wstring{ argv.get()[i + 1] };
+            }
+        }
+        // The profile fragments WSL ships for store distros launch by id rather than by name:
+        // `wsl.exe --distribution-id {guid} --cd ~`. Without this arm they fall through to the
+        // default distro, so a link clicked in a Debian pane opens the same path under Ubuntu.
+        else if (arg == L"--distribution-id")
+        {
+            if (i + 1 < argc)
+            {
+                if (auto byId = Utils::WslDistroById(std::wstring{ argv.get()[i + 1] }); !byId.empty())
+                {
+                    return byId;
+                }
+            }
+        }
+        else if (til::starts_with_insensitive_ascii(arg, L"--distribution-id="))
+        {
+            const auto eqPos = arg.find(L'=');
+            if (auto byId = Utils::WslDistroById(std::wstring{ arg.substr(eqPos + 1) }); !byId.empty())
+            {
+                return byId;
+            }
+        }
+        else if (til::starts_with_insensitive_ascii(arg, L"-d=") || til::starts_with_insensitive_ascii(arg, L"--distribution="))
+        {
+            const auto eqPos = arg.find(L'=');
+            return std::wstring{ arg.substr(eqPos + 1) };
+        }
+    }
+
+    return launcherDistro.empty() ? Utils::DefaultWslDistro() : launcherDistro;
+}
+

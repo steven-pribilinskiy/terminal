@@ -318,6 +318,16 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         winrt::Windows::UI::Xaml::Controls::SwapChainPanel::LayoutUpdated_revoker _layoutUpdatedRevoker;
         winrt::hstring _restorePath;
         winrt::hstring _followLinkHintCtrlClick;
+
+        // The hyperlink card. _hoveredUri is the URI as the buffer holds it: the Run in the
+        // card may carry a punycode annotation beside it, which is there to be read and not
+        // to be acted on. The timers are the ones GH#8242 said we would have to write
+        // ourselves, and _pointerInHyperlinkCard is what stops the terminal's own
+        // PointerExited from pulling the card out from under the pointer heading for it.
+        winrt::hstring _hoveredUri;
+        SafeDispatcherTimer _hyperlinkShowTimer;
+        SafeDispatcherTimer _hyperlinkHideTimer;
+        bool _pointerInHyperlinkCard{ false };
         bool _showMarksInScrollbar{ false };
 
         bool _isBackgroundLight{ false };
@@ -373,6 +383,19 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void _PointerMovedHandler(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
         void _PointerReleasedHandler(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
         void _PointerExitedHandler(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+
+        void _HyperlinkCardPointerEntered(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+        void _HyperlinkCardPointerExited(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+        void _HyperlinkCardPointerPressed(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+        void _HyperlinkCardPointerReleased(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+        void _HyperlinkOpenClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
+        void _HyperlinkCopyLinkClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
+        void _HyperlinkCopyPathClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
+        void _HyperlinkRevealClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
+        void _showHyperlinkCard();
+        void _hideHyperlinkCard();
+        void _scheduleHyperlinkCardHide();
+        std::wstring _resolvedHyperlinkTarget() const;
         void _MouseWheelHandler(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
         void _ScrollbarChangeHandler(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Controls::Primitives::RangeBaseValueChangedEventArgs& e);
 

@@ -30,6 +30,9 @@ namespace Microsoft.Terminal.Settings.Editor
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, DetectURLs);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, OpenLinksOnSingleClick);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, HyperlinkTooltipMaxWidth);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, HyperlinkTooltipShowDelay);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, HyperlinkTooltipHideDelay);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, HyperlinkTooltipActions);
         String SafeUriSchemes;
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(String, SearchWebDefaultQueryUrl);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(String, WordDelimiters);

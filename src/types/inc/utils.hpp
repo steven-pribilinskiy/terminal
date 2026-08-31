@@ -141,6 +141,14 @@ namespace Microsoft::Console::Utils
     // the URI is validated, so that the safety checks see the target that will be opened.
     std::wstring_view StripUriFragment(std::wstring_view uriString) noexcept;
 
+    // Which WSL distro, if any, a pane launched with this commandline is running, for
+    // resolving the POSIX paths it prints. `declaresWslPathTranslation` is the profile's
+    // pathTranslationStyle == WSL. Lives here rather than in TerminalPage because both
+    // that (to open a link) and TermControl (to show where it will go) need the answer.
+    std::wstring WslDistroForCommandline(std::wstring_view commandline, const bool declaresWslPathTranslation);
+    std::wstring WslDistroById(const std::wstring& distroId);
+    std::wstring DefaultWslDistro();
+
     bool IsWindows11() noexcept;
 
     bool IsLikelyToBeEmojiOrSymbolIcon(std::wstring_view text) noexcept;

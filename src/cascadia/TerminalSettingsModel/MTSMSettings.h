@@ -41,6 +41,9 @@ Author(s):
     X(bool, ScrollToZoom, "experimental.scrollToZoom", false)                                                                                                                                         \
     X(bool, OpenLinksOnSingleClick, "openLinksOnSingleClick", true)                                                                                                                                   \
     X(int32_t, HyperlinkTooltipMaxWidth, "hyperlink.tooltipMaxWidth", 640)                                                                                                                            \
+    X(int32_t, HyperlinkTooltipShowDelay, "hyperlink.tooltipShowDelay", 250)                                                                                                                          \
+    X(int32_t, HyperlinkTooltipHideDelay, "hyperlink.tooltipHideDelay", 400)                                                                                                                          \
+    X(bool, HyperlinkTooltipActions, "hyperlink.tooltipActions", true)                                                                                                                                \
     X(bool, ScrollToChangeOpacity, "experimental.scrollToChangeOpacity", false)                                                                                                                       \
     X(winrt::Microsoft::Terminal::Control::GraphicsAPI, GraphicsAPI, "rendering.graphicsAPI")                                                                                                         \
     X(bool, DisablePartialInvalidation, "rendering.disablePartialInvalidation", false)                                                                                                                \

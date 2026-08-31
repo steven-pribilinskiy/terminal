@@ -187,6 +187,7 @@ namespace Microsoft.Terminal.Control
         Boolean ShouldShowSelectOutput();
 
         void OpenCWD();
+        void CopyTextToClipboard(String text);
 
         void ClearQuickFix();
 

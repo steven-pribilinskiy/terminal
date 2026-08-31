@@ -130,6 +130,37 @@
                                 Value="{x:Bind ViewModel.HyperlinkTooltipMaxWidth, Mode=TwoWay}" />
             </local:SettingsCard>
 
+            <!--  Hyperlink Tooltip Show Delay  -->
+            <local:SettingsCard x:Name="HyperlinkTooltipShowDelay"
+                                x:Uid="Globals_HyperlinkTooltipShowDelay">
+                <muxc:NumberBox x:Uid="Globals_HyperlinkTooltipShowDelayBox"
+                                LargeChange="100"
+                                Maximum="5000"
+                                Minimum="0"
+                                SmallChange="50"
+                                Style="{StaticResource NumberBoxSettingStyle}"
+                                Value="{x:Bind ViewModel.HyperlinkTooltipShowDelay, Mode=TwoWay}" />
+            </local:SettingsCard>
+
+            <!--  Hyperlink Tooltip Hide Delay  -->
+            <local:SettingsCard x:Name="HyperlinkTooltipHideDelay"
+                                x:Uid="Globals_HyperlinkTooltipHideDelay">
+                <muxc:NumberBox x:Uid="Globals_HyperlinkTooltipHideDelayBox"
+                                LargeChange="100"
+                                Maximum="5000"
+                                Minimum="0"
+                                SmallChange="50"
+                                Style="{StaticResource NumberBoxSettingStyle}"
+                                Value="{x:Bind ViewModel.HyperlinkTooltipHideDelay, Mode=TwoWay}" />
+            </local:SettingsCard>
+
+            <!--  Hyperlink Tooltip Actions  -->
+            <local:SettingsCard x:Name="HyperlinkTooltipActions"
+                                x:Uid="Globals_HyperlinkTooltipActions">
+                <ToggleSwitch IsOn="{x:Bind ViewModel.HyperlinkTooltipActions, Mode=TwoWay}"
+                              Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+            </local:SettingsCard>
+
             <!--  Safe URI Schemes  -->
             <local:SettingsCard x:Name="SafeUriSchemes"
                                 x:Uid="Globals_SafeUriSchemes">

@@ -8,6 +8,7 @@
 
 #include "TermControlAutomationPeer.h"
 #include "../../renderer/atlas/AtlasEngine.h"
+#include "../../types/inc/utils.hpp"
 #include "../../tsf/Handle.h"
 
 #include "TermControl.g.cpp"
@@ -985,13 +986,13 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
         HowToOpenRun().Text(settings.OpenLinksOnSingleClick() ? RS_(L"HowToOpenRunSingleClick") : _followLinkHintCtrlClick);
 
-        // The template restated in the XAML takes the content's cap from the ToolTip
-        // itself, so this is the whole of hyperlink.tooltipMaxWidth. Zero or less means
-        // "don't wrap at all", which is only sensible on a very wide window but is the
-        // honest reading of "no maximum".
+        // Zero or less means "don't wrap at all", which is only sensible on a very wide
+        // window but is the honest reading of "no maximum".
         const auto tooltipMaxWidth = settings.HyperlinkTooltipMaxWidth();
-        LinkTip().MaxWidth(tooltipMaxWidth > 0 ? static_cast<double>(tooltipMaxWidth) :
-                                                 std::numeric_limits<double>::infinity());
+        HyperlinkCard().MaxWidth(tooltipMaxWidth > 0 ? static_cast<double>(tooltipMaxWidth) :
+                                                       std::numeric_limits<double>::infinity());
+        HyperlinkCardActions().Visibility(settings.HyperlinkTooltipActions() ? Visibility::Visible :
+                                                                              Visibility::Collapsed);
 
         _interactivity.UpdateSettings();
         {
@@ -3490,21 +3491,28 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                                             const Windows::UI::Xaml::Input::PointerRoutedEventArgs& /*e*/)
     {
         _core.ClearHoveredCell();
+
+        // The card sits in the overlay canvas rather than inside the element that raises
+        // this, so setting out for its buttons leaves the terminal and lands here. Hiding
+        // now would make them unreachable by mouse; the grace period is the gap the pointer
+        // is crossing.
+        _scheduleHyperlinkCardHide();
     }
 
     void TermControl::_hoveredHyperlinkChanged(const IInspectable& /*sender*/, const IInspectable& /*args*/)
     {
         const auto lastHoveredCell = _core.HoveredCell();
-        if (!lastHoveredCell)
+        auto uriText = lastHoveredCell ? _core.HoveredUriText() : hstring{};
+        if (uriText.empty())
         {
+            // Off the link. Don't hide at once -- the pointer may be on its way to the card.
+            _scheduleHyperlinkCardHide();
             return;
         }
 
-        auto uriText = _core.HoveredUriText();
-        if (uriText.empty())
-        {
-            return;
-        }
+        // Keep the URI as the buffer holds it. The text below may gain a punycode
+        // annotation, which is there to be read, not to be opened or copied.
+        _hoveredUri = uriText;
 
         // Attackers abuse Unicode characters that happen to look similar to ASCII characters. Cyrillic for instance has
         // its own glyphs for а, с, е, о, р, х, and у that look practically identical to their ASCII counterparts.
@@ -3542,23 +3550,218 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             uriText = RS_(L"InvalidUri");
         }
 
-        const auto panel = SwapChainPanel();
-        const auto offset = panel.ActualOffset();
-
-        // Update the tooltip with the URI
         HoveredUri().Text(uriText);
 
-        // Set the border thickness so it covers the entire cell
+        // Say where a file:// link will really go when that is not what it says. A POSIX
+        // path printed inside WSL opens as \\wsl.localhost\<distro>\..., and seeing that
+        // before clicking is the difference between trusting a link and finding out after.
+        const auto target = _resolvedHyperlinkTarget();
+        const auto showTarget = !target.empty() && target != std::wstring_view{ _hoveredUri };
+        if (showTarget)
+        {
+            HyperlinkCardTarget().Text(winrt::hstring{ L"\u2192 " + target });
+        }
+        HyperlinkCardTarget().Visibility(showTarget ? Visibility::Visible : Visibility::Collapsed);
+
+        // Copying a path and revealing one only mean anything for a file.
+        const auto fileActions = target.empty() ? Visibility::Collapsed : Visibility::Visible;
+        HyperlinkCopyPathButton().Visibility(fileActions);
+        HyperlinkRevealButton().Visibility(fileActions);
+
+        // Already up: it has only moved to a different link, so reposition and leave it.
+        _hyperlinkHideTimer.Stop();
+        if (HyperlinkCard().Visibility() == Visibility::Visible)
+        {
+            _showHyperlinkCard();
+            return;
+        }
+
+        const auto delay = std::max(0, _core.Settings().HyperlinkTooltipShowDelay());
+        if (delay == 0)
+        {
+            _showHyperlinkCard();
+            return;
+        }
+
+        if (!_hyperlinkShowTimer)
+        {
+            _hyperlinkShowTimer.Tick([weakThis = get_weak()](auto&&, auto&&) {
+                if (const auto self = weakThis.get(); self && !self->_IsClosing())
+                {
+                    self->_hyperlinkShowTimer.Stop();
+                    self->_showHyperlinkCard();
+                }
+            });
+        }
+        _hyperlinkShowTimer.Stop();
+        _hyperlinkShowTimer.Interval(std::chrono::milliseconds{ delay });
+        _hyperlinkShowTimer.Start();
+    }
+
+    // Resolves a file:// link to the path it will actually open, or an empty string for
+    // anything else. The distro lookup is shared with TerminalPage rather than repeated,
+    // so what the card promises and what a click delivers cannot drift apart.
+    std::wstring TermControl::_resolvedHyperlinkTarget() const
+    {
+        if (_hoveredUri.empty() || !til::starts_with_insensitive_ascii(std::wstring_view{ _hoveredUri }, L"file:"))
+        {
+            return {};
+        }
+
+        const auto settings = _core.Settings();
+        if (!settings)
+        {
+            return {};
+        }
+
+        const auto distro = ::Microsoft::Console::Utils::WslDistroForCommandline(
+            settings.Commandline(),
+            settings.PathTranslationStyle() == PathTranslationStyle::WSL);
+        return ::Microsoft::Console::Utils::ResolveFileUriTarget(
+            ::Microsoft::Console::Utils::StripUriFragment(_hoveredUri), distro);
+    }
+
+    void TermControl::_showHyperlinkCard()
+    {
+        const auto cell = _core.HoveredCell();
+        if (_hoveredUri.empty() || !cell)
+        {
+            return;
+        }
+
+        const auto card = HyperlinkCard();
+
+        // Measure first: where it goes depends on how big it turned out to be, and it has
+        // just been given new text.
+        card.Measure({ gsl::narrow_cast<float>(ActualWidth()), gsl::narrow_cast<float>(ActualHeight()) });
+        const auto desired = card.DesiredSize();
+
+        const auto offset = SwapChainPanel().ActualOffset();
         const auto fontSize = CharacterDimensions();
-        const Thickness newThickness{ fontSize.Height, fontSize.Width, 0, 0 };
-        HyperlinkTooltipBorder().BorderThickness(newThickness);
+        const auto pos = _toPosInDips(cell.Value());
+        const auto cellLeft = static_cast<double>(pos.X) - offset.x;
+        const auto cellTop = static_cast<double>(pos.Y) - offset.y;
 
-        // Compute the location of the top left corner of the cell in DIPS
-        const auto locationInDIPs{ _toPosInDips(lastHoveredCell.Value()) };
+        // Under the line by default, flipped above it when there is no room, and never
+        // pushed off the right edge -- a long URI would otherwise take its buttons with it.
+        auto top = cellTop + fontSize.Height;
+        if (top + desired.Height > ActualHeight())
+        {
+            top = cellTop - desired.Height;
+        }
+        const auto left = std::clamp(cellLeft, 0.0, std::max(0.0, ActualWidth() - desired.Width));
 
-        // Move the border to the top left corner of the cell
-        OverlayCanvas().SetLeft(HyperlinkTooltipBorder(), locationInDIPs.X - offset.x);
-        OverlayCanvas().SetTop(HyperlinkTooltipBorder(), locationInDIPs.Y - offset.y);
+        Controls::Canvas::SetLeft(card, left);
+        Controls::Canvas::SetTop(card, std::max(0.0, top));
+        card.Visibility(Visibility::Visible);
+    }
+
+    void TermControl::_hideHyperlinkCard()
+    {
+        _hyperlinkShowTimer.Stop();
+        _hyperlinkHideTimer.Stop();
+        _pointerInHyperlinkCard = false;
+        HyperlinkCard().Visibility(Visibility::Collapsed);
+    }
+
+    void TermControl::_scheduleHyperlinkCardHide()
+    {
+        _hyperlinkShowTimer.Stop();
+
+        if (_pointerInHyperlinkCard || HyperlinkCard().Visibility() != Visibility::Visible)
+        {
+            return;
+        }
+
+        const auto delay = std::max(0, _core.Settings().HyperlinkTooltipHideDelay());
+        if (delay == 0)
+        {
+            _hideHyperlinkCard();
+            return;
+        }
+
+        if (!_hyperlinkHideTimer)
+        {
+            _hyperlinkHideTimer.Tick([weakThis = get_weak()](auto&&, auto&&) {
+                if (const auto self = weakThis.get(); self && !self->_IsClosing())
+                {
+                    self->_hyperlinkHideTimer.Stop();
+                    // Re-check: the pointer may have arrived while the timer was running.
+                    if (!self->_pointerInHyperlinkCard)
+                    {
+                        self->_hideHyperlinkCard();
+                    }
+                }
+            });
+        }
+        _hyperlinkHideTimer.Stop();
+        _hyperlinkHideTimer.Interval(std::chrono::milliseconds{ delay });
+        _hyperlinkHideTimer.Start();
+    }
+
+    void TermControl::_HyperlinkCardPointerEntered(const IInspectable& /*sender*/, const PointerRoutedEventArgs& /*e*/)
+    {
+        _pointerInHyperlinkCard = true;
+        _hyperlinkHideTimer.Stop();
+    }
+
+    void TermControl::_HyperlinkCardPointerExited(const IInspectable& /*sender*/, const PointerRoutedEventArgs& /*e*/)
+    {
+        _pointerInHyperlinkCard = false;
+        _scheduleHyperlinkCardHide();
+    }
+
+    // Swallow both halves of the click so neither reaches the terminal underneath: without
+    // this, pressing a button also starts a selection in the buffer behind it. The search
+    // box does the same thing for the same reason.
+    void TermControl::_HyperlinkCardPointerPressed(const IInspectable& /*sender*/, const PointerRoutedEventArgs& e)
+    {
+        e.Handled(true);
+    }
+
+    void TermControl::_HyperlinkCardPointerReleased(const IInspectable& /*sender*/, const PointerRoutedEventArgs& e)
+    {
+        e.Handled(true);
+    }
+
+    void TermControl::_HyperlinkOpenClick(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
+    {
+        if (!_hoveredUri.empty())
+        {
+            // Down the same path a click takes, so the unsafe-URL prompt and the file://
+            // resolution in TerminalPage still apply. The card gets no rules of its own.
+            OpenHyperlink.raise(*this, winrt::make<OpenHyperlinkEventArgs>(_hoveredUri));
+        }
+        _hideHyperlinkCard();
+    }
+
+    void TermControl::_HyperlinkCopyLinkClick(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
+    {
+        if (!_hoveredUri.empty())
+        {
+            _core.CopyTextToClipboard(_hoveredUri);
+        }
+        _hideHyperlinkCard();
+    }
+
+    void TermControl::_HyperlinkCopyPathClick(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
+    {
+        if (const auto target = _resolvedHyperlinkTarget(); !target.empty())
+        {
+            _core.CopyTextToClipboard(winrt::hstring{ target });
+        }
+        _hideHyperlinkCard();
+    }
+
+    void TermControl::_HyperlinkRevealClick(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
+    {
+        if (const auto target = _resolvedHyperlinkTarget(); !target.empty())
+        {
+            // /select, so the file itself comes up selected rather than just its folder.
+            const auto args = fmt::format(LR"(/select,"{}")", target);
+            ShellExecuteW(nullptr, nullptr, L"explorer", args.c_str(), nullptr, SW_SHOW);
+        }
+        _hideHyperlinkCard();
     }
 
     safe_void_coroutine TermControl::_updateSelectionMarkers(IInspectable /*sender*/, Control::UpdateSelectionMarkersEventArgs args)

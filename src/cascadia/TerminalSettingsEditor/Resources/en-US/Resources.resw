@@ -296,6 +296,38 @@
     <value>Maximum width of the link tooltip</value>
     <comment>Name for a control to choose how wide the tooltip shown when hovering a link may grow.</comment>
   </data>
+  <data name="Globals_HyperlinkTooltipShowDelay.Header" xml:space="preserve">
+    <value>Delay before the link tooltip appears</value>
+    <comment>Header for a control to choose how long the pointer must rest on a link before its tooltip appears.</comment>
+  </data>
+  <data name="Globals_HyperlinkTooltipShowDelay.Description" xml:space="preserve">
+    <value>In milliseconds. Set to 0 to show it immediately.</value>
+    <comment>Additional text presented near "Globals_HyperlinkTooltipShowDelay.Header".</comment>
+  </data>
+  <data name="Globals_HyperlinkTooltipShowDelayBox.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Delay before the link tooltip appears</value>
+    <comment>Name for a control to choose how long the pointer must rest on a link before its tooltip appears.</comment>
+  </data>
+  <data name="Globals_HyperlinkTooltipHideDelay.Header" xml:space="preserve">
+    <value>Delay before the link tooltip disappears</value>
+    <comment>Header for a control to choose how long the link tooltip stays on screen after the pointer leaves the link.</comment>
+  </data>
+  <data name="Globals_HyperlinkTooltipHideDelay.Description" xml:space="preserve">
+    <value>In milliseconds. This is the time you have to move the pointer onto the tooltip to use its buttons, so 0 puts them out of reach of the mouse.</value>
+    <comment>Additional text presented near "Globals_HyperlinkTooltipHideDelay.Header".</comment>
+  </data>
+  <data name="Globals_HyperlinkTooltipHideDelayBox.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Delay before the link tooltip disappears</value>
+    <comment>Name for a control to choose how long the link tooltip stays on screen after the pointer leaves the link.</comment>
+  </data>
+  <data name="Globals_HyperlinkTooltipActions.Header" xml:space="preserve">
+    <value>Show buttons on the link tooltip</value>
+    <comment>Header for a control to toggle whether the link tooltip carries action buttons.</comment>
+  </data>
+  <data name="Globals_HyperlinkTooltipActions.Description" xml:space="preserve">
+    <value>Open the link, copy it, and — for links to files — copy the path it resolves to or show it in File Explorer.</value>
+    <comment>Additional text presented near "Globals_HyperlinkTooltipActions.Header".</comment>
+  </data>
   <data name="Globals_SafeUriSchemes.Header" xml:space="preserve">
     <value>URI schemes that open without a warning</value>
     <comment>Header for a control listing the URI schemes that are treated as safe to open.</comment>

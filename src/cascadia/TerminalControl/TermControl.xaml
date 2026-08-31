@@ -1270,67 +1270,79 @@
                                 SizeChanged="_SwapChainSizeChanged">
                     <Canvas x:Name="OverlayCanvas"
                             Visibility="Visible">
-                        <Border x:Name="HyperlinkTooltipBorder"
-                                BorderBrush="Transparent">
-                            <ToolTipService.ToolTip>
-                                <ToolTip x:Name="LinkTip"
-                                         MaxWidth="640"
-                                         Placement="Mouse">
-                                    <ToolTip.Template>
-                                        <!--
-                                            A copy of the default ToolTip template, whose content is
-                                            capped at 320px. That cap is a hardcoded local value on the
-                                            ContentPresenter, so it cannot be widened with a setter or a
-                                            theme resource; the whole template has to be restated. This
-                                            tooltip holds a URI, which the default width folds into a
-                                            tall unreadable stack.
+                        <!--
+                            The hyperlink card. This was a system ToolTip hung off a Border sized
+                            to one character cell that chased the pointer around the canvas, and
+                            that shape cost us three things. The tooltip was flaky, because the
+                            hit target was yanked out from under the pointer as it moved
+                            (GH#11735). Its delay could not be configured, because WinUI's ToolTip
+                            exposes no delay API -- GH#8242 was closed over exactly that, with
+                            "the only way we can support this right now is by creating our own
+                            timer and tooltip". And it could never hold a button, because a
+                            ToolTip lives in its own popup and dismisses itself the moment the
+                            pointer approaches.
 
-                                            Restating it is also what makes the cap configurable: the
-                                            ContentPresenter takes its width from the ToolTip, which
-                                            _ApplySettings sets from hyperlink.tooltipMaxWidth. The 640
-                                            above is the default, and applies before that first runs.
-                                        -->
-                                        <ControlTemplate TargetType="ToolTip">
-                                            <ContentPresenter x:Name="LayoutRoot"
-                                                              MaxWidth="{TemplateBinding MaxWidth}"
-                                                              Padding="{TemplateBinding Padding}"
-                                                              Background="{TemplateBinding Background}"
-                                                              BackgroundSizing="OuterBorderEdge"
-                                                              BorderBrush="{TemplateBinding BorderBrush}"
-                                                              BorderThickness="{TemplateBinding BorderThickness}"
-                                                              Content="{TemplateBinding Content}"
-                                                              ContentTemplate="{TemplateBinding ContentTemplate}"
-                                                              ContentTransitions="{TemplateBinding ContentTransitions}"
-                                                              TextWrapping="Wrap">
-                                                <VisualStateManager.VisualStateGroups>
-                                                    <VisualStateGroup x:Name="OpenStates">
-                                                        <VisualState x:Name="Closed">
-                                                            <Storyboard>
-                                                                <FadeOutThemeAnimation TargetName="LayoutRoot" />
-                                                            </Storyboard>
-                                                        </VisualState>
-                                                        <VisualState x:Name="Opened">
-                                                            <Storyboard>
-                                                                <FadeInThemeAnimation TargetName="LayoutRoot" />
-                                                            </Storyboard>
-                                                        </VisualState>
-                                                    </VisualStateGroup>
-                                                </VisualStateManager.VisualStateGroups>
-                                            </ContentPresenter>
-                                        </ControlTemplate>
-                                    </ToolTip.Template>
-                                    <TextBlock IsTextSelectionEnabled="True"
-                                               TextWrapping="Wrap">
-                                        <TextBlock.ContextFlyout>
-                                            <mtu:TextMenuFlyout />
-                                        </TextBlock.ContextFlyout>
-                                        <Run x:Name="HoveredUri" /> <LineBreak />
-                                        <Run x:Name="HowToOpenRun"
-                                             x:Uid="HowToOpenRun"
-                                             FontStyle="Italic" />
-                                    </TextBlock>
-                                </ToolTip>
-                            </ToolTipService.ToolTip>
+                            So this is that timer and tooltip. It is an ordinary Border on the
+                            overlay canvas, positioned and shown by TermControl, which is what
+                            makes the delays, the configurable width and the actions possible.
+                            The QuickFixButton below is the same pattern.
+                        -->
+                        <Border x:Name="HyperlinkCard"
+                                Padding="10,8"
+                                Background="{ThemeResource FlyoutPresenterBackground}"
+                                BorderBrush="{ThemeResource FlyoutBorderThemeBrush}"
+                                BorderThickness="{ThemeResource FlyoutBorderThemeThickness}"
+                                CornerRadius="{ThemeResource OverlayCornerRadius}"
+                                PointerEntered="_HyperlinkCardPointerEntered"
+                                PointerExited="_HyperlinkCardPointerExited"
+                                PointerPressed="_HyperlinkCardPointerPressed"
+                                PointerReleased="_HyperlinkCardPointerReleased"
+                                Visibility="Collapsed">
+                            <StackPanel Spacing="6">
+                                <TextBlock IsTextSelectionEnabled="True"
+                                           TextWrapping="Wrap">
+                                    <TextBlock.ContextFlyout>
+                                        <mtu:TextMenuFlyout />
+                                    </TextBlock.ContextFlyout>
+                                    <Run x:Name="HoveredUri" /><LineBreak />
+                                    <Run x:Name="HowToOpenRun"
+                                         x:Uid="HowToOpenRun"
+                                         FontStyle="Italic" />
+                                </TextBlock>
+
+                                <!--
+                                    Where a file:// link actually resolves to, shown only when that
+                                    differs from the URI itself. A POSIX path emitted inside WSL
+                                    opens as \\wsl.localhost\<distro>\..., and being able to see
+                                    that before clicking is the difference between trusting the
+                                    link and finding out afterwards.
+                                -->
+                                <TextBlock x:Name="HyperlinkCardTarget"
+                                           Opacity="0.75"
+                                           TextWrapping="Wrap"
+                                           Visibility="Collapsed" />
+
+                                <StackPanel x:Name="HyperlinkCardActions"
+                                            Orientation="Horizontal"
+                                            Spacing="4">
+                                    <Button x:Name="HyperlinkOpenButton"
+                                            x:Uid="HyperlinkOpenButton"
+                                            AllowFocusOnInteraction="False"
+                                            Click="_HyperlinkOpenClick" />
+                                    <Button x:Name="HyperlinkCopyLinkButton"
+                                            x:Uid="HyperlinkCopyLinkButton"
+                                            AllowFocusOnInteraction="False"
+                                            Click="_HyperlinkCopyLinkClick" />
+                                    <Button x:Name="HyperlinkCopyPathButton"
+                                            x:Uid="HyperlinkCopyPathButton"
+                                            AllowFocusOnInteraction="False"
+                                            Click="_HyperlinkCopyPathClick" />
+                                    <Button x:Name="HyperlinkRevealButton"
+                                            x:Uid="HyperlinkRevealButton"
+                                            AllowFocusOnInteraction="False"
+                                            Click="_HyperlinkRevealClick" />
+                                </StackPanel>
+                            </StackPanel>
                         </Border>
 
                         <Button x:Name="QuickFixButton"

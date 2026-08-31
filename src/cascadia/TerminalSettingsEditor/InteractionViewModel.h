@@ -31,6 +31,9 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, DetectURLs);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, OpenLinksOnSingleClick);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkTooltipMaxWidth);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkTooltipShowDelay);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkTooltipHideDelay);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkTooltipActions);
 
         // safeUriSchemes is a list in JSON, but it holds a handful of short tokens, so
         // it is surfaced as one comma-separated line rather than the add/remove list

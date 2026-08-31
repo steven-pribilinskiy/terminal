@@ -1722,6 +1722,15 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         ShellExecute(nullptr, nullptr, L"explorer", workingDirectory.c_str(), nullptr, SW_SHOW);
     }
 
+    // Puts arbitrary text on the clipboard, for callers that have something to copy which is
+    // not a selection -- the hyperlink card's copy buttons. Same channel OSC 52 and the
+    // selection copy already use, so TerminalPage needs no new handler: it is already
+    // listening for this to do the actual clipboard write.
+    void ControlCore::CopyTextToClipboard(const winrt::hstring& text)
+    {
+        WriteToClipboard.raise(*this, winrt::make<WriteToClipboardEventArgs>(text, std::string{}, std::string{}));
+    }
+
     void ControlCore::ClearQuickFix()
     {
         _cachedQuickFixes = nullptr;

@@ -515,9 +515,6 @@ namespace winrt::TerminalApp::implementation
         safe_void_coroutine _OpenHyperlinkHandler(const IInspectable sender, const Microsoft::Terminal::Control::OpenHyperlinkEventArgs eventArgs);
         static bool _IsUriSupported(const winrt::Windows::Foundation::Uri& parsedUri);
         static bool _IsLocalHostname(const std::wstring_view host) noexcept;
-        static std::wstring _GetDefaultWslDistro();
-        static std::wstring _GetWslDistroById(const std::wstring& distroId);
-        static std::wstring _GetWslDistroMatchingLauncher(std::wstring_view exePath);
         std::wstring _GetWslDistroForControl(const IInspectable& sender) const;
         bool _IsUriConsideredSomewhatSafe(const winrt::Windows::Foundation::Uri& parsedUri) const;
 
