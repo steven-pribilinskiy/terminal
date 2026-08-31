@@ -1728,7 +1728,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     // listening for this to do the actual clipboard write.
     void ControlCore::CopyTextToClipboard(const winrt::hstring& text)
     {
-        WriteToClipboard.raise(*this, winrt::make<WriteToClipboardEventArgs>(text, std::string{}, std::string{}));
+        // The args take the string by rvalue reference, so hand them one of their own
+        // rather than this caller's.
+        WriteToClipboard.raise(*this, winrt::make<WriteToClipboardEventArgs>(winrt::hstring{ text }, std::string{}, std::string{}));
     }
 
     void ControlCore::ClearQuickFix()
