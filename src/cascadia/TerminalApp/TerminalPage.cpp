@@ -2296,7 +2296,30 @@ namespace winrt::TerminalApp::implementation
     safe_void_coroutine TerminalPage::RequestQuit()
     {
         const auto setting = _settings.GlobalSettings().ConfirmOnClose();
-        if (setting != ConfirmOnClose::Never && !_displayingCloseDialog)
+
+        // Automatic already means "don't warn when there's nothing extra to
+        // lose" for every other close-confirmation dialog (a single pane, a
+        // single tab) -- this is that same rule applied here: quitting with
+        // only one window open isn't really "closing all windows" in any
+        // sense beyond what closing that one window already means, so it
+        // doesn't warrant the CloseAll phrasing. Always keeps warning
+        // regardless of window count, same as it already does for panes/tabs.
+        auto skipForSingleWindow = false;
+        if (setting == ConfirmOnClose::Automatic)
+        {
+            uint32_t windowCount{ 1 };
+            if (const auto request{ winrt::make<WindowListRequest>() })
+            {
+                RequestWindowList.raise(*this, request);
+                if (const auto entries{ request.Entries() }; entries && entries.Size() > 0)
+                {
+                    windowCount = entries.Size();
+                }
+            }
+            skipForSingleWindow = windowCount <= 1;
+        }
+
+        if (setting != ConfirmOnClose::Never && !skipForSingleWindow && !_displayingCloseDialog)
         {
             _displayingCloseDialog = true;
 
