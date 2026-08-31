@@ -1276,7 +1276,7 @@
                             that shape cost us three things. The tooltip was flaky, because the
                             hit target was yanked out from under the pointer as it moved
                             (GH#11735). Its delay could not be configured, because WinUI's ToolTip
-                            exposes no delay API -- GH#8242 was closed over exactly that, with
+                            exposes no delay API. GH#8242 was closed over exactly that, with
                             "the only way we can support this right now is by creating our own
                             timer and tooltip". And it could never hold a button, because a
                             ToolTip lives in its own popup and dismisses itself the moment the
