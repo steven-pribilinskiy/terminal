@@ -378,6 +378,13 @@ $info | ConvertTo-Json | Set-Content -Path $infoPath -Encoding UTF8
 # know, and so promotion still works from a checkout that has moved.
 Copy-Item "$PSScriptRoot\Promote-DevSlot.ps1" (Join-Path $SlotRoot 'Promote-DevSlot.ps1') -Force
 
+# Same reasoning, for the CI-poll-interval setting on the Compatibility page: the
+# Dev slot reconciles the Scheduled Task against it on startup by shelling out to
+# a fixed path, not into the repo. Install-CIBuildPoller.ps1 in turn expects
+# Fetch-CIBuild.ps1 beside itself, so both travel together.
+Copy-Item "$PSScriptRoot\Install-CIBuildPoller.ps1" (Join-Path $SlotRoot 'Install-CIBuildPoller.ps1') -Force
+Copy-Item "$PSScriptRoot\Fetch-CIBuild.ps1" (Join-Path $SlotRoot 'Fetch-CIBuild.ps1') -Force
+
 Write-Host ''
 Write-Host "Test slot  : registered from $TestStage (run: wtt)" -ForegroundColor Green
 Write-Host "Dev slot   : staged at $DevStage -- NOT installed" -ForegroundColor Yellow

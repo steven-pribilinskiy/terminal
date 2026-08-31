@@ -641,6 +641,18 @@
     <value>Enable debugging features</value>
     <comment>Header for a control to toggle debug features.</comment>
   </data>
+  <data name="Globals_CiPollIntervalMinutes.Header" xml:space="preserve">
+    <value>CI build poll interval (minutes)</value>
+    <comment>Header for a control to set how often to check for a newly built CI payload. 0 disables polling.</comment>
+  </data>
+  <data name="Globals_CiPollIntervalMinutes.Description" xml:space="preserve">
+    <value>How often to check for a newer CI build to stage for the Dev slot. Set to 0 to disable.</value>
+    <comment>Additional description for what the "CI build poll interval" setting does. Presented near "Globals_CiPollIntervalMinutes.Header".</comment>
+  </data>
+  <data name="Globals_CiPollIntervalMinutesBox.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>CI build poll interval in minutes</value>
+    <comment>Name for a control to choose how often, in minutes, to poll for a new CI build.</comment>
+  </data>
   <data name="Globals_AlwaysOnTop.Description" xml:space="preserve">
     <value>Terminal will always be the topmost window on the desktop.</value>
     <comment>A description for what the "always on top" setting does. Presented near "Globals_AlwaysOnTop.Header".</comment>

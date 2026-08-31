@@ -16,6 +16,8 @@
 #include "SlotPromotion.h"
 #include "WindowListRequest.g.h"
 
+#include <atomic>
+
 #include <LibraryResources.h>
 
 using namespace winrt;
@@ -184,6 +186,64 @@ namespace winrt::TerminalApp::implementation
     {
         LOG_CAUGHT_EXCEPTION();
         return false;
+    }
+
+    // Keep the CI-build-poller scheduled task in step with the user's configured
+    // interval, so the setting in Compatibility.xaml is more than decoration.
+    //
+    // Only the Dev slot touches this: the task is one machine-wide Scheduled
+    // Task, not one per slot, and it exists to keep the Dev slot's promote
+    // button fresh. Letting the Test slot's own copy of the setting fight over
+    // the same task would just mean whichever window started last wins, for no
+    // benefit -- the Test slot has nothing that reads dev-pending*.json.
+    //
+    // Fire-and-forget like _armPromotionHelper, and for the same reason:
+    // Register-ScheduledTask is a sub-second call, but nothing on this path
+    // should ever block a window from opening. Install-CIBuildPoller.ps1's own
+    // -Force registration is idempotent, so calling this once per window
+    // startup -- guarded here to once per process -- costs nothing when the
+    // interval hasn't changed.
+    void TerminalPage::_ReconcileCiPollInterval()
+    try
+    {
+        static std::atomic_bool reconciled{ false };
+        if (reconciled.exchange(true))
+        {
+            return;
+        }
+
+        if (!::TerminalApp::SlotPromotion::ThisSlotCanBePromoted())
+        {
+            return;
+        }
+
+        const auto helper{ std::filesystem::path{ ::TerminalApp::SlotPromotion::SlotRoot } / L"Install-CIBuildPoller.ps1" };
+        if (!std::filesystem::exists(helper))
+        {
+            return;
+        }
+
+        const auto intervalMinutes{ _settings.GlobalSettings().CiPollIntervalMinutes() };
+        const auto args{ intervalMinutes > 0 ?
+                             fmt::format(LR"(-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "{}" -IntervalMinutes {})", helper.wstring(), intervalMinutes) :
+                             fmt::format(LR"(-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "{}" -Uninstall)", helper.wstring()) };
+
+        SHELLEXECUTEINFOW info{};
+        info.cbSize = sizeof(info);
+        info.fMask = SEE_MASK_NOASYNC | SEE_MASK_NOCLOSEPROCESS;
+        info.lpVerb = L"open";
+        info.lpFile = L"pwsh.exe";
+        info.lpParameters = args.c_str();
+        info.nShow = SW_HIDE;
+
+        if (ShellExecuteExW(&info) && info.hProcess)
+        {
+            CloseHandle(info.hProcess);
+        }
+    }
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION();
     }
 
     // The badge says which build this window is; this puts that answer on the

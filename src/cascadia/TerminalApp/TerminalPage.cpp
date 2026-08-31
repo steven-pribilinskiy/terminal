@@ -352,6 +352,7 @@ namespace winrt::TerminalApp::implementation
         _tabRow.PromoteRequested({ get_weak(), &TerminalPage::_PromoteSlotRequested });
         _tabRow.CopyBuildInfoRequested({ get_weak(), &TerminalPage::_CopyBuildInfoRequested });
         RefreshPendingPromotion();
+        _ReconcileCiPollInterval();
 
         // Rebuild the workspace flyout each time it opens so it always
         // reflects the latest set of persisted workspaces.

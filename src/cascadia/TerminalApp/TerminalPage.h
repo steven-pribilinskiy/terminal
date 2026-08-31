@@ -314,6 +314,7 @@ namespace winrt::TerminalApp::implementation
         hstring _describePromotionCost();
         bool _armPromotionHelper(bool relaunch, const ::TerminalApp::SlotPromotion::StagedBuild& staged);
         safe_void_coroutine _PromoteSlotRequested(Windows::Foundation::IInspectable sender, Windows::Foundation::IInspectable args);
+        void _ReconcileCiPollInterval();
         void _CopyBuildInfoRequested(const Windows::Foundation::IInspectable& sender, const Windows::Foundation::IInspectable& args);
 
         void _UpdateTabIndices();
