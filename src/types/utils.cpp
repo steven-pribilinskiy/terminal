@@ -9,6 +9,7 @@
 
 #include "inc/colorTable.hpp"
 
+#include <shellapi.h> // CommandLineToArgvW, for picking a distro out of a profile's commandline
 #include <shlwapi.h>
 #include <icu.h>
 
