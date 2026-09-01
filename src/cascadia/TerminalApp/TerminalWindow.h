@@ -73,6 +73,7 @@ namespace winrt::TerminalApp::implementation
 
         winrt::Microsoft::Terminal::Settings::Model::WindowLayout GetWindowLayout() const;
         void PersistState();
+        winrt::hstring GetResumableSessionsJson();
 
         void UpdateSettings(winrt::TerminalApp::SettingsLoadEventArgs args);
 

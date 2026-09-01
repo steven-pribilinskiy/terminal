@@ -290,6 +290,15 @@ JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::FirstWindowPrefe
     };
 };
 
+JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::ResumeSessionNotification)
+{
+    JSON_MAPPINGS(3) = {
+        pair_type{ "silent", ValueType::Silent },
+        pair_type{ "toast", ValueType::Toast },
+        pair_type{ "confirm", ValueType::Confirm },
+    };
+};
+
 JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::LaunchMode)
 {
     JSON_MAPPINGS(8) = {

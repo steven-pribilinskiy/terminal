@@ -102,4 +102,17 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         }();
         return enumMap;
     }
+
+    winrt::Windows::Foundation::Collections::IMap<winrt::hstring, Model::ResumeSessionNotification> EnumMappings::ResumeSessionNotification()
+    {
+        static auto enumMap = []() {
+            auto map = single_threaded_map<winrt::hstring, Model::ResumeSessionNotification>();
+            for (auto [enumStr, enumVal] : JsonUtils::ConversionTrait<Model::ResumeSessionNotification>::mappings)
+            {
+                map.Insert(winrt::to_hstring(enumStr), enumVal);
+            }
+            return map;
+        }();
+        return enumMap;
+    }
 }

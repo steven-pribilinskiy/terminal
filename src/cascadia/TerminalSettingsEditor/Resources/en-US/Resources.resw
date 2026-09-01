@@ -505,6 +505,32 @@
     <value>Restore window layout</value>
     <comment>An option to choose from for the "First window preference" setting. Reopen the layouts from the last session, but don't preserve the content.</comment>
   </data>
+  <data name="Globals_ResumeRecognizedSessions.Header" xml:space="preserve">
+    <value>Resume recognized sessions</value>
+    <comment>Header for a control to toggle automatically resuming session multiplexers and agent runtimes (shefrd, herdr, tmux, screen, zellij) that were running when Terminal last closed.</comment>
+  </data>
+  <data name="Globals_ResumeRecognizedSessions.Description" xml:space="preserve">
+    <value>If a pane was running shefrd, herdr, tmux, screen, or zellij, reattach to it the next time Terminal starts. Other panes are unaffected.</value>
+  </data>
+  <data name="Globals_ResumeSessionNotification.Header" xml:space="preserve">
+    <value>When resuming sessions</value>
+    <comment>Header for a control to choose whether resuming a recognized session asks first, or just shows a notice, or says nothing at all.</comment>
+  </data>
+  <data name="Globals_ResumeSessionNotification.Description" xml:space="preserve">
+    <value>Only applies when "Resume recognized sessions" is on.</value>
+  </data>
+  <data name="Globals_ResumeSessionNotificationSilent.Content" xml:space="preserve">
+    <value>Resume with no notice</value>
+    <comment>An option for the "When resuming sessions" setting. Resume automatically and say nothing about it.</comment>
+  </data>
+  <data name="Globals_ResumeSessionNotificationToast.Content" xml:space="preserve">
+    <value>Resume immediately, then show a notice</value>
+    <comment>An option for the "When resuming sessions" setting. Resume automatically and show a dismissible notice naming what was resumed.</comment>
+  </data>
+  <data name="Globals_ResumeSessionNotificationConfirm.Content" xml:space="preserve">
+    <value>Ask first</value>
+    <comment>An option for the "When resuming sessions" setting. Show a dialog listing what would be resumed and wait for confirmation before resuming anything.</comment>
+  </data>
   <data name="Globals_LaunchParameters.Header" xml:space="preserve">
     <value>Launch parameters</value>
     <comment>Header for a set of settings that determine how terminal launches. These settings include the launch mode, launch position and whether the terminal should center itself on launch.</comment>

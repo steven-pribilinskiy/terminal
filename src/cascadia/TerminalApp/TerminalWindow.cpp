@@ -283,6 +283,11 @@ namespace winrt::TerminalApp::implementation
         }
     }
 
+    winrt::hstring TerminalWindow::GetResumableSessionsJson()
+    {
+        return _root ? _root->GetResumableSessionsJson() : winrt::hstring{};
+    }
+
     winrt::Windows::UI::Xaml::ElementTheme TerminalWindow::GetRequestedTheme()
     {
         return Theme().RequestedTheme();

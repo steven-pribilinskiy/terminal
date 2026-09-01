@@ -55,6 +55,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _LaunchModeList.RemoveAt(6); // fullscreenFocus
         _LaunchModeList.RemoveAt(3); // maximizedFullscreen
         INITIALIZE_BINDABLE_ENUM_SETTING(WindowingBehavior, WindowingMode, WindowingMode, L"Globals_WindowingBehavior", L"Content");
+        INITIALIZE_BINDABLE_ENUM_SETTING(ResumeSessionNotification, ResumeSessionNotification, ResumeSessionNotification, L"Globals_ResumeSessionNotification", L"Content");
 
         // Add a property changed handler to our own property changed event.
         // This propagates changes from the settings model to anybody listening to our

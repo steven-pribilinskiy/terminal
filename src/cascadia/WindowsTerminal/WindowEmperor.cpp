@@ -8,8 +8,11 @@
 #include <ScopedResourceLoader.h>
 #include <WtExeUtils.h>
 #include <til/hash.h>
+#include <til/io.h>
+#include <til/u8u16convert.h>
 #include <wil/token_helpers.h>
 #include <winrt/TerminalApp.h>
+#include <winrt/Windows.Data.Json.h>
 #include <sddl.h>
 #include <propkey.h>
 #include <propvarutil.h>
@@ -765,6 +768,10 @@ void WindowEmperor::HandleCommandlineArgs(int nCmdShow)
                 startIdx += 1;
             }
         }
+
+        // Independent of the above -- runs whether or not there were any
+        // persisted layouts, since this is a wholly separate opt-in setting.
+        _restoreResumableSessions(cwd, env, showCmd);
 
         const auto args = commandlineToArgArray(GetCommandLineW());
 
@@ -1555,9 +1562,151 @@ void WindowEmperor::_persistState(const ApplicationState& state) const
     state.Flush();
 }
 
+// The file both halves of the opt-in session-resume feature agree on.
+// Deliberately not part of ApplicationState/state.json: that schema is core
+// to every window's startup and worth touching carefully and separately,
+// not as a rider on this feature. A standalone file is also trivially safe
+// to delete by hand if this ever needs to be reset.
+std::filesystem::path WindowEmperor::_resumableSessionsPath() const
+{
+    return std::filesystem::path{ std::wstring_view{ CascadiaSettings::SettingsDirectory() } } / L"resumable-sessions.json";
+}
+
+// Writes out whatever's currently running a recognized multiplexer/agent
+// (shefrd, herdr, tmux, screen, zellij), across every window, so the next
+// startup can offer to resume it. Opt-in (GlobalSettings().ResumeRecognizedSessions()),
+// and every step here is defensive: a bug in a brand new, never-yet-exercised
+// feature must not be able to turn a normal app exit into a crash or a hang.
+void WindowEmperor::_persistResumableSessions() const
+try
+{
+    if (!_app.Logic().Settings().GlobalSettings().ResumeRecognizedSessions())
+    {
+        return;
+    }
+
+    winrt::Windows::Data::Json::JsonArray allSessions;
+    for (const auto& w : _windows)
+    {
+        const auto json = w->Logic().GetResumableSessionsJson();
+        if (json.empty())
+        {
+            continue;
+        }
+        winrt::Windows::Data::Json::JsonArray parsed{ nullptr };
+        if (!winrt::Windows::Data::Json::JsonArray::TryParse(json, parsed))
+        {
+            continue;
+        }
+        for (const auto& item : parsed)
+        {
+            allSessions.Append(item);
+        }
+    }
+
+    const auto path = _resumableSessionsPath();
+    if (allSessions.Size() == 0)
+    {
+        // Nothing to resume next time -- and nothing stale should linger
+        // from a previous run that did have something.
+        std::error_code ec;
+        std::filesystem::remove(path, ec);
+        return;
+    }
+
+    til::io::write_utf8_string_to_file_atomic(path, til::u16u8(std::wstring_view{ allSessions.Stringify() }));
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION();
+}
+
+// The startup half: if the setting is on and a marker from the last exit
+// names something resumable, open one new window with one tab per
+// recognized session, each running the command that reattaches it. Never
+// throws past this function -- a malformed or unreadable marker must fall
+// through to ordinary startup exactly as if the file were never there.
+void WindowEmperor::_restoreResumableSessions(wil::zwstring_view currentDirectory, wil::zwstring_view envString, uint32_t showWindowCommand) const
+try
+{
+    if (!_app.Logic().Settings().GlobalSettings().ResumeRecognizedSessions())
+    {
+        return;
+    }
+
+    const auto path = _resumableSessionsPath();
+    const auto contents = til::io::read_file_as_utf8_string_if_exists(path);
+    if (contents.empty())
+    {
+        return;
+    }
+
+    winrt::Windows::Data::Json::JsonArray sessions{ nullptr };
+    if (!winrt::Windows::Data::Json::JsonArray::TryParse(winrt::hstring{ til::u8u16(contents) }, sessions) || sessions.Size() == 0)
+    {
+        return;
+    }
+
+    // One `new-tab` action per session, chained with the same `;` separator
+    // `wt`'s own commandline parser already uses to sequence multiple
+    // actions -- each argv element here is one token, so nothing needs its
+    // own quoting the way it would if this were a single flattened string.
+    std::vector<winrt::hstring> args{ L"wt" };
+    auto any = false;
+    for (const auto& item : sessions)
+    {
+        if (item.ValueType() != winrt::Windows::Data::Json::JsonValueType::Object)
+        {
+            continue;
+        }
+        const auto obj = item.GetObject();
+        const auto cwd = obj.GetNamedString(L"cwd", L"");
+        const auto resumeArgs = obj.GetNamedArray(L"resumeArgs", nullptr);
+        if (!resumeArgs || resumeArgs.Size() == 0)
+        {
+            continue;
+        }
+
+        if (any)
+        {
+            args.push_back(L";");
+        }
+        args.push_back(L"new-tab");
+        if (!cwd.empty())
+        {
+            args.push_back(L"-d");
+            args.push_back(cwd);
+        }
+        args.push_back(L"--");
+        for (const auto& argVal : resumeArgs)
+        {
+            args.push_back(argVal.GetString());
+        }
+        any = true;
+    }
+
+    if (!any)
+    {
+        return;
+    }
+
+    _dispatchCommandlineCommon(args, currentDirectory, envString, showWindowCommand);
+
+    // Consumed: leaving it in place would offer the same resume again after
+    // a later, unrelated restart that has nothing to do with this one.
+    std::error_code ec;
+    std::filesystem::remove(path, ec);
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION();
+}
+
 void WindowEmperor::_finalizeSessionPersistence() const
 {
     using namespace std::string_view_literals;
+
+    _persistResumableSessions();
 
     if (_skipPersistence)
     {

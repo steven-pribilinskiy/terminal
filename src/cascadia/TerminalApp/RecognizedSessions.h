@@ -51,13 +51,15 @@ namespace TerminalApp::RecognizedSessions
     struct Recognized
     {
         std::wstring ProcessName;
-        // The command that reattaches: the bare process name for a native
-        // leaf, or a `wsl.exe -d <distro> -- <name>` invocation for a WSL
-        // one. Running it again is what "resuming" means here -- these are
-        // daemon-backed multiplexers, so re-invoking the same command
-        // reattaches to the already-running session rather than starting a
-        // second one.
-        std::wstring ResumeCommandline;
+        // The argv that reattaches: just the process name for a native leaf,
+        // or {"wsl.exe", "-d", "<distro>", "--", "<name>"} for a WSL one --
+        // kept as separate tokens rather than one flattened string so a
+        // caller building a `wt` commandline never has to re-split on
+        // spaces to recover them. Running this again is what "resuming"
+        // means here -- these are daemon-backed multiplexers, so
+        // re-invoking the same command reattaches to the session already
+        // running rather than starting a second one.
+        std::vector<std::wstring> ResumeArgs;
     };
 
     namespace details
@@ -251,7 +253,7 @@ namespace TerminalApp::RecognizedSessions
             const auto wideName = til::u8u16(matchedName);
             return Recognized{
                 wideName,
-                fmt::format(L"wsl.exe -d {} -- {}", DefaultWslDistro, wideName)
+                std::vector<std::wstring>{ L"wsl.exe", L"-d", std::wstring{ DefaultWslDistro }, L"--", wideName }
             };
         }
     }
@@ -299,7 +301,7 @@ namespace TerminalApp::RecognizedSessions
                 {
                     if (details::NameMatches(proc.Name, known))
                     {
-                        return Recognized{ std::wstring{ known }, std::wstring{ known } };
+                        return Recognized{ std::wstring{ known }, std::vector<std::wstring>{ std::wstring{ known } } };
                     }
                 }
             }

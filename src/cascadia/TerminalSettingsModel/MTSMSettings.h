@@ -30,7 +30,9 @@ Author(s):
     X(bool, AllowHeadless, "compatibility.allowHeadless", false)                                                                   \
     X(bool, ControlPipeEnabled, "controlPipe", true)                                                                               \
     X(bool, EnableColorSelection, "experimental.enableColorSelection", false)                                                      \
-    X(int32_t, CiPollIntervalMinutes, "ciPollIntervalMinutes", 15)
+    X(int32_t, CiPollIntervalMinutes, "ciPollIntervalMinutes", 15)                                                                 \
+    X(bool, ResumeRecognizedSessions, "resumeRecognizedSessions", false)                                                           \
+    X(Model::ResumeSessionNotification, ResumeSessionNotification, "resumeSessionNotification", Model::ResumeSessionNotification::Toast)
 
 // Settings that are per-window (may vary by window name in the future)
 #define MTSM_WINDOW_SETTINGS(X)                                                                                                                                                                       \

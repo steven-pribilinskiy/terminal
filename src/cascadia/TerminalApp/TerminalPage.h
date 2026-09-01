@@ -189,6 +189,11 @@ namespace winrt::TerminalApp::implementation
         // when AppLogic notices the staged build change.
         void RefreshPendingPromotion();
 
+        // Which panes are running a recognized session multiplexer/agent
+        // right now. See TerminalPage.SessionResume.cpp; UI thread only, and
+        // only ever called from WindowEmperor on the way out.
+        hstring GetResumableSessionsJson();
+
         // The control pipe. See TerminalPage.ControlPipe.cpp; UI thread only.
         Windows::Foundation::Collections::IVector<TerminalApp::ControlPipePaneInfo> ControlPipeListPanes(hstring containing);
         TerminalApp::ControlPipeCaptureResult ControlPipeCapturePane(uint32_t tabIndex, uint32_t paneId, int32_t lines);

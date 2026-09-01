@@ -51,7 +51,9 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         GETSET_BINDABLE_ENUM_SETTING(DefaultInputScope, winrt::Microsoft::Terminal::Control::DefaultInputScope, _Settings.WindowSettingsDefaults().DefaultInputScope);
         GETSET_BINDABLE_ENUM_SETTING(FirstWindowPreference, Model::FirstWindowPreference, _Settings.GlobalSettings().FirstWindowPreference);
         GETSET_BINDABLE_ENUM_SETTING(WindowingBehavior, Model::WindowingMode, _Settings.GlobalSettings().WindowingBehavior);
+        GETSET_BINDABLE_ENUM_SETTING(ResumeSessionNotification, Model::ResumeSessionNotification, _Settings.GlobalSettings().ResumeSessionNotification);
 
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_Settings.GlobalSettings(), ResumeRecognizedSessions);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_Settings.WindowSettingsDefaults(), CenterOnLaunch);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_Settings.WindowSettingsDefaults(), RememberWindowGeometry);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_Settings.WindowSettingsDefaults(), InitialRows);

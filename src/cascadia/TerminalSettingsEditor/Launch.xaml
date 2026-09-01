@@ -185,6 +185,24 @@
                           Style="{StaticResource ComboBoxSettingStyle}" />
             </local:SettingsCard>
 
+            <!--  Resume Recognized Sessions  -->
+            <local:SettingsCard x:Name="ResumeRecognizedSessions"
+                                x:Uid="Globals_ResumeRecognizedSessions">
+                <ToggleSwitch IsOn="{x:Bind ViewModel.ResumeRecognizedSessions, Mode=TwoWay}"
+                              Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+            </local:SettingsCard>
+
+            <!--  Resume Session Notification  -->
+            <local:SettingsCard x:Name="ResumeSessionNotification"
+                                x:Uid="Globals_ResumeSessionNotification"
+                                IsEnabled="{x:Bind ViewModel.ResumeRecognizedSessions, Mode=OneWay}">
+                <ComboBox AutomationProperties.AccessibilityView="Content"
+                          ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                          ItemsSource="{x:Bind ViewModel.ResumeSessionNotificationList}"
+                          SelectedItem="{x:Bind ViewModel.CurrentResumeSessionNotification, Mode=TwoWay}"
+                          Style="{StaticResource ComboBoxSettingStyle}" />
+            </local:SettingsCard>
+
             <!--  Windowing Behavior  -->
             <local:SettingsCard x:Name="WindowingBehavior"
                                 x:Uid="Globals_WindowingBehavior">
