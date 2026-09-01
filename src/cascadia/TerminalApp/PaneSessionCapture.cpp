@@ -668,12 +668,16 @@ done
             return std::nullopt;
         }
 
-        // `node /path/to/claude` is claude, not node.
-        auto name = BaseName(captured.Argv[0]);
-        auto argv = captured.Argv;
-        if (NameIn(name, ScriptHosts, std::size(ScriptHosts)) && argv.size() > 1 && !argv[1].starts_with(L'-'))
+        // `node /path/to/claude` is claude, not node. Owned rather than a view,
+        // because the interpreter gets dropped from the argv below and that
+        // would leave a view dangling into a vector that has moved on.
+        const auto& original = captured.Argv;
+        auto name = std::wstring{ BaseName(original[0]) };
+        auto hostLaunched = false;
+        if (NameIn(name, ScriptHosts, std::size(ScriptHosts)) && original.size() > 1 && !original[1].starts_with(L'-'))
         {
-            name = BaseName(argv[1]);
+            name = std::wstring{ BaseName(original[1]) };
+            hostLaunched = true;
         }
 
         const auto matches = [&](const std::vector<std::wstring>& list) {
@@ -705,7 +709,17 @@ done
         // it was: we know nothing about its session model.
         if (!agent || captured.AgentSessionId.empty())
         {
-            return ResumePlan{ JoinArgv(argv), false };
+            // Replayed exactly as found, interpreter and all: we are not
+            // rewriting a command we have no table row for.
+            return ResumePlan{ JoinArgv(original), false };
+        }
+
+        auto argv = original;
+        if (hostLaunched)
+        {
+            // Drop the interpreter. The row names a program to run, and
+            // `claude /usr/lib/claude --foo` would run neither.
+            argv.erase(argv.begin());
         }
 
         auto rebuilt = StripSessionSelectors(argv);
@@ -720,18 +734,20 @@ done
 
         switch (agent->Style)
         {
+        // A subcommand lands in the same place a flag does -- after everything
+        // the command was already carrying. That is what keeps a global flag
+        // applying to it: `codex --yolo resume <id>`, which is the order codex
+        // wants, rather than `codex resume <id> --yolo`. The two styles differ
+        // in the token they add, not in where it goes; only StripSessionSelectors
+        // has to tell them apart, because an old subcommand is removed
+        // differently from an old flag.
         case SelectorStyle::FlagSpace:
+        case SelectorStyle::Subcommand:
             rebuilt.emplace_back(agent->Selector);
             rebuilt.push_back(captured.AgentSessionId);
             break;
         case SelectorStyle::FlagEquals:
             rebuilt.push_back(std::wstring{ agent->Selector } + L"=" + captured.AgentSessionId);
-            break;
-        case SelectorStyle::Subcommand:
-            // Immediately after the program, so a global flag still applies:
-            // `codex --yolo resume <id>`, not `codex resume <id> --yolo`.
-            rebuilt.insert(rebuilt.begin() + 1, std::wstring{ agent->Selector });
-            rebuilt.insert(rebuilt.begin() + 2, captured.AgentSessionId);
             break;
         }
 
