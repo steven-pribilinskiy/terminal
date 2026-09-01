@@ -4,313 +4,201 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>steven-pribilinskiy/terminal — a Windows Terminal fork</title>
-<meta name="description" content="A personal Windows Terminal fork with a live production/test deploy system, a local automation control-pipe, richer link handling, and more — features upstream doesn't have." />
+<meta name="description" content="A personal Windows Terminal fork: script it from outside the process, run a live build alongside a disposable test one, and a pile of quieter fixes to links, icons and windows." />
 <style>
-  :root {
-    --bg: #0d1117;
-    --bg-raised: #161b22;
-    --bg-card: #131820;
-    --border: #21262d;
-    --text: #e6edf3;
-    --text-dim: #8b949e;
-    --accent: #7c6fe0;
-    --accent-2: #4fd6d1;
-    --mono: 'Cascadia Code', 'Consolas', ui-monospace, SFMono-Regular, monospace;
-    --sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  /* ============================================================================
+   * Windows 11 / Fluent 2 design tokens, matching this fork's own tooling
+   * (windows-control/app). Light is the default; dark applies only under
+   * prefers-color-scheme, guarded so an explicit [data-theme] always wins in
+   * either direction. Never hard-code one theme -- this follows the OS.
+   * ========================================================================== */
+  :root,
+  :root[data-theme="light"] {
+    --bg: #f3f3f3;
+    --card: #ffffff;
+    --control: #fbfbfb;
+    --control-hover: #f6f6f6;
+    --border: #e5e5e5;
+    --text: #1b1b1b;
+    --muted: #5d5d5d;
+    --text-tertiary: #8c8c8c;
+    --accent: #005fb8;
+    --accent-hover: #196fbf;
+    --on-accent: #ffffff;
+    --accent-text: #005fb8;
+    --elevation-card: 0 0 2px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.09);
+    --elevation-flyout: 0 0 2px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.14);
+    color-scheme: light;
   }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #202020; --card: #2d2d2d; --control: #363636; --control-hover: #3c3c3c;
+      --border: #3a3a3a; --text: #ffffff; --muted: #cccccc; --text-tertiary: #969696;
+      --accent: #60cdff; --accent-hover: #5ebce9; --on-accent: #000000; --accent-text: #99ebff;
+      --elevation-card: 0 0 2px rgba(0, 0, 0, 0.14), 0 1px 2px rgba(0, 0, 0, 0.2);
+      --elevation-flyout: 0 0 2px rgba(0, 0, 0, 0.24), 0 8px 16px rgba(0, 0, 0, 0.28);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #202020; --card: #2d2d2d; --control: #363636; --control-hover: #3c3c3c;
+    --border: #3a3a3a; --text: #ffffff; --muted: #cccccc; --text-tertiary: #969696;
+    --accent: #60cdff; --accent-hover: #5ebce9; --on-accent: #000000; --accent-text: #99ebff;
+    --elevation-card: 0 0 2px rgba(0, 0, 0, 0.14), 0 1px 2px rgba(0, 0, 0, 0.2);
+    --elevation-flyout: 0 0 2px rgba(0, 0, 0, 0.24), 0 8px 16px rgba(0, 0, 0, 0.28);
+    color-scheme: dark;
+  }
+
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
     background: var(--bg);
     color: var(--text);
-    font-family: var(--sans);
+    font-family: "Segoe UI Variable", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
     line-height: 1.55;
   }
-  a { color: var(--accent-2); text-decoration: none; }
+  a { color: var(--accent-text); text-decoration: none; }
   a:hover { text-decoration: underline; }
-  code, .mono { font-family: var(--mono); }
+  code, .mono { font-family: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, monospace; }
 
-  header.hero {
-    padding: 5rem 1.5rem 4rem;
-    text-align: center;
-    background:
-      radial-gradient(ellipse 60% 50% at 50% -10%, rgba(124, 111, 224, 0.25), transparent),
-      var(--bg);
-    border-bottom: 1px solid var(--border);
+  .theme-toggle {
+    position: fixed; top: 1rem; right: 1rem;
+    display: inline-flex; gap: 2px;
+    border-radius: 4px; border: 1px solid var(--border);
+    background: var(--control); padding: 2px; z-index: 10;
   }
+  .theme-toggle button {
+    border: none; background: none; color: var(--muted);
+    padding: 0.4rem 0.55rem; border-radius: 3px; cursor: pointer;
+    font-size: 0.9rem; line-height: 1;
+  }
+  .theme-toggle button:hover { background: var(--control-hover); color: var(--text); }
+  .theme-toggle button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+
+  header.hero { padding: 5.5rem 1.5rem 4rem; text-align: center; border-bottom: 1px solid var(--border); }
   header.hero .badge {
     display: inline-block;
-    font-family: var(--mono);
-    font-size: 0.8rem;
-    color: var(--accent-2);
-    background: rgba(79, 214, 209, 0.1);
-    border: 1px solid rgba(79, 214, 209, 0.3);
-    border-radius: 999px;
-    padding: 0.25rem 0.9rem;
-    margin-bottom: 1.25rem;
+    font-family: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, monospace;
+    font-size: 0.78rem; color: var(--accent-text);
+    background: var(--control); border: 1px solid var(--border);
+    border-radius: 999px; padding: 0.25rem 0.9rem; margin-bottom: 1.25rem;
   }
   header.hero h1 {
-    font-size: clamp(2rem, 5vw, 3.2rem);
-    margin: 0 0 0.75rem;
-    background: linear-gradient(120deg, #fff, var(--accent-2));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    font-family: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+    font-size: clamp(1.9rem, 4.5vw, 2.9rem);
+    font-weight: 600;
+    margin: 0 0 0.9rem;
   }
   header.hero p.tagline {
-    font-size: 1.15rem;
-    color: var(--text-dim);
-    max-width: 42rem;
-    margin: 0 auto 2rem;
+    font-size: 1.08rem; color: var(--muted);
+    max-width: 40rem; margin: 0 auto 2.25rem;
   }
-  header.hero .links {
-    display: flex;
-    gap: 0.75rem;
-    justify-content: center;
-    flex-wrap: wrap;
-  }
+  header.hero .links { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
   .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.65rem 1.3rem;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 0.95rem;
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.65rem 1.35rem; border-radius: 4px;
+    font-weight: 600; font-size: 0.92rem; border: 1px solid transparent;
   }
-  .btn-primary {
-    background: var(--accent);
-    color: #fff;
-  }
-  .btn-primary:hover { background: #6a5dd6; text-decoration: none; }
-  .btn-ghost {
-    border: 1px solid var(--border);
-    color: var(--text);
-  }
-  .btn-ghost:hover { border-color: var(--accent-2); text-decoration: none; }
+  .btn-primary { background: var(--accent); color: var(--on-accent); }
+  .btn-primary:hover { background: var(--accent-hover); text-decoration: none; }
+  .btn-ghost { border-color: var(--border); color: var(--text); background: var(--control); }
+  .btn-ghost:hover { background: var(--control-hover); text-decoration: none; }
 
-  main { max-width: 68rem; margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
+  main { max-width: 62rem; margin: 0 auto; padding: 3.5rem 1.5rem 5rem; }
 
-  .filters {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    margin-bottom: 2.5rem;
-  }
-  .filter-tag {
-    font-family: var(--mono);
-    font-size: 0.8rem;
-    padding: 0.35rem 0.8rem;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-    cursor: pointer;
-    background: none;
-    transition: border-color 0.15s, color 0.15s;
-  }
-  .filter-tag:hover, .filter-tag.active {
-    border-color: var(--accent-2);
-    color: var(--accent-2);
+  h2.section-title {
+    font-size: 1.05rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--text-tertiary);
+    margin: 0 0 1.25rem;
   }
 
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
-    gap: 1.25rem;
-  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr)); gap: 1rem; }
   .card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    transition: border-color 0.15s, transform 0.15s;
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: var(--elevation-card);
+    padding: 1.3rem; display: flex; flex-direction: column; gap: 0.55rem;
+    transition: box-shadow 0.12s;
   }
-  .card:hover { border-color: var(--accent); transform: translateY(-2px); }
-  .card .kicker {
-    font-family: var(--mono);
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--accent-2);
-  }
-  .card h3 { margin: 0; font-size: 1.15rem; }
-  .card p { margin: 0; color: var(--text-dim); font-size: 0.92rem; flex-grow: 1; }
-  .card .demo-slot {
-    margin-top: 0.25rem;
-    border: 1px dashed var(--border);
-    border-radius: 8px;
-    padding: 0.6rem 0.8rem;
-    font-family: var(--mono);
-    font-size: 0.75rem;
-    color: var(--text-dim);
-  }
-  .card.standout {
-    border-color: var(--accent);
-    background: linear-gradient(160deg, rgba(124, 111, 224, 0.08), var(--bg-card));
-  }
-  .card.standout .kicker { color: var(--accent); }
+  .card:hover { box-shadow: var(--elevation-flyout); }
+  .card.standout { border-color: var(--accent); }
+  .card h3 { margin: 0; font-size: 1.05rem; font-weight: 600; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.88rem; }
 
-  section.standalone {
-    margin-top: 3.5rem;
-  }
-  section.standalone h2 {
-    font-size: 1.4rem;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 0.6rem;
+  .cta-row {
+    margin-top: 2.5rem;
+    text-align: center;
   }
 
   footer {
     border-top: 1px solid var(--border);
-    text-align: center;
-    padding: 2.5rem 1.5rem;
-    color: var(--text-dim);
-    font-size: 0.85rem;
+    text-align: center; padding: 2.5rem 1.5rem;
+    color: var(--text-tertiary); font-size: 0.83rem;
   }
 </style>
 </head>
 <body>
 
+<div class="theme-toggle" role="group" aria-label="Theme">
+  <button type="button" data-theme-choice="light" aria-pressed="false" title="Light">&#9728;</button>
+  <button type="button" data-theme-choice="system" aria-pressed="true" title="Match system">&#9680;</button>
+  <button type="button" data-theme-choice="dark" aria-pressed="false" title="Dark">&#9790;</button>
+</div>
+
 <header class="hero">
   <span class="badge">personal fork — not upstream</span>
   <h1>Windows Terminal, with more in it</h1>
   <p class="tagline">
-    A personal fork of Microsoft's Windows Terminal. Same core, plus a running
-    production/test deploy system, a local automation pipe upstream refused
-    twice, and a pile of quieter fixes to how links, icons and windows behave.
+    A personal fork of Microsoft's Windows Terminal. You can script it from outside
+    the process — list what's open, read what a pane printed, type into one — run a
+    live build and a disposable test build side by side, and a long list of quieter
+    fixes to how links, icons and windows behave.
   </p>
   <div class="links">
     <a class="btn btn-primary" href="https://github.com/steven-pribilinskiy/terminal">View on GitHub</a>
-    <a class="btn btn-ghost" href="#features">Browse features</a>
+    <a class="btn btn-ghost" href="features.html">Browse all features &rarr;</a>
   </div>
 </header>
 
 <main>
-  <div class="filters" id="filters">
-    <button class="filter-tag active" data-filter="all">All</button>
-    <button class="filter-tag" data-filter="automation">Automation</button>
-    <button class="filter-tag" data-filter="links">Links</button>
-    <button class="filter-tag" data-filter="ui">UI &amp; theming</button>
-    <button class="filter-tag" data-filter="deploy">Deploy system</button>
-  </div>
+  <h2 class="section-title">A few highlights</h2>
+  <div class="grid">
 
-  <div class="grid" id="features">
-
-    <article class="card standout" data-tags="automation">
-      <span class="kicker">Automation</span>
-      <h3>Local control pipe</h3>
+    <article class="card standout">
+      <h3>Drive it from outside the process</h3>
       <p>
-        A named pipe per Terminal process (<code>\\.\pipe\wt-control-&lt;pid&gt;</code>) that lets
-        another process list panes, capture a specific pane's text, or send it input —
-        precisely, not via UI Automation and SendKeys. Security-scoped to the current user,
-        with a settings kill switch. Upstream has refused this exact capability twice
-        (issue #9368, PR #20106); their own automation surface doesn't reach from WSL.
-      </p>
-      <div class="demo-slot">demo: recording pending</div>
-    </article>
-
-    <article class="card" data-tags="deploy">
-      <span class="kicker">Deploy system</span>
-      <h3>Live production / disposable test slots</h3>
-      <p>
-        Two parallel installs, <code>wtt</code> and <code>wtd</code>, with distinct
-        single-instance identities so both can run at once. Production changes only on
-        an explicit promote — never a side effect of a build — with a tab-row badge, an
-        update-available banner, and an About dialog naming exactly which commit and
-        build time you're running.
-      </p>
-      <div class="demo-slot">demo: recording pending</div>
-    </article>
-
-    <article class="card" data-tags="deploy automation">
-      <span class="kicker">Deploy system</span>
-      <h3>CI-built, self-updating</h3>
-      <p>
-        Builds happen in CI, not on the machine running Terminal — a background poller
-        fetches the newest green build on a configurable interval (its own Settings UI
-        control) and stages it for the next promote, no manual fetch required.
+        Every window opens a local pipe another program can talk to: ask what tabs
+        and panes exist, read back exactly what one of them printed, or type into a
+        specific pane — no simulated keystrokes, no guessing which window is
+        focused. Microsoft looked at this exact idea twice and passed on it; their
+        own automation surface doesn't reach a pane running inside WSL.
       </p>
     </article>
 
-    <article class="card" data-tags="links">
-      <span class="kicker">Links</span>
-      <h3>Plain-click URLs, everywhere</h3>
+    <article class="card">
+      <h3>A live build and a throwaway one, side by side</h3>
       <p>
-        Links open on a plain click — no Ctrl required, toggleable in Settings — and
-        work correctly inside mouse-mode apps like tmux, where a click would otherwise
-        just move the cursor.
-      </p>
-      <div class="demo-slot">demo: recording pending</div>
-    </article>
-
-    <article class="card" data-tags="links">
-      <span class="kicker">Links</span>
-      <h3>A link card that actually fits</h3>
-      <p>
-        The plain hover tooltip was replaced with a richer card — configurable delay,
-        a "how to open" hint, room for an action button — that flips to whichever side
-        actually has room and never renders past the edge of the pane, on either axis.
-      </p>
-      <div class="demo-slot">demo: recording pending</div>
-    </article>
-
-    <article class="card" data-tags="links">
-      <span class="kicker">Links</span>
-      <h3>Slack-style and WSL links</h3>
-      <p>
-        <code>&lt;url|label&gt;</code> bracketed links (the format Slack and many CLIs
-        emit) become clickable with the label shown, and a WSL <code>file://</code>
-        link resolves to the right distro's UNC path — including fragments — so it
-        actually opens the file it points at.
+        One install is what you actually use every day; a second, disposable one
+        is safe to break. The disposable one only ever gets replaced when you say
+        so, updates are fetched in the background, and there's always a badge
+        telling you exactly which build and commit is running.
       </p>
     </article>
 
-    <article class="card" data-tags="ui">
-      <span class="kicker">UI &amp; theming</span>
-      <h3>Separate light/dark color schemes</h3>
+    <article class="card">
+      <h3>Links that behave like you'd expect</h3>
       <p>
-        Pick one scheme for light mode and a different one for dark mode, right in the
-        Settings UI — the terminal actually follows the OS appearance instead of being
-        stuck on whichever scheme you set last.
-      </p>
-      <div class="demo-slot">demo: recording pending</div>
-    </article>
-
-    <article class="card" data-tags="ui">
-      <span class="kicker">UI &amp; theming</span>
-      <h3>Icons that don't block on the network</h3>
-      <p>
-        A profile's http(s) icon is cached locally, so settings load never stalls
-        waiting on a remote image — and glyph/emoji profile icons get rasterized into
-        real jump-list icons instead of showing a blank tile.
-      </p>
-    </article>
-
-    <article class="card" data-tags="ui">
-      <span class="kicker">UI &amp; theming</span>
-      <h3>Quieter defaults</h3>
-      <p>
-        Text selection can search with your default engine, the mouse wheel no longer
-        changes font size or opacity by accident, window position and size are
-        remembered per window, and quitting doesn't ask "close all windows?" when
-        there's only one open.
+        Click a link without holding Ctrl, even inside tmux. Hover it and the
+        preview card lands wherever there's actually room instead of running off
+        the edge of the window. A WSL file link opens the real file, not an error.
       </p>
     </article>
 
   </div>
 
-  <section class="standalone">
-    <h2 id="about">About this page</h2>
-    <p>
-      Feature list generated from <code>git log upstream/main..main</code> against
-      <a href="https://github.com/microsoft/terminal">microsoft/terminal</a> — every
-      commit this fork carries that upstream doesn't. Demo clips are recorded as they're
-      captured; slots above marked "recording pending" are real features already shipped
-      on <code>main</code>, just not filmed yet.
-    </p>
-  </section>
+  <div class="cta-row">
+    <a class="btn btn-ghost" href="features.html">See the full list, with dates and commit links &rarr;</a>
+  </div>
 </main>
 
 <footer>
@@ -319,19 +207,27 @@
 </footer>
 
 <script>
-  const buttons = document.querySelectorAll('.filter-tag');
-  const cards = document.querySelectorAll('#features.grid > .card');
-  buttons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      buttons.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      const filter = btn.dataset.filter;
-      cards.forEach(card => {
-        const tags = card.dataset.tags || '';
-        card.style.display = (filter === 'all' || tags.includes(filter)) ? '' : 'none';
+  (function () {
+    var root = document.documentElement;
+    var buttons = document.querySelectorAll('[data-theme-choice]');
+    var stored = null;
+    try { stored = localStorage.getItem('theme'); } catch (e) {}
+    function apply(choice) {
+      if (choice === 'system') root.removeAttribute('data-theme');
+      else root.setAttribute('data-theme', choice);
+      buttons.forEach(function (btn) {
+        btn.setAttribute('aria-pressed', String(btn.dataset.themeChoice === choice));
+      });
+    }
+    buttons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var choice = btn.dataset.themeChoice;
+        apply(choice);
+        try { localStorage.setItem('theme', choice); } catch (e) {}
       });
     });
-  });
+    apply(stored || 'system');
+  })();
 </script>
 
 </body>
