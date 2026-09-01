@@ -8,6 +8,7 @@
 #include <shellapi.h>
 #include <winternl.h>
 #include <algorithm>
+#include <limits>
 #include <map>
 #include <sstream>
 #include <til/string.h>
@@ -227,10 +228,20 @@ namespace TerminalApp::SessionResume
             return argv;
         }
 
-        // The deepest descendant that isn't shell scaffolding. Depth, rather
-        // than "any known name", so a pane running something we have no row
-        // for still reports honestly and BuildPlan gets to make the decision.
-        std::optional<DWORD> DeepestWorkerBelow(DWORD rootPid, const std::vector<NativeProcess>& all)
+        // The SHALLOWEST descendant that isn't shell scaffolding -- the first
+        // thing the pane's shell actually launched.
+        //
+        // Not the deepest: an agent spawns children of its own, so a pane
+        // running `claude` has node processes for every MCP server hanging off
+        // it, and the deepest descendant is one of those rather than claude.
+        // The WSL side gets this right from the terminal's foreground process
+        // group; Windows has no equivalent, so depth from the pane's own root
+        // stands in for it.
+        //
+        // Depth, rather than "the first name we recognize", so a pane running
+        // something no table covers still reports honestly and BuildPlan is
+        // left to decide whether policy allows it back.
+        std::optional<DWORD> FirstWorkerBelow(DWORD rootPid, const std::vector<NativeProcess>& all)
         {
             std::map<DWORD, std::vector<DWORD>> childrenOf;
             std::map<DWORD, std::wstring> nameOf;
@@ -241,7 +252,7 @@ namespace TerminalApp::SessionResume
             }
 
             std::optional<DWORD> best;
-            auto bestDepth = -1;
+            auto bestDepth = std::numeric_limits<int>::max();
 
             std::vector<std::pair<DWORD, int>> queue{ { rootPid, 0 } };
             std::vector<DWORD> seen{ rootPid };
@@ -253,7 +264,7 @@ namespace TerminalApp::SessionResume
                 if (depth > 0)
                 {
                     const auto name = BaseName(nameOf[pid]);
-                    if (!NameIn(name, ShellNames, std::size(ShellNames)) && depth > bestDepth)
+                    if (!NameIn(name, ShellNames, std::size(ShellNames)) && depth < bestDepth)
                     {
                         bestDepth = depth;
                         best = pid;
@@ -413,7 +424,12 @@ done
             si.dwFlags = STARTF_USESTDHANDLES;
             si.hStdInput = inRead.get();
             si.hStdOutput = outWrite.get();
-            si.hStdError = nullptr;
+            // Merged into stdout rather than left null: STARTF_USESTDHANDLES
+            // hands the child exactly these three, and a null stderr is an
+            // invalid handle it may refuse to start with. Anything the shell
+            // complains about lands in the output and is dropped by the parser,
+            // which only accepts lines with the full field count.
+            si.hStdError = outWrite.get();
 
             auto commandLine = fmt::format(LR"(wsl.exe -d {} -- sh -s)", distro);
 
@@ -434,18 +450,45 @@ done
             WriteFile(inWrite.get(), WslProbeScript.data(), gsl::narrow_cast<DWORD>(WslProbeScript.size()), &written, nullptr);
             inWrite.reset();
 
+            // Polled rather than a plain blocking read loop, because a blocking
+            // ReadFile cannot be given a deadline: if the distro is cold,
+            // wedged, or mid-shutdown, the read never returns and the timeout
+            // below never gets to run. This path executes while the app is
+            // closing, so "wait forever" is not an option it may take.
             std::string output;
             char buffer[4096];
-            DWORD read = 0;
-            while (ReadFile(outRead.get(), buffer, sizeof(buffer), &read, nullptr) && read > 0)
+            const auto deadline = GetTickCount64() + timeoutMs;
+
+            for (;;)
             {
+                DWORD available = 0;
+                if (!PeekNamedPipe(outRead.get(), nullptr, 0, nullptr, &available, nullptr))
+                {
+                    // The child closed its end: everything it wrote is read.
+                    break;
+                }
+
+                if (available == 0)
+                {
+                    if (GetTickCount64() > deadline)
+                    {
+                        TerminateProcess(process.get(), 1);
+                        break;
+                    }
+                    Sleep(20);
+                    continue;
+                }
+
+                DWORD read = 0;
+                const auto want = std::min(static_cast<DWORD>(sizeof(buffer)), available);
+                if (!ReadFile(outRead.get(), buffer, want, &read, nullptr) || read == 0)
+                {
+                    break;
+                }
                 output.append(buffer, read);
             }
 
-            if (WaitForSingleObject(process.get(), timeoutMs) != WAIT_OBJECT_0)
-            {
-                TerminateProcess(process.get(), 1);
-            }
+            WaitForSingleObject(process.get(), 1000);
             return output;
         }
 
@@ -792,7 +835,7 @@ done
                 {
                     continue;
                 }
-                const auto worker = DeepestWorkerBelow(pane.RootPid, all);
+                const auto worker = FirstWorkerBelow(pane.RootPid, all);
                 if (!worker)
                 {
                     continue;
