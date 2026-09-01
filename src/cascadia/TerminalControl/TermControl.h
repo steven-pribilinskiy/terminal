@@ -71,6 +71,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void RestoreFromPath(winrt::hstring path);
         void PersistTo(int64_t handle) const;
         safe_void_coroutine PersistToPathInBackground(winrt::hstring path, bool elevated);
+        static int64_t TakePersistMicroseconds() noexcept;
         void OpenCWD();
         void Close();
         Windows::Foundation::Size CharacterDimensions() const;
@@ -322,6 +323,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // is still writing this pane's file. Both would be writing the same
         // path, and the loser would leave a half-serialized buffer behind.
         std::atomic<bool> _persistInFlight{ false };
+        // Process-wide, because the cost worth reporting is what a whole
+        // persistence pass took across every pane, not what one of them did.
+        static inline std::atomic<int64_t> _persistMicroseconds{ 0 };
         winrt::hstring _followLinkHintCtrlClick;
 
         // The hyperlink card. _hoveredUri is the URI as the buffer holds it: the Run in the

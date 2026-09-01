@@ -1599,7 +1599,6 @@ void WindowEmperor::_persistBuffers() const
     const auto admin = _app.Logic().IsRunningElevated();
     const auto filenamePrefix = admin ? L"elevated_"sv : L"buffer_"sv;
 
-    const auto started = std::chrono::steady_clock::now();
     uint32_t paneCount = 0;
 
     for (const auto& w : _windows)
@@ -1637,8 +1636,11 @@ void WindowEmperor::_persistBuffers() const
         }
     }
 
-    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
-    _recordPersistCost(paneCount, _bufferBytesOnDisk(settingsDirectory, filenamePrefix), gsl::narrow_cast<int64_t>(elapsed));
+    // Both numbers describe the PREVIOUS pass, and deliberately so: this one's
+    // writes are still running on their own threads. Timing this loop instead
+    // would report ~0 forever, since all it does is hand the work off.
+    const auto micros = winrt::Microsoft::Terminal::Control::TermControl::TakePersistMicroseconds();
+    _recordPersistCost(paneCount, _bufferBytesOnDisk(settingsDirectory, filenamePrefix), micros);
 }
 
 // Total size of the buffer files currently on disk. Sampled at the START of a
@@ -1668,7 +1670,7 @@ int64_t WindowEmperor::_bufferBytesOnDisk(const std::filesystem::path& settingsD
 // it rather than leave the user guessing. Its own file, not part of
 // state.json: this is a log, and a log that fails to parse must never be able
 // to take the app's real state down with it.
-void WindowEmperor::_recordPersistCost(uint32_t panes, int64_t bytes, int64_t elapsedMs) const
+void WindowEmperor::_recordPersistCost(uint32_t panes, int64_t bytes, int64_t elapsedMicros) const
 try
 {
     const std::filesystem::path path{ std::filesystem::path{ std::wstring_view{ CascadiaSettings::SettingsDirectory() } } / L"persistence-timings.json" };
@@ -1695,7 +1697,7 @@ try
 
     winrt::Windows::Data::Json::JsonObject entry;
     entry.SetNamedValue(L"t", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(static_cast<double>(now)));
-    entry.SetNamedValue(L"ms", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(static_cast<double>(elapsedMs)));
+    entry.SetNamedValue(L"us", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(static_cast<double>(elapsedMicros)));
     entry.SetNamedValue(L"bytes", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(static_cast<double>(bytes)));
     entry.SetNamedValue(L"panes", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(panes));
     kept.Append(entry);

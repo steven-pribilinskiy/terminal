@@ -110,6 +110,7 @@ namespace Microsoft.Terminal.Control
         void RestoreFromPath(String path);
         void PersistTo(Int64 handle);
         void PersistToPathInBackground(String path, Boolean elevated);
+        static Int64 TakePersistMicroseconds();
         void OpenCWD();
         void Close();
         Windows.Foundation.Size CharacterDimensions { get; };

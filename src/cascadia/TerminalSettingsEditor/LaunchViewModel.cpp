@@ -469,7 +469,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     // absent, truncated or hand-deleted without complaint.
     struct PersistSample
     {
-        int64_t Ms;
+        int64_t Micros;
         int64_t Bytes;
     };
 
@@ -498,7 +498,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 }
                 const auto obj = item.GetObject();
                 samples.push_back(PersistSample{
-                    static_cast<int64_t>(obj.GetNamedNumber(L"ms", 0)),
+                    static_cast<int64_t>(obj.GetNamedNumber(L"us", 0)),
                     static_cast<int64_t>(obj.GetNamedNumber(L"bytes", 0)) });
             }
         }
@@ -524,14 +524,14 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         int64_t peak = 1;
         for (auto it = first; it != samples.end(); ++it)
         {
-            peak = std::max(peak, it->Ms);
+            peak = std::max(peak, it->Micros);
         }
 
         std::wstring line;
         line.reserve(maxPoints);
         for (auto it = first; it != samples.end(); ++it)
         {
-            const auto level = static_cast<size_t>((it->Ms * 7) / peak);
+            const auto level = static_cast<size_t>((it->Micros * 7) / peak);
             line.push_back(blocks[std::min<size_t>(level, 7)]);
         }
         return winrt::hstring{ line };
@@ -549,7 +549,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         durations.reserve(samples.size());
         for (const auto& sample : samples)
         {
-            durations.push_back(sample.Ms);
+            durations.push_back(sample.Micros);
         }
         std::sort(durations.begin(), durations.end());
 
@@ -557,11 +557,14 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         const auto worst = durations.back();
         const auto latestBytes = samples.back().Bytes;
 
+        // Milliseconds with a decimal, because a handful of small panes really
+        // does serialize in well under one and rounding that to "0 ms" would
+        // read as a broken counter rather than a fast one.
         return winrt::hstring{ fmt::format(
-            FMT_COMPILE(L"{} passes · median {} ms · worst {} ms · {:.1f} MB on disk"),
+            FMT_COMPILE(L"{} passes · median {:.1f} ms · worst {:.1f} ms · {:.1f} MB on disk"),
             samples.size(),
-            median,
-            worst,
+            static_cast<double>(median) / 1000.0,
+            static_cast<double>(worst) / 1000.0,
             static_cast<double>(latestBytes) / (1024.0 * 1024.0)) };
     }
 

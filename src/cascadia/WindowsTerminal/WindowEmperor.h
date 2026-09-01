@@ -91,7 +91,7 @@ private:
     void _finalizeSessionPersistence() const;
     void _persistBuffers() const;
     int64_t _bufferBytesOnDisk(const std::filesystem::path& settingsDirectory, std::wstring_view filenamePrefix) const;
-    void _recordPersistCost(uint32_t panes, int64_t bytes, int64_t elapsedMs) const;
+    void _recordPersistCost(uint32_t panes, int64_t bytes, int64_t elapsedMicros) const;
     void _checkWindowsForNotificationIcon();
     void _setupAumid(const std::wstring& aumid);
     void _setupControlPipe(bool enabled);

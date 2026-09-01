@@ -2708,10 +2708,23 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
             if (wil::unique_hfile file{ CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_DELETE, &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr) })
             {
+                const auto started = std::chrono::steady_clock::now();
                 winrt::get_self<ControlCore>(_core)->PersistTo(file.get());
+                const auto spent = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - started).count();
+                _persistMicroseconds.fetch_add(spent, std::memory_order_relaxed);
             }
         }
         CATCH_LOG();
+    }
+
+    // How long the serializing has cost across every pane since the last time
+    // anyone asked, in microseconds. Accumulated here because this is where the
+    // work actually happens: the emperor only dispatches these and returns, so
+    // timing its own loop would report ~0 forever and tell nobody anything.
+    // Reading resets, so each persistence pass gets the cost of that pass.
+    int64_t TermControl::TakePersistMicroseconds() noexcept
+    {
+        return _persistMicroseconds.exchange(0, std::memory_order_relaxed);
     }
 
     void TermControl::OpenCWD()
