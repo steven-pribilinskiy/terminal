@@ -2422,6 +2422,59 @@
           "description": "When set to true, a selection is immediately copied to your clipboard upon creation. When set to false, the selection persists and awaits further action.",
           "type": "boolean"
         },
+        "ciPollIntervalMinutes": {
+          "default": 15,
+          "description": "How often, in minutes, to check for a newer CI build to offer as an update. Set to 0 to never check.",
+          "type": "integer"
+        },
+        "resumeAgents": {
+          "default": true,
+          "description": "When set to true, a pane that was running a known coding agent (claude, codex, copilot, and similar) reopens the same conversation on the next start, keeping the flags it was launched with. Requires firstWindowPreference to be persistedLayout or persistedLayoutAndContent.",
+          "type": "boolean"
+        },
+        "resumeMultiplexers": {
+          "default": true,
+          "description": "When set to true, a pane that was running a session multiplexer (shefrd, herdr, tmux, screen, zellij) re-runs it on the next start, reattaching to the session its server is still holding. Requires firstWindowPreference to be persistedLayout or persistedLayoutAndContent.",
+          "type": "boolean"
+        },
+        "resumeExtraPrograms": {
+          "default": [],
+          "description": "Additional program names to bring back. Each is re-run exactly as it was found, with its original arguments. Use this for programs that are neither known agents nor multiplexers.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "resumeExcludedPrograms": {
+          "default": [],
+          "description": "Program names to never bring back. Takes precedence over resumeAgents, resumeMultiplexers and resumeExtraPrograms, so a whole category can be enabled with individual programs left out.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "resumeSessionNotification": {
+          "default": "toast",
+          "description": "How resuming announces itself. \"silent\" resumes with no notice, \"toast\" resumes and then names what came back, and \"confirm\" lists what would be resumed and waits for confirmation first.",
+          "enum": [
+            "silent",
+            "toast",
+            "confirm"
+          ],
+          "type": "string"
+        },
+        "persistBufferPeriodically": {
+          "default": true,
+          "description": "When set to true, each pane's contents are saved on a timer rather than only when the Terminal is closed normally, so a crash or a forced termination doesn't lose the scrollback. Only applies when firstWindowPreference is persistedLayoutAndContent.",
+          "type": "boolean"
+        },
+        "bufferPersistIntervalMinutes": {
+          "default": 5,
+          "description": "How often, in minutes, to save the window layout and pane contents.",
+          "maximum": 240,
+          "minimum": 1,
+          "type": "integer"
+        },
         "openLinksOnSingleClick": {
           "default": true,
           "description": "When set to true, clicking a link in the terminal opens it without holding Ctrl. The link opens on mouse release, and only if the click did not become a text selection, so dragging to select a URL still selects it rather than opening it. Ctrl+click continues to work either way.",

@@ -70,6 +70,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         bool ExpandSelectionToWord();
         void RestoreFromPath(winrt::hstring path);
         void PersistTo(int64_t handle) const;
+        safe_void_coroutine PersistToPathInBackground(winrt::hstring path, bool elevated);
         void OpenCWD();
         void Close();
         Windows::Foundation::Size CharacterDimensions() const;
@@ -317,6 +318,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         winrt::Windows::UI::Xaml::Controls::SwapChainPanel::LayoutUpdated_revoker _layoutUpdatedRevoker;
         winrt::hstring _restorePath;
+        // Guards against a second periodic capture starting while the last one
+        // is still writing this pane's file. Both would be writing the same
+        // path, and the loser would leave a half-serialized buffer behind.
+        std::atomic<bool> _persistInFlight{ false };
         winrt::hstring _followLinkHintCtrlClick;
 
         // The hyperlink card. _hoveredUri is the URI as the buffer holds it: the Run in the

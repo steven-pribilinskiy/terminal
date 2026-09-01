@@ -769,10 +769,6 @@ void WindowEmperor::HandleCommandlineArgs(int nCmdShow)
             }
         }
 
-        // Independent of the above -- runs whether or not there were any
-        // persisted layouts, since this is a wholly separate opt-in setting.
-        _restoreResumableSessions(cwd, env, showCmd);
-
         const auto args = commandlineToArgArray(GetCommandLineW());
 
         if (args.size() == 2 && args[1] == L"-Embedding")
@@ -1526,9 +1522,26 @@ void WindowEmperor::_setupSessionPersistence(bool enabled)
         _persistStateTimer.Stop();
         return;
     }
-    _persistStateTimer.Interval(std::chrono::minutes(5));
+
+    // Configurable, because what this costs depends entirely on how much
+    // scrollback the panes are holding: the buffer capture below writes the
+    // whole of it, uncapped.
+    auto minutes = _app.Logic().Settings().GlobalSettings().BufferPersistIntervalMinutes();
+    minutes = std::clamp(minutes, 1, 240);
+
+    _persistStateTimer.Interval(std::chrono::minutes(minutes));
     _persistStateTimer.Tick([&](auto&&, auto&&) {
+        // Kicked off first and deliberately not waited on. Each window hands
+        // the process walking to a background thread and updates its panes
+        // when that finishes, so this round persists what the previous round
+        // learned -- at most one interval stale, and costing the UI nothing.
+        for (const auto& w : _windows)
+        {
+            w->Logic().RefreshResumeCommands();
+        }
+
         _persistState(ApplicationState::SharedInstance());
+        _persistBuffers();
     });
     _persistStateTimer.Start();
 }
@@ -1562,140 +1575,132 @@ void WindowEmperor::_persistState(const ApplicationState& state) const
     state.Flush();
 }
 
-// The file both halves of the opt-in session-resume feature agree on.
-// Deliberately not part of ApplicationState/state.json: that schema is core
-// to every window's startup and worth touching carefully and separately,
-// not as a rider on this feature. A standalone file is also trivially safe
-// to delete by hand if this ever needs to be reset.
-std::filesystem::path WindowEmperor::_resumableSessionsPath() const
+// The periodic half of buffer persistence. Upstream only ever writes buffers
+// on the way out, so a crash, a BSOD or an End Task loses every pane's
+// scrollback while the layout -- saved on this same timer -- survives.
+//
+// Each control does its own write on a background thread (see
+// TermControl::PersistToPathInBackground). Serializing a pane writes its whole
+// scrollback with no cap, so doing this inline every few minutes would be a
+// hitch the user can feel. Nothing waits for the results: whatever is still
+// in flight when the next round comes is skipped by the control's own guard.
+void WindowEmperor::_persistBuffers() const
 {
-    return std::filesystem::path{ std::wstring_view{ CascadiaSettings::SettingsDirectory() } } / L"resumable-sessions.json";
-}
+    using namespace std::string_view_literals;
 
-// Writes out whatever's currently running a recognized multiplexer/agent
-// (shefrd, herdr, tmux, screen, zellij), across every window, so the next
-// startup can offer to resume it. Opt-in (GlobalSettings().ResumeRecognizedSessions()),
-// and every step here is defensive: a bug in a brand new, never-yet-exercised
-// feature must not be able to turn a normal app exit into a crash or a hang.
-void WindowEmperor::_persistResumableSessions() const
-try
-{
-    if (!_app.Logic().Settings().GlobalSettings().ResumeRecognizedSessions())
+    const auto globals = _app.Logic().Settings().GlobalSettings();
+    if (!globals.PersistBufferPeriodically() ||
+        globals.FirstWindowPreference() != FirstWindowPreference::PersistedLayoutAndContent)
     {
         return;
     }
 
-    winrt::Windows::Data::Json::JsonArray allSessions;
+    const std::filesystem::path settingsDirectory{ std::wstring_view{ CascadiaSettings::SettingsDirectory() } };
+    const auto admin = _app.Logic().IsRunningElevated();
+    const auto filenamePrefix = admin ? L"elevated_"sv : L"buffer_"sv;
+
+    const auto started = std::chrono::steady_clock::now();
+    uint32_t paneCount = 0;
+
     for (const auto& w : _windows)
     {
-        const auto json = w->Logic().GetResumableSessionsJson();
-        if (json.empty())
+        for (const auto pane : w->Logic().Panes())
         {
-            continue;
-        }
-        winrt::Windows::Data::Json::JsonArray parsed{ nullptr };
-        if (!winrt::Windows::Data::Json::JsonArray::TryParse(json, parsed))
-        {
-            continue;
-        }
-        for (const auto& item : parsed)
-        {
-            allSessions.Append(item);
+            try
+            {
+                const auto term = pane.try_as<winrt::TerminalApp::ITerminalPaneContent>();
+                if (!term)
+                {
+                    continue;
+                }
+                const auto control = term.GetTermControl();
+                if (!control)
+                {
+                    continue;
+                }
+                const auto connection = control.Connection();
+                if (!connection)
+                {
+                    continue;
+                }
+                const auto sessionId = connection.SessionId();
+                if (sessionId == winrt::guid{})
+                {
+                    continue;
+                }
+
+                const auto path = settingsDirectory / fmt::format(FMT_COMPILE(L"{}{}.txt"), filenamePrefix, sessionId);
+                control.PersistToPathInBackground(winrt::hstring{ path.native() }, admin);
+                ++paneCount;
+            }
+            CATCH_LOG();
         }
     }
 
-    const auto path = _resumableSessionsPath();
-    if (allSessions.Size() == 0)
-    {
-        // Nothing to resume next time -- and nothing stale should linger
-        // from a previous run that did have something.
-        std::error_code ec;
-        std::filesystem::remove(path, ec);
-        return;
-    }
-
-    til::io::write_utf8_string_to_file_atomic(path, til::u16u8(std::wstring_view{ allSessions.Stringify() }));
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
+    _recordPersistCost(paneCount, _bufferBytesOnDisk(settingsDirectory, filenamePrefix), gsl::narrow_cast<int64_t>(elapsed));
 }
-catch (...)
+
+// Total size of the buffer files currently on disk. Sampled at the START of a
+// pass, so it reports what the PREVIOUS pass wrote -- this pass's writes are
+// still running on their own threads. That is the honest number to show
+// anyway: it's what persistence is costing in storage right now.
+int64_t WindowEmperor::_bufferBytesOnDisk(const std::filesystem::path& settingsDirectory, std::wstring_view filenamePrefix) const
 {
-    LOG_CAUGHT_EXCEPTION();
+    int64_t total = 0;
+    const auto filter = fmt::format(FMT_COMPILE(L"{}\\{}*"), settingsDirectory.native(), filenamePrefix);
+
+    WIN32_FIND_DATAW ffd;
+    const wil::unique_hfind handle{ FindFirstFileExW(filter.c_str(), FindExInfoBasic, &ffd, FindExSearchNameMatch, nullptr, FIND_FIRST_EX_LARGE_FETCH) };
+    if (!handle)
+    {
+        return 0;
+    }
+    do
+    {
+        total += (static_cast<int64_t>(ffd.nFileSizeHigh) << 32) | ffd.nFileSizeLow;
+    } while (FindNextFileW(handle.get(), &ffd));
+
+    return total;
 }
 
-// The startup half: if the setting is on and a marker from the last exit
-// names something resumable, open one new window with one tab per
-// recognized session, each running the command that reattaches it. Never
-// throws past this function -- a malformed or unreadable marker must fall
-// through to ordinary startup exactly as if the file were never there.
-void WindowEmperor::_restoreResumableSessions(wil::zwstring_view currentDirectory, wil::zwstring_view envString, uint32_t showWindowCommand)
+// A rolling week of what persistence has cost, so the Settings page can draw
+// it rather than leave the user guessing. Its own file, not part of
+// state.json: this is a log, and a log that fails to parse must never be able
+// to take the app's real state down with it.
+void WindowEmperor::_recordPersistCost(uint32_t panes, int64_t bytes, int64_t elapsedMs) const
 try
 {
-    if (!_app.Logic().Settings().GlobalSettings().ResumeRecognizedSessions())
+    const std::filesystem::path path{ std::filesystem::path{ std::wstring_view{ CascadiaSettings::SettingsDirectory() } } / L"persistence-timings.json" };
+
+    const auto now = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    const auto oldest = now - (7 * 24 * 60 * 60);
+
+    winrt::Windows::Data::Json::JsonArray kept;
+    if (const auto contents = til::io::read_file_as_utf8_string_if_exists(path); !contents.empty())
     {
-        return;
+        winrt::Windows::Data::Json::JsonArray parsed{ nullptr };
+        if (winrt::Windows::Data::Json::JsonArray::TryParse(winrt::hstring{ til::u8u16(contents) }, parsed))
+        {
+            for (const auto& item : parsed)
+            {
+                if (item.ValueType() == winrt::Windows::Data::Json::JsonValueType::Object &&
+                    static_cast<int64_t>(item.GetObject().GetNamedNumber(L"t", 0)) >= oldest)
+                {
+                    kept.Append(item);
+                }
+            }
+        }
     }
 
-    const auto path = _resumableSessionsPath();
-    const auto contents = til::io::read_file_as_utf8_string_if_exists(path);
-    if (contents.empty())
-    {
-        return;
-    }
+    winrt::Windows::Data::Json::JsonObject entry;
+    entry.SetNamedValue(L"t", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(static_cast<double>(now)));
+    entry.SetNamedValue(L"ms", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(static_cast<double>(elapsedMs)));
+    entry.SetNamedValue(L"bytes", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(static_cast<double>(bytes)));
+    entry.SetNamedValue(L"panes", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(panes));
+    kept.Append(entry);
 
-    winrt::Windows::Data::Json::JsonArray sessions{ nullptr };
-    if (!winrt::Windows::Data::Json::JsonArray::TryParse(winrt::hstring{ til::u8u16(contents) }, sessions) || sessions.Size() == 0)
-    {
-        return;
-    }
-
-    // One `new-tab` action per session, chained with the same `;` separator
-    // `wt`'s own commandline parser already uses to sequence multiple
-    // actions -- each argv element here is one token, so nothing needs its
-    // own quoting the way it would if this were a single flattened string.
-    std::vector<winrt::hstring> args{ L"wt" };
-    auto any = false;
-    for (const auto& item : sessions)
-    {
-        if (item.ValueType() != winrt::Windows::Data::Json::JsonValueType::Object)
-        {
-            continue;
-        }
-        const auto obj = item.GetObject();
-        const auto cwd = obj.GetNamedString(L"cwd", L"");
-        const auto resumeArgs = obj.GetNamedArray(L"resumeArgs", nullptr);
-        if (!resumeArgs || resumeArgs.Size() == 0)
-        {
-            continue;
-        }
-
-        if (any)
-        {
-            args.push_back(L";");
-        }
-        args.push_back(L"new-tab");
-        if (!cwd.empty())
-        {
-            args.push_back(L"-d");
-            args.push_back(cwd);
-        }
-        args.push_back(L"--");
-        for (const auto& argVal : resumeArgs)
-        {
-            args.push_back(argVal.GetString());
-        }
-        any = true;
-    }
-
-    if (!any)
-    {
-        return;
-    }
-
-    _dispatchCommandlineCommon(args, currentDirectory, envString, showWindowCommand);
-
-    // Consumed: leaving it in place would offer the same resume again after
-    // a later, unrelated restart that has nothing to do with this one.
-    std::error_code ec;
-    std::filesystem::remove(path, ec);
+    til::io::write_utf8_string_to_file_atomic(path, til::u16u8(std::wstring_view{ kept.Stringify() }));
 }
 catch (...)
 {
@@ -1706,8 +1711,6 @@ void WindowEmperor::_finalizeSessionPersistence() const
 {
     using namespace std::string_view_literals;
 
-    _persistResumableSessions();
-
     if (_skipPersistence)
     {
         // We received WM_ENDSESSION and persisted the state.
@@ -1717,10 +1720,22 @@ void WindowEmperor::_finalizeSessionPersistence() const
 
     const auto state = ApplicationState::SharedInstance();
 
-    _persistState(state);
-
     const auto firstWindowPreference = _app.Logic().Settings().GlobalSettings().FirstWindowPreference();
     const auto wantsPersistence = firstWindowPreference != FirstWindowPreference::DefaultProfile;
+
+    // Work out what each pane is running BEFORE the layout is written, so the
+    // resume command rides along in the same action the pane is restored from.
+    // Only worth anything when a layout is actually being kept -- and this is
+    // the last moment the windows still exist to be asked.
+    if (wantsPersistence)
+    {
+        for (const auto& w : _windows)
+        {
+            w->Logic().CaptureResumeCommandsNow(5000);
+        }
+    }
+
+    _persistState(state);
 
     // If we neither need a cleanup nor want to persist, we can exit early.
     if (!_needsPersistenceCleanup && !wantsPersistence)

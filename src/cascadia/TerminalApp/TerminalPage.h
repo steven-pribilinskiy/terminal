@@ -35,6 +35,13 @@ namespace TerminalApp::SlotPromotion
     struct StagedBuild;
 }
 
+// Likewise: defined in PaneSessionCapture.h, which
+// TerminalPage.SessionResume.cpp includes.
+namespace TerminalApp::SessionResume
+{
+    struct PaneProbe;
+}
+
 namespace Microsoft::Terminal::Core
 {
     class ControlKeyStates;
@@ -189,10 +196,13 @@ namespace winrt::TerminalApp::implementation
         // when AppLogic notices the staged build change.
         void RefreshPendingPromotion();
 
-        // Which panes are running a recognized session multiplexer/agent
-        // right now. See TerminalPage.SessionResume.cpp; UI thread only, and
-        // only ever called from WindowEmperor on the way out.
-        hstring GetResumableSessionsJson();
+        // Working out what each pane is running so the persisted layout can
+        // bring it back. See TerminalPage.SessionResume.cpp. Both are called
+        // from WindowEmperor and must run on the UI thread; the first hands
+        // the expensive part off to a background thread, the second cannot
+        // because it runs once the message pump has already stopped.
+        safe_void_coroutine RefreshResumeCommands();
+        void CaptureResumeCommandsNow(uint32_t timeoutMs);
 
         // The control pipe. See TerminalPage.ControlPipe.cpp; UI thread only.
         Windows::Foundation::Collections::IVector<TerminalApp::ControlPipePaneInfo> ControlPipeListPanes(hstring containing);
@@ -321,6 +331,18 @@ namespace winrt::TerminalApp::implementation
         safe_void_coroutine _PromoteSlotRequested(Windows::Foundation::IInspectable sender, Windows::Foundation::IInspectable args);
         void _ReconcileCiPollInterval();
         void _CopyBuildInfoRequested(const Windows::Foundation::IInspectable& sender, const Windows::Foundation::IInspectable& args);
+
+        std::vector<::TerminalApp::SessionResume::PaneProbe> _collectResumeProbes();
+        void _applyResumeCommands(const std::map<std::wstring, winrt::hstring>& commands);
+        void _queueResumeCommand(const Microsoft::Terminal::Control::TermControl& control, const hstring& command);
+        safe_void_coroutine _flushPendingResumes();
+        safe_void_coroutine _runResumeCommand(Microsoft::Terminal::Control::TermControl control, hstring command);
+
+        // Panes restored with something to re-run, collected as the layout is
+        // rebuilt and acted on once as a batch -- so "ask first" can list all
+        // of them in one dialog instead of one prompt per pane.
+        std::vector<std::pair<Microsoft::Terminal::Control::TermControl, hstring>> _pendingResumes;
+        bool _resumeFlushQueued{ false };
 
         void _UpdateTabIndices();
 

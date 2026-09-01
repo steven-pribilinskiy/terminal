@@ -90,7 +90,7 @@
     <ClInclude Include="Jumplist.h" />
     <ClInclude Include="JumplistIconCache.h" />
     <ClInclude Include="LanguageProfileNotifier.h" />
-    <ClInclude Include="RecognizedSessions.h" />
+    <ClInclude Include="PaneSessionCapture.h" />
     <ClInclude Include="MinMaxCloseControl.h">
       <DependentUpon>MinMaxCloseControl.xaml</DependentUpon>
     </ClInclude>
@@ -228,6 +228,7 @@
       <DependentUpon>TerminalPage.xaml</DependentUpon>
       <SubType>Code</SubType>
     </ClCompile>
+    <ClCompile Include="PaneSessionCapture.cpp" />
     <ClCompile Include="TabManagement.cpp">
       <DependentUpon>TerminalPage.xaml</DependentUpon>
       <SubType>Code</SubType>

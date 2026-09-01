@@ -50,10 +50,9 @@ namespace Microsoft.Terminal.Settings.Model
         AfterCurrentTab,
     };
 
-    // How resuming a recognized multiplexer/agent session (shefrd, herdr,
-    // tmux, screen, zellij) announces itself on the next startup that finds
-    // one to resume. Independent of resumeRecognizedSessions itself: this
-    // only matters once that's on.
+    // How resuming a recognized agent or multiplexer session announces itself
+    // on the next startup that finds one to resume. Independent of which
+    // programs are eligible: this only matters once something is.
     enum ResumeSessionNotification
     {
         Silent,  // Resume with no notice at all.
@@ -81,7 +80,12 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(Boolean, ControlPipeEnabled);
         INHERITABLE_SETTING(Boolean, EnableColorSelection);
         INHERITABLE_SETTING(Int32, CiPollIntervalMinutes);
-        INHERITABLE_SETTING(Boolean, ResumeRecognizedSessions);
+        INHERITABLE_SETTING(Boolean, ResumeAgents);
+        INHERITABLE_SETTING(Boolean, ResumeMultiplexers);
+        INHERITABLE_SETTING(IVector<String>, ResumeExtraPrograms);
+        INHERITABLE_SETTING(IVector<String>, ResumeExcludedPrograms);
+        INHERITABLE_SETTING(Boolean, PersistBufferPeriodically);
+        INHERITABLE_SETTING(Int32, BufferPersistIntervalMinutes);
         INHERITABLE_SETTING(ResumeSessionNotification, ResumeSessionNotification);
         INHERITABLE_SETTING(ConfirmOnClose, ConfirmOnClose);
 

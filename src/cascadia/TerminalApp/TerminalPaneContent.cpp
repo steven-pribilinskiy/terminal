@@ -141,6 +141,10 @@ namespace winrt::TerminalApp::implementation
             {
                 args.SessionId(id);
             }
+            if (!_resumeCommand.empty())
+            {
+                args.ResumeCommand(_resumeCommand);
+            }
             break;
         }
         default:

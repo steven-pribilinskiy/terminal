@@ -54,6 +54,16 @@
                             Click="_CloseOnExitInfoDismissHandler" />
                 </mux:InfoBar.ActionButton>
             </mux:InfoBar>
+
+            <!--  Names what was brought back, when the setting asks for a notice.  -->
+            <mux:InfoBar x:Name="ResumedSessionsInfoBar"
+                         x:Uid="ResumedSessionsInfoBar"
+                         x:Load="False"
+                         CornerRadius="0"
+                         IsClosable="True"
+                         IsIconVisible="True"
+                         IsOpen="False"
+                         Severity="Informational" />
         </StackPanel>
 
         <Grid x:Name="TabContent"
@@ -98,6 +108,16 @@
                        Grid.Row="2"
                        x:Load="False"
                        DefaultButton="Close" />
+
+        <!--  Lists what would be resumed, when the setting says to ask first.  -->
+        <ContentDialog x:Name="ResumeSessionsDialog"
+                       x:Uid="ResumeSessionsDialog"
+                       Grid.Row="2"
+                       x:Load="False"
+                       DefaultButton="Primary">
+            <TextBlock IsTextSelectionEnabled="True"
+                       TextWrapping="Wrap" />
+        </ContentDialog>
 
         <ContentDialog x:Name="MultiLinePasteDialog"
                        x:Uid="MultiLinePasteDialog"

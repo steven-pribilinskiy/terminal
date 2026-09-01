@@ -505,19 +505,69 @@
     <value>Restore window layout</value>
     <comment>An option to choose from for the "First window preference" setting. Reopen the layouts from the last session, but don't preserve the content.</comment>
   </data>
-  <data name="Globals_ResumeRecognizedSessions.Header" xml:space="preserve">
-    <value>Resume recognized sessions</value>
-    <comment>Header for a control to toggle automatically resuming session multiplexers and agent runtimes (shefrd, herdr, tmux, screen, zellij) that were running when Terminal last closed.</comment>
+  <data name="Globals_ResumeAgents.Header" xml:space="preserve">
+    <value>Resume coding agents</value>
+    <comment>Header for a control to toggle bringing back coding agents (Claude Code, Codex and similar) that were running when Terminal last closed.</comment>
   </data>
-  <data name="Globals_ResumeRecognizedSessions.Description" xml:space="preserve">
-    <value>If a pane was running shefrd, herdr, tmux, screen, or zellij, reattach to it the next time Terminal starts. Other panes are unaffected.</value>
+  <data name="Globals_ResumeAgents.Description" xml:space="preserve">
+    <value>A pane running Claude Code, Codex, Copilot or another known agent reopens the same conversation, keeping the flags it was started with.</value>
+  </data>
+  <data name="Globals_ResumeMultiplexers.Header" xml:space="preserve">
+    <value>Resume session multiplexers</value>
+    <comment>Header for a control to toggle bringing back terminal multiplexers (shefrd, herdr, tmux, screen, zellij) that were running when Terminal last closed.</comment>
+  </data>
+  <data name="Globals_ResumeMultiplexers.Description" xml:space="preserve">
+    <value>A pane running shefrd, herdr, tmux, screen or zellij reattaches to the session its server is still holding.</value>
+  </data>
+  <data name="Globals_ResumeExtraPrograms.Header" xml:space="preserve">
+    <value>Also resume these programs</value>
+    <comment>Header for a text box listing extra program names, separated by commas, that should be re-run when Terminal starts.</comment>
+  </data>
+  <data name="Globals_ResumeExtraPrograms.Description" xml:space="preserve">
+    <value>Comma-separated program names. Each is re-run exactly as it was, with its original arguments. Use this for anything that isn't a known agent or multiplexer.</value>
+  </data>
+  <data name="Globals_ResumeExcludedPrograms.Header" xml:space="preserve">
+    <value>Never resume these programs</value>
+    <comment>Header for a text box listing program names, separated by commas, that should never be brought back even if the settings above would otherwise cover them.</comment>
+  </data>
+  <data name="Globals_ResumeExcludedPrograms.Description" xml:space="preserve">
+    <value>Comma-separated program names. Wins over everything above, so you can turn a whole category on and still leave one program out.</value>
   </data>
   <data name="Globals_ResumeSessionNotification.Header" xml:space="preserve">
     <value>When resuming sessions</value>
     <comment>Header for a control to choose whether resuming a recognized session asks first, or just shows a notice, or says nothing at all.</comment>
   </data>
   <data name="Globals_ResumeSessionNotification.Description" xml:space="preserve">
-    <value>Only applies when "Resume recognized sessions" is on.</value>
+    <value>Only applies when something above is eligible to be resumed.</value>
+  </data>
+  <data name="Globals_PersistBufferPeriodically.Header" xml:space="preserve">
+    <value>Save pane contents periodically</value>
+    <comment>Header for a control to toggle saving each pane's scrollback on a timer, instead of only when Terminal is closed normally.</comment>
+  </data>
+  <data name="Globals_PersistBufferPeriodically.Description" xml:space="preserve">
+    <value>Without this, scrollback is only written when Terminal closes normally, so a crash or an End Task loses it. Requires "Restore window layout and content".</value>
+  </data>
+  <data name="Globals_BufferPersistIntervalMinutes.Header" xml:space="preserve">
+    <value>Save pane contents every</value>
+    <comment>Header for a control to choose how often, in minutes, to save pane contents and window layout.</comment>
+  </data>
+  <data name="Globals_BufferPersistIntervalMinutes.Description" xml:space="preserve">
+    <value>Minutes between saves. Shorter loses less in a crash; longer writes less to disk.</value>
+  </data>
+  <data name="Globals_BufferPersistIntervalMinutesBox.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Save pane contents every, in minutes</value>
+    <comment>Name for a control to choose how often, in minutes, to save pane contents.</comment>
+  </data>
+  <data name="Globals_PersistCost.Header" xml:space="preserve">
+    <value>What saving has been costing</value>
+    <comment>Header for a read-only display showing how long recent save passes took and how much disk they use.</comment>
+  </data>
+  <data name="Globals_PersistCost.Description" xml:space="preserve">
+    <value>The last seven days of saves, oldest on the left.</value>
+  </data>
+  <data name="Globals_PersistCostNoData" xml:space="preserve">
+    <value>Nothing saved yet</value>
+    <comment>Shown in place of the summary when no save has happened yet, so there is nothing to chart.</comment>
   </data>
   <data name="Globals_ResumeSessionNotificationSilent.Content" xml:space="preserve">
     <value>Resume with no notice</value>

@@ -17,6 +17,7 @@
 #include "App.h"
 #include "DebugTapConnection.h"
 #include "MarkdownPaneContent.h"
+#include "PaneSessionCapture.h"
 #include "Remoting.h"
 #include "ScratchpadContent.h"
 #include "SettingsPaneContent.h"
@@ -3934,7 +3935,17 @@ namespace winrt::TerminalApp::implementation
 
         const auto control = _CreateNewControlAndContent(controlSettings, connection);
 
-        if (hasSessionId)
+        // What this pane was running when it was persisted, if anything.
+        const auto resumeCommand = newTerminalArgs ? newTerminalArgs.ResumeCommand() : hstring{};
+        // An agent that reopens a conversation repaints that conversation
+        // itself. Replaying the saved scrollback underneath it would leave the
+        // pane showing the same transcript twice -- once as dead text, once
+        // live. A pane that merely re-runs a command, or resumes nothing, has
+        // no such redraw coming and keeps its buffer.
+        const auto agentRepaints = !resumeCommand.empty() &&
+                                   ::TerminalApp::SessionResume::ResumesAgentSession(resumeCommand);
+
+        if (hasSessionId && !agentRepaints)
         {
             using namespace std::string_view_literals;
 
@@ -3943,6 +3954,11 @@ namespace winrt::TerminalApp::implementation
             const auto filenamePrefix = admin ? L"elevated_"sv : L"buffer_"sv;
             const auto path = fmt::format(FMT_COMPILE(L"{}\\{}{}.txt"), settingsDir, filenamePrefix, sessionId);
             control.RestoreFromPath(path);
+        }
+
+        if (!resumeCommand.empty())
+        {
+            _queueResumeCommand(control, resumeCommand);
         }
 
         auto paneContent{ winrt::make<TerminalPaneContent>(profile, _terminalSettingsCache, control) };

@@ -31,7 +31,12 @@ Author(s):
     X(bool, ControlPipeEnabled, "controlPipe", true)                                                                               \
     X(bool, EnableColorSelection, "experimental.enableColorSelection", false)                                                      \
     X(int32_t, CiPollIntervalMinutes, "ciPollIntervalMinutes", 15)                                                                 \
-    X(bool, ResumeRecognizedSessions, "resumeRecognizedSessions", false)                                                           \
+    X(bool, ResumeAgents, "resumeAgents", true)                                                                                    \
+    X(bool, ResumeMultiplexers, "resumeMultiplexers", true)                                                                        \
+    X(winrt::Windows::Foundation::Collections::IVector<winrt::hstring>, ResumeExtraPrograms, "resumeExtraPrograms", nullptr)       \
+    X(winrt::Windows::Foundation::Collections::IVector<winrt::hstring>, ResumeExcludedPrograms, "resumeExcludedPrograms", nullptr) \
+    X(bool, PersistBufferPeriodically, "persistBufferPeriodically", true)                                                          \
+    X(int32_t, BufferPersistIntervalMinutes, "bufferPersistIntervalMinutes", 5)                                                    \
     X(Model::ResumeSessionNotification, ResumeSessionNotification, "resumeSessionNotification", Model::ResumeSessionNotification::Toast)
 
 // Settings that are per-window (may vary by window name in the future)

@@ -7,6 +7,10 @@
 #include "EnumEntry.h"
 
 #include <WtExeUtils.h>
+#include <til/io.h>
+#include <til/string.h>
+#include <til/u8u16convert.h>
+#include <winrt/Windows.Data.Json.h>
 
 using namespace winrt::Windows::UI::Xaml::Navigation;
 using namespace winrt::Windows::Foundation;
@@ -62,6 +66,12 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         // unique view model members.
         PropertyChanged([this](auto&&, const PropertyChangedEventArgs& args) {
             const auto viewModelProperty{ args.PropertyName() };
+            if (viewModelProperty == L"ResumeAgents" || viewModelProperty == L"ResumeMultiplexers")
+            {
+                // The notification setting is only reachable while something
+                // is eligible to be resumed at all.
+                _NotifyChanges(L"AnyResumeEnabled");
+            }
             if (viewModelProperty == L"CenterOnLaunch" || viewModelProperty == L"RememberWindowGeometry")
             {
                 _NotifyChanges(L"LaunchParametersCurrentValue");
@@ -380,6 +390,179 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     winrt::Windows::Foundation::Collections::IObservableVector<Model::DefaultTerminal> LaunchViewModel::DefaultTerminals() const
     {
         return _Settings.DefaultTerminals();
+    }
+
+    static winrt::hstring _joinPrograms(const winrt::Windows::Foundation::Collections::IVector<winrt::hstring>& list)
+    {
+        if (!list)
+        {
+            return {};
+        }
+        std::wstring joined;
+        for (const auto& entry : list)
+        {
+            if (!joined.empty())
+            {
+                joined.append(L", ");
+            }
+            joined.append(entry);
+        }
+        return winrt::hstring{ joined };
+    }
+
+    static winrt::Windows::Foundation::Collections::IVector<winrt::hstring> _splitPrograms(std::wstring_view text)
+    {
+        std::vector<winrt::hstring> entries;
+        for (const auto& part : til::split_iterator{ text, L',' })
+        {
+            const auto trimmed = til::trim(part, L' ');
+            if (!trimmed.empty())
+            {
+                entries.emplace_back(trimmed);
+            }
+        }
+        // An empty list is stored as nothing at all, so the key drops out of
+        // settings.json instead of persisting as a confusing empty array.
+        if (entries.empty())
+        {
+            return nullptr;
+        }
+        return winrt::single_threaded_vector<winrt::hstring>(std::move(entries));
+    }
+
+    winrt::hstring LaunchViewModel::ResumeExtraProgramsText()
+    {
+        return _joinPrograms(_Settings.GlobalSettings().ResumeExtraPrograms());
+    }
+
+    void LaunchViewModel::ResumeExtraProgramsText(const winrt::hstring& value)
+    {
+        _Settings.GlobalSettings().ResumeExtraPrograms(_splitPrograms(value));
+        _NotifyChanges(L"ResumeExtraProgramsText", L"AnyResumeEnabled");
+    }
+
+    winrt::hstring LaunchViewModel::ResumeExcludedProgramsText()
+    {
+        return _joinPrograms(_Settings.GlobalSettings().ResumeExcludedPrograms());
+    }
+
+    void LaunchViewModel::ResumeExcludedProgramsText(const winrt::hstring& value)
+    {
+        _Settings.GlobalSettings().ResumeExcludedPrograms(_splitPrograms(value));
+        _NotifyChanges(L"ResumeExcludedProgramsText");
+    }
+
+    bool LaunchViewModel::AnyResumeEnabled()
+    {
+        const auto globals = _Settings.GlobalSettings();
+        if (globals.ResumeAgents() || globals.ResumeMultiplexers())
+        {
+            return true;
+        }
+        const auto extra = globals.ResumeExtraPrograms();
+        return extra && extra.Size() > 0;
+    }
+
+    // Written by WindowEmperor after each periodic persistence pass. Read here
+    // rather than plumbed through settings, because it is a log of what
+    // happened and not a setting: nothing edits it, and it must survive being
+    // absent, truncated or hand-deleted without complaint.
+    struct PersistSample
+    {
+        int64_t Ms;
+        int64_t Bytes;
+    };
+
+    static std::vector<PersistSample> _readPersistCostLog()
+    {
+        std::vector<PersistSample> samples;
+        try
+        {
+            const std::filesystem::path path{ std::filesystem::path{ std::wstring_view{ Model::CascadiaSettings::SettingsDirectory() } } / L"persistence-timings.json" };
+            const auto contents = til::io::read_file_as_utf8_string_if_exists(path);
+            if (contents.empty())
+            {
+                return samples;
+            }
+
+            winrt::Windows::Data::Json::JsonArray parsed{ nullptr };
+            if (!winrt::Windows::Data::Json::JsonArray::TryParse(winrt::hstring{ til::u8u16(contents) }, parsed))
+            {
+                return samples;
+            }
+            for (const auto& item : parsed)
+            {
+                if (item.ValueType() != winrt::Windows::Data::Json::JsonValueType::Object)
+                {
+                    continue;
+                }
+                const auto obj = item.GetObject();
+                samples.push_back(PersistSample{
+                    static_cast<int64_t>(obj.GetNamedNumber(L"ms", 0)),
+                    static_cast<int64_t>(obj.GetNamedNumber(L"bytes", 0)) });
+            }
+        }
+        CATCH_LOG();
+        return samples;
+    }
+
+    winrt::hstring LaunchViewModel::PersistCostSparkline()
+    {
+        const auto samples = _readPersistCostLog();
+        if (samples.empty())
+        {
+            return {};
+        }
+
+        static constexpr std::wstring_view blocks{ L"▁▂▃▄▅▆▇█" };
+        static constexpr size_t maxPoints = 48;
+        const auto first = samples.size() > maxPoints ? samples.end() - maxPoints : samples.begin();
+
+        // Scaled against the worst sample in view, so the shape shows how this
+        // run compares with the rest of the week rather than against an
+        // absolute ceiling nothing ever reaches.
+        int64_t peak = 1;
+        for (auto it = first; it != samples.end(); ++it)
+        {
+            peak = std::max(peak, it->Ms);
+        }
+
+        std::wstring line;
+        line.reserve(maxPoints);
+        for (auto it = first; it != samples.end(); ++it)
+        {
+            const auto level = static_cast<size_t>((it->Ms * 7) / peak);
+            line.push_back(blocks[std::min<size_t>(level, 7)]);
+        }
+        return winrt::hstring{ line };
+    }
+
+    winrt::hstring LaunchViewModel::PersistCostSummary()
+    {
+        auto samples = _readPersistCostLog();
+        if (samples.empty())
+        {
+            return RS_(L"Globals_PersistCostNoData");
+        }
+
+        std::vector<int64_t> durations;
+        durations.reserve(samples.size());
+        for (const auto& sample : samples)
+        {
+            durations.push_back(sample.Ms);
+        }
+        std::sort(durations.begin(), durations.end());
+
+        const auto median = durations[durations.size() / 2];
+        const auto worst = durations.back();
+        const auto latestBytes = samples.back().Bytes;
+
+        return winrt::hstring{ fmt::format(
+            FMT_COMPILE(L"{} passes · median {} ms · worst {} ms · {:.1f} MB on disk"),
+            samples.size(),
+            median,
+            worst,
+            static_cast<double>(latestBytes) / (1024.0 * 1024.0)) };
     }
 
     bool LaunchViewModel::StartOnUserLoginAvailable()

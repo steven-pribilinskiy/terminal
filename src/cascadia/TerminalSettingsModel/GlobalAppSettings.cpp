@@ -110,6 +110,22 @@ winrt::com_ptr<GlobalAppSettings> GlobalAppSettings::Copy() const
             globals->_SafeUriSchemes->Append(src);
         }
     }
+    if (_ResumeExtraPrograms)
+    {
+        globals->_ResumeExtraPrograms = winrt::single_threaded_vector<hstring>();
+        for (const auto& src : *_ResumeExtraPrograms)
+        {
+            globals->_ResumeExtraPrograms->Append(src);
+        }
+    }
+    if (_ResumeExcludedPrograms)
+    {
+        globals->_ResumeExcludedPrograms = winrt::single_threaded_vector<hstring>();
+        for (const auto& src : *_ResumeExcludedPrograms)
+        {
+            globals->_ResumeExcludedPrograms->Append(src);
+        }
+    }
 
     for (const auto& parent : _parents)
     {

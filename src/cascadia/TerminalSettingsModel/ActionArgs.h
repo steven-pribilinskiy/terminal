@@ -391,8 +391,16 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         ACTION_ARG(winrt::guid, SessionId, winrt::guid{});
         ACTION_ARG(bool, AppendCommandLine, false);
         ACTION_ARG(uint64_t, ContentId);
+        // What the pane was running when it was persisted, ready to be typed
+        // back into the restored pane's own shell. Deliberately separate from
+        // Commandline: that REPLACES the profile's launch command, which would
+        // make the resumed program the pane's root process and close the pane
+        // when it exits. This runs the profile as configured and then the
+        // command inside it, which is where it was in the first place.
+        ACTION_ARG(winrt::hstring, ResumeCommand, L"");
 
         static constexpr std::string_view SessionIdKey{ "sessionId" };
+        static constexpr std::string_view ResumeCommandKey{ "resumeCommand" };
         static constexpr std::string_view AppendCommandLineKey{ "appendCommandLine" };
         static constexpr std::string_view ContentKey{ "__content" };
 
@@ -439,6 +447,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
             JsonUtils::GetValueForKey(json, ElevateKey, args->_Elevate);
             JsonUtils::GetValueForKey(json, ReloadEnvironmentVariablesKey, args->_ReloadEnvironmentVariables);
             JsonUtils::GetValueForKey(json, ContentKey, args->_ContentId);
+            JsonUtils::GetValueForKey(json, ResumeCommandKey, args->_ResumeCommand);
             return *args;
         }
         static Json::Value ToJson(const Model::NewTerminalArgs& val)
@@ -461,6 +470,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
             JsonUtils::SetValueForKey(json, ElevateKey, args->_Elevate);
             JsonUtils::SetValueForKey(json, ReloadEnvironmentVariablesKey, args->_ReloadEnvironmentVariables);
             JsonUtils::SetValueForKey(json, ContentKey, args->_ContentId);
+            JsonUtils::SetValueForKey(json, ResumeCommandKey, args->_ResumeCommand);
             return json;
         }
         Model::NewTerminalArgs Copy() const
@@ -478,6 +488,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
             copy->_Elevate = _Elevate;
             copy->_ReloadEnvironmentVariables = _ReloadEnvironmentVariables;
             copy->_ContentId = _ContentId;
+            copy->_ResumeCommand = _ResumeCommand;
             return *copy;
         }
         size_t Hash() const

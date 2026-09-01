@@ -65,7 +65,8 @@ namespace TerminalApp
 
         Microsoft.Terminal.Settings.Model.WindowLayout GetWindowLayout();
         void PersistState();
-        String GetResumableSessionsJson();
+        void RefreshResumeCommands();
+        void CaptureResumeCommandsNow(UInt32 timeoutMs);
 
         Windows.UI.Xaml.UIElement GetRoot();
         IVector<IPaneContent> Panes { get; };

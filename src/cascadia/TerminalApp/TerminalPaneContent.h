@@ -55,6 +55,14 @@ namespace winrt::TerminalApp::implementation
             return _profile;
         }
 
+        // Set by TerminalPage's capture pass shortly before the layout is
+        // written out, and read by GetNewTerminalArgs when it is. Kept here
+        // rather than looked up at serialization time because working it out
+        // means walking process trees and, for a WSL pane, launching a probe
+        // inside the distro -- far too slow to do while building args.
+        void ResumeCommand(const winrt::hstring& command) { _resumeCommand = command; }
+        winrt::hstring ResumeCommand() const noexcept { return _resumeCommand; }
+
         winrt::hstring Title() { return _control.Title(); }
         uint64_t TaskbarState() { return _control.TaskbarState(); }
         uint64_t TaskbarProgress() { return _control.TaskbarProgress(); }
@@ -76,6 +84,7 @@ namespace winrt::TerminalApp::implementation
         winrt::Microsoft::Terminal::Settings::Model::Profile _profile{ nullptr };
         std::shared_ptr<TerminalSettingsCache> _cache{};
         bool _isDefTermSession{ false };
+        winrt::hstring _resumeCommand{};
 
         struct ControlEventTokens
         {

@@ -89,9 +89,9 @@ private:
     void _setupSessionPersistence(bool enabled);
     void _persistState(const winrt::Microsoft::Terminal::Settings::Model::ApplicationState& state) const;
     void _finalizeSessionPersistence() const;
-    void _persistResumableSessions() const;
-    void _restoreResumableSessions(wil::zwstring_view currentDirectory, wil::zwstring_view envString, uint32_t showWindowCommand);
-    std::filesystem::path _resumableSessionsPath() const;
+    void _persistBuffers() const;
+    int64_t _bufferBytesOnDisk(const std::filesystem::path& settingsDirectory, std::wstring_view filenamePrefix) const;
+    void _recordPersistCost(uint32_t panes, int64_t bytes, int64_t elapsedMs) const;
     void _checkWindowsForNotificationIcon();
     void _setupAumid(const std::wstring& aumid);
     void _setupControlPipe(bool enabled);

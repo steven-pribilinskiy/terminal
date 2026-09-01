@@ -5,6 +5,8 @@
 #include "TermControl.h"
 
 #include <inputpaneinterop.h>
+// For the mandatory-integrity label an elevated window's buffer file needs.
+#include <sddl.h>
 
 #include "TermControlAutomationPeer.h"
 #include "../../renderer/atlas/AtlasEngine.h"
@@ -2658,6 +2660,58 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         {
             winrt::get_self<ControlCore>(_core)->PersistTo(reinterpret_cast<HANDLE>(handle));
         }
+    }
+
+    // The periodic counterpart to PersistTo. Serializing a pane writes its
+    // WHOLE scrollback -- uncapped, and megabytes for a busy pane -- so doing
+    // it on a timer the way the exit path does it would be a visible hitch
+    // every few minutes. This mirrors _restoreInBackground exactly: hop to a
+    // background thread and talk to ControlCore directly, which takes the
+    // terminal's read lock and is safe to call from off the UI thread.
+    //
+    // Fire and forget, so it is only ever used for the periodic save. The
+    // exit path stays synchronous -- there, the process is about to end and
+    // work that hasn't finished is work that never happens.
+    safe_void_coroutine TermControl::PersistToPathInBackground(winrt::hstring path, bool elevated)
+    {
+        // See PersistTo: a control that never got a size has no buffer worth
+        // writing, and one waiting to be restored still owns its old file.
+        if (!_initializedTerminal || !_restorePath.empty())
+        {
+            co_return;
+        }
+        if (_persistInFlight.exchange(true))
+        {
+            co_return;
+        }
+
+        // Strong, not weak: the scope_exit below has to clear the flag, and a
+        // control that went away mid-write would take the flag's storage with
+        // it. _restoreInBackground can afford a weak ref because it only ever
+        // reads through it; this one has cleanup to do.
+        const auto strongSelf = get_strong();
+        const auto done = wil::scope_exit([strongSelf]() { strongSelf->_persistInFlight.store(false); });
+
+        try
+        {
+            co_await winrt::resume_background();
+
+            wil::unique_hlocal_security_descriptor sd;
+            SECURITY_ATTRIBUTES sa{};
+            if (elevated)
+            {
+                unsigned long cb;
+                THROW_IF_WIN32_BOOL_FALSE(ConvertStringSecurityDescriptorToSecurityDescriptorW(L"S:(ML;;NRNW;;;HI)", SDDL_REVISION_1, wil::out_param_ptr<PSECURITY_DESCRIPTOR*>(sd), &cb));
+                sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+                sa.lpSecurityDescriptor = sd.get();
+            }
+
+            if (wil::unique_hfile file{ CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_DELETE, &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr) })
+            {
+                winrt::get_self<ControlCore>(_core)->PersistTo(file.get());
+            }
+        }
+        CATCH_LOG();
     }
 
     void TermControl::OpenCWD()

@@ -53,11 +53,29 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         GETSET_BINDABLE_ENUM_SETTING(WindowingBehavior, Model::WindowingMode, _Settings.GlobalSettings().WindowingBehavior);
         GETSET_BINDABLE_ENUM_SETTING(ResumeSessionNotification, Model::ResumeSessionNotification, _Settings.GlobalSettings().ResumeSessionNotification);
 
-        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_Settings.GlobalSettings(), ResumeRecognizedSessions);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_Settings.GlobalSettings(), ResumeAgents);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_Settings.GlobalSettings(), ResumeMultiplexers);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_Settings.GlobalSettings(), PersistBufferPeriodically);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_Settings.GlobalSettings(), BufferPersistIntervalMinutes);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_Settings.WindowSettingsDefaults(), CenterOnLaunch);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_Settings.WindowSettingsDefaults(), RememberWindowGeometry);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_Settings.WindowSettingsDefaults(), InitialRows);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_Settings.WindowSettingsDefaults(), InitialCols);
+
+        // The two program lists are edited as one comma-separated line each.
+        // A settings page has no list editor to reuse, and a program name has
+        // no commas in it, so the round trip is lossless.
+        winrt::hstring ResumeExtraProgramsText();
+        void ResumeExtraProgramsText(const winrt::hstring& value);
+        winrt::hstring ResumeExcludedProgramsText();
+        void ResumeExcludedProgramsText(const winrt::hstring& value);
+        bool AnyResumeEnabled();
+
+        // What the last seven days of persistence passes cost, drawn with
+        // block characters rather than a chart: it needs no XAML shapes, no
+        // converters, and follows the theme for free.
+        winrt::hstring PersistCostSparkline();
+        winrt::hstring PersistCostSummary();
 
         bool StartOnUserLoginAvailable();
         safe_void_coroutine PrepareStartOnUserLoginSettings();
