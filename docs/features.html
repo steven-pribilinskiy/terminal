@@ -276,6 +276,14 @@
   table.feature-table .table-commits { display: flex; gap: 0.3rem; flex-wrap: wrap; }
 
   [hidden] { display: none !important; }
+
+  /* A card is a link to the feature's own page; the commit links inside it
+   * keep their own destinations, so only the surrounding area opens it. */
+  .opens { cursor: pointer; }
+  .card.opens:hover { border-color: var(--accent); }
+  tr.opens:hover { background: var(--control-hover); }
+  .card h3 a, td strong a { color: inherit; }
+  .card h3 a:hover, td strong a:hover { color: var(--accent-text); text-decoration: none; }
 </style>
 </head>
 <body>
@@ -329,95 +337,11 @@
   </table>
 </main>
 
+<script src="features.js"></script>
 <script>
   const REPO = "https://github.com/steven-pribilinskiy/terminal/commit/";
 
-  const FEATURES = [
-    {
-      id: "control-pipe", title: "Drive it from outside the process", cat: "automation", catLabel: "Automation",
-      standout: true, dateAdded: "2026-08-16",
-      desc: "Every window opens a local pipe another program can use: list which tabs and panes exist, read back exactly what a specific pane printed, or type into it directly — no simulated keystrokes, no guessing which window has focus. Scoped to your own user account, with a settings switch to turn it off entirely. Microsoft considered this exact capability twice (issue #9368, PR #20106) and passed; their own automation surface can't reach a pane running inside WSL.",
-      commits: ["7ef36403f", "1c4da28dd"], files: 33, ins: 2028, del: 16, demo: "pending"
-    },
-    {
-      id: "slot-system", title: "Slot badge, build info & update banner", cat: "deploy", catLabel: "Deploy system",
-      dateAdded: "2026-08-15",
-      desc: "A tab-row badge names which slot (Test/Dev) you're running, click it to copy build info, the About dialog shows commit and build time, and an update banner names what's available and where it came from.",
-      commits: ["1f779cbc9", "a766ea36b", "da724f9f0", "e2463ad5b", "a31749e61"], files: 32, ins: 696, del: 69
-    },
-    {
-      id: "distinct-identity", title: "The test build can't impersonate the real one", cat: "deploy", catLabel: "Deploy system",
-      dateAdded: "2026-08-17",
-      desc: "Windows only lets one instance of a given app identity run at a time, and the disposable test build used to share an identity with the live one — opening it would silently hand off to the live window and quietly run its code instead. Each now has its own distinct identity, so the disposable build actually runs, side by side with the live one.",
-      commits: ["a98921578"], files: 3, ins: 41, del: 6
-    },
-    {
-      id: "auto-promote", title: "Narrow auto-promote exception", cat: "automation", catLabel: "Automation",
-      dateAdded: "2026-08-31",
-      desc: "A verified, read-only check (fails closed on anything ambiguous) that allows promoting a staged build without asking, only when the production window has nothing running that would be lost.",
-      commits: ["416988a08"], files: 2, ins: 143, del: 3
-    },
-    {
-      id: "ci-poll", title: "CI-poll-cadence setting", cat: "deploy", catLabel: "Deploy system",
-      dateAdded: "2026-08-31",
-      desc: "How often the background poller checks for a new CI build is a real Settings UI control now, not a fixed constant.",
-      commits: ["1692ac5a9"], files: 10, ins: 97, del: 1
-    },
-    {
-      id: "ci-tests", title: "CI runs tests and ships the Test payload", cat: "deploy", catLabel: "Deploy system",
-      dateAdded: "2026-08-31",
-      desc: "CI used to compile and nothing else. It now runs two unit-test suites and ships a Test-slot payload alongside Dev's, so a machine that never compiles can still verify UI behaviour.",
-      commits: ["97a5cc18c"], files: 1, ins: 36, del: 0
-    },
-    {
-      id: "window-persist", title: "Per-window position & size", cat: "ui", catLabel: "UI & theming",
-      dateAdded: "2026-08-23",
-      desc: "Each window remembers where it was and reopens there, instead of every new window landing in the same default spot.",
-      commits: ["552f130c2"], files: 22, ins: 763, del: 37, demo: "pending"
-    },
-    {
-      id: "plain-click", title: "Plain-click links, everywhere", cat: "links", catLabel: "Links",
-      dateAdded: "2026-08-16",
-      desc: "Links open on a plain click — no Ctrl required, toggleable in Settings — and correctly inside mouse-mode apps like tmux, where a click would otherwise just move the cursor.",
-      commits: ["92cfcb8ab", "7f20f24f7", "9e668b8b6"], files: 15, ins: 204, del: 14, demo: "pending"
-    },
-    {
-      id: "slack-links", title: "Slack-style bracketed links", cat: "links", catLabel: "Links",
-      dateAdded: "2026-08-20",
-      desc: "&lt;url|label&gt; links — the format Slack and many CLIs emit — become clickable with the label shown, instead of just the raw bracketed text.",
-      commits: ["c2dd09a42"], files: 6, ins: 61, del: 8
-    },
-    {
-      id: "wsl-links", title: "WSL file:// link resolution", cat: "links", catLabel: "Links",
-      dateAdded: "2026-08-25",
-      desc: "A WSL file:// link resolves to the right distro's launchable UNC path, fragments included, instead of failing to open or opening the wrong file.",
-      commits: ["d0f44aab7", "c15aae37a"], files: 10, ins: 585, del: 75
-    },
-    {
-      id: "link-card", title: "A link card that actually fits", cat: "links", catLabel: "Links",
-      dateAdded: "2026-08-31",
-      desc: "The plain hover tooltip became a richer card — configurable delay, a \"how to open\" hint, room for an action button — that flips to whichever side has room and never renders past the pane's edge, on either axis.",
-      commits: ["db520fed5", "bb45059e6", "7d4de07c1", "cf9ce0111", "69ae29d2c"], files: 37, ins: 814, del: 288, demo: "pending"
-    },
-    {
-      id: "icons", title: "Profile icon caching & jump-list glyphs", cat: "ui", catLabel: "UI & theming",
-      dateAdded: "2026-08-25",
-      desc: "An http(s) profile icon is cached locally so settings load never blocks on the network; glyph/emoji icons get rasterized into real jump-list icons instead of a blank tile, refreshed automatically on deploy.",
-      commits: ["b8bc5aa7e", "208d67c4d", "088757274", "c14db2649"], files: 12, ins: 722, del: 17
-    },
-    {
-      id: "defaults", title: "Quieter interaction defaults", cat: "ui", catLabel: "UI & theming",
-      dateAdded: "2026-08-17",
-      desc: "Text selection can search with your default engine, the mouse wheel no longer changes font size or opacity by accident, and quitting doesn't ask \"close all windows?\" when there's only one open.",
-      commits: ["88069dd16", "d9acb4bf4"], files: 3, ins: 34, del: 6
-    },
-    {
-      id: "color-schemes", title: "Separate light & dark color schemes", cat: "ui", catLabel: "UI & theming",
-      dateAdded: "2026-08-15",
-      desc: "Pick one scheme for light mode and a different one for dark — the terminal actually follows the OS appearance instead of being stuck on whichever scheme you set last.",
-      commits: ["68e59692a"], files: 10, ins: 396, del: 223, demo: "pending"
-    }
-  ];
+  const FEATURES = window.FEATURES;
 
   const state = { query: "", cat: "all", sort: "date-desc", view: "cards" };
 
@@ -453,16 +377,17 @@
       '</div>';
   }
 
+  function docHref(f) { return "feature.html?id=" + encodeURIComponent(f.id); }
+
   function renderCards(list) {
     const el = document.getElementById("view-cards");
     el.innerHTML = list.map(function (f) {
-      return '<article class="card' + (f.standout ? ' standout' : '') + '">' +
+      return '<article class="card opens' + (f.standout ? ' standout' : '') + '" data-open="' + docHref(f) + '">' +
         '<span class="kicker">' + f.catLabel + '</span>' +
-        '<h3>' + f.title + '</h3>' +
+        '<h3><a href="' + docHref(f) + '">' + f.title + '</a></h3>' +
         '<p class="desc">' + f.desc + '</p>' +
         metaRow(f) +
         '<div class="table-commits">' + commitLinks(f) + '</div>' +
-        (f.demo ? '<div class="demo-slot">demo: recording ' + f.demo + '</div>' : '') +
         '</article>';
     }).join("");
   }
@@ -470,11 +395,11 @@
   function renderPreview(list) {
     const el = document.getElementById("view-preview");
     el.innerHTML = list.map(function (f) {
-      return '<article class="card' + (f.standout ? ' standout' : '') + '">' +
-        '<div class="preview-visual">' + (f.demo ? 'demo recording ' + f.demo : f.catLabel) + '</div>' +
+      return '<article class="card opens' + (f.standout ? ' standout' : '') + '" data-open="' + docHref(f) + '">' +
+        '<div class="preview-visual">' + f.catLabel + '</div>' +
         '<div class="body">' +
         '<span class="kicker">' + f.catLabel + '</span>' +
-        '<h3>' + f.title + '</h3>' +
+        '<h3><a href="' + docHref(f) + '">' + f.title + '</a></h3>' +
         '<p class="desc">' + f.desc + '</p>' +
         metaRow(f) +
         '<div class="table-commits">' + commitLinks(f) + '</div>' +
@@ -485,8 +410,8 @@
   function renderTable(list) {
     const el = document.getElementById("table-body");
     el.innerHTML = list.map(function (f) {
-      return '<tr>' +
-        '<td><strong>' + f.title + '</strong></td>' +
+      return '<tr class="opens" data-open="' + docHref(f) + '">' +
+        '<td><strong><a href="' + docHref(f) + '">' + f.title + '</a></strong></td>' +
         '<td>' + f.catLabel + '</td>' +
         '<td>' + f.dateAdded + '</td>' +
         '<td><span class="stat-add">+' + f.ins + '</span> <span class="stat-del">&minus;' + f.del + '</span></td>' +
@@ -503,6 +428,15 @@
     renderPreview(list);
     renderTable(list);
   }
+
+  // The whole card is a target, but the commit links inside it are their own
+  // destinations -- so a click that landed on any anchor is left alone, and
+  // only the surrounding area opens the feature's page.
+  document.addEventListener("click", function (e) {
+    if (e.target.closest("a")) { return; }
+    const opener = e.target.closest("[data-open]");
+    if (opener) { window.location.href = opener.getAttribute("data-open"); }
+  });
 
   document.getElementById("search").addEventListener("input", function (e) {
     state.query = e.target.value;
