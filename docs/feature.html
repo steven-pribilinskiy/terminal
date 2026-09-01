@@ -130,6 +130,11 @@
     :root:not([data-theme="light"]) .shot-light { display: none; }
     :root:not([data-theme="light"]) .shot-dark { display: block; }
   }
+  /* A capture that exists in only one theme is shown in both rather than
+   * leaving the other blank -- the wrong background beats no picture. */
+  .absent { display: none !important; }
+  figure:has(.shot-light.absent) .shot-dark { display: block; }
+  figure:has(.shot-dark.absent) .shot-light { display: block; }
 
   .pending {
     padding: 28px; text-align: center; color: var(--text-tertiary); font-size: 13px;
@@ -239,9 +244,22 @@
     for (var m = 0; m < d.media.length; m++) {
       var item = d.media[m];
       var alt = esc(item.caption);
-      html += '<figure data-base="' + esc(item.base) + '">' +
-        '<img class="shot-light" src="media/' + item.base + '-light.png" alt="' + alt + '" loading="lazy" />' +
-        '<img class="shot-dark" src="media/' + item.base + '-dark.png" alt="' + alt + '" loading="lazy" />' +
+      var body;
+      if (item.kind === "video") {
+        // Muted + playsinline + loop so it behaves like an animation rather
+        // than something that demands to be started; controls stay available
+        // for anyone who wants to scrub it.
+        body =
+          '<video class="shot-light" src="media/' + item.base + '-light.mp4" ' +
+          'autoplay loop muted playsinline controls preload="metadata"></video>' +
+          '<video class="shot-dark" src="media/' + item.base + '-dark.mp4" ' +
+          'autoplay loop muted playsinline controls preload="metadata"></video>';
+      } else {
+        body =
+          '<img class="shot-light" src="media/' + item.base + '-light.png" alt="' + alt + '" loading="lazy" />' +
+          '<img class="shot-dark" src="media/' + item.base + '-dark.png" alt="' + alt + '" loading="lazy" />';
+      }
+      html += '<figure data-base="' + esc(item.base) + '">' + body +
         '<div class="pending">Capture pending</div>' +
         "<figcaption>" + alt + "</figcaption></figure>";
     }
@@ -296,10 +314,13 @@
   var figures = host.querySelectorAll("figure[data-base]");
   for (var i = 0; i < figures.length; i++) {
     (function (fig) {
-      var shots = fig.querySelectorAll("img");
+      var shots = fig.querySelectorAll("img, video");
       var missing = 0;
       for (var j = 0; j < shots.length; j++) {
         shots[j].addEventListener("error", function () {
+          // A video reports failure on its own element, not by bubbling, so
+          // both node types are listened to the same way.
+          this.classList.add("absent");
           missing++;
           // Only give up once neither theme's capture is available.
           if (missing >= shots.length) { fig.classList.add("no-media"); }

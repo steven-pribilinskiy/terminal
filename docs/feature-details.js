@@ -36,7 +36,8 @@ window.FEATURE_DETAILS = {
       { key: "bufferPersistIntervalMinutes", def: "5", note: "How often that happens." },
     ],
     media: [
-      { base: "resume-toast", caption: "After a restart: the pane is back in its multiplexer, and the notice names what was resumed." },
+      { kind: "video", base: "resume-restore", caption: "A tmux session running, the terminal killed outright, and the pane coming back attached to it. Recorded in one take across the restart." },
+      { base: "resume-toast", caption: "After the restart: the notice names what was resumed, and it is the attach form — not the command the session was first created with." },
       { base: "resume-settings", caption: "The settings, under Startup. Agents and multiplexers are separate switches, with lists for anything else." },
       { base: "resume-restored-buffer", caption: "A pane that resumed nothing keeps its scrollback instead, marked with when it was saved." },
     ],
