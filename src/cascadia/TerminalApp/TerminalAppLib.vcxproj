@@ -90,6 +90,7 @@
     <ClInclude Include="Jumplist.h" />
     <ClInclude Include="JumplistIconCache.h" />
     <ClInclude Include="LanguageProfileNotifier.h" />
+    <ClInclude Include="RecognizedSessions.h" />
     <ClInclude Include="MinMaxCloseControl.h">
       <DependentUpon>MinMaxCloseControl.xaml</DependentUpon>
     </ClInclude>
