@@ -634,6 +634,69 @@ done
         return stripped;
     }
 
+    namespace
+    {
+        // The session name a multiplexer was started with, if it names one.
+        // tmux and zellij spell it -s, screen -S, and any of them may take
+        // --session; -t is how tmux and screen name a target to attach to.
+        std::wstring SessionNameIn(const std::vector<std::wstring>& argv)
+        {
+            for (size_t i = 1; i < argv.size(); ++i)
+            {
+                const auto& arg = argv[i];
+                if ((arg == L"-s" || arg == L"-S" || arg == L"-t" || arg == L"--session") && i + 1 < argv.size())
+                {
+                    return argv[i + 1];
+                }
+                for (const std::wstring_view prefix : { L"--session=", L"-s=", L"-S=" })
+                {
+                    if (arg.starts_with(prefix))
+                    {
+                        return arg.substr(prefix.size());
+                    }
+                }
+            }
+            return {};
+        }
+
+        // How to get BACK into a multiplexer, which is not the command that
+        // started it. Replaying the launch verbatim is actively wrong: `tmux
+        // new-session -s demo` answers "duplicate session: demo" and leaves
+        // the pane at a prompt with the session still detached.
+        //
+        // shefrd and herdr are the exception -- their client attaches to the
+        // running server on its own, so the bare command is already the right
+        // answer. The rest need an explicit attach, spelled differently by
+        // each. The `||` fallbacks are safe because this is typed into the
+        // pane's own shell: if there is nothing to attach to, because the
+        // server died with the machine, a fresh session is the sane outcome.
+        std::wstring MultiplexerResume(std::wstring_view name, const std::vector<std::wstring>& argv)
+        {
+            const auto session = SessionNameIn(argv);
+
+            if (til::equals_insensitive_ascii(name, L"tmux"))
+            {
+                return session.empty() ? L"tmux attach || tmux" :
+                                         fmt::format(FMT_COMPILE(L"tmux new-session -A -s {}"), QuoteIfNeeded(session));
+            }
+            if (til::equals_insensitive_ascii(name, L"screen"))
+            {
+                // -R reattaches if it can and creates if it cannot, which is
+                // exactly the semantic wanted here.
+                return session.empty() ? L"screen -R" :
+                                         fmt::format(FMT_COMPILE(L"screen -R {}"), QuoteIfNeeded(session));
+            }
+            if (til::equals_insensitive_ascii(name, L"zellij"))
+            {
+                return session.empty() ? L"zellij attach || zellij" :
+                                         fmt::format(FMT_COMPILE(L"zellij attach -c {}"), QuoteIfNeeded(session));
+            }
+
+            // shefrd, herdr: the client attaches by itself.
+            return std::wstring{ name };
+        }
+    }
+
     bool ResumesAgentSession(std::wstring_view commandLine) noexcept
     {
         // The program is the first whitespace-delimited token; BuildPlan never
@@ -707,6 +770,12 @@ done
         // A multiplexer's daemon outlives us and still owns its shells, so the
         // bare command reattaches. Anything the user added by hand replays as
         // it was: we know nothing about its session model.
+        // Getting back into a multiplexer is an attach, not a re-launch.
+        if (multiplexer)
+        {
+            return ResumePlan{ MultiplexerResume(name, original), false };
+        }
+
         if (!agent || captured.AgentSessionId.empty())
         {
             // Replayed exactly as found, interpreter and all: we are not
