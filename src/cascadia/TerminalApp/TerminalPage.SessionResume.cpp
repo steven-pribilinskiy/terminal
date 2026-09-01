@@ -40,12 +40,19 @@ namespace winrt
 
 namespace winrt::TerminalApp::implementation
 {
-    // Whether anything is eligible at all. Also gates the work itself: with
-    // both lists off and nothing added by hand there is nothing any amount of
-    // process walking could produce.
-    static bool _anyResumeEnabled(const CascadiaSettings& settings)
+    // Whether anything is eligible at all. Gates three things: the capture
+    // work itself (with everything off, no amount of process walking could
+    // produce a result), seeding a restored pane, and actually running what a
+    // saved layout asks for -- so turning the feature off stops commands that
+    // were recorded while it was on, rather than leaving them to replay out of
+    // a layout written earlier.
+    bool TerminalPage::_resumeEnabled() const
     {
-        const auto globals = settings.GlobalSettings();
+        if (!_settings)
+        {
+            return false;
+        }
+        const auto globals = _settings.GlobalSettings();
         if (globals.ResumeAgents() || globals.ResumeMultiplexers())
         {
             return true;
@@ -212,7 +219,7 @@ namespace winrt::TerminalApp::implementation
     // stale and costs the UI thread nothing.
     safe_void_coroutine TerminalPage::RefreshResumeCommands()
     {
-        if (!_settings || !_anyResumeEnabled(_settings))
+        if (!_resumeEnabled())
         {
             co_return;
         }
@@ -244,7 +251,7 @@ namespace winrt::TerminalApp::implementation
     void TerminalPage::CaptureResumeCommandsNow(uint32_t timeoutMs)
     try
     {
-        if (!_settings || !_anyResumeEnabled(_settings))
+        if (!_resumeEnabled())
         {
             return;
         }

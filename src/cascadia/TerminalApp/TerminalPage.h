@@ -332,6 +332,7 @@ namespace winrt::TerminalApp::implementation
         void _ReconcileCiPollInterval();
         void _CopyBuildInfoRequested(const Windows::Foundation::IInspectable& sender, const Windows::Foundation::IInspectable& args);
 
+        bool _resumeEnabled() const;
         std::vector<::TerminalApp::SessionResume::PaneProbe> _collectResumeProbes();
         void _applyResumeCommands(const std::map<std::wstring, winrt::hstring>& commands);
         void _queueResumeCommand(const Microsoft::Terminal::Control::TermControl& control, const hstring& command);

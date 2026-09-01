@@ -11,9 +11,22 @@
     someone is typing.
 
     PrintWindow asks the window to render itself into a bitmap instead. It is
-    read-only, works while the window is behind others, and never moves focus.
+    read-only, does not move focus, and captures a window sitting behind others.
     PW_RENDERFULLCONTENT (2) is required for a composited window like Terminal;
     without it the terminal surface comes back blank.
+
+    KNOWN LIMIT, observed rather than assumed: the tab row is XAML and always
+    captures, but the terminal surface itself is a separate swap chain that the
+    renderer only presents to when the window is actually being composited. A
+    window that has been fully occluded since it last drew comes back with a
+    correct frame and chrome around an empty pane -- and the pane is genuinely
+    running, which is easy to confirm over the control pipe while looking at a
+    blank picture.
+
+    So a still that must show pane CONTENT needs the window visible when it is
+    taken. That means waiting for the machine to be idle, since bringing it
+    forward takes focus from whoever is typing. Chrome-only shots, and anything
+    where the pane may be empty, work regardless.
 
 .PARAMETER ProcessId
     The process to capture from. Windows are enumerated in Z-order.

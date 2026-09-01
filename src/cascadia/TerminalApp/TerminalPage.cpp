@@ -3935,8 +3935,10 @@ namespace winrt::TerminalApp::implementation
 
         const auto control = _CreateNewControlAndContent(controlSettings, connection);
 
-        // What this pane was running when it was persisted, if anything.
-        const auto resumeCommand = newTerminalArgs ? newTerminalArgs.ResumeCommand() : hstring{};
+        // What this pane was running when it was persisted, if anything. Read
+        // only while the feature is on, so switching it off stops layouts
+        // written earlier from still replaying their commands.
+        const auto resumeCommand = (newTerminalArgs && _resumeEnabled()) ? newTerminalArgs.ResumeCommand() : hstring{};
         // An agent that reopens a conversation repaints that conversation
         // itself. Replaying the saved scrollback underneath it would leave the
         // pane showing the same transcript twice -- once as dead text, once
@@ -3962,6 +3964,20 @@ namespace winrt::TerminalApp::implementation
         }
 
         auto paneContent{ winrt::make<TerminalPaneContent>(profile, _terminalSettingsCache, control) };
+
+        // Carry the command forward onto the restored pane, so it survives
+        // being saved again before anything has had a chance to re-examine
+        // what this pane is running.
+        //
+        // Without this the feature quietly undoes itself: capture runs on a
+        // timer and updates the pane afterwards, so the first save after a
+        // restore would write the layout back with no command at all, and the
+        // next restart would restore a bare shell. Every restart would lose it
+        // unless a whole capture cycle happened to fit in between.
+        if (!resumeCommand.empty())
+        {
+            winrt::get_self<TerminalPaneContent>(paneContent)->ResumeCommand(resumeCommand);
+        }
 
         auto resultPane = std::make_shared<Pane>(paneContent);
 
