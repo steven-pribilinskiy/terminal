@@ -13,6 +13,8 @@
 #include "Tab.h"
 #include "RecognizedSessions.h"
 
+#include <winrt/Windows.Data.Json.h>
+
 using namespace winrt::Microsoft::Terminal::TerminalConnection;
 using namespace winrt::Windows::Data::Json;
 
