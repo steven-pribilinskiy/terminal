@@ -36,8 +36,17 @@ if (-not (Test-Path $Fetcher)) { throw "Fetch-CIBuild.ps1 not found beside this 
 $pwsh = (Get-Command pwsh -ErrorAction SilentlyContinue)?.Source
 if (-not $pwsh) { throw 'pwsh not found on PATH. The fetcher needs PowerShell 7.' }
 
-$action = New-ScheduledTaskAction -Execute $pwsh `
-    -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$Fetcher`""
+# -WindowStyle Hidden alone is not enough on a machine that has Windows Terminal
+# set as its default terminal-delegation host: console-app window creation gets
+# handed off to a new WT window before pwsh's own hidden-window request can
+# suppress it, so the task flashes a window despite asking not to. Routing
+# through Invoke-Hidden.vbs's WScript.Shell.Run avoids that handoff entirely.
+# See Invoke-Hidden.vbs's header for the full explanation.
+$hiddenLauncher = Join-Path $PSScriptRoot 'Invoke-Hidden.vbs'
+if (-not (Test-Path $hiddenLauncher)) { throw "Invoke-Hidden.vbs not found beside this script" }
+
+$action = New-ScheduledTaskAction -Execute 'wscript.exe' `
+    -Argument "`"$hiddenLauncher`" `"$pwsh`" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $Fetcher"
 
 # Repeat forever from a start in the past, so it begins on the next interval
 # rather than waiting for a first occurrence.

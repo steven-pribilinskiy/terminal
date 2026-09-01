@@ -1,14 +1,16 @@
-# Stage the newest CI-built Dev payload so a running wtd can offer to promote it.
+# Stage the newest CI-built Dev and Test payloads.
 #
 # The counterpart to Deploy-TerminalSlots.ps1 on a machine that should not be
 # compiling Terminal. It ends in the same state a local deploy leaves behind --
-# an unpacked payload on disk and a marker describing it -- but in its own
-# directory and under its own marker name, so both can be present at once and the
-# Terminal picks whichever is newer. Neither producer has to know about the other.
+# an unpacked payload on disk and a marker describing it, for each slot -- but
+# in its own directories and under its own marker names, so both a local deploy
+# and a CI fetch can have staged something at once and each consumer picks
+# whichever is newer. Neither producer has to know about the other.
 #
-# It never touches the live Dev payload. Promotion is still the user's gesture,
-# performed by Promote-DevSlot.ps1 from inside wtd; all this does is put a
-# candidate where that can find it.
+# It never touches a live payload. Registering either slot is a deliberate next
+# step, not a side effect of staging: Promote-DevSlot.ps1 (Dev, from inside wtd)
+# or Refresh-TestSlot.ps1 (Test, on demand) -- this just puts a candidate where
+# each of those can find it.
 #
 # Safe to run on a timer: the common case is "nothing newer", which costs one API
 # call and no download. See Install-CIBuildPoller.ps1.
@@ -24,9 +26,11 @@ Param(
 
 $ErrorActionPreference = 'Stop'
 
-$ArtifactName = 'dev-payload'
-$StageDir     = Join-Path $SlotRoot 'dev-staged-ci'
-$MarkerPath   = Join-Path $SlotRoot 'dev-pending-ci.json'
+$ArtifactName     = 'dev-payload'
+$StageDir         = Join-Path $SlotRoot 'dev-staged-ci'
+$MarkerPath       = Join-Path $SlotRoot 'dev-pending-ci.json'
+$TestStageDir     = Join-Path $SlotRoot 'test-staged-ci'
+$TestMarkerPath   = Join-Path $SlotRoot 'test-pending-ci.json'
 
 function Say {
     Param([string]$Message, [ConsoleColor]$Color = [ConsoleColor]::Gray)
@@ -84,7 +88,10 @@ if (-not $run) {
 if (-not $Force -and (Test-Path $MarkerPath)) {
     $existing = $null
     try { $existing = Get-Content $MarkerPath -Raw | ConvertFrom-Json } catch { $existing = $null }
-    if ($existing -and $existing.commitFull -eq $run.headSha -and (Test-Path $StageDir)) {
+    # Also require test-staged-ci to exist: a marker written before this script
+    # learned to keep the Test half would otherwise look "already staged" forever
+    # and the Test payload would never get backfilled.
+    if ($existing -and $existing.commitFull -eq $run.headSha -and (Test-Path $StageDir) -and (Test-Path $TestStageDir)) {
         Say "Already staged: $($run.headSha.Substring(0,9)). Nothing to do."
         return
     }
@@ -126,16 +133,42 @@ try {
     $info | ConvertTo-Json | Set-Content -Path $markerTemp -Encoding UTF8
     Move-Item $markerTemp $MarkerPath -Force
 
+    # Same artifact carries a Test-branded unpacked payload too (build.yml stages
+    # both from one compile). Nothing today asks for it automatically -- Refresh-
+    # TestSlot.ps1 does that on demand -- but stage it every time regardless, same
+    # as the Dev half: staging is cheap and automatic, registering never is.
+    $testPayloadSrc = Join-Path $temp 'test-staged'
+    if (Test-Path (Join-Path $testPayloadSrc 'AppxManifest.xml')) {
+        if (Test-Path $TestStageDir) { Remove-Item -Recurse -Force $TestStageDir }
+        Move-Item $testPayloadSrc $TestStageDir
+
+        # No separate marker ships for the Test half; it is the same build as the
+        # Dev marker just staged, so describe it with the same commit/branch/time.
+        $testInfo = $info | Select-Object commit, commitFull, branch, dirty, timestampUtc, timestamp, source
+        $testInfo | Add-Member -NotePropertyName payload -NotePropertyValue $TestStageDir -Force
+        $testMarkerTemp = "$TestMarkerPath.tmp"
+        $testInfo | ConvertTo-Json | Set-Content -Path $testMarkerTemp -Encoding UTF8
+        Move-Item $testMarkerTemp $TestMarkerPath -Force
+    }
+    else {
+        Say 'Artifact has no test-staged payload (older CI run, or build.yml changed) -- Test half not updated.' ([ConsoleColor]::DarkYellow)
+    }
+
     # The Terminal looks for the promotion helper at exactly one fixed path, and
     # a machine that has only ever fetched CI builds has never run the deploy
-    # that puts it there.
-    $helper = Join-Path $SlotRoot 'Promote-DevSlot.ps1'
-    if (-not (Test-Path $helper)) {
-        Copy-Item (Join-Path $PSScriptRoot 'Promote-DevSlot.ps1') $helper -Force
+    # that puts it there. Same reasoning for the on-demand Test-slot refresher.
+    foreach ($helperName in 'Promote-DevSlot.ps1', 'Refresh-TestSlot.ps1', 'Invoke-Hidden.vbs') {
+        $helper = Join-Path $SlotRoot $helperName
+        if (-not (Test-Path $helper)) {
+            Copy-Item (Join-Path $PSScriptRoot $helperName) $helper -Force
+        }
     }
 
     Say "Staged $($info.commit) ($($info.branch)) built $($info.timestampUtc)" ([ConsoleColor]::Green)
     Say 'wtd will offer it as an update.'
+    if (Test-Path $TestStageDir) {
+        Say 'wtt: run Refresh-TestSlot.ps1 to pick it up.' ([ConsoleColor]::Green)
+    }
 }
 finally {
     Remove-Item -Recurse -Force $temp -ErrorAction SilentlyContinue

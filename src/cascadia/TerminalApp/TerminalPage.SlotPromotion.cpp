@@ -153,18 +153,27 @@ namespace winrt::TerminalApp::implementation
             return false;
         }
 
-        const auto args{ fmt::format(LR"(-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "{}" -WaitForPid {} -Staged "{}" -Marker "{}"{})",
+        // Routed through Invoke-Hidden.vbs rather than launching powershell.exe
+        // directly with SW_HIDE: on a machine that has Windows Terminal set as
+        // its default terminal-delegation host, a "hidden" console-app launch
+        // still gets a WT window created for it before the hidden-window request
+        // can suppress it. See Invoke-Hidden.vbs's header for the full story.
+        // Every token is independently quoted -- the vbs re-quotes each one
+        // rather than trusting a flattened string, so paths with spaces survive.
+        const auto hiddenLauncher{ std::filesystem::path{ ::TerminalApp::SlotPromotion::SlotRoot } / L"Invoke-Hidden.vbs" };
+        const auto args{ fmt::format(LR"("{}" "powershell.exe" "-NoProfile" "-NonInteractive" "-ExecutionPolicy" "Bypass" "-File" "{}" "-WaitForPid" "{}" "-Staged" "{}" "-Marker" "{}"{})",
+                                     hiddenLauncher.wstring(),
                                      helper.wstring(),
                                      GetCurrentProcessId(),
                                      std::wstring_view{ staged.Payload },
                                      staged.MarkerPath.wstring(),
-                                     relaunch ? L" -Relaunch" : L"") };
+                                     relaunch ? LR"( "-Relaunch")" : L"") };
 
         SHELLEXECUTEINFOW info{};
         info.cbSize = sizeof(info);
         info.fMask = SEE_MASK_NOASYNC | SEE_MASK_NOCLOSEPROCESS;
         info.lpVerb = L"open";
-        info.lpFile = L"powershell.exe";
+        info.lpFile = L"wscript.exe";
         info.lpParameters = args.c_str();
         // The helper outlives us on purpose - it cannot start work until we are
         // gone - so SEE_MASK_NOASYNC matters: it keeps the launch from being
@@ -223,16 +232,19 @@ namespace winrt::TerminalApp::implementation
             return;
         }
 
+        // Same Invoke-Hidden.vbs routing as _armPromotionHelper, and for the
+        // same reason -- see that function's comment.
+        const auto hiddenLauncher{ std::filesystem::path{ ::TerminalApp::SlotPromotion::SlotRoot } / L"Invoke-Hidden.vbs" };
         const auto intervalMinutes{ _settings.GlobalSettings().CiPollIntervalMinutes() };
         const auto args{ intervalMinutes > 0 ?
-                             fmt::format(LR"(-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "{}" -IntervalMinutes {})", helper.wstring(), intervalMinutes) :
-                             fmt::format(LR"(-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "{}" -Uninstall)", helper.wstring()) };
+                             fmt::format(LR"("{}" "pwsh.exe" "-NoProfile" "-NonInteractive" "-ExecutionPolicy" "Bypass" "-File" "{}" "-IntervalMinutes" "{}")", hiddenLauncher.wstring(), helper.wstring(), intervalMinutes) :
+                             fmt::format(LR"("{}" "pwsh.exe" "-NoProfile" "-NonInteractive" "-ExecutionPolicy" "Bypass" "-File" "{}" "-Uninstall")", hiddenLauncher.wstring(), helper.wstring()) };
 
         SHELLEXECUTEINFOW info{};
         info.cbSize = sizeof(info);
         info.fMask = SEE_MASK_NOASYNC | SEE_MASK_NOCLOSEPROCESS;
         info.lpVerb = L"open";
-        info.lpFile = L"pwsh.exe";
+        info.lpFile = L"wscript.exe";
         info.lpParameters = args.c_str();
         info.nShow = SW_HIDE;
 

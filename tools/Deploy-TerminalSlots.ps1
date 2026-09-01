@@ -373,10 +373,13 @@ else {
 
 $info | ConvertTo-Json | Set-Content -Path $infoPath -Encoding UTF8
 
-# The promote button in a running Dev window shells out to this. It lives beside
-# the payloads rather than in the repo so the app has exactly one fixed path to
-# know, and so promotion still works from a checkout that has moved.
+# The promote button in a running Dev window shells out to this, and Refresh-
+# TestSlot.ps1 is its Test-slot counterpart for refreshing wtt from a CI fetch.
+# Both live beside the payloads rather than in the repo so the app -- and a
+# machine that only ever fetches CI builds -- has exactly one fixed path to know,
+# and so this still works from a checkout that has moved.
 Copy-Item "$PSScriptRoot\Promote-DevSlot.ps1" (Join-Path $SlotRoot 'Promote-DevSlot.ps1') -Force
+Copy-Item "$PSScriptRoot\Refresh-TestSlot.ps1" (Join-Path $SlotRoot 'Refresh-TestSlot.ps1') -Force
 
 # Same reasoning, for the CI-poll-interval setting on the Compatibility page: the
 # Dev slot reconciles the Scheduled Task against it on startup by shelling out to
@@ -384,6 +387,11 @@ Copy-Item "$PSScriptRoot\Promote-DevSlot.ps1" (Join-Path $SlotRoot 'Promote-DevS
 # Fetch-CIBuild.ps1 beside itself, so both travel together.
 Copy-Item "$PSScriptRoot\Install-CIBuildPoller.ps1" (Join-Path $SlotRoot 'Install-CIBuildPoller.ps1') -Force
 Copy-Item "$PSScriptRoot\Fetch-CIBuild.ps1" (Join-Path $SlotRoot 'Fetch-CIBuild.ps1') -Force
+
+# Every hidden launch above (and the promote/reconcile helpers built into the
+# app itself) routes through this to avoid Windows Terminal's default-terminal
+# console-delegation flashing a window despite asking to stay hidden.
+Copy-Item "$PSScriptRoot\Invoke-Hidden.vbs" (Join-Path $SlotRoot 'Invoke-Hidden.vbs') -Force
 
 Write-Host ''
 Write-Host "Test slot  : registered from $TestStage (run: wtt)" -ForegroundColor Green
