@@ -3630,10 +3630,20 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
 
         const auto card = HyperlinkCard();
+        const auto viewportWidth = ActualWidth();
+        const auto viewportHeight = ActualHeight();
+
+        // Cap at the viewport itself, not just the configured setting -- a pane
+        // narrower than hyperlink.tooltipMaxWidth (or with wrapping disabled,
+        // where the setting is +inf) must still be able to fit the card
+        // entirely inside it, or the position clamp below has nothing left to
+        // clamp to and the card overflows the pane regardless of where it sits.
+        const auto configuredMaxWidth = static_cast<double>(_core.Settings().HyperlinkTooltipMaxWidth());
+        card.MaxWidth(configuredMaxWidth > 0 ? std::min(configuredMaxWidth, viewportWidth) : viewportWidth);
 
         // Measure first: where it goes depends on how big it turned out to be, and it has
         // just been given new text.
-        card.Measure({ gsl::narrow_cast<float>(ActualWidth()), gsl::narrow_cast<float>(ActualHeight()) });
+        card.Measure({ gsl::narrow_cast<float>(viewportWidth), gsl::narrow_cast<float>(viewportHeight) });
         const auto desired = card.DesiredSize();
 
         const auto offset = SwapChainPanel().ActualOffset();
@@ -3642,17 +3652,29 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         const auto cellLeft = static_cast<double>(pos.X) - offset.x;
         const auto cellTop = static_cast<double>(pos.Y) - offset.y;
 
-        // Under the line by default, flipped above it when there is no room, and never
-        // pushed off the right edge -- a long URI would otherwise take its buttons with it.
+        // Under the line by default, flipped above it when there is no room below.
         auto top = cellTop + fontSize.Height;
-        if (top + desired.Height > ActualHeight())
+        if (top + desired.Height > viewportHeight)
         {
             top = cellTop - desired.Height;
         }
-        const auto left = std::clamp(cellLeft, 0.0, std::max(0.0, ActualWidth() - desired.Width));
+
+        // Right of the cursor by default, flipped to grow left of it instead when
+        // there is no room that way -- a long URI near the right edge would
+        // otherwise still spill past it even after the left edge was clamped in.
+        auto left = cellLeft;
+        if (left + desired.Width > viewportWidth)
+        {
+            left = cellLeft + fontSize.Width - desired.Width;
+        }
+
+        // Final safety net on both axes either way: never let an edge land
+        // outside the control's own bounds, however the flip above worked out.
+        left = std::clamp(left, 0.0, std::max(0.0, viewportWidth - desired.Width));
+        top = std::clamp(top, 0.0, std::max(0.0, viewportHeight - desired.Height));
 
         Controls::Canvas::SetLeft(card, left);
-        Controls::Canvas::SetTop(card, std::max(0.0, top));
+        Controls::Canvas::SetTop(card, top);
         card.Visibility(Visibility::Visible);
     }
 
