@@ -90,7 +90,7 @@ private:
     void _persistState(const winrt::Microsoft::Terminal::Settings::Model::ApplicationState& state) const;
     void _finalizeSessionPersistence() const;
     void _persistResumableSessions() const;
-    void _restoreResumableSessions(wil::zwstring_view currentDirectory, wil::zwstring_view envString, uint32_t showWindowCommand) const;
+    void _restoreResumableSessions(wil::zwstring_view currentDirectory, wil::zwstring_view envString, uint32_t showWindowCommand);
     std::filesystem::path _resumableSessionsPath() const;
     void _checkWindowsForNotificationIcon();
     void _setupAumid(const std::wstring& aumid);

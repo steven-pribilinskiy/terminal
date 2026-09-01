@@ -1626,7 +1626,7 @@ catch (...)
 // recognized session, each running the command that reattaches it. Never
 // throws past this function -- a malformed or unreadable marker must fall
 // through to ordinary startup exactly as if the file were never there.
-void WindowEmperor::_restoreResumableSessions(wil::zwstring_view currentDirectory, wil::zwstring_view envString, uint32_t showWindowCommand) const
+void WindowEmperor::_restoreResumableSessions(wil::zwstring_view currentDirectory, wil::zwstring_view envString, uint32_t showWindowCommand)
 try
 {
     if (!_app.Logic().Settings().GlobalSettings().ResumeRecognizedSessions())

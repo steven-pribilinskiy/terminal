@@ -3514,6 +3514,15 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // annotation, which is there to be read, not to be opened or copied.
         _hoveredUri = uriText;
 
+        // A bare absolute POSIX path (no scheme, e.g. printed by a tool running
+        // inside WSL) is never a valid Windows::Foundation::Uri -- schemes are
+        // always [a-z][a-z0-9+.-]*:, which can't start with a slash. It's still a
+        // perfectly good path that _resolvedHyperlinkTarget below can resolve the
+        // same way it already resolves file:// links, so it skips the homoglyph/
+        // punycode handling entirely rather than hitting the catch below and
+        // being shown as "Invalid URI".
+        const auto looksLikeBarePosixPath = !uriText.empty() && uriText[0] == L'/';
+
         // Attackers abuse Unicode characters that happen to look similar to ASCII characters. Cyrillic for instance has
         // its own glyphs for а, с, е, о, р, х, and у that look practically identical to their ASCII counterparts.
         // This is called an "IDN homoglyph attack".
@@ -3525,29 +3534,32 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // Such a detector however is not quite trivial and requires constant maintenance, which this project's
         // maintainers aren't currently well equipped to handle. As such we do the next best thing and show the
         // Punycode encoding side-by-side with the Unicode string for any IDN.
-        try
+        if (!looksLikeBarePosixPath)
         {
-            // DisplayUri/Iri drop authentication credentials, which is probably great, but AbsoluteCanonicalUri()
-            // is the only getter that returns a punycode encoding of the URL. AbsoluteUri() is the only possible
-            // counterpart, but as the name indicates, we'll end up hitting the != below for any non-canonical URL.
-            //
-            // This issue can be fixed by using the IUrl API from urlmon.h directly, which the WinRT API simply wraps.
-            // IUrl is a very complex system with a ton of useful functionality, but we don't rely on it (neither WinRT),
-            // so we could alternatively use its underlying API in wininet.h (InternetCrackUrlW, etc.).
-            // That API however is rather difficult to use for such seldom executed code.
-            const Windows::Foundation::Uri uri{ uriText };
-            const auto unicode = uri.AbsoluteUri();
-            const auto punycode = uri.AbsoluteCanonicalUri();
-
-            if (punycode != unicode)
+            try
             {
-                const auto text = fmt::format(FMT_COMPILE(L"{}\n({})"), punycode, unicode);
-                uriText = winrt::hstring{ text };
+                // DisplayUri/Iri drop authentication credentials, which is probably great, but AbsoluteCanonicalUri()
+                // is the only getter that returns a punycode encoding of the URL. AbsoluteUri() is the only possible
+                // counterpart, but as the name indicates, we'll end up hitting the != below for any non-canonical URL.
+                //
+                // This issue can be fixed by using the IUrl API from urlmon.h directly, which the WinRT API simply wraps.
+                // IUrl is a very complex system with a ton of useful functionality, but we don't rely on it (neither WinRT),
+                // so we could alternatively use its underlying API in wininet.h (InternetCrackUrlW, etc.).
+                // That API however is rather difficult to use for such seldom executed code.
+                const Windows::Foundation::Uri uri{ uriText };
+                const auto unicode = uri.AbsoluteUri();
+                const auto punycode = uri.AbsoluteCanonicalUri();
+
+                if (punycode != unicode)
+                {
+                    const auto text = fmt::format(FMT_COMPILE(L"{}\n({})"), punycode, unicode);
+                    uriText = winrt::hstring{ text };
+                }
             }
-        }
-        catch (...)
-        {
-            uriText = RS_(L"InvalidUri");
+            catch (...)
+            {
+                uriText = RS_(L"InvalidUri");
+            }
         }
 
         HoveredUri().Text(uriText);
@@ -3598,12 +3610,23 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         _hyperlinkShowTimer.Start();
     }
 
-    // Resolves a file:// link to the path it will actually open, or an empty string for
-    // anything else. The distro lookup is shared with TerminalPage rather than repeated,
-    // so what the card promises and what a click delivers cannot drift apart.
+    // Resolves a file:// link -- or a bare absolute POSIX path with no scheme at
+    // all, which a tool running inside WSL prints far more often than an actual
+    // file:// URI -- to the path it will actually open. Empty string for
+    // anything else. The distro lookup is shared with TerminalPage rather than
+    // repeated, so what the card promises and what a click delivers cannot
+    // drift apart.
     std::wstring TermControl::_resolvedHyperlinkTarget() const
     {
-        if (_hoveredUri.empty() || !til::starts_with_insensitive_ascii(std::wstring_view{ _hoveredUri }, L"file:"))
+        if (_hoveredUri.empty())
+        {
+            return {};
+        }
+
+        const std::wstring_view hovered{ _hoveredUri };
+        const auto isFileUri = til::starts_with_insensitive_ascii(hovered, L"file:");
+        const auto isBarePosixPath = hovered[0] == L'/';
+        if (!isFileUri && !isBarePosixPath)
         {
             return {};
         }
@@ -3617,8 +3640,14 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         const auto distro = ::Microsoft::Console::Utils::WslDistroForCommandline(
             settings.Commandline(),
             settings.PathTranslationStyle() == PathTranslationStyle::WSL);
+
+        // ResolveFileUriTarget only recognizes an actual file:// prefix; a bare
+        // path gets one synthesized so it goes through the exact same
+        // percent-decoding and \\wsl.localhost\<distro> construction rather than
+        // a second, separately-maintained copy of that logic.
+        const auto uriForm = isFileUri ? winrt::hstring{ hovered } : winrt::hstring{ L"file://" + std::wstring{ hovered } };
         return ::Microsoft::Console::Utils::ResolveFileUriTarget(
-            ::Microsoft::Console::Utils::StripUriFragment(_hoveredUri), distro);
+            ::Microsoft::Console::Utils::StripUriFragment(uriForm), distro);
     }
 
     void TermControl::_showHyperlinkCard()
