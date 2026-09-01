@@ -135,6 +135,10 @@
     padding: 28px; text-align: center; color: var(--text-tertiary); font-size: 13px;
     background: var(--card); border: 1px dashed var(--border); border-radius: 8px;
   }
+  /* The placeholder only appears once both captures have failed to load. */
+  figure[data-base] .pending { display: none; }
+  figure.no-media .pending { display: block; }
+  figure.no-media img { display: none !important; }
 
   ol.steps { margin: 0 0 14px; padding-left: 22px; }
   ol.steps li { margin-bottom: 8px; }
@@ -235,11 +239,10 @@
     for (var m = 0; m < d.media.length; m++) {
       var item = d.media[m];
       var alt = esc(item.caption);
-      html += "<figure>" +
-        '<img class="shot-light" src="media/' + item.base + '-light.png" alt="' + alt + '" loading="lazy" ' +
-        "onerror=\"this.closest('figure').innerHTML='<div class=\\'pending\\'>Capture pending</div>'\" />" +
-        '<img class="shot-dark" src="media/' + item.base + '-dark.png" alt="' + alt + '" loading="lazy" ' +
-        "onerror=\"this.style.display='none'\" />" +
+      html += '<figure data-base="' + esc(item.base) + '">' +
+        '<img class="shot-light" src="media/' + item.base + '-light.png" alt="' + alt + '" loading="lazy" />' +
+        '<img class="shot-dark" src="media/' + item.base + '-dark.png" alt="' + alt + '" loading="lazy" />' +
+        '<div class="pending">Capture pending</div>' +
         "<figcaption>" + alt + "</figcaption></figure>";
     }
   }
@@ -284,6 +287,26 @@
   html += "</div>";
 
   host.innerHTML = html;
+
+  // A figure shows its placeholder until a real capture loads. Wiring this up
+  // after insertion, rather than as an inline onerror attribute, keeps the
+  // quoting out of an HTML attribute nested inside a JS string -- which is
+  // three levels of escaping and exactly the kind of thing that breaks
+  // silently and only in the case that matters.
+  var figures = host.querySelectorAll("figure[data-base]");
+  for (var i = 0; i < figures.length; i++) {
+    (function (fig) {
+      var shots = fig.querySelectorAll("img");
+      var missing = 0;
+      for (var j = 0; j < shots.length; j++) {
+        shots[j].addEventListener("error", function () {
+          missing++;
+          // Only give up once neither theme's capture is available.
+          if (missing >= shots.length) { fig.classList.add("no-media"); }
+        });
+      }
+    })(figures[i]);
+  }
 })();
 </script>
 </body>
