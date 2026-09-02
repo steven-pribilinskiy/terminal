@@ -92,7 +92,7 @@ window.FEATURE_DETAILS = {
       { key: "hyperlink.tooltipMaxWidth", def: "640", note: "Cap on the card's width, further limited by the pane." },
     ],
     media: [
-      { base: "link-card", caption: "The card, flipped to stay inside the window." },
+      { base: "link-card", caption: "The card names the link, says what a click will do, and shows the path it will really open — with the actions that were previously buried in a right-click menu." },
     ],
   },
 
@@ -105,6 +105,9 @@ window.FEATURE_DETAILS = {
       "In a WSL pane, print a path: <code>ls -d ~/Documents</code>, or anything that emits an absolute path.",
       "Hover it. The card shows the <code>\\\\wsl.localhost\\…</code> path it will actually open.",
       "Click it. Explorer opens the real file, inside the distro.",
+    ],
+    media: [
+      { base: "link-card", caption: "Hovering a file inside WSL. The arrow shows what will actually open: the \\\\wsl.localhost path for this pane's distro, not the POSIX path as written." },
     ],
     notes: [
       "Resolution is deliberately gated on the pane really being WSL. Without that, a Windows program printing <code>file:///etc/hosts</code> into a PowerShell tab would silently resolve against whichever distro is default.",
