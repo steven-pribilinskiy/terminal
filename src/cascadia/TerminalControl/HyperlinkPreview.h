@@ -28,6 +28,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         WINRT_PROPERTY(hstring, IconUri);
         WINRT_PROPERTY(hstring, Color);
 
+    public:
         bool IsTitle() const noexcept { return _Kind == HyperlinkPreviewFieldKind::Title; }
         bool IsRow() const noexcept { return !IsTitle(); }
         bool IsBadge() const noexcept { return _Kind == HyperlinkPreviewFieldKind::Badge; }
