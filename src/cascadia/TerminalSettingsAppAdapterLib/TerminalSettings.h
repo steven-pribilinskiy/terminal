@@ -87,6 +87,11 @@ namespace winrt::Microsoft::Terminal::Settings
         CONTROL_APPEARANCE_SETTINGS(SIMPLE_OVERRIDABLE_SETTING);
         CORE_SETTINGS(SIMPLE_OVERRIDABLE_SETTING);
         CONTROL_SETTINGS(SIMPLE_OVERRIDABLE_SETTING);
+        // Not in CORE_SETTINGS: that macro table is also expanded by MockTermSettings
+        // (UnitTests_TerminalCore), which has no winmd reference to the Control project
+        // and so cannot resolve a runtimeclass type like this one -- only the primitives
+        // the rest of that table is made of.
+        SIMPLE_OVERRIDABLE_SETTING(winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::Terminal::Control::HyperlinkTooltipRule>, HyperlinkTooltipRules, nullptr);
 #if 0
         SIMPLE_OVERRIDABLE_SETTING(float, Opacity, UseAcrylic() ? 0.5f : 1.0f);
         SIMPLE_OVERRIDABLE_SETTING(hstring, FontFace, DEFAULT_FONT_FACE);

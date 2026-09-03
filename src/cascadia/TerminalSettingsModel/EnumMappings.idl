@@ -3,6 +3,7 @@
 
 import "GlobalAppSettings.idl";
 import "Profile.idl";
+import "HyperlinkTooltipRule.idl";
 
 namespace Microsoft.Terminal.Settings.Model
 {

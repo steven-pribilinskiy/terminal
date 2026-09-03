@@ -25,6 +25,12 @@ namespace ControlUnitTests
         CONTROL_APPEARANCE_SETTINGS(SETTINGS_GEN)
 #undef SETTINGS_GEN
 
+        // Not in CORE_SETTINGS: that macro table is also expanded by MockTermSettings
+        // (UnitTests_TerminalCore), which has no winmd reference to the Control project
+        // and so cannot resolve a runtimeclass type like this one. IControlSettings still
+        // requires it, so it's implemented here directly instead.
+        WINRT_PROPERTY(winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::Terminal::Control::HyperlinkTooltipRule>, HyperlinkTooltipRules, nullptr);
+
     public:
         MockControlSettings() = default;
 
