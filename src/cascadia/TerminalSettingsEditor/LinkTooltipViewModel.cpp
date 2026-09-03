@@ -152,7 +152,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     void HyperlinkTooltipRuleViewModel::OverrideShowDelay(bool value)
     {
-        _Rule.TooltipShowDelay(value ? box_value<int32_t>(ShowDelay()) : nullptr);
+        _Rule.TooltipShowDelay(value ? winrt::Windows::Foundation::IReference<int32_t>{ ShowDelay() } : nullptr);
         _NotifyChanges(L"OverrideShowDelay", L"ShowDelay");
     }
 
@@ -167,13 +167,13 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     void HyperlinkTooltipRuleViewModel::ShowDelay(int32_t value)
     {
-        _Rule.TooltipShowDelay(box_value<int32_t>(value));
+        _Rule.TooltipShowDelay(winrt::Windows::Foundation::IReference<int32_t>{ value });
         _NotifyChanges(L"ShowDelay", L"OverrideShowDelay");
     }
 
     void HyperlinkTooltipRuleViewModel::OverrideHideDelay(bool value)
     {
-        _Rule.TooltipHideDelay(value ? box_value<int32_t>(HideDelay()) : nullptr);
+        _Rule.TooltipHideDelay(value ? winrt::Windows::Foundation::IReference<int32_t>{ HideDelay() } : nullptr);
         _NotifyChanges(L"OverrideHideDelay", L"HideDelay");
     }
 
@@ -188,13 +188,13 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     void HyperlinkTooltipRuleViewModel::HideDelay(int32_t value)
     {
-        _Rule.TooltipHideDelay(box_value<int32_t>(value));
+        _Rule.TooltipHideDelay(winrt::Windows::Foundation::IReference<int32_t>{ value });
         _NotifyChanges(L"HideDelay", L"OverrideHideDelay");
     }
 
     void HyperlinkTooltipRuleViewModel::OverrideMaxWidth(bool value)
     {
-        _Rule.TooltipMaxWidth(value ? box_value<int32_t>(MaxWidth()) : nullptr);
+        _Rule.TooltipMaxWidth(value ? winrt::Windows::Foundation::IReference<int32_t>{ MaxWidth() } : nullptr);
         _NotifyChanges(L"OverrideMaxWidth", L"MaxWidth");
     }
 
@@ -209,7 +209,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     void HyperlinkTooltipRuleViewModel::MaxWidth(int32_t value)
     {
-        _Rule.TooltipMaxWidth(box_value<int32_t>(value));
+        _Rule.TooltipMaxWidth(winrt::Windows::Foundation::IReference<int32_t>{ value });
         _NotifyChanges(L"MaxWidth", L"OverrideMaxWidth");
     }
 
