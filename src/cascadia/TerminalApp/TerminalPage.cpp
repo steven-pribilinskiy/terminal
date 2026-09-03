@@ -2050,6 +2050,7 @@ namespace winrt::TerminalApp::implementation
         term.PasteFromClipboard({ this, &TerminalPage::_PasteFromClipboardHandler });
 
         term.OpenHyperlink({ this, &TerminalPage::_OpenHyperlinkHandler });
+        term.HyperlinkTooltipActionInvoked({ this, &TerminalPage::_HyperlinkTooltipActionInvokedHandler });
 
         // Add an event handler for when the terminal or tab wants to set a
         // progress indicator on the taskbar
@@ -3357,6 +3358,72 @@ namespace winrt::TerminalApp::implementation
             LOG_CAUGHT_EXCEPTION();
             _ShowCouldNotOpenDialog(RS_(L"InvalidUriText"), eventArgs.Uri());
         }
+    }
+
+    // A hyperlink tooltip rule's custom action button was clicked. actionId names an entry
+    // under "actions", resolved and dispatched exactly like a keybinding would be -- except
+    // that, for the two action types where a plain string argument makes sense as "text
+    // handed to a shell", any "%u" in it is replaced with the hovered link's raw URI first.
+    // An action with no "%u" in it (or of any other type) still runs unmodified: clicking a
+    // custom button is a legitimate way to fire an action that ignores which link was hovered.
+    void TerminalPage::_HyperlinkTooltipActionInvokedHandler(const IInspectable& /*sender*/, const Microsoft::Terminal::Control::HyperlinkTooltipActionInvokedEventArgs& eventArgs)
+    {
+        const auto action = _settings.ActionMap().GetActionByID(eventArgs.ActionId());
+        if (!action)
+        {
+            return;
+        }
+
+        auto toRun = action.ActionAndArgs();
+        if (!toRun)
+        {
+            return;
+        }
+
+        constexpr std::wstring_view uriToken{ L"%u" };
+        const std::wstring_view uri{ eventArgs.Uri() };
+
+        switch (toRun.Action())
+        {
+        case ShortcutAction::SendInput:
+        {
+            if (const auto args = toRun.Args().try_as<SendInputArgs>())
+            {
+                std::wstring input{ args.Input() };
+                if (auto pos = input.find(uriToken); pos != std::wstring::npos)
+                {
+                    do
+                    {
+                        input.replace(pos, uriToken.length(), uri);
+                        pos = input.find(uriToken, pos + uri.length());
+                    } while (pos != std::wstring::npos);
+                    toRun = ActionAndArgs{ ShortcutAction::SendInput, SendInputArgs{ winrt::hstring{ input } } };
+                }
+            }
+            break;
+        }
+        case ShortcutAction::ExecuteCommandline:
+        {
+            if (const auto args = toRun.Args().try_as<ExecuteCommandlineArgs>())
+            {
+                std::wstring commandline{ args.Commandline() };
+                if (auto pos = commandline.find(uriToken); pos != std::wstring::npos)
+                {
+                    do
+                    {
+                        commandline.replace(pos, uriToken.length(), uri);
+                        pos = commandline.find(uriToken, pos + uri.length());
+                    } while (pos != std::wstring::npos);
+                    toRun = ActionAndArgs{ ShortcutAction::ExecuteCommandline, ExecuteCommandlineArgs{ winrt::hstring{ commandline } } };
+                }
+            }
+            break;
+        }
+        default:
+            break;
+        }
+
+        _actionDispatch->DoAction(toRun);
     }
 
     // Reads a string value out of an open registry key, or an empty string if it isn't there.

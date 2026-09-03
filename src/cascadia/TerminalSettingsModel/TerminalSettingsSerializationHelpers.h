@@ -735,6 +735,22 @@ JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::FolderEntryInlin
     };
 };
 
+// Possible HyperlinkFileTypeGroup values
+JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::HyperlinkFileTypeGroup)
+{
+    JSON_MAPPINGS(9) = {
+        pair_type{ "none", ValueType::None },
+        pair_type{ "image", ValueType::Image },
+        pair_type{ "video", ValueType::Video },
+        pair_type{ "audio", ValueType::Audio },
+        pair_type{ "media", ValueType::Media },
+        pair_type{ "sourceCode", ValueType::SourceCode },
+        pair_type{ "document", ValueType::Document },
+        pair_type{ "archive", ValueType::Archive },
+        pair_type{ "executable", ValueType::Executable },
+    };
+};
+
 JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::SelectOutputDirection)
 {
     JSON_MAPPINGS(2) = {

@@ -29,6 +29,62 @@ namespace Microsoft.Terminal.Control
         MinGW,
     };
 
+    // Mirrors Microsoft.Terminal.Settings.Model.HyperlinkFileTypeGroup -- kept as a
+    // separate, self-contained copy here (rather than importing the Settings Model
+    // project's idl) because IControlSettings is otherwise a flat mirror with no
+    // dependency on Settings Model WinRT types.
+    enum HyperlinkFileTypeGroup
+    {
+        None = 0,
+        Image,
+        Video,
+        Audio,
+        Media,
+        SourceCode,
+        Document,
+        Archive,
+        Executable
+    };
+
+    // Mirrors Microsoft.Terminal.Settings.Model.HyperlinkTooltipAction. Icon is a
+    // plain resolved (or raw) path string rather than an IMediaResource, since
+    // IMediaResource is itself a Settings Model type.
+    [default_interface] runtimeclass HyperlinkTooltipAction
+    {
+        HyperlinkTooltipAction();
+
+        String Name;
+        String ActionId;
+        String Icon;
+    }
+
+    // Mirrors Microsoft.Terminal.Settings.Model.HyperlinkTooltipRule -- see that
+    // type for the semantics of each field. TerminalSettings (the App-adapter
+    // layer) is responsible for translating the Settings Model list into this one.
+    [default_interface] runtimeclass HyperlinkTooltipRule
+    {
+        HyperlinkTooltipRule();
+
+        String Name;
+        Boolean Enabled;
+
+        Windows.Foundation.Collections.IVector<String> Schemes;
+        String Pattern;
+        HyperlinkFileTypeGroup FileTypeGroup;
+        Windows.Foundation.Collections.IVector<String> CustomExtensions;
+
+        Windows.Foundation.IReference<Int32> TooltipShowDelay;
+        Windows.Foundation.IReference<Int32> TooltipHideDelay;
+        Windows.Foundation.IReference<Int32> TooltipMaxWidth;
+
+        Boolean SuppressOpen;
+        Boolean SuppressCopyLink;
+        Boolean SuppressCopyPath;
+        Boolean SuppressReveal;
+
+        Windows.Foundation.Collections.IVector<HyperlinkTooltipAction> CustomActions;
+    }
+
     // Class Description:
     // TerminalSettings encapsulates all settings that control the
     //      TermControl's behavior. In these settings there is both the entirety
@@ -61,6 +117,7 @@ namespace Microsoft.Terminal.Control
         Int32 HyperlinkTooltipShowDelay { get; };
         Int32 HyperlinkTooltipHideDelay { get; };
         Boolean HyperlinkTooltipActions { get; };
+        Windows.Foundation.Collections.IVector<HyperlinkTooltipRule> HyperlinkTooltipRules { get; };
         Boolean ScrollToChangeOpacity { get; };
 
         String Commandline { get; };

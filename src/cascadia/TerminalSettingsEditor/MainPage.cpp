@@ -6,6 +6,7 @@
 #include "MainPage.g.cpp"
 #include "Launch.h"
 #include "Interaction.h"
+#include "LinkTooltip.h"
 #include "Compatibility.h"
 #include "Rendering.h"
 #include "RenderingViewModel.h"
@@ -18,6 +19,7 @@
 #include "EditColorScheme.h"
 #include "Profiles.h"
 #include "InteractionViewModel.h"
+#include "LinkTooltipViewModel.h"
 #include "LaunchViewModel.h"
 #include "NewTabMenuViewModel.h"
 #include "NewTabMenu.h"
@@ -545,6 +547,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             {
                 contentFrame().Navigate(xaml_typename<Editor::Interaction>(), winrt::make<NavigateToPageArgs>(winrt::make<InteractionViewModel>(_settingsClone.GlobalSettings(), _windowSettingsClone), *this, elementToFocus));
                 _breadcrumbs.Append(winrt::make<Breadcrumb>(vm, RS_(L"Nav_Interaction/Content"), BreadcrumbSubPage::None));
+            }
+            else if (*clickedItemTag == linkTooltipTag)
+            {
+                contentFrame().Navigate(xaml_typename<Editor::LinkTooltip>(), winrt::make<NavigateToPageArgs>(winrt::make<LinkTooltipViewModel>(_settingsClone.GlobalSettings(), _windowSettingsClone), *this, elementToFocus));
+                _breadcrumbs.Append(winrt::make<Breadcrumb>(vm, RS_(L"Nav_LinkTooltip/Content"), BreadcrumbSubPage::None));
             }
             else if (*clickedItemTag == renderingTag)
             {

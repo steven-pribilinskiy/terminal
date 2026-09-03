@@ -48,6 +48,7 @@
     X(int32_t, HyperlinkTooltipShowDelay, 250)                                                                    \
     X(int32_t, HyperlinkTooltipHideDelay, 400)                                                                    \
     X(bool, HyperlinkTooltipActions, true)                                                                        \
+    X(winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::Terminal::Control::HyperlinkTooltipRule>, HyperlinkTooltipRules, nullptr) \
     X(bool, ScrollToChangeOpacity, true)                                                                          \
     X(winrt::Windows::Foundation::IReference<winrt::Microsoft::Terminal::Core::Color>, TabColor, nullptr)         \
     X(winrt::Windows::Foundation::IReference<winrt::Microsoft::Terminal::Core::Color>, StartingTabColor, nullptr) \

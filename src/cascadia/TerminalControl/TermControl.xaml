@@ -1341,6 +1341,32 @@
                                             x:Uid="HyperlinkRevealButton"
                                             AllowFocusOnInteraction="False"
                                             Click="_HyperlinkRevealClick" />
+
+                                    <!--
+                                        A rule's custom actions (see HyperlinkTooltipRule), populated per-hover
+                                        by TermControl -- not a live editable list, just a per-hover snapshot.
+                                    -->
+                                    <ItemsControl x:Name="HyperlinkCardCustomActions">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal"
+                                                            Spacing="4" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="local:HyperlinkTooltipAction">
+                                                <Button AllowFocusOnInteraction="False"
+                                                        Click="_HyperlinkCustomActionClick"
+                                                        Tag="{x:Bind ActionId}">
+                                                    <StackPanel Orientation="Horizontal"
+                                                                Spacing="4">
+                                                        <ContentControl Content="{x:Bind mtu:IconPathConverter.IconWUX(Icon), Mode=OneWay}" />
+                                                        <TextBlock Text="{x:Bind Name}" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
                                 </StackPanel>
                             </StackPanel>
                         </Border>

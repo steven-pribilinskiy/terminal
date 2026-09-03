@@ -379,6 +379,46 @@ namespace winrt::Microsoft::Terminal::Settings
         _HyperlinkTooltipShowDelay = windowSettings.HyperlinkTooltipShowDelay();
         _HyperlinkTooltipHideDelay = windowSettings.HyperlinkTooltipHideDelay();
         _HyperlinkTooltipActions = windowSettings.HyperlinkTooltipActions();
+
+        if (const auto modelRules = windowSettings.HyperlinkTooltipRules())
+        {
+            auto controlRules = winrt::single_threaded_vector<HyperlinkTooltipRule>();
+            for (const auto& modelRule : modelRules)
+            {
+                HyperlinkTooltipRule controlRule{};
+                controlRule.Name(modelRule.Name());
+                controlRule.Enabled(modelRule.Enabled());
+                controlRule.Schemes(modelRule.Schemes());
+                controlRule.Pattern(modelRule.Pattern());
+                controlRule.FileTypeGroup(static_cast<HyperlinkFileTypeGroup>(modelRule.FileTypeGroup()));
+                controlRule.CustomExtensions(modelRule.CustomExtensions());
+                controlRule.TooltipShowDelay(modelRule.TooltipShowDelay());
+                controlRule.TooltipHideDelay(modelRule.TooltipHideDelay());
+                controlRule.TooltipMaxWidth(modelRule.TooltipMaxWidth());
+                controlRule.SuppressOpen(modelRule.SuppressOpen());
+                controlRule.SuppressCopyLink(modelRule.SuppressCopyLink());
+                controlRule.SuppressCopyPath(modelRule.SuppressCopyPath());
+                controlRule.SuppressReveal(modelRule.SuppressReveal());
+
+                auto controlActions = winrt::single_threaded_vector<HyperlinkTooltipAction>();
+                if (const auto modelActions = modelRule.CustomActions())
+                {
+                    for (const auto& modelAction : modelActions)
+                    {
+                        HyperlinkTooltipAction controlAction{};
+                        controlAction.Name(modelAction.Name());
+                        controlAction.ActionId(modelAction.ActionId());
+                        controlAction.Icon(modelAction.Icon() ? modelAction.Icon().Resolved() : hstring{});
+                        controlActions.Append(controlAction);
+                    }
+                }
+                controlRule.CustomActions(controlActions);
+
+                controlRules.Append(controlRule);
+            }
+            _HyperlinkTooltipRules = controlRules;
+        }
+
         _ScrollToChangeOpacity = windowSettings.ScrollToChangeOpacity();
         _GraphicsAPI = windowSettings.GraphicsAPI();
         _DisablePartialInvalidation = windowSettings.DisablePartialInvalidation();

@@ -1,0 +1,68 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
+import "ISettingsModelObject.idl";
+
+namespace Microsoft.Terminal.Settings.Model
+{
+    // Predefined groups of file extensions a rule can match a file:// (or bare
+    // POSIX path) link against, in addition to (or instead of) an individual
+    // extension list. Media is the union of Image, Video and Audio.
+    enum HyperlinkFileTypeGroup
+    {
+        None = 0,
+        Image,
+        Video,
+        Audio,
+        Media,
+        SourceCode,
+        Document,
+        Archive,
+        Executable
+    };
+
+    // One custom button shown on the hyperlink tooltip card for links matched
+    // by a HyperlinkTooltipRule. ActionId names an entry already defined under
+    // "actions" -- the same reference-by-id scheme ActionEntry (New Tab Menu)
+    // uses -- which is invoked with the hovered link's URI available to it.
+    [default_interface] runtimeclass HyperlinkTooltipAction
+    {
+        HyperlinkTooltipAction();
+
+        String Name;
+        String ActionId;
+        IMediaResource Icon;
+    }
+
+    // A rule that customizes the hyperlink tooltip card's behavior for links
+    // matching its criteria. All set match criteria are ANDed together; an
+    // unset criterion is skipped rather than treated as false. The first
+    // enabled rule (in list order) whose criteria are all satisfied wins --
+    // overrides are not merged across multiple matching rules.
+    [default_interface] runtimeclass HyperlinkTooltipRule
+    {
+        HyperlinkTooltipRule();
+
+        String Name;
+        Boolean Enabled;
+
+        // --- match criteria ---
+        IVector<String> Schemes;
+        String Pattern;
+        HyperlinkFileTypeGroup FileTypeGroup;
+        IVector<String> CustomExtensions;
+
+        // --- overrides; unset (null) means "inherit the global default" ---
+        Windows.Foundation.IReference<Int32> TooltipShowDelay;
+        Windows.Foundation.IReference<Int32> TooltipHideDelay;
+        Windows.Foundation.IReference<Int32> TooltipMaxWidth;
+
+        // --- built-in action-button suppression ---
+        Boolean SuppressOpen;
+        Boolean SuppressCopyLink;
+        Boolean SuppressCopyPath;
+        Boolean SuppressReveal;
+
+        IVector<HyperlinkTooltipAction> CustomActions;
+    }
+}

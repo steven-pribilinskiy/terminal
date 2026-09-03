@@ -99,6 +99,8 @@
     </ClInclude>
     <ClInclude Include="ActionArgsMagic.h" />
     <ClInclude Include="NewTabMenuEntry.h" />
+    <ClInclude Include="HyperlinkTooltipRule.h" />
+    <ClInclude Include="HyperlinkTooltipAction.h" />
   </ItemGroup>
   <ItemGroup>
     <Midl Include="ActionArgs.idl" />
@@ -117,6 +119,7 @@
     <Midl Include="DefaultTerminal.idl" />
     <Midl Include="ApplicationState.idl" />
     <Midl Include="NewTabMenuEntry.idl" />
+    <Midl Include="HyperlinkTooltipRule.idl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

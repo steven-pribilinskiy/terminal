@@ -542,6 +542,7 @@ namespace winrt::TerminalApp::implementation
                                                        const Microsoft::Terminal::Control::PasteFromClipboardEventArgs eventArgs);
 
         safe_void_coroutine _OpenHyperlinkHandler(const IInspectable sender, const Microsoft::Terminal::Control::OpenHyperlinkEventArgs eventArgs);
+        void _HyperlinkTooltipActionInvokedHandler(const IInspectable& sender, const Microsoft::Terminal::Control::HyperlinkTooltipActionInvokedEventArgs& eventArgs);
         static bool _IsUriSupported(const winrt::Windows::Foundation::Uri& parsedUri);
         static bool _IsLocalHostname(const std::wstring_view host) noexcept;
         std::wstring _GetWslDistroForControl(const IInspectable& sender) const;

@@ -45,6 +45,10 @@
     <ClInclude Include="EventArgs.h">
       <DependentUpon>EventArgs.idl</DependentUpon>
     </ClInclude>
+    <ClInclude Include="HyperlinkTooltipRule.h">
+      <DependentUpon>IControlSettings.idl</DependentUpon>
+    </ClInclude>
+    <ClInclude Include="HyperlinkFileTypeGroups.h" />
     <ClInclude Include="SearchBoxControl.h">
       <DependentUpon>SearchBoxControl.xaml</DependentUpon>
     </ClInclude>
@@ -80,6 +84,9 @@
     </ClCompile>
     <ClCompile Include="EventArgs.cpp">
       <DependentUpon>EventArgs.idl</DependentUpon>
+    </ClCompile>
+    <ClCompile Include="HyperlinkTooltipRule.cpp">
+      <DependentUpon>IControlSettings.idl</DependentUpon>
     </ClCompile>
     <ClCompile Include="init.cpp" />
     <ClCompile Include="KeyChord.cpp">

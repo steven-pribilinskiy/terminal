@@ -1,0 +1,15 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
+import "LinkTooltipViewModel.idl";
+import "MainPage.idl";
+
+namespace Microsoft.Terminal.Settings.Editor
+{
+    [default_interface] runtimeclass LinkTooltip : Windows.UI.Xaml.Controls.Page
+    {
+        LinkTooltip();
+        LinkTooltipViewModel ViewModel { get; };
+        IHostedInWindow WindowRoot { get; };
+    }
+}

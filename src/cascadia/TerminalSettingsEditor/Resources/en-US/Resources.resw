@@ -3008,4 +3008,168 @@
     <value>None</value>
     <comment>Default placeholder text shown in text box settings when no value has been set.</comment>
   </data>
+  <data name="Nav_LinkTooltip.Content" xml:space="preserve">
+    <value>Link Tooltip</value>
+    <comment>Header for the "link tooltip" menu item. This navigates to a page that lets you see and modify settings related to the tooltip shown when hovering a link, and define custom rules for it.</comment>
+  </data>
+  <data name="LinkTooltip_DefaultsHeader.Text" xml:space="preserve">
+    <value>Defaults</value>
+    <comment>Header for a group of settings that control the link tooltip's default behavior, before any rule below overrides it.</comment>
+  </data>
+  <data name="LinkTooltip_RulesHeader.Text" xml:space="preserve">
+    <value>Rules</value>
+    <comment>Header for a group of settings that let the user define custom rules that override the link tooltip's behavior for specific kinds of links.</comment>
+  </data>
+  <data name="LinkTooltip_AddRuleButtonText.Text" xml:space="preserve">
+    <value>Add rule</value>
+    <comment>Text for a button that adds a new link tooltip rule.</comment>
+  </data>
+  <data name="LinkTooltip_RuleEditorHeader.Text" xml:space="preserve">
+    <value>Edit rule</value>
+    <comment>Header for the panel used to edit a single link tooltip rule.</comment>
+  </data>
+  <data name="LinkTooltip_RuleName.Header" xml:space="preserve">
+    <value>Name</value>
+    <comment>Header for a control to set a link tooltip rule's display name.</comment>
+  </data>
+  <data name="LinkTooltip_RuleEnabled.Header" xml:space="preserve">
+    <value>Enabled</value>
+    <comment>Header for a control to toggle whether a link tooltip rule is applied.</comment>
+  </data>
+  <data name="LinkTooltip_MatchCriteriaHeader.Text" xml:space="preserve">
+    <value>Match criteria</value>
+    <comment>Header for a group of settings that control which links a link tooltip rule applies to.</comment>
+  </data>
+  <data name="LinkTooltip_RuleSchemes.Header" xml:space="preserve">
+    <value>URI schemes</value>
+    <comment>Header for a control listing the URI schemes a link tooltip rule matches.</comment>
+  </data>
+  <data name="LinkTooltip_RuleSchemes.Description" xml:space="preserve">
+    <value>Separate schemes with commas, for example: https, stith. Leave empty to match any scheme.</value>
+    <comment>{Locked="https"}{Locked="stith"} Additional text presented near "LinkTooltip_RuleSchemes.Header".</comment>
+  </data>
+  <data name="LinkTooltip_RulePattern.Header" xml:space="preserve">
+    <value>Pattern</value>
+    <comment>Header for a control to set a regular expression a link tooltip rule matches against the full link text.</comment>
+  </data>
+  <data name="LinkTooltip_RulePattern.Description" xml:space="preserve">
+    <value>A regular expression matched against the full link text. Leave empty to match any text.</value>
+    <comment>Additional text presented near "LinkTooltip_RulePattern.Header".</comment>
+  </data>
+  <data name="LinkTooltip_RuleFileTypeGroup.Header" xml:space="preserve">
+    <value>File type</value>
+    <comment>Header for a control to choose a predefined group of file extensions a link tooltip rule matches.</comment>
+  </data>
+  <data name="LinkTooltip_RuleFileTypeGroup.Description" xml:space="preserve">
+    <value>Only applies to links that resolve to a file path. "None" does not constrain by file type.</value>
+    <comment>Additional text presented near "LinkTooltip_RuleFileTypeGroup.Header".</comment>
+  </data>
+  <data name="LinkTooltip_RuleCustomExtensions.Header" xml:space="preserve">
+    <value>Custom file extensions</value>
+    <comment>Header for a control listing individual file extensions a link tooltip rule matches, in addition to the chosen file type group.</comment>
+  </data>
+  <data name="LinkTooltip_RuleCustomExtensions.Description" xml:space="preserve">
+    <value>Separate extensions with commas, for example: log, ini. Merged with the file type group above.</value>
+    <comment>{Locked="log"}{Locked="ini"} Additional text presented near "LinkTooltip_RuleCustomExtensions.Header".</comment>
+  </data>
+  <data name="LinkTooltip_OverridesHeader.Text" xml:space="preserve">
+    <value>Overrides</value>
+    <comment>Header for a group of settings that let a link tooltip rule override the default show delay, hide delay, and maximum width.</comment>
+  </data>
+  <data name="LinkTooltip_OverrideShowDelay.Header" xml:space="preserve">
+    <value>Show delay</value>
+    <comment>Header for a control to override, for links matching this rule, the delay before the link tooltip appears.</comment>
+  </data>
+  <data name="LinkTooltip_OverrideShowDelay.Description" xml:space="preserve">
+    <value>In milliseconds. Leave unchecked to use the default above.</value>
+    <comment>Additional text presented near "LinkTooltip_OverrideShowDelay.Header".</comment>
+  </data>
+  <data name="LinkTooltip_OverrideHideDelay.Header" xml:space="preserve">
+    <value>Hide delay</value>
+    <comment>Header for a control to override, for links matching this rule, the delay before the link tooltip disappears.</comment>
+  </data>
+  <data name="LinkTooltip_OverrideHideDelay.Description" xml:space="preserve">
+    <value>In milliseconds. Leave unchecked to use the default above.</value>
+    <comment>Additional text presented near "LinkTooltip_OverrideHideDelay.Header".</comment>
+  </data>
+  <data name="LinkTooltip_OverrideMaxWidth.Header" xml:space="preserve">
+    <value>Maximum width</value>
+    <comment>Header for a control to override, for links matching this rule, the maximum width of the link tooltip.</comment>
+  </data>
+  <data name="LinkTooltip_OverrideMaxWidth.Description" xml:space="preserve">
+    <value>In device-independent pixels. Leave unchecked to use the default above.</value>
+    <comment>Additional text presented near "LinkTooltip_OverrideMaxWidth.Header".</comment>
+  </data>
+  <data name="LinkTooltip_BuiltInButtonsHeader.Text" xml:space="preserve">
+    <value>Built-in buttons</value>
+    <comment>Header for a group of settings that let a link tooltip rule hide specific built-in tooltip buttons.</comment>
+  </data>
+  <data name="LinkTooltip_SuppressOpen.Header" xml:space="preserve">
+    <value>Hide "Open" button</value>
+    <comment>{Locked="Open"} Header for a control to hide the "Open" button on the link tooltip for links matching this rule.</comment>
+  </data>
+  <data name="LinkTooltip_SuppressCopyLink.Header" xml:space="preserve">
+    <value>Hide "Copy link" button</value>
+    <comment>{Locked="Copy link"} Header for a control to hide the "Copy link" button on the link tooltip for links matching this rule.</comment>
+  </data>
+  <data name="LinkTooltip_SuppressCopyPath.Header" xml:space="preserve">
+    <value>Hide "Copy path" button</value>
+    <comment>{Locked="Copy path"} Header for a control to hide the "Copy path" button on the link tooltip for links matching this rule.</comment>
+  </data>
+  <data name="LinkTooltip_SuppressReveal.Header" xml:space="preserve">
+    <value>Hide "Show in Explorer" button</value>
+    <comment>{Locked="Show in Explorer"} Header for a control to hide the "Show in Explorer" button on the link tooltip for links matching this rule.</comment>
+  </data>
+  <data name="LinkTooltip_CustomActionsHeader.Text" xml:space="preserve">
+    <value>Custom actions</value>
+    <comment>Header for a group of settings that let a link tooltip rule add its own action buttons to the link tooltip.</comment>
+  </data>
+  <data name="LinkTooltip_AddCustomActionButtonText.Text" xml:space="preserve">
+    <value>Add custom action</value>
+    <comment>Text for a button that adds a new custom action to a link tooltip rule.</comment>
+  </data>
+  <data name="LinkTooltip_CustomActionNameBox.PlaceholderText" xml:space="preserve">
+    <value>Button label</value>
+    <comment>Placeholder text for the box that sets a custom link tooltip action's button label.</comment>
+  </data>
+  <data name="LinkTooltip_CustomActionIdBox.PlaceholderText" xml:space="preserve">
+    <value>Action ID</value>
+    <comment>Placeholder text for the box that sets which existing action (from "actions" in settings.json) a custom link tooltip button invokes.</comment>
+  </data>
+  <data name="LinkTooltip_FileTypeGroupNone.Content" xml:space="preserve">
+    <value>None</value>
+    <comment>An option to choose from for the "file type" match criterion. Does not constrain by file type.</comment>
+  </data>
+  <data name="LinkTooltip_FileTypeGroupImage.Content" xml:space="preserve">
+    <value>Image</value>
+    <comment>An option to choose from for the "file type" match criterion. Matches common image file extensions.</comment>
+  </data>
+  <data name="LinkTooltip_FileTypeGroupVideo.Content" xml:space="preserve">
+    <value>Video</value>
+    <comment>An option to choose from for the "file type" match criterion. Matches common video file extensions.</comment>
+  </data>
+  <data name="LinkTooltip_FileTypeGroupAudio.Content" xml:space="preserve">
+    <value>Audio</value>
+    <comment>An option to choose from for the "file type" match criterion. Matches common audio file extensions.</comment>
+  </data>
+  <data name="LinkTooltip_FileTypeGroupMedia.Content" xml:space="preserve">
+    <value>Media (image, video, or audio)</value>
+    <comment>An option to choose from for the "file type" match criterion. Matches common image, video, or audio file extensions.</comment>
+  </data>
+  <data name="LinkTooltip_FileTypeGroupSourceCode.Content" xml:space="preserve">
+    <value>Source code</value>
+    <comment>An option to choose from for the "file type" match criterion. Matches common source code file extensions.</comment>
+  </data>
+  <data name="LinkTooltip_FileTypeGroupDocument.Content" xml:space="preserve">
+    <value>Document</value>
+    <comment>An option to choose from for the "file type" match criterion. Matches common document file extensions.</comment>
+  </data>
+  <data name="LinkTooltip_FileTypeGroupArchive.Content" xml:space="preserve">
+    <value>Archive</value>
+    <comment>An option to choose from for the "file type" match criterion. Matches common archive file extensions.</comment>
+  </data>
+  <data name="LinkTooltip_FileTypeGroupExecutable.Content" xml:space="preserve">
+    <value>Executable</value>
+    <comment>An option to choose from for the "file type" match criterion. Matches common executable file extensions.</comment>
+  </data>
 </root>

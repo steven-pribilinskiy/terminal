@@ -208,6 +208,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         til::property_changed_event PropertyChanged;
 
         til::typed_event<IInspectable, Control::OpenHyperlinkEventArgs> OpenHyperlink;
+        til::typed_event<IInspectable, Control::HyperlinkTooltipActionInvokedEventArgs> HyperlinkTooltipActionInvoked;
         til::typed_event<IInspectable, Control::NoticeEventArgs> RaiseNotice;
         til::typed_event<> HidePointerCursor;
         til::typed_event<> RestorePointerCursor;
@@ -339,6 +340,25 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         bool _pointerInHyperlinkCard{ false };
         bool _showMarksInScrollbar{ false };
 
+        // The show/hide delay, max width, built-in button visibility and custom action
+        // list actually in effect for the currently hovered link -- the global settings,
+        // unless a HyperlinkTooltipRule matched and overrode some of them. Recomputed once
+        // per _hoveredHyperlinkChanged and read from everywhere the four globals used to be
+        // read directly, so a rule's overrides apply consistently everywhere they're used.
+        struct EffectiveHyperlinkTooltipSettings
+        {
+            int32_t showDelay{ 0 };
+            int32_t hideDelay{ 0 };
+            int32_t maxWidth{ 0 };
+            bool showOpen{ true };
+            bool showCopyLink{ true };
+            bool showCopyPath{ true };
+            bool showReveal{ true };
+            std::vector<Control::HyperlinkTooltipAction> customActions;
+        };
+        EffectiveHyperlinkTooltipSettings _currentHyperlinkTooltipSettings;
+        EffectiveHyperlinkTooltipSettings _effectiveHyperlinkTooltipSettings(std::wstring_view uri, bool isFileLink) const;
+
         bool _isBackgroundLight{ false };
         bool _detached{ false };
         til::CoordType _searchScrollOffset = 0;
@@ -401,6 +421,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void _HyperlinkCopyLinkClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
         void _HyperlinkCopyPathClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
         void _HyperlinkRevealClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
+        void _HyperlinkCustomActionClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
         void _showHyperlinkCard();
         void _hideHyperlinkCard();
         void _scheduleHyperlinkCardHide();

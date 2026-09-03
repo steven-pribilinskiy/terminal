@@ -94,6 +94,14 @@ winrt::com_ptr<GlobalAppSettings> GlobalAppSettings::Copy() const
             globals->_NewTabMenu->Append(get_self<NewTabMenuEntry>(entry)->Copy());
         }
     }
+    if (_HyperlinkTooltipRules)
+    {
+        globals->_HyperlinkTooltipRules = winrt::single_threaded_vector<Model::HyperlinkTooltipRule>();
+        for (const auto& rule : *_HyperlinkTooltipRules)
+        {
+            globals->_HyperlinkTooltipRules->Append(get_self<HyperlinkTooltipRule>(rule)->Copy());
+        }
+    }
     if (_DisabledProfileSources)
     {
         globals->_DisabledProfileSources = winrt::single_threaded_vector<hstring>();
@@ -440,6 +448,22 @@ void GlobalAppSettings::ResolveMediaResources(const Model::MediaResourceResolver
             if (const auto resolvable{ entry.try_as<IPathlessMediaResourceContainer>() })
             {
                 resolvable->ResolveMediaResourcesWithBasePath(SourceBasePath, resolver);
+            }
+        }
+    }
+    if (_HyperlinkTooltipRules)
+    {
+        for (const auto& rule : *_HyperlinkTooltipRules)
+        {
+            if (const auto actions{ rule.CustomActions() })
+            {
+                for (const auto& action : actions)
+                {
+                    if (const auto resolvable{ action.try_as<IPathlessMediaResourceContainer>() })
+                    {
+                        resolvable->ResolveMediaResourcesWithBasePath(SourceBasePath, resolver);
+                    }
+                }
             }
         }
     }

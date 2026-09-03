@@ -46,6 +46,12 @@
     <ClInclude Include="MatchProfilesEntry.h">
       <DependentUpon>NewTabMenuEntry.idl</DependentUpon>
     </ClInclude>
+    <ClInclude Include="HyperlinkTooltipRule.h">
+      <DependentUpon>HyperlinkTooltipRule.idl</DependentUpon>
+    </ClInclude>
+    <ClInclude Include="HyperlinkTooltipAction.h">
+      <DependentUpon>HyperlinkTooltipRule.idl</DependentUpon>
+    </ClInclude>
     <ClInclude Include="MediaResourceSupport.h" />
     <ClInclude Include="VisualStudioGenerator.h" />
     <ClInclude Include="DefaultTerminal.h">
@@ -209,6 +215,12 @@
     <ClCompile Include="MatchProfilesEntry.cpp">
       <DependentUpon>NewTabMenuEntry.idl</DependentUpon>
     </ClCompile>
+    <ClCompile Include="HyperlinkTooltipRule.cpp">
+      <DependentUpon>HyperlinkTooltipRule.idl</DependentUpon>
+    </ClCompile>
+    <ClCompile Include="HyperlinkTooltipAction.cpp">
+      <DependentUpon>HyperlinkTooltipRule.idl</DependentUpon>
+    </ClCompile>
     <ClCompile Include="MediaResourceSupport.cpp" />
     <ClCompile Include="VsDevCmdGenerator.cpp" />
     <ClCompile Include="VsDevShellGenerator.cpp" />
@@ -226,6 +238,7 @@
     <Midl Include="CascadiaSettings.idl" />
     <Midl Include="ColorScheme.idl" />
     <Midl Include="NewTabMenuEntry.idl" />
+    <Midl Include="HyperlinkTooltipRule.idl" />
     <Midl Include="Theme.idl" />
     <Midl Include="Command.idl" />
     <Midl Include="DefaultTerminal.idl" />

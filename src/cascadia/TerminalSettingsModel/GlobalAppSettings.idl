@@ -7,6 +7,7 @@ import "Theme.idl";
 import "ColorScheme.idl";
 import "ActionMap.idl";
 import "NewTabMenuEntry.idl";
+import "HyperlinkTooltipRule.idl";
 
 namespace Microsoft.Terminal.Settings.Model
 {
@@ -153,6 +154,7 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(Int32, HyperlinkTooltipShowDelay);
         INHERITABLE_SETTING(Int32, HyperlinkTooltipHideDelay);
         INHERITABLE_SETTING(Boolean, HyperlinkTooltipActions);
+        INHERITABLE_SETTING(IVector<HyperlinkTooltipRule>, HyperlinkTooltipRules);
         INHERITABLE_SETTING(Boolean, ScrollToChangeOpacity);
         INHERITABLE_SETTING(Boolean, TrimBlockSelection);
         INHERITABLE_SETTING(Boolean, DetectURLs);

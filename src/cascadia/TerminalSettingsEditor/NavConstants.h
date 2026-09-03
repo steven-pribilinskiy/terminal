@@ -12,6 +12,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     inline constexpr std::wstring_view openJsonTag{ L"OpenJson_Nav" };
     inline constexpr std::wstring_view launchTag{ L"Launch_Nav" };
     inline constexpr std::wstring_view interactionTag{ L"Interaction_Nav" };
+    inline constexpr std::wstring_view linkTooltipTag{ L"LinkTooltip_Nav" };
     inline constexpr std::wstring_view renderingTag{ L"Rendering_Nav" };
     inline constexpr std::wstring_view compatibilityTag{ L"Compatibility_Nav" };
     inline constexpr std::wstring_view actionsTag{ L"Actions_Nav" };
@@ -26,6 +27,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     inline constexpr til::static_map NavTagIconMap{
         std::pair{ launchTag, L"\xE7B5" }, /* Set Lock Screen */
         std::pair{ interactionTag, L"\xE7C9" }, /* Touch Pointer */
+        std::pair{ linkTooltipTag, L"\xE71B" }, /* Link */
         std::pair{ globalAppearanceTag, L"\xE771" }, /* Personalize */
         std::pair{ colorSchemesTag, L"\xE790" }, /* Color */
         std::pair{ renderingTag, L"\xE7F8" }, /* Device Laptop No Pic */

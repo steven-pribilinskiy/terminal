@@ -58,6 +58,11 @@ $ClassMap = @{
         NavigationParam = "Interaction_Nav"
         SubPage         = "BreadcrumbSubPage::None"
     }
+    "Microsoft::Terminal::Settings::Editor::LinkTooltip" = @{
+        ResourceName    = "Nav_LinkTooltip/Content"
+        NavigationParam = "LinkTooltip_Nav"
+        SubPage         = "BreadcrumbSubPage::None"
+    }
     "Microsoft::Terminal::Settings::Editor::GlobalAppearance" = @{
         ResourceName    = "Nav_Appearance/Content"
         NavigationParam = "GlobalAppearance_Nav"

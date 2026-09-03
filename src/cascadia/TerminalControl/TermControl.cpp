@@ -8,10 +8,13 @@
 // For the mandatory-integrity label an elevated window's buffer file needs.
 #include <sddl.h>
 
+#include <regex>
+
 #include "TermControlAutomationPeer.h"
 #include "../../renderer/atlas/AtlasEngine.h"
 #include "../../types/inc/utils.hpp"
 #include "../../tsf/Handle.h"
+#include "HyperlinkFileTypeGroups.h"
 
 #include "TermControl.g.cpp"
 
@@ -993,8 +996,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         const auto tooltipMaxWidth = settings.HyperlinkTooltipMaxWidth();
         HyperlinkCard().MaxWidth(tooltipMaxWidth > 0 ? static_cast<double>(tooltipMaxWidth) :
                                                        std::numeric_limits<double>::infinity());
-        HyperlinkCardActions().Visibility(settings.HyperlinkTooltipActions() ? Visibility::Visible :
-                                                                              Visibility::Collapsed);
+        // HyperlinkCardActions' own children's Visibility -- and HyperlinkCardCustomActions'
+        // contents -- are recomputed per-hover in _hoveredHyperlinkChanged instead of once
+        // here, since a HyperlinkTooltipRule can only be evaluated once a specific link is
+        // known.
 
         _interactivity.UpdateSettings();
         {
@@ -3566,6 +3571,155 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         _scheduleHyperlinkCardHide();
     }
 
+    // Walks HyperlinkTooltipRules in order and returns the show/hide delay, max width,
+    // built-in button visibility and custom action list that should actually be used for
+    // the given hovered link -- the global settings, overridden by the first enabled rule
+    // (if any) whose match criteria are all satisfied. isFileLink should be the same
+    // file-vs-not-file test _resolvedHyperlinkTarget() already performs, since a file-type
+    // criterion can only ever be satisfied by a link that resolves to a path.
+    TermControl::EffectiveHyperlinkTooltipSettings TermControl::_effectiveHyperlinkTooltipSettings(std::wstring_view uri, bool isFileLink) const
+    {
+        const auto settings = _core.Settings();
+        const auto actionsEnabled = settings.HyperlinkTooltipActions();
+        EffectiveHyperlinkTooltipSettings effective{
+            .showDelay = std::max(0, settings.HyperlinkTooltipShowDelay()),
+            .hideDelay = std::max(0, settings.HyperlinkTooltipHideDelay()),
+            .maxWidth = settings.HyperlinkTooltipMaxWidth(),
+            .showOpen = actionsEnabled,
+            .showCopyLink = actionsEnabled,
+            .showCopyPath = actionsEnabled,
+            .showReveal = actionsEnabled,
+        };
+
+        const auto rules = settings.HyperlinkTooltipRules();
+        if (!rules || uri.empty())
+        {
+            return effective;
+        }
+
+        // Bare POSIX paths (see _hoveredHyperlinkChanged) have no scheme of their own;
+        // treat them as "file" so a rule can still target them by scheme.
+        std::wstring scheme;
+        if (uri.front() == L'/')
+        {
+            scheme = L"file";
+        }
+        else
+        {
+            try
+            {
+                scheme = Windows::Foundation::Uri{ winrt::hstring{ uri } }.SchemeName().c_str();
+            }
+            catch (...)
+            {
+            }
+        }
+
+        std::wstring extension;
+        if (isFileLink)
+        {
+            if (const auto dot = uri.find_last_of(L'.'); dot != std::wstring_view::npos)
+            {
+                const auto slash = uri.find_last_of(L"/\\");
+                if ((slash == std::wstring_view::npos || dot > slash) && dot + 1 < uri.size())
+                {
+                    extension.assign(uri.substr(dot + 1));
+                    std::transform(extension.begin(), extension.end(), extension.begin(), [](wchar_t c) { return static_cast<wchar_t>(std::towlower(c)); });
+                }
+            }
+        }
+
+        for (const auto& rule : rules)
+        {
+            if (!rule || !rule.Enabled())
+            {
+                continue;
+            }
+
+            if (const auto schemes = rule.Schemes(); schemes && schemes.Size() > 0)
+            {
+                const auto found = std::any_of(begin(schemes), end(schemes), [&](const auto& s) {
+                    return til::equals_insensitive_ascii(std::wstring_view{ scheme }, std::wstring_view{ s });
+                });
+                if (!found)
+                {
+                    continue;
+                }
+            }
+
+            if (const auto pattern = rule.Pattern(); !pattern.empty())
+            {
+                bool matched = false;
+                try
+                {
+                    const std::wregex re{ pattern.c_str(), std::regex_constants::ECMAScript | std::regex_constants::icase };
+                    matched = std::regex_search(uri.begin(), uri.end(), re);
+                }
+                catch (...)
+                {
+                    // An invalid regex never matches, rather than crashing or matching everything.
+                }
+                if (!matched)
+                {
+                    continue;
+                }
+            }
+
+            const auto group = rule.FileTypeGroup();
+            const auto customExtensions = rule.CustomExtensions();
+            const auto hasExtensionCriteria = group != Control::HyperlinkFileTypeGroup::None || (customExtensions && customExtensions.Size() > 0);
+            if (hasExtensionCriteria)
+            {
+                if (extension.empty())
+                {
+                    continue;
+                }
+
+                auto matches = HyperlinkFileTypeGroups::ExtensionInGroup(group, extension);
+                if (!matches && customExtensions)
+                {
+                    matches = std::any_of(begin(customExtensions), end(customExtensions), [&](const auto& e) {
+                        return til::equals_insensitive_ascii(std::wstring_view{ extension }, std::wstring_view{ e });
+                    });
+                }
+                if (!matches)
+                {
+                    continue;
+                }
+            }
+
+            // All configured criteria matched (or none were configured, which is also a match).
+            if (const auto showDelay = rule.TooltipShowDelay())
+            {
+                effective.showDelay = std::max(0, showDelay.Value());
+            }
+            if (const auto hideDelay = rule.TooltipHideDelay())
+            {
+                effective.hideDelay = std::max(0, hideDelay.Value());
+            }
+            if (const auto maxWidth = rule.TooltipMaxWidth())
+            {
+                effective.maxWidth = maxWidth.Value();
+            }
+            effective.showOpen = effective.showOpen && !rule.SuppressOpen();
+            effective.showCopyLink = effective.showCopyLink && !rule.SuppressCopyLink();
+            effective.showCopyPath = effective.showCopyPath && !rule.SuppressCopyPath();
+            effective.showReveal = effective.showReveal && !rule.SuppressReveal();
+
+            if (actionsEnabled)
+            {
+                if (const auto actions = rule.CustomActions())
+                {
+                    effective.customActions.assign(begin(actions), end(actions));
+                }
+            }
+
+            break;
+        }
+
+        return effective;
+    }
+
     void TermControl::_hoveredHyperlinkChanged(const IInspectable& /*sender*/, const IInspectable& /*args*/)
     {
         const auto lastHoveredCell = _core.HoveredCell();
@@ -3574,6 +3728,17 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         {
             // Off the link. Don't hide at once -- the pointer may be on its way to the card.
             _scheduleHyperlinkCardHide();
+            return;
+        }
+
+        // PointerMoved is bound on an ancestor of HyperlinkCard, and the card never marks
+        // the event handled, so it keeps bubbling up even while the pointer is visually over
+        // the card -- e.g. on its way to one of its buttons. When that happens, ControlCore
+        // is only reporting whatever hyperlink sits on the terminal cell behind the card, not
+        // something the user is actually pointing at. Ignore it entirely -- don't touch the
+        // card's text, buttons, or position -- until the pointer actually leaves the card.
+        if (_pointerInHyperlinkCard && HyperlinkCard().Visibility() == Visibility::Visible)
+        {
             return;
         }
 
@@ -3642,10 +3807,18 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
         HyperlinkCardTarget().Visibility(showTarget ? Visibility::Visible : Visibility::Collapsed);
 
-        // Copying a path and revealing one only mean anything for a file.
-        const auto fileActions = target.empty() ? Visibility::Collapsed : Visibility::Visible;
-        HyperlinkCopyPathButton().Visibility(fileActions);
-        HyperlinkRevealButton().Visibility(fileActions);
+        // A matching HyperlinkTooltipRule (if any) can override the delays, max width,
+        // built-in button visibility, and custom action list for this specific link.
+        _currentHyperlinkTooltipSettings = _effectiveHyperlinkTooltipSettings(_hoveredUri, !target.empty());
+
+        // Copying a path and revealing one only mean anything for a file, on top of
+        // whatever the effective settings above already suppressed.
+        HyperlinkOpenButton().Visibility(_currentHyperlinkTooltipSettings.showOpen ? Visibility::Visible : Visibility::Collapsed);
+        HyperlinkCopyLinkButton().Visibility(_currentHyperlinkTooltipSettings.showCopyLink ? Visibility::Visible : Visibility::Collapsed);
+        const auto fileActions = !target.empty() && _currentHyperlinkTooltipSettings.showCopyPath;
+        const auto fileReveal = !target.empty() && _currentHyperlinkTooltipSettings.showReveal;
+        HyperlinkCopyPathButton().Visibility(fileActions ? Visibility::Visible : Visibility::Collapsed);
+        HyperlinkRevealButton().Visibility(fileReveal ? Visibility::Visible : Visibility::Collapsed);
 
         // Already up: it has only moved to a different link, so reposition and leave it.
         _hyperlinkHideTimer.Stop();
@@ -3655,7 +3828,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             return;
         }
 
-        const auto delay = std::max(0, _core.Settings().HyperlinkTooltipShowDelay());
+        const auto delay = _currentHyperlinkTooltipSettings.showDelay;
         if (delay == 0)
         {
             _showHyperlinkCard();
@@ -3734,8 +3907,13 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // where the setting is +inf) must still be able to fit the card
         // entirely inside it, or the position clamp below has nothing left to
         // clamp to and the card overflows the pane regardless of where it sits.
-        const auto configuredMaxWidth = static_cast<double>(_core.Settings().HyperlinkTooltipMaxWidth());
+        const auto configuredMaxWidth = static_cast<double>(_currentHyperlinkTooltipSettings.maxWidth);
         card.MaxWidth(configuredMaxWidth > 0 ? std::min(configuredMaxWidth, viewportWidth) : viewportWidth);
+
+        // A rule's custom actions, if any, alongside the (possibly individually
+        // suppressed) built-in buttons above -- see _hoveredHyperlinkChanged.
+        HyperlinkCardCustomActions().ItemsSource(winrt::single_threaded_vector<Control::HyperlinkTooltipAction>(
+            std::vector<Control::HyperlinkTooltipAction>{ _currentHyperlinkTooltipSettings.customActions }));
 
         // Measure first: where it goes depends on how big it turned out to be, and it has
         // just been given new text.
@@ -3791,7 +3969,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             return;
         }
 
-        const auto delay = std::max(0, _core.Settings().HyperlinkTooltipHideDelay());
+        const auto delay = _currentHyperlinkTooltipSettings.hideDelay;
         if (delay == 0)
         {
             _hideHyperlinkCard();
@@ -3878,6 +4056,21 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             // /select, so the file itself comes up selected rather than just its folder.
             const auto args = fmt::format(LR"(/select,"{}")", target);
             ShellExecuteW(nullptr, nullptr, L"explorer", args.c_str(), nullptr, SW_SHOW);
+        }
+        _hideHyperlinkCard();
+    }
+
+    // Shared Click handler for every button in HyperlinkCardCustomActions -- the button's
+    // Tag carries the action id (bound from HyperlinkTooltipAction.ActionId), and the
+    // actual dispatch, including the %u URI substitution, happens up in TerminalPage.
+    void TermControl::_HyperlinkCustomActionClick(const IInspectable& sender, const RoutedEventArgs& /*e*/)
+    {
+        if (const auto button = sender.try_as<Controls::Button>())
+        {
+            if (const auto actionId = button.Tag().try_as<hstring>(); actionId && !actionId->empty() && !_hoveredUri.empty())
+            {
+                HyperlinkTooltipActionInvoked.raise(*this, winrt::make<HyperlinkTooltipActionInvokedEventArgs>(*actionId, _hoveredUri));
+            }
         }
         _hideHyperlinkCard();
     }

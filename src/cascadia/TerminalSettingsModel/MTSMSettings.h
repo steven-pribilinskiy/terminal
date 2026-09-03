@@ -52,6 +52,7 @@ Author(s):
     X(int32_t, HyperlinkTooltipShowDelay, "hyperlink.tooltipShowDelay", 250)                                                                                                                          \
     X(int32_t, HyperlinkTooltipHideDelay, "hyperlink.tooltipHideDelay", 400)                                                                                                                          \
     X(bool, HyperlinkTooltipActions, "hyperlink.tooltipActions", true)                                                                                                                                \
+    X(winrt::Windows::Foundation::Collections::IVector<Model::HyperlinkTooltipRule>, HyperlinkTooltipRules, "hyperlink.tooltipRules", winrt::single_threaded_vector<Model::HyperlinkTooltipRule>())   \
     X(bool, ScrollToChangeOpacity, "experimental.scrollToChangeOpacity", false)                                                                                                                       \
     X(winrt::Microsoft::Terminal::Control::GraphicsAPI, GraphicsAPI, "rendering.graphicsAPI")                                                                                                         \
     X(bool, DisablePartialInvalidation, "rendering.disablePartialInvalidation", false)                                                                                                                \

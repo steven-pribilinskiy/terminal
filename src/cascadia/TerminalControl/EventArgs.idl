@@ -80,6 +80,13 @@ namespace Microsoft.Terminal.Control
         String Uri { get; };
     }
 
+    runtimeclass HyperlinkTooltipActionInvokedEventArgs
+    {
+        HyperlinkTooltipActionInvokedEventArgs(String actionId, String uri);
+        String ActionId { get; };
+        String Uri { get; };
+    }
+
     enum NoticeLevel
     {
         Debug = 10,

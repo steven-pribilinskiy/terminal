@@ -9,6 +9,7 @@
 #include "WriteToClipboardEventArgs.g.h"
 #include "PasteFromClipboardEventArgs.g.h"
 #include "OpenHyperlinkEventArgs.g.h"
+#include "HyperlinkTooltipActionInvokedEventArgs.g.h"
 #include "NoticeEventArgs.g.h"
 #include "ScrollPositionChangedArgs.g.h"
 #include "RendererWarningArgs.g.h"
@@ -111,6 +112,20 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         hstring Uri() { return _uri; };
 
     private:
+        hstring _uri;
+    };
+
+    struct HyperlinkTooltipActionInvokedEventArgs : public HyperlinkTooltipActionInvokedEventArgsT<HyperlinkTooltipActionInvokedEventArgs>
+    {
+    public:
+        HyperlinkTooltipActionInvokedEventArgs(hstring actionId, hstring uri) :
+            _actionId(actionId), _uri(uri) {}
+
+        hstring ActionId() { return _actionId; };
+        hstring Uri() { return _uri; };
+
+    private:
+        hstring _actionId;
         hstring _uri;
     };
 
@@ -282,4 +297,5 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 namespace winrt::Microsoft::Terminal::Control::factory_implementation
 {
     BASIC_FACTORY(OpenHyperlinkEventArgs);
+    BASIC_FACTORY(HyperlinkTooltipActionInvokedEventArgs);
 }

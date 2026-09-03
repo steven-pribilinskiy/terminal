@@ -1,0 +1,75 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
+import "EnumEntry.idl";
+
+#include "ViewModelHelpers.idl.h"
+
+namespace Microsoft.Terminal.Settings.Editor
+{
+    [default_interface] runtimeclass HyperlinkTooltipActionViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
+    {
+        HyperlinkTooltipActionViewModel(Microsoft.Terminal.Settings.Model.HyperlinkTooltipAction action);
+
+        String Name;
+        String ActionId;
+        String Icon;
+    }
+
+    [default_interface] runtimeclass HyperlinkTooltipRuleViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
+    {
+        HyperlinkTooltipRuleViewModel(Microsoft.Terminal.Settings.Model.HyperlinkTooltipRule rule);
+
+        String Name;
+        Boolean Enabled;
+        String SummaryText { get; };
+
+        // Comma-separated, same convention as LinkTooltipViewModel.SafeUriSchemes.
+        String Schemes;
+        String Pattern;
+
+        IInspectable CurrentFileTypeGroup;
+        Windows.Foundation.Collections.IObservableVector<EnumEntry> FileTypeGroupList { get; };
+        String CustomExtensions;
+
+        // Each override pairs a bool (is this field overridden at all) with the value to
+        // use when it is -- unlike a plain nullable NumberBox binding, this keeps the last
+        // value around when the override checkbox is unchecked and rechecked.
+        Boolean OverrideShowDelay;
+        Int32 ShowDelay;
+        Boolean OverrideHideDelay;
+        Int32 HideDelay;
+        Boolean OverrideMaxWidth;
+        Int32 MaxWidth;
+
+        Boolean SuppressOpen;
+        Boolean SuppressCopyLink;
+        Boolean SuppressCopyPath;
+        Boolean SuppressReveal;
+
+        Windows.Foundation.Collections.IObservableVector<HyperlinkTooltipActionViewModel> CustomActions { get; };
+        HyperlinkTooltipActionViewModel RequestAddCustomAction();
+        void RequestDeleteCustomAction(HyperlinkTooltipActionViewModel vm);
+    }
+
+    runtimeclass LinkTooltipViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
+    {
+        LinkTooltipViewModel(Microsoft.Terminal.Settings.Model.GlobalAppSettings globalSettings, Microsoft.Terminal.Settings.Model.WindowSettings windowSettings);
+
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, DetectURLs);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, OpenLinksOnSingleClick);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, HyperlinkTooltipMaxWidth);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, HyperlinkTooltipShowDelay);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, HyperlinkTooltipHideDelay);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, HyperlinkTooltipActions);
+        String SafeUriSchemes;
+
+        Windows.Foundation.Collections.IObservableVector<HyperlinkTooltipRuleViewModel> CurrentView { get; };
+        HyperlinkTooltipRuleViewModel CurrentRule;
+        Boolean IsEditingRule { get; };
+
+        void RequestReorderRule(HyperlinkTooltipRuleViewModel vm, Boolean goingUp);
+        void RequestDeleteRule(HyperlinkTooltipRuleViewModel vm);
+        HyperlinkTooltipRuleViewModel RequestAddRule();
+    }
+}
