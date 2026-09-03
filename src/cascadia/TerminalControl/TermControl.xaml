@@ -1344,7 +1344,7 @@
 
                                     <!--
                                         A rule's custom actions (see HyperlinkTooltipRule), populated per-hover
-                                        by TermControl -- not a live editable list, just a per-hover snapshot.
+                                        by TermControl: not a live editable list, just a per-hover snapshot.
                                     -->
                                     <ItemsControl x:Name="HyperlinkCardCustomActions">
                                         <ItemsControl.ItemsPanel>
