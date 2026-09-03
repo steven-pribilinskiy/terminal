@@ -28,6 +28,17 @@ Author(s):
 #include "HyperlinkTooltipRule.h"
 #include "IntegrationSettings.h"
 
+// Named types for the "integrations" entry in MTSM_GLOBAL_ONLY_SETTINGS: a comma
+// inside a template argument list would split the X-macro's arguments.
+namespace winrt::Microsoft::Terminal::Settings::Model::implementation
+{
+    using IntegrationSettingsMap = winrt::Windows::Foundation::Collections::IMap<winrt::hstring, winrt::Microsoft::Terminal::Settings::Model::IntegrationSettings>;
+    inline IntegrationSettingsMap MakeIntegrationSettingsMap()
+    {
+        return winrt::single_threaded_map<winrt::hstring, winrt::Microsoft::Terminal::Settings::Model::IntegrationSettings>();
+    }
+}
+
 // fwdecl unittest classes
 namespace SettingsModelUnitTests
 {

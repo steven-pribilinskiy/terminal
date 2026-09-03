@@ -18,17 +18,10 @@ Author(s):
 // Macro format (defaultArgs are optional):
 // (type, name, jsonKey, defaultArgs)
 
-// A comma inside a template argument list splits an X-macro argument, so a
-// two-parameter map type has to hide behind an alias (and its default behind
-// a function) to be usable in the tables below.
-namespace winrt::Microsoft::Terminal::Settings::Model::implementation
-{
-    using IntegrationSettingsMap = winrt::Windows::Foundation::Collections::IMap<winrt::hstring, winrt::Microsoft::Terminal::Settings::Model::IntegrationSettings>;
-    inline IntegrationSettingsMap MakeIntegrationSettingsMap()
-    {
-        return winrt::single_threaded_map<winrt::hstring, winrt::Microsoft::Terminal::Settings::Model::IntegrationSettings>();
-    }
-}
+// A comma inside a template argument list splits an X-macro argument, so the
+// Integrations entry below names IntegrationSettingsMap / MakeIntegrationSettingsMap(),
+// which GlobalAppSettings.h defines (the only place the global table expands).
+// They cannot live here: Theme.h includes this header before any projection.
 
 // Settings that are truly app-global (not per-window)
 #define MTSM_GLOBAL_ONLY_SETTINGS(X)                                                                                               \

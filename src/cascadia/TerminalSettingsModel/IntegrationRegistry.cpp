@@ -6,6 +6,9 @@
 #include "CascadiaSettings.h"
 #include "resource.h"
 
+#include <shlobj.h>
+#include <til/io.h>
+
 #include "IntegrationRegistry.g.cpp"
 
 using namespace winrt::Windows::Foundation::Collections;
