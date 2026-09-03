@@ -124,7 +124,7 @@ namespace winrt::TerminalApp::implementation
 namespace
 {
     using Snapshot = winrt::TerminalApp::implementation::HyperlinkPreviewSnapshot;
-    using StringMap = std::map<std::wstring, std::wstring>;
+    using TemplateValueMap = std::map<std::wstring, std::wstring>;
 
     // ---- small string helpers -------------------------------------------
 
@@ -211,7 +211,7 @@ namespace
                   const std::vector<std::wstring>& groupNames,
                   const std::wstring& text,
                   bool requireFullMatch,
-                  StringMap& groups)
+                  TemplateValueMap& groups)
     {
         if (!compiled || text.empty())
         {
@@ -419,9 +419,9 @@ namespace
 
     struct ExpandContext
     {
-        const StringMap* Groups{ nullptr };
-        const StringMap* Settings{ nullptr };
-        const StringMap* Credentials{ nullptr };
+        const TemplateValueMap* Groups{ nullptr };
+        const TemplateValueMap* Settings{ nullptr };
+        const TemplateValueMap* Credentials{ nullptr };
         const std::map<std::wstring, IJsonValue>* Results{ nullptr };
     };
 
@@ -436,7 +436,7 @@ namespace
         constexpr std::wstring_view settingsPrefix{ L"settings." };
         constexpr std::wstring_view credentialsPrefix{ L"credentials." };
 
-        const auto lookIn = [](const StringMap* map, std::wstring_view key) -> std::wstring {
+        const auto lookIn = [](const TemplateValueMap* map, std::wstring_view key) -> std::wstring {
             if (!map)
             {
                 return {};
@@ -702,7 +702,7 @@ namespace
     {
         std::shared_ptr<Snapshot::Plugin> Owner;
         const Snapshot::Matcher* Matcher{ nullptr };
-        StringMap Groups;
+        TemplateValueMap Groups;
     };
 
     std::optional<MatchResult> MatchIn(const std::vector<std::shared_ptr<Snapshot::Plugin>>& plugins,
@@ -719,7 +719,7 @@ namespace
                     continue;
                 }
 
-                StringMap groups;
+                TemplateValueMap groups;
                 if (!TryMatch(matcher.Regex, matcher.GroupNames, text, requireFullMatch, groups))
                 {
                     continue;
@@ -785,7 +785,7 @@ namespace
         // made this text hoverable, and they say which integration owns it.
         for (const auto& rule : snapshot->TextRules)
         {
-            StringMap ruleGroups;
+            TemplateValueMap ruleGroups;
             if (!TryMatch(rule.Regex, {}, text, true, ruleGroups))
             {
                 continue;
@@ -973,7 +973,7 @@ namespace
 
     // Runs the whole pipeline for one integration and renders the result.
     // Blocking; always called from a background thread.
-    Control::HyperlinkPreview RunFetch(const Snapshot::Plugin& plugin, const StringMap& groups)
+    Control::HyperlinkPreview RunFetch(const Snapshot::Plugin& plugin, const TemplateValueMap& groups)
     {
         Control::HyperlinkPreview preview{};
         preview.IntegrationId(winrt::hstring{ plugin.Id });
@@ -1443,7 +1443,7 @@ namespace winrt::TerminalApp::implementation
         // in flight, and the plugin this fetch belongs to must not change
         // underneath it.
         std::shared_ptr<HyperlinkPreviewSnapshot::Plugin> plugin;
-        StringMap groups;
+        TemplateValueMap groups;
         std::wstring cacheKey;
         Control::HyperlinkPreview cached{ nullptr };
 
