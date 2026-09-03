@@ -27,6 +27,10 @@ $ProhibitedUids = @(
     "Extensions_FragmentColorSchemeNavigator",
     "Extensions_FragmentProfileNavigator",
     "Extensions_Scope",
+    "Integrations_CredentialRow",
+    "Integrations_IntegrationNavigator",
+    "Integrations_MatcherRow",
+    "Integrations_SettingRow",
     "Profile_AdvancedNavigator",
     "Profile_AppearanceNavigator",
     "Profile_DeleteProfile",
@@ -61,6 +65,11 @@ $ClassMap = @{
     "Microsoft::Terminal::Settings::Editor::LinkTooltip" = @{
         ResourceName    = "Nav_LinkTooltip/Content"
         NavigationParam = "LinkTooltip_Nav"
+        SubPage         = "BreadcrumbSubPage::None"
+    }
+    "Microsoft::Terminal::Settings::Editor::Integrations" = @{
+        ResourceName    = "Nav_Integrations/Content"
+        NavigationParam = "Integrations_Nav"
         SubPage         = "BreadcrumbSubPage::None"
     }
     "Microsoft::Terminal::Settings::Editor::GlobalAppearance" = @{

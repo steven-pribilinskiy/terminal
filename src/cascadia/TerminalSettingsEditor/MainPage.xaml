@@ -164,6 +164,10 @@
                                      x:Uid="Nav_LinkTooltip"
                                      Tag="LinkTooltip_Nav" />
 
+            <muxc:NavigationViewItem x:Name="IntegrationsNavItem"
+                                     x:Uid="Nav_Integrations"
+                                     Tag="Integrations_Nav" />
+
             <muxc:NavigationViewItem x:Name="AppearanceNavItem"
                                      x:Uid="Nav_Appearance"
                                      Tag="GlobalAppearance_Nav" />

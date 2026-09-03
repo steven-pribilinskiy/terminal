@@ -7,6 +7,7 @@
 #include "Launch.h"
 #include "Interaction.h"
 #include "LinkTooltip.h"
+#include "Integrations.h"
 #include "Compatibility.h"
 #include "Rendering.h"
 #include "RenderingViewModel.h"
@@ -20,6 +21,7 @@
 #include "Profiles.h"
 #include "InteractionViewModel.h"
 #include "LinkTooltipViewModel.h"
+#include "IntegrationsViewModel.h"
 #include "LaunchViewModel.h"
 #include "NewTabMenuViewModel.h"
 #include "NewTabMenu.h"
@@ -553,6 +555,15 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 contentFrame().Navigate(xaml_typename<Editor::LinkTooltip>(), winrt::make<NavigateToPageArgs>(winrt::make<LinkTooltipViewModel>(_settingsClone.GlobalSettings(), _windowSettingsClone), *this, elementToFocus));
                 _breadcrumbs.Append(winrt::make<Breadcrumb>(vm, RS_(L"Nav_LinkTooltip/Content"), BreadcrumbSubPage::None));
             }
+            else if (*clickedItemTag == integrationsTag)
+            {
+                // "Add as rule" on this page creates a rule that lives on the Link
+                // Tooltip page, so give the VM a way to send us there afterwards.
+                const auto integrationsVM = winrt::make<IntegrationsViewModel>(_settingsClone.GlobalSettings(), _windowSettingsClone);
+                integrationsVM.NavigateToLinkTooltipRequested({ this, &MainPage::_NavigateToLinkTooltipHandler });
+                contentFrame().Navigate(xaml_typename<Editor::Integrations>(), winrt::make<NavigateToPageArgs>(integrationsVM, *this, elementToFocus));
+                _breadcrumbs.Append(winrt::make<Breadcrumb>(vm, RS_(L"Nav_Integrations/Content"), BreadcrumbSubPage::None));
+            }
             else if (*clickedItemTag == renderingTag)
             {
                 contentFrame().Navigate(xaml_typename<Editor::Rendering>(), winrt::make<NavigateToPageArgs>(winrt::make<RenderingViewModel>(_settingsClone), *this, elementToFocus));
@@ -982,6 +993,13 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     void MainPage::_NavigateToColorSchemeHandler(const IInspectable& /*sender*/, const IInspectable& /*args*/)
     {
         _Navigate(box_value(hstring{ colorSchemesTag }), BreadcrumbSubPage::ColorSchemes_Edit);
+    }
+
+    // The Integrations page adds text-matching rules that are edited on the Link
+    // Tooltip page; this is how it hands the user over to them.
+    void MainPage::_NavigateToLinkTooltipHandler(const IInspectable& /*sender*/, const IInspectable& /*args*/)
+    {
+        _Navigate(box_value(hstring{ linkTooltipTag }));
     }
 
     void MainPage::_AppendProfilesRootCrumb()

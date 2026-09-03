@@ -26,6 +26,7 @@ Author(s):
 #include "NewTabMenuEntry.h"
 #include "RemainingProfilesEntry.h"
 #include "HyperlinkTooltipRule.h"
+#include "IntegrationSettings.h"
 
 // fwdecl unittest classes
 namespace SettingsModelUnitTests

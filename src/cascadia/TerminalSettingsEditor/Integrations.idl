@@ -1,0 +1,13 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
+import "IntegrationsViewModel.idl";
+
+namespace Microsoft.Terminal.Settings.Editor
+{
+    [default_interface] runtimeclass Integrations : Windows.UI.Xaml.Controls.Page
+    {
+        Integrations();
+        IntegrationsViewModel ViewModel { get; };
+    }
+}

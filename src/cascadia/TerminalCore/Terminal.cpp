@@ -144,6 +144,28 @@ void Terminal::UpdateSettings(ICoreSettings settings)
     {
         // Clear the patterns first
         _detectURLs = settings.DetectURLs();
+
+        // Only keep patterns ICU can compile; a bad one is dropped rather than
+        // silently disabling every other pattern in the scan.
+        _textPatterns.clear();
+        if (const auto patterns = settings.TextPatterns())
+        {
+            constexpr size_t maxTextPatterns = 16;
+            for (const auto& pattern : patterns)
+            {
+                if (_textPatterns.size() >= maxTextPatterns)
+                {
+                    break;
+                }
+                UErrorCode status = U_ZERO_ERROR;
+                const auto re = til::ICU::CreateRegex(pattern, 0, &status);
+                if (re && U_SUCCESS(status))
+                {
+                    _textPatterns.emplace_back(pattern);
+                }
+            }
+        }
+
         _updateUrlDetection();
     }
 }
@@ -587,6 +609,15 @@ std::wstring Terminal::GetHyperlinkAtBufferPosition(const til::point bufferPos)
                 return buffer.GetPlainText(result.start, result.stop);
             }
         }
+        // A user text pattern: the match itself is the "link" text. Whoever
+        // consumes it (the hyperlink card, an integration) resolves it further.
+        for (const auto& result : results)
+        {
+            if (result.value >= _firstTextPatternId)
+            {
+                return buffer.GetPlainText(result.start, result.stop);
+            }
+        }
     }
     return {};
 }
@@ -635,6 +666,13 @@ std::optional<PointTree::interval> Terminal::GetHyperlinkIntervalFromViewportPos
         for (const auto& result : results)
         {
             if (result.value == _hyperlinkPatternId)
+            {
+                return toViewport(result);
+            }
+        }
+        for (const auto& result : results)
+        {
+            if (result.value >= _firstTextPatternId)
             {
                 return toViewport(result);
             }
@@ -1482,9 +1520,13 @@ PointTree Terminal::_getPatterns(til::CoordType beg, til::CoordType end) const
     UErrorCode status = U_ZERO_ERROR;
     PointTree::interval_vector intervals;
 
-    for (size_t i = 0; i < patterns.size(); ++i)
-    {
-        const auto re = uregexInterner.Intern(patterns.at(i));
+    const auto scan = [&](std::wstring_view pattern, size_t id) {
+        status = U_ZERO_ERROR;
+        const auto re = uregexInterner.Intern(pattern);
+        if (!re)
+        {
+            return;
+        }
         uregex_setUText(re.get(), &text, &status);
 
         if (uregex_find(re.get(), -1, &status))
@@ -1493,9 +1535,20 @@ PointTree Terminal::_getPatterns(til::CoordType beg, til::CoordType end) const
             {
                 // PointTree uses half-open ranges and buffer-absolute coordinates.
                 const auto range = ICU::BufferRangeFromMatch(&text, re.get());
-                intervals.push_back(PointTree::interval(range.start, range.end, i));
+                intervals.push_back(PointTree::interval(range.start, range.end, id));
             } while (uregex_findNext(re.get(), &status));
         }
+    };
+
+    for (size_t i = 0; i < patterns.size(); ++i)
+    {
+        scan(patterns.at(i), i);
+    }
+    // User text patterns (see ICoreSettings::TextPatterns) come after the
+    // built-ins so their ids never collide with _hyperlinkPatternId & co.
+    for (size_t i = 0; i < _textPatterns.size(); ++i)
+    {
+        scan(_textPatterns[i], _firstTextPatternId + i);
     }
 
     return PointTree{ std::move(intervals) };

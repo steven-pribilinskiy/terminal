@@ -1,0 +1,528 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
+#include "pch.h"
+#include "IntegrationsViewModel.h"
+#include "IntegrationsViewModel.g.cpp"
+#include "IntegrationViewModel.g.cpp"
+#include "IntegrationSettingViewModel.g.cpp"
+#include "IntegrationCredentialViewModel.g.cpp"
+#include "IntegrationDisplayFieldViewModel.g.cpp"
+#include "IntegrationMatcherViewModel.g.cpp"
+
+using namespace winrt::Windows::Foundation::Collections;
+using namespace winrt::Microsoft::Terminal::Settings::Model;
+
+namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
+{
+    // Shown when a manifest gives no icon of its own. E71B is "Link", which is
+    // what every integration is ultimately about.
+    static constexpr std::wstring_view DefaultIntegrationGlyph{ L"\xE71B" };
+
+    // Returns the user's stored configuration for this integration, or null when
+    // they've never configured it. Never writes.
+    static Model::IntegrationSettings _findEntry(const Model::GlobalAppSettings& globals, const hstring& id)
+    {
+        if (const auto map = globals.Integrations(); map && map.HasKey(id))
+        {
+            return map.Lookup(id);
+        }
+        return nullptr;
+    }
+
+    // Same, but creates whatever is missing so the caller can write into it.
+    //
+    // The subtlety worth knowing: "integrations" is an INHERITABLE_SETTING, and an
+    // inheritable setting that the user has never set returns a *freshly
+    // constructed* fallback on every read (see IInheritable.h). Inserting into that
+    // map would therefore write into a temporary and be silently lost, so we assign
+    // the map back as the user's own value before touching it.
+    static Model::IntegrationSettings _ensureEntry(const Model::GlobalAppSettings& globals, const hstring& id)
+    {
+        auto map = globals.Integrations();
+        if (!map)
+        {
+            map = single_threaded_map<hstring, Model::IntegrationSettings>();
+        }
+        globals.Integrations(map);
+
+        if (map.HasKey(id))
+        {
+            return map.Lookup(id);
+        }
+
+        Model::IntegrationSettings entry{};
+        entry.Values(single_threaded_map<hstring, hstring>());
+        map.Insert(id, entry);
+        return entry;
+    }
+
+#pragma region IntegrationSettingViewModel
+
+    IntegrationSettingViewModel::IntegrationSettingViewModel(Model::IntegrationField field,
+                                                             Model::GlobalAppSettings globalSettings,
+                                                             hstring integrationId) :
+        _Field{ std::move(field) },
+        _GlobalSettings{ std::move(globalSettings) },
+        _IntegrationId{ std::move(integrationId) }
+    {
+    }
+
+    hstring IntegrationSettingViewModel::Label() const
+    {
+        const auto label = _Field.Label();
+        return label.empty() ? _Field.Key() : label;
+    }
+
+    hstring IntegrationSettingViewModel::Value() const
+    {
+        if (const auto entry = _findEntry(_GlobalSettings, _IntegrationId))
+        {
+            if (const auto values = entry.Values(); values && values.HasKey(_Field.Key()))
+            {
+                return values.Lookup(_Field.Key());
+            }
+        }
+        return {};
+    }
+
+    void IntegrationSettingViewModel::Value(const hstring& value)
+    {
+        if (Value() == value)
+        {
+            return;
+        }
+
+        const auto entry = _ensureEntry(_GlobalSettings, _IntegrationId);
+        auto values = entry.Values();
+        if (!values)
+        {
+            values = single_threaded_map<hstring, hstring>();
+            entry.Values(values);
+        }
+
+        // An emptied box removes the key rather than storing "", so settings.json
+        // goes back to not mentioning it at all.
+        if (value.empty())
+        {
+            if (values.HasKey(_Field.Key()))
+            {
+                values.Remove(_Field.Key());
+            }
+        }
+        else
+        {
+            values.Insert(_Field.Key(), value);
+        }
+
+        _NotifyChanges(L"Value");
+    }
+
+#pragma endregion
+
+#pragma region IntegrationCredentialViewModel
+
+    IntegrationCredentialViewModel::IntegrationCredentialViewModel(Model::IntegrationField field, hstring integrationId) :
+        _Field{ std::move(field) },
+        _IntegrationId{ std::move(integrationId) }
+    {
+        _refreshStored();
+    }
+
+    hstring IntegrationCredentialViewModel::Label() const
+    {
+        const auto label = _Field.Label();
+        return label.empty() ? _Field.Key() : label;
+    }
+
+    hstring IntegrationCredentialViewModel::StatusText() const
+    {
+        return _isStored ? RS_(L"Integrations_CredentialStored") : RS_(L"Integrations_CredentialNotSet");
+    }
+
+    void IntegrationCredentialViewModel::_refreshStored()
+    {
+        auto stored = false;
+        try
+        {
+            stored = Model::IntegrationCredentialStore::Has(_IntegrationId, _Field.Key());
+        }
+        CATCH_LOG();
+        _isStored = stored;
+    }
+
+    // Writes straight through to the Windows credential vault -- there is no
+    // "save the settings" step for a secret, and nothing about it ever reaches
+    // settings.json.
+    void IntegrationCredentialViewModel::Save(const hstring& value)
+    {
+        if (value.empty())
+        {
+            return;
+        }
+
+        try
+        {
+            Model::IntegrationCredentialStore::Set(_IntegrationId, _Field.Key(), value);
+        }
+        CATCH_LOG();
+
+        _refreshStored();
+        // Empties the bound PasswordBox: the secret is in the vault now, and we
+        // can never read it back to re-fill the box anyway.
+        PendingValue(hstring{});
+        _NotifyChanges(L"IsStored", L"StatusText");
+    }
+
+    void IntegrationCredentialViewModel::Clear()
+    {
+        try
+        {
+            Model::IntegrationCredentialStore::Remove(_IntegrationId, _Field.Key());
+        }
+        CATCH_LOG();
+
+        _refreshStored();
+        PendingValue(hstring{});
+        _NotifyChanges(L"IsStored", L"StatusText");
+    }
+
+#pragma endregion
+
+#pragma region IntegrationDisplayFieldViewModel
+
+    IntegrationDisplayFieldViewModel::IntegrationDisplayFieldViewModel(Model::IntegrationDisplayField field,
+                                                                      Model::IntegrationManifest manifest,
+                                                                      Model::GlobalAppSettings globalSettings,
+                                                                      hstring integrationId) :
+        _Field{ std::move(field) },
+        _Manifest{ std::move(manifest) },
+        _GlobalSettings{ std::move(globalSettings) },
+        _IntegrationId{ std::move(integrationId) }
+    {
+    }
+
+    hstring IntegrationDisplayFieldViewModel::Label() const
+    {
+        const auto label = _Field.Label();
+        return label.empty() ? _Field.Key() : label;
+    }
+
+    bool IntegrationDisplayFieldViewModel::Visible() const
+    {
+        if (const auto entry = _findEntry(_GlobalSettings, _IntegrationId))
+        {
+            // A null list means "the manifest decides"; a present list is the
+            // complete set of keys the user wants.
+            if (const auto fields = entry.Fields())
+            {
+                for (const auto& key : fields)
+                {
+                    if (key == _Field.Key())
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+        return _Field.DefaultVisible();
+    }
+
+    void IntegrationDisplayFieldViewModel::Visible(bool value)
+    {
+        if (Visible() == value)
+        {
+            return;
+        }
+
+        const auto entry = _ensureEntry(_GlobalSettings, _IntegrationId);
+
+        std::vector<hstring> keys;
+        if (const auto existing = entry.Fields())
+        {
+            for (const auto& key : existing)
+            {
+                keys.push_back(key);
+            }
+        }
+        else if (const auto manifestFields = _Manifest.Fields())
+        {
+            // First edit: start from what the manifest shows by default, so
+            // ticking one box doesn't silently hide everything else.
+            for (const auto& field : manifestFields)
+            {
+                if (field.DefaultVisible())
+                {
+                    keys.push_back(field.Key());
+                }
+            }
+        }
+
+        const auto key = _Field.Key();
+        const auto existingKey = std::find(keys.begin(), keys.end(), key);
+        if (value)
+        {
+            if (existingKey == keys.end())
+            {
+                keys.push_back(key);
+            }
+        }
+        else if (existingKey != keys.end())
+        {
+            keys.erase(existingKey);
+        }
+
+        // Store them in manifest order, so the card renders in the order the
+        // integration intended no matter which boxes were ticked when.
+        if (const auto manifestFields = _Manifest.Fields())
+        {
+            std::vector<hstring> ordered;
+            for (const auto& field : manifestFields)
+            {
+                if (std::find(keys.begin(), keys.end(), field.Key()) != keys.end())
+                {
+                    ordered.push_back(field.Key());
+                }
+            }
+            keys = std::move(ordered);
+        }
+
+        entry.Fields(single_threaded_vector<hstring>(std::move(keys)));
+        _NotifyChanges(L"Visible");
+    }
+
+#pragma endregion
+
+#pragma region IntegrationMatcherViewModel
+
+    IntegrationMatcherViewModel::IntegrationMatcherViewModel(Model::IntegrationMatcher matcher,
+                                                             Model::WindowSettings windowSettings,
+                                                             hstring integrationId,
+                                                             hstring integrationName) :
+        _Matcher{ std::move(matcher) },
+        _WindowSettings{ std::move(windowSettings) },
+        _IntegrationId{ std::move(integrationId) },
+        _IntegrationName{ std::move(integrationName) }
+    {
+    }
+
+    hstring IntegrationMatcherViewModel::Description() const
+    {
+        const auto description = _Matcher.Description();
+        return description.empty() ? _Matcher.Pattern() : description;
+    }
+
+    // Turns the suggestion into a real text-kind rule on the Link Tooltip page,
+    // bound to this integration. Returns the rule's name so the page can say what
+    // it added.
+    hstring IntegrationMatcherViewModel::AddAsRule()
+    {
+        const auto description = Description();
+        const auto name = _IntegrationName.empty() ?
+                              description :
+                              til::hstring_format(FMT_COMPILE(L"{}: {}"), _IntegrationName, description);
+
+        Model::HyperlinkTooltipRule rule{};
+        rule.Name(name);
+        rule.Enabled(true);
+        rule.Kind(Model::HyperlinkMatchKind::Text);
+        rule.Pattern(_Matcher.Pattern());
+        rule.Integration(_IntegrationId);
+        rule.ShowPreview(true);
+        rule.CustomActions(single_threaded_vector<Model::HyperlinkTooltipAction>());
+
+        auto rules = _WindowSettings.HyperlinkTooltipRules();
+        if (!rules)
+        {
+            rules = single_threaded_vector<Model::HyperlinkTooltipRule>();
+        }
+        // Same inheritable-setting trap as _ensureEntry: pin the vector as the
+        // user's own value, or the rule is appended to a temporary.
+        _WindowSettings.HyperlinkTooltipRules(rules);
+        rules.Append(rule);
+
+        return name;
+    }
+
+#pragma endregion
+
+#pragma region IntegrationViewModel
+
+    IntegrationViewModel::IntegrationViewModel(Model::IntegrationManifest manifest,
+                                               Model::GlobalAppSettings globalSettings,
+                                               Model::WindowSettings windowSettings) :
+        _Manifest{ std::move(manifest) },
+        _GlobalSettings{ std::move(globalSettings) },
+        _WindowSettings{ std::move(windowSettings) }
+    {
+        const auto id = Id();
+
+        std::vector<Editor::IntegrationSettingViewModel> settingVMs;
+        if (const auto fields = _Manifest.Settings())
+        {
+            for (const auto& field : fields)
+            {
+                settingVMs.push_back(make<IntegrationSettingViewModel>(field, _GlobalSettings, id));
+            }
+        }
+        _Settings = single_threaded_observable_vector<Editor::IntegrationSettingViewModel>(std::move(settingVMs));
+
+        std::vector<Editor::IntegrationCredentialViewModel> credentialVMs;
+        if (const auto fields = _Manifest.Credentials())
+        {
+            for (const auto& field : fields)
+            {
+                credentialVMs.push_back(make<IntegrationCredentialViewModel>(field, id));
+            }
+        }
+        _Credentials = single_threaded_observable_vector<Editor::IntegrationCredentialViewModel>(std::move(credentialVMs));
+
+        std::vector<Editor::IntegrationDisplayFieldViewModel> fieldVMs;
+        if (const auto fields = _Manifest.Fields())
+        {
+            for (const auto& field : fields)
+            {
+                fieldVMs.push_back(make<IntegrationDisplayFieldViewModel>(field, _Manifest, _GlobalSettings, id));
+            }
+        }
+        _Fields = single_threaded_observable_vector<Editor::IntegrationDisplayFieldViewModel>(std::move(fieldVMs));
+
+        // Only text matchers the manifest flags as "suggested" are offered here --
+        // link matchers need no rule of their own, they run against hovered links.
+        std::vector<Editor::IntegrationMatcherViewModel> matcherVMs;
+        if (const auto matchers = _Manifest.Matchers())
+        {
+            for (const auto& matcher : matchers)
+            {
+                if (matcher.Kind() == Model::IntegrationMatcherKind::Text && matcher.Suggested() && !matcher.Pattern().empty())
+                {
+                    matcherVMs.push_back(make<IntegrationMatcherViewModel>(matcher, _WindowSettings, id, Name()));
+                }
+            }
+        }
+        _SuggestedMatchers = single_threaded_observable_vector<Editor::IntegrationMatcherViewModel>(std::move(matcherVMs));
+
+        // Typing into a setting or storing a credential is what flips
+        // "not configured" off, so listen to every child that can do it.
+        for (const auto& vm : _Settings)
+        {
+            _childRevokers.push_back(vm.PropertyChanged(winrt::auto_revoke, [this](auto&&, auto&&) { _recomputeConfigured(); }));
+        }
+        for (const auto& vm : _Credentials)
+        {
+            _childRevokers.push_back(vm.PropertyChanged(winrt::auto_revoke, [this](auto&&, auto&&) { _recomputeConfigured(); }));
+        }
+
+        _recomputeConfigured();
+    }
+
+    hstring IntegrationViewModel::Name() const
+    {
+        const auto name = _Manifest.Name();
+        return name.empty() ? _Manifest.Id() : name;
+    }
+
+    hstring IntegrationViewModel::Icon() const
+    {
+        const auto icon = _Manifest.Icon();
+        return icon.empty() ? hstring{ DefaultIntegrationGlyph } : icon;
+    }
+
+    hstring IntegrationViewModel::AccessibleName() const
+    {
+        const auto source = Source();
+        if (source.empty())
+        {
+            return Name();
+        }
+        return til::hstring_format(FMT_COMPILE(L"{}, {}"), Name(), source);
+    }
+
+    bool IntegrationViewModel::Enabled() const
+    {
+        if (const auto entry = _findEntry(_GlobalSettings, Id()))
+        {
+            return entry.Enabled();
+        }
+        return false;
+    }
+
+    void IntegrationViewModel::Enabled(bool value)
+    {
+        if (Enabled() == value)
+        {
+            return;
+        }
+        _ensureEntry(_GlobalSettings, Id()).Enabled(value);
+        _NotifyChanges(L"Enabled");
+    }
+
+    void IntegrationViewModel::_recomputeConfigured()
+    {
+        auto configured = true;
+
+        for (const auto& setting : _Settings)
+        {
+            if (setting.Required() && setting.Value().empty())
+            {
+                configured = false;
+                break;
+            }
+        }
+
+        if (configured)
+        {
+            for (const auto& credential : _Credentials)
+            {
+                if (!credential.IsStored())
+                {
+                    configured = false;
+                    break;
+                }
+            }
+        }
+
+        if (configured != _isConfigured)
+        {
+            _isConfigured = configured;
+            _NotifyChanges(L"IsConfigured", L"IsNotConfigured");
+        }
+    }
+
+#pragma endregion
+
+#pragma region IntegrationsViewModel
+
+    IntegrationsViewModel::IntegrationsViewModel(Model::GlobalAppSettings globalSettings, Model::WindowSettings windowSettings) :
+        _GlobalSettings{ std::move(globalSettings) },
+        _WindowSettings{ std::move(windowSettings) }
+    {
+        std::vector<Editor::IntegrationViewModel> integrationVMs;
+        if (const auto manifests = Model::IntegrationRegistry::All())
+        {
+            for (const auto& manifest : manifests)
+            {
+                integrationVMs.push_back(make<IntegrationViewModel>(manifest, _GlobalSettings, _WindowSettings));
+            }
+        }
+        _Integrations = single_threaded_observable_vector<Editor::IntegrationViewModel>(std::move(integrationVMs));
+    }
+
+    hstring IntegrationsViewModel::UserDirectory() const
+    {
+        try
+        {
+            return Model::IntegrationRegistry::UserDirectory();
+        }
+        CATCH_LOG();
+        return {};
+    }
+
+    void IntegrationsViewModel::RequestNavigateToLinkTooltip()
+    {
+        NavigateToLinkTooltipRequested.raise(*this, nullptr);
+    }
+
+#pragma endregion
+}

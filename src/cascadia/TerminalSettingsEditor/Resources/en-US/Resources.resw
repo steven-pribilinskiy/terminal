@@ -3172,4 +3172,156 @@
     <value>Executable</value>
     <comment>An option to choose from for the "file type" match criterion. Matches common executable file extensions.</comment>
   </data>
+  <data name="LinkTooltip_RuleKind.Header" xml:space="preserve">
+    <value>Match kind</value>
+    <comment>Header for a control to choose whether a rule matches links or plain terminal text.</comment>
+  </data>
+  <data name="LinkTooltip_RuleKind.Description" xml:space="preserve">
+    <value>Links are matched against detected or embedded hyperlinks. Text is matched against the terminal's output, turning what it finds into a hoverable match.</value>
+    <comment>Additional text presented near "LinkTooltip_RuleKind.Header".</comment>
+  </data>
+  <data name="LinkTooltip_MatchKindLink.Content" xml:space="preserve">
+    <value>Link</value>
+    <comment>An option to choose from for the "match kind" setting. The rule applies to hyperlinks.</comment>
+  </data>
+  <data name="LinkTooltip_MatchKindText.Content" xml:space="preserve">
+    <value>Text</value>
+    <comment>An option to choose from for the "match kind" setting. The rule applies to plain text in the terminal's output.</comment>
+  </data>
+  <data name="LinkTooltip_RuleTextPatternHint.Text" xml:space="preserve">
+    <value>Matched against the terminal's output. The whole match becomes hoverable and clickable.</value>
+    <comment>A hint shown under the "pattern" box when the rule matches text rather than links.</comment>
+  </data>
+  <data name="LinkTooltip_PreviewHeader.Text" xml:space="preserve">
+    <value>Preview</value>
+    <comment>Header for a group of settings that control the live preview an integration adds to the link tooltip.</comment>
+  </data>
+  <data name="LinkTooltip_RuleIntegration.Header" xml:space="preserve">
+    <value>Integration</value>
+    <comment>Header for a control to choose which integration fetches the preview shown on the link tooltip for this rule.</comment>
+  </data>
+  <data name="LinkTooltip_RuleIntegration.Description" xml:space="preserve">
+    <value>Which integration looks up what a match refers to. "Automatic" uses the first enabled integration that recognizes it.</value>
+    <comment>{Locked="Automatic"} Additional text presented near "LinkTooltip_RuleIntegration.Header".</comment>
+  </data>
+  <data name="LinkTooltip_RuleShowPreview.Header" xml:space="preserve">
+    <value>Show preview</value>
+    <comment>Header for a control to toggle whether the link tooltip shows the details an integration fetched.</comment>
+  </data>
+  <data name="LinkTooltip_RuleShowPreview.Description" xml:space="preserve">
+    <value>Turn off to keep the tooltip's buttons without fetching anything.</value>
+    <comment>Additional text presented near "LinkTooltip_RuleShowPreview.Header".</comment>
+  </data>
+  <data name="LinkTooltip_IntegrationAutomatic" xml:space="preserve">
+    <value>Automatic</value>
+    <comment>An option to choose from for a rule's "integration" setting. Picks whichever enabled integration recognizes the match.</comment>
+  </data>
+  <data name="LinkTooltip_IntegrationNone" xml:space="preserve">
+    <value>None</value>
+    <comment>An option to choose from for a rule's "integration" setting. No integration previews the match.</comment>
+  </data>
+  <data name="Nav_Integrations.Content" xml:space="preserve">
+    <value>Integrations</value>
+    <comment>Header for the "integrations" menu item. This navigates to a page that lets you enable and configure the integrations that look up what a link or a piece of terminal output refers to.</comment>
+  </data>
+  <data name="Integrations_PageDescription.Text" xml:space="preserve">
+    <value>Integrations teach the terminal what a link or a piece of output refers to, so hovering it can show a live preview. Enable the ones you use and fill in what they need.</value>
+    <comment>A description of what the Integrations page is for, shown at the top of it.</comment>
+  </data>
+  <data name="Integrations_UserDirectoryHint.Text" xml:space="preserve">
+    <value>To add your own, drop a folder containing an integration.json into</value>
+    <comment>{Locked="integration.json"} A hint shown at the top of the Integrations page. The folder's path follows this text.</comment>
+  </data>
+  <data name="Integrations_NoIntegrations.Text" xml:space="preserve">
+    <value>No integrations were found.</value>
+    <comment>Shown on the Integrations page when there is nothing to list.</comment>
+  </data>
+  <data name="Integrations_CloseEditorButton.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Close integration settings</value>
+    <comment>The name of a button that returns from one integration's settings to the list of integrations.</comment>
+  </data>
+  <data name="Integrations_NotConfiguredInfoBar.Title" xml:space="preserve">
+    <value>Not configured</value>
+    <comment>Title of a warning shown when an integration is missing something it needs before it can be used.</comment>
+  </data>
+  <data name="Integrations_NotConfiguredInfoBar.Message" xml:space="preserve">
+    <value>Fill in the required settings and credentials below. Until then, this integration is never contacted.</value>
+    <comment>The body of a warning shown when an integration is missing something it needs before it can be used.</comment>
+  </data>
+  <data name="Integrations_Enabled.Header" xml:space="preserve">
+    <value>Enabled</value>
+    <comment>Header for a control to toggle whether an integration is used.</comment>
+  </data>
+  <data name="Integrations_Enabled.Description" xml:space="preserve">
+    <value>A disabled integration is never contacted, whatever a rule says.</value>
+    <comment>Additional text presented near "Integrations_Enabled.Header".</comment>
+  </data>
+  <data name="Integrations_Source.Header" xml:space="preserve">
+    <value>Source</value>
+    <comment>Header for a read-only row showing where an integration's definition came from.</comment>
+  </data>
+  <data name="Integrations_Source.Description" xml:space="preserve">
+    <value>Where this integration's definition came from.</value>
+    <comment>Additional text presented near "Integrations_Source.Header".</comment>
+  </data>
+  <data name="Integrations_SettingsHeader.Text" xml:space="preserve">
+    <value>Settings</value>
+    <comment>Header for the group of plain, non-secret values an integration needs.</comment>
+  </data>
+  <data name="Integrations_CredentialsHeader.Text" xml:space="preserve">
+    <value>Credentials</value>
+    <comment>Header for the group of secrets an integration needs to authenticate.</comment>
+  </data>
+  <data name="Integrations_CredentialsDescription.Text" xml:space="preserve">
+    <value>Credentials are saved in Windows Credential Manager, never in settings.json, and are only ever sent to the host this integration is configured for.</value>
+    <comment>{Locked="Windows Credential Manager"}{Locked="settings.json"} A description of where an integration's credentials are stored.</comment>
+  </data>
+  <data name="Integrations_CredentialBox.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>New value</value>
+    <comment>The name of the box used to type a new value for one of an integration's credentials.</comment>
+  </data>
+  <data name="Integrations_SaveCredentialButton.Content" xml:space="preserve">
+    <value>Save</value>
+    <comment>Text for a button that stores the typed credential in Windows Credential Manager.</comment>
+  </data>
+  <data name="Integrations_ClearCredentialButton.Content" xml:space="preserve">
+    <value>Clear</value>
+    <comment>Text for a button that removes a stored credential from Windows Credential Manager.</comment>
+  </data>
+  <data name="Integrations_CredentialStored" xml:space="preserve">
+    <value>Stored in Windows Credential Manager</value>
+    <comment>{Locked="Windows Credential Manager"} Shown next to a credential that has been saved.</comment>
+  </data>
+  <data name="Integrations_CredentialNotSet" xml:space="preserve">
+    <value>Not set</value>
+    <comment>Shown next to a credential that has not been saved yet.</comment>
+  </data>
+  <data name="Integrations_FieldsHeader.Text" xml:space="preserve">
+    <value>Show in tooltip</value>
+    <comment>Header for the group of check boxes choosing which of an integration's fields appear on the link tooltip.</comment>
+  </data>
+  <data name="Integrations_MatchersHeader.Text" xml:space="preserve">
+    <value>Detect in output</value>
+    <comment>Header for the group of text patterns an integration suggests turning into rules.</comment>
+  </data>
+  <data name="Integrations_MatchersDescription.Text" xml:space="preserve">
+    <value>Patterns this integration can recognize in plain terminal output. Adding one creates a rule on the Link Tooltip page, which you can edit or remove later.</value>
+    <comment>A description of the suggested text patterns listed below it.</comment>
+  </data>
+  <data name="Integrations_AddAsRuleButton.Content" xml:space="preserve">
+    <value>Add as rule</value>
+    <comment>Text for a button that turns a suggested text pattern into a link tooltip rule.</comment>
+  </data>
+  <data name="Integrations_RuleAddedInfoBar.Title" xml:space="preserve">
+    <value>Rule added</value>
+    <comment>Title of a message shown after a suggested text pattern has been turned into a rule.</comment>
+  </data>
+  <data name="Integrations_RuleAddedInfoBar.Message" xml:space="preserve">
+    <value>The new rule is on the Link Tooltip page, where you can rename, reorder, or remove it.</value>
+    <comment>The body of a message shown after a suggested text pattern has been turned into a rule.</comment>
+  </data>
+  <data name="Integrations_GoToLinkTooltipButton.Content" xml:space="preserve">
+    <value>Go to Link Tooltip</value>
+    <comment>Text for a button that navigates to the Link Tooltip page.</comment>
+  </data>
 </root>

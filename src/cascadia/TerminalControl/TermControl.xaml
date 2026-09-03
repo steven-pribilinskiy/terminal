@@ -1322,6 +1322,105 @@
                                            TextWrapping="Wrap"
                                            Visibility="Collapsed" />
 
+                                <!--
+                                    What an integration has to say about the hovered link, or about
+                                    the plain text a text rule matched. TermControl shows this
+                                    section with the ring spinning while the fetch is in flight and
+                                    fills it in when the result arrives; the whole thing stays
+                                    collapsed when there is nothing to fetch, which is the ordinary
+                                    case for an ordinary link.
+                                -->
+                                <StackPanel x:Name="HyperlinkCardPreview"
+                                            Spacing="4"
+                                            Visibility="Collapsed">
+                                    <StackPanel Orientation="Horizontal"
+                                                Spacing="6">
+                                        <ContentControl x:Name="HyperlinkCardPreviewIcon"
+                                                        VerticalAlignment="Center"
+                                                        IsTabStop="False" />
+                                        <TextBlock x:Name="HyperlinkCardPreviewName"
+                                                   VerticalAlignment="Center"
+                                                   Opacity="0.7" />
+                                        <!--  MinWidth/MinHeight are zeroed because the default style floors the ring well above 16 px, as TabHeaderControl found.  -->
+                                        <mux:ProgressRing x:Name="HyperlinkCardPreviewProgress"
+                                                          Width="16"
+                                                          Height="16"
+                                                          MinWidth="0"
+                                                          MinHeight="0"
+                                                          IsActive="False"
+                                                          Visibility="Collapsed" />
+                                    </StackPanel>
+
+                                    <!--  Why the integration could not answer, in place of the fields it would have produced.  -->
+                                    <TextBlock x:Name="HyperlinkCardPreviewError"
+                                               Opacity="0.8"
+                                               TextWrapping="Wrap"
+                                               Visibility="Collapsed" />
+
+                                    <!--
+                                        One row per field the integration returned, populated
+                                        per-hover by TermControl: a snapshot, not a live list.
+                                    -->
+                                    <ItemsControl x:Name="HyperlinkCardPreviewFields"
+                                                  IsTabStop="False">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="local:HyperlinkPreviewField">
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"
+                                                                          MinWidth="64" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <!--  A title spans both columns: it is the subject of the card, not a labelled row.  -->
+                                                    <TextBlock Grid.ColumnSpan="2"
+                                                               FontWeight="SemiBold"
+                                                               IsTextSelectionEnabled="True"
+                                                               MaxLines="3"
+                                                               Text="{x:Bind Value}"
+                                                               TextWrapping="Wrap"
+                                                               Visibility="{x:Bind IsTitle}" />
+
+                                                    <TextBlock Grid.Column="0"
+                                                               VerticalAlignment="Top"
+                                                               Opacity="0.7"
+                                                               Text="{x:Bind Label}"
+                                                               Visibility="{x:Bind IsRow}" />
+
+                                                    <StackPanel Grid.Column="1"
+                                                                Orientation="Horizontal"
+                                                                Spacing="6"
+                                                                Visibility="{x:Bind IsRow}">
+                                                        <Image Width="16"
+                                                               Height="16"
+                                                               Margin="0,2,0,0"
+                                                               VerticalAlignment="Top"
+                                                               Source="{x:Bind local:HyperlinkPreviewHelpers.ImageFromUri(IconUri)}"
+                                                               Visibility="{x:Bind HasIcon}" />
+                                                        <Border Padding="6,1"
+                                                                VerticalAlignment="Top"
+                                                                Background="{x:Bind local:HyperlinkPreviewHelpers.BadgeBrush(Color)}"
+                                                                CornerRadius="4"
+                                                                Visibility="{x:Bind IsBadge}">
+                                                            <TextBlock FontSize="12"
+                                                                       Text="{x:Bind Value}" />
+                                                        </Border>
+                                                        <TextBlock IsTextSelectionEnabled="True"
+                                                                   MaxLines="6"
+                                                                   Text="{x:Bind Value}"
+                                                                   TextWrapping="Wrap"
+                                                                   Visibility="{x:Bind IsPlain}" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <!--  Reserved for a plugin's own HTML representation. Nothing hosts it yet.  -->
+                                    <Border x:Name="HyperlinkCardHtmlHost"
+                                            Visibility="Collapsed" />
+                                </StackPanel>
+
                                 <StackPanel x:Name="HyperlinkCardActions"
                                             Orientation="Horizontal"
                                             Spacing="4">

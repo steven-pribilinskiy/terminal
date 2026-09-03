@@ -1,0 +1,243 @@
+<!--
+    Copyright (c) Microsoft Corporation. All rights reserved. Licensed under
+    the MIT License. See LICENSE in the project root for license information.
+-->
+<Page x:Class="Microsoft.Terminal.Settings.Editor.Integrations"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:local="using:Microsoft.Terminal.Settings.Editor"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:mtu="using:Microsoft.Terminal.UI"
+      xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
+      mc:Ignorable="d">
+
+    <Page.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="CommonResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!--  Paths and regular expressions read better in a fixed-width face.  -->
+            <Style x:Key="IntegrationsCodeTextStyle"
+                   TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="Cascadia Mono, Consolas" />
+                <Setter Property="IsTextSelectionEnabled" Value="True" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
+        </ResourceDictionary>
+    </Page.Resources>
+
+    <StackPanel>
+        <!--  The list of known integrations. Hidden while one is being configured.  -->
+        <StackPanel Spacing="2"
+                    Style="{StaticResource SettingsStackStyle}"
+                    Visibility="{x:Bind ViewModel.IsNotEditing, Mode=OneWay}">
+            <TextBlock x:Uid="Integrations_PageDescription"
+                       IsTextSelectionEnabled="True"
+                       Style="{StaticResource DisclaimerStyle}" />
+
+            <StackPanel Margin="0,0,0,8"
+                        Orientation="Horizontal"
+                        Spacing="6">
+                <TextBlock x:Uid="Integrations_UserDirectoryHint"
+                           Margin="0"
+                           Style="{StaticResource DisclaimerStyle}"
+                           VerticalAlignment="Center" />
+                <TextBlock Style="{StaticResource IntegrationsCodeTextStyle}"
+                           Text="{x:Bind ViewModel.UserDirectory}" />
+            </StackPanel>
+
+            <TextBlock x:Uid="Integrations_NoIntegrations"
+                       Style="{StaticResource DisclaimerStyle}"
+                       Visibility="{x:Bind ViewModel.NoIntegrations, Mode=OneWay}" />
+
+            <ItemsControl ItemsSource="{x:Bind ViewModel.Integrations, Mode=OneWay}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="local:IntegrationViewModel">
+                        <local:SettingsCard x:Uid="Integrations_IntegrationNavigator"
+                                            Margin="0,2,0,0"
+                                            AutomationProperties.Name="{x:Bind AccessibleName}"
+                                            Click="IntegrationNavigator_Click"
+                                            Description="{x:Bind Source}"
+                                            Header="{x:Bind Name}"
+                                            IsClickEnabled="True"
+                                            Tag="{x:Bind}">
+                            <local:SettingsCard.HeaderIcon>
+                                <IconSourceElement IconSource="{x:Bind mtu:IconPathConverter.IconSourceWUX(Icon)}" />
+                            </local:SettingsCard.HeaderIcon>
+                            <ToggleSwitch HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          AutomationProperties.Name="{x:Bind AccessibleName}"
+                                          IsOn="{x:Bind Enabled, Mode=TwoWay}"
+                                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                        </local:SettingsCard>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+
+        <!--  Detail: master-detail, edits ViewModel.CurrentIntegration in place  -->
+        <StackPanel Margin="0,12,0,0"
+                    Padding="12"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource FlyoutBorderThemeBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{ThemeResource OverlayCornerRadius}"
+                    Spacing="2"
+                    Style="{StaticResource SettingsStackStyle}"
+                    Visibility="{x:Bind ViewModel.IsEditing, Mode=OneWay}">
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock VerticalAlignment="Center"
+                           Style="{StaticResource TextBlockSubHeaderStyle}"
+                           Text="{x:Bind ViewModel.CurrentIntegration.Name, Mode=OneWay}" />
+                <Button x:Uid="Integrations_CloseEditorButton"
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Click="CloseIntegrationEditor_Click">
+                    <FontIcon FontSize="{StaticResource StandardIconSize}"
+                              Glyph="&#xE711;" />
+                </Button>
+            </Grid>
+
+            <muxc:InfoBar x:Uid="Integrations_NotConfiguredInfoBar"
+                          Margin="0,0,0,8"
+                          IsClosable="False"
+                          IsOpen="{x:Bind ViewModel.CurrentIntegration.IsNotConfigured, Mode=OneWay}"
+                          Severity="Warning" />
+
+            <local:SettingsCard x:Uid="Integrations_Enabled">
+                <ToggleSwitch IsOn="{x:Bind ViewModel.CurrentIntegration.Enabled, Mode=TwoWay}"
+                              Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+            </local:SettingsCard>
+
+            <local:SettingsCard x:Uid="Integrations_Source">
+                <TextBlock Style="{StaticResource SettingContainerCurrentValueTextBlockStyle}"
+                           Text="{x:Bind ViewModel.CurrentIntegration.Source, Mode=OneWay}" />
+            </local:SettingsCard>
+
+            <!--  Settings: plain values, stored in settings.json  -->
+            <TextBlock x:Uid="Integrations_SettingsHeader"
+                       Style="{StaticResource TextBlockSubHeaderStyle}"
+                       Visibility="{x:Bind ViewModel.CurrentIntegration.HasSettings, Mode=OneWay}" />
+
+            <ItemsControl ItemsSource="{x:Bind ViewModel.CurrentIntegration.Settings, Mode=OneWay}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="local:IntegrationSettingViewModel">
+                        <local:SettingsCard x:Uid="Integrations_SettingRow"
+                                            Margin="0,2,0,0"
+                                            Description="{x:Bind Description}"
+                                            Header="{x:Bind Label}">
+                            <TextBox IsSpellCheckEnabled="False"
+                                     PlaceholderText="{x:Bind Placeholder}"
+                                     Style="{StaticResource TextBoxSettingStyle}"
+                                     Text="{x:Bind Value, Mode=TwoWay}" />
+                        </local:SettingsCard>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!--  Credentials: written straight to the Windows credential vault  -->
+            <TextBlock x:Uid="Integrations_CredentialsHeader"
+                       Style="{StaticResource TextBlockSubHeaderStyle}"
+                       Visibility="{x:Bind ViewModel.CurrentIntegration.HasCredentials, Mode=OneWay}" />
+
+            <TextBlock x:Uid="Integrations_CredentialsDescription"
+                       Style="{StaticResource DisclaimerStyle}"
+                       Visibility="{x:Bind ViewModel.CurrentIntegration.HasCredentials, Mode=OneWay}" />
+
+            <ItemsControl ItemsSource="{x:Bind ViewModel.CurrentIntegration.Credentials, Mode=OneWay}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="local:IntegrationCredentialViewModel">
+                        <local:SettingsCard x:Uid="Integrations_CredentialRow"
+                                            Margin="0,2,0,0"
+                                            ContentAlignment="Vertical"
+                                            Description="{x:Bind Description}"
+                                            Header="{x:Bind Label}">
+                            <StackPanel HorizontalAlignment="Left"
+                                        Orientation="Horizontal"
+                                        Spacing="8">
+                                <PasswordBox x:Uid="Integrations_CredentialBox"
+                                             MinWidth="248"
+                                             Password="{x:Bind PendingValue, Mode=OneWay}"
+                                             PasswordChanged="CredentialPassword_Changed"
+                                             Tag="{x:Bind}" />
+                                <Button x:Uid="Integrations_SaveCredentialButton"
+                                        Click="SaveCredential_Click"
+                                        Tag="{x:Bind}" />
+                                <Button x:Uid="Integrations_ClearCredentialButton"
+                                        Click="ClearCredential_Click"
+                                        IsEnabled="{x:Bind IsStored, Mode=OneWay}"
+                                        Tag="{x:Bind}" />
+                                <TextBlock VerticalAlignment="Center"
+                                           Style="{StaticResource SettingsPageItemDescriptionStyle}"
+                                           Text="{x:Bind StatusText, Mode=OneWay}" />
+                            </StackPanel>
+                        </local:SettingsCard>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!--  Which of the integration's fields the hyperlink card shows  -->
+            <TextBlock x:Uid="Integrations_FieldsHeader"
+                       Style="{StaticResource TextBlockSubHeaderStyle}"
+                       Visibility="{x:Bind ViewModel.CurrentIntegration.HasFields, Mode=OneWay}" />
+
+            <ItemsControl ItemsSource="{x:Bind ViewModel.CurrentIntegration.Fields, Mode=OneWay}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="local:IntegrationDisplayFieldViewModel">
+                        <CheckBox Content="{x:Bind Label}"
+                                  IsChecked="{x:Bind Visible, Mode=TwoWay}" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!--  Text patterns the integration suggests turning into rules  -->
+            <TextBlock x:Uid="Integrations_MatchersHeader"
+                       Style="{StaticResource TextBlockSubHeaderStyle}"
+                       Visibility="{x:Bind ViewModel.CurrentIntegration.HasSuggestedMatchers, Mode=OneWay}" />
+
+            <TextBlock x:Uid="Integrations_MatchersDescription"
+                       Style="{StaticResource DisclaimerStyle}"
+                       Visibility="{x:Bind ViewModel.CurrentIntegration.HasSuggestedMatchers, Mode=OneWay}" />
+
+            <ItemsControl ItemsSource="{x:Bind ViewModel.CurrentIntegration.SuggestedMatchers, Mode=OneWay}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="local:IntegrationMatcherViewModel">
+                        <local:SettingsCard x:Uid="Integrations_MatcherRow"
+                                            Margin="0,2,0,0"
+                                            ContentAlignment="Vertical"
+                                            Header="{x:Bind Description}">
+                            <StackPanel HorizontalAlignment="Left"
+                                        Orientation="Horizontal"
+                                        Spacing="8">
+                                <TextBlock Style="{StaticResource IntegrationsCodeTextStyle}"
+                                           Text="{x:Bind Pattern}" />
+                                <Button x:Uid="Integrations_AddAsRuleButton"
+                                        Click="AddMatcherAsRule_Click"
+                                        Tag="{x:Bind}" />
+                            </StackPanel>
+                        </local:SettingsCard>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <muxc:InfoBar x:Name="RuleAddedInfoBar"
+                          x:Uid="Integrations_RuleAddedInfoBar"
+                          Margin="0,8,0,0"
+                          IsOpen="False"
+                          Severity="Success">
+                <muxc:InfoBar.ActionButton>
+                    <Button x:Uid="Integrations_GoToLinkTooltipButton"
+                            Click="GoToLinkTooltip_Click" />
+                </muxc:InfoBar.ActionButton>
+            </muxc:InfoBar>
+        </StackPanel>
+    </StackPanel>
+</Page>

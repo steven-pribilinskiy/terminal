@@ -13,6 +13,9 @@ using namespace winrt::Windows::Foundation::Collections;
 
 static constexpr std::string_view NameKey{ "name" };
 static constexpr std::string_view EnabledKey{ "enabled" };
+static constexpr std::string_view KindKey{ "match" };
+static constexpr std::string_view IntegrationKey{ "integration" };
+static constexpr std::string_view ShowPreviewKey{ "preview" };
 static constexpr std::string_view SchemesKey{ "schemes" };
 static constexpr std::string_view PatternKey{ "pattern" };
 static constexpr std::string_view FileTypeGroupKey{ "fileTypeGroup" };
@@ -34,6 +37,9 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
 
         JsonUtils::SetValueForKey(json, NameKey, _Name);
         JsonUtils::SetValueForKey(json, EnabledKey, _Enabled);
+        JsonUtils::SetValueForKey(json, KindKey, _Kind);
+        JsonUtils::SetValueForKey(json, IntegrationKey, _Integration);
+        JsonUtils::SetValueForKey(json, ShowPreviewKey, _ShowPreview);
         JsonUtils::SetValueForKey(json, SchemesKey, _Schemes);
         JsonUtils::SetValueForKey(json, PatternKey, _Pattern);
         JsonUtils::SetValueForKey(json, FileTypeGroupKey, _FileTypeGroup);
@@ -56,6 +62,9 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
 
         JsonUtils::GetValueForKey(json, NameKey, rule->_Name);
         JsonUtils::GetValueForKey(json, EnabledKey, rule->_Enabled);
+        JsonUtils::GetValueForKey(json, KindKey, rule->_Kind);
+        JsonUtils::GetValueForKey(json, IntegrationKey, rule->_Integration);
+        JsonUtils::GetValueForKey(json, ShowPreviewKey, rule->_ShowPreview);
         JsonUtils::GetValueForKey(json, SchemesKey, rule->_Schemes);
         JsonUtils::GetValueForKey(json, PatternKey, rule->_Pattern);
         JsonUtils::GetValueForKey(json, FileTypeGroupKey, rule->_FileTypeGroup);
@@ -77,6 +86,9 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         auto rule = winrt::make_self<HyperlinkTooltipRule>();
         rule->_Name = _Name;
         rule->_Enabled = _Enabled;
+        rule->_Kind = _Kind;
+        rule->_Integration = _Integration;
+        rule->_ShowPreview = _ShowPreview;
         rule->_Pattern = _Pattern;
         rule->_FileTypeGroup = _FileTypeGroup;
         rule->_TooltipShowDelay = _TooltipShowDelay;

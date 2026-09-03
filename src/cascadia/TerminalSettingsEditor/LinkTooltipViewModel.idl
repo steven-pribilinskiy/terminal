@@ -16,6 +16,14 @@ namespace Microsoft.Terminal.Settings.Editor
         String Icon;
     }
 
+    // One entry in a rule's "Integration" picker: an integration id (or "" for
+    // automatic, "none" for no preview) paired with what to show for it.
+    [default_interface] runtimeclass IntegrationChoiceViewModel
+    {
+        String Id { get; };
+        String DisplayName { get; };
+    }
+
     [default_interface] runtimeclass HyperlinkTooltipRuleViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
     {
         HyperlinkTooltipRuleViewModel(Microsoft.Terminal.Settings.Model.HyperlinkTooltipRule rule);
@@ -24,6 +32,12 @@ namespace Microsoft.Terminal.Settings.Editor
         Boolean Enabled;
         String SummaryText { get; };
 
+        // Link rules match hovered links; text rules match plain terminal output.
+        IInspectable CurrentKind;
+        Windows.Foundation.Collections.IObservableVector<EnumEntry> KindList { get; };
+        Boolean IsLinkKind { get; };
+        Boolean IsTextKind { get; };
+
         // Comma-separated, same convention as LinkTooltipViewModel.SafeUriSchemes.
         String Schemes;
         String Pattern;
@@ -31,6 +45,15 @@ namespace Microsoft.Terminal.Settings.Editor
         IInspectable CurrentFileTypeGroup;
         Windows.Foundation.Collections.IObservableVector<EnumEntry> FileTypeGroupList { get; };
         String CustomExtensions;
+
+        // Which integration previews matches: "" = pick automatically,
+        // "none" = no preview, else an integration id.
+        String Integration;
+        Windows.Foundation.Collections.IVector<IntegrationChoiceViewModel> IntegrationChoices { get; };
+        // IInspectable rather than IntegrationChoiceViewModel, so the two-way
+        // ComboBox binding matches how CurrentFileTypeGroup already works.
+        IInspectable CurrentIntegrationChoice;
+        Boolean ShowPreview;
 
         // Each override pairs a bool (is this field overridden at all) with the value to
         // use when it is -- unlike a plain nullable NumberBox binding, this keeps the last

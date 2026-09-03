@@ -15,6 +15,7 @@
 #include "../../types/inc/utils.hpp"
 #include "../../tsf/Handle.h"
 #include "HyperlinkFileTypeGroups.h"
+#include "HyperlinkPreview.h"
 
 #include "TermControl.g.cpp"
 
@@ -3407,6 +3408,26 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // (like ShellExecute pumping our messaging thread...GH#7994)
         co_await winrt::resume_foreground(Dispatcher());
 
+        // A text match arrives here as the plain text it matched -- "CAB-8209", not a URI --
+        // because that is what the buffer scanner found and what ControlCore reported. Only
+        // an integration knows what it stands for, so give it the chance to say before the
+        // event carries on to TerminalPage, which would otherwise refuse it as an invalid
+        // URI. An ordinary link resolves to nothing here and passes through untouched.
+        if (_hyperlinkPreviewProvider)
+        {
+            hstring resolved;
+            try
+            {
+                resolved = _hyperlinkPreviewProvider.ResolveLink(args.Uri());
+            }
+            CATCH_LOG();
+
+            if (!resolved.empty())
+            {
+                args = winrt::make<OpenHyperlinkEventArgs>(resolved);
+            }
+        }
+
         OpenHyperlink.raise(*strongThis, args);
     }
 
@@ -3636,7 +3657,40 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 continue;
             }
 
-            if (const auto schemes = rule.Schemes(); schemes && schemes.Size() > 0)
+            // A text-kind rule is not about links at all: its pattern is what the buffer
+            // scanner used to find this run of plain text in the first place, so the rule
+            // applies exactly when that pattern accounts for the whole of it. Anything less
+            // than a full match would attach the rule to text it never selected. A text rule
+            // with no pattern has nothing to match against and can never apply.
+            const auto isTextRule = rule.Kind() == Control::HyperlinkMatchKind::Text;
+            if (isTextRule)
+            {
+                const auto pattern = rule.Pattern();
+                if (pattern.empty())
+                {
+                    continue;
+                }
+
+                auto matched = false;
+                try
+                {
+                    const std::wregex re{ pattern.c_str(), std::regex_constants::ECMAScript | std::regex_constants::icase };
+                    matched = std::regex_match(uri.begin(), uri.end(), re);
+                }
+                catch (...)
+                {
+                    // An invalid regex never matches, rather than crashing or matching everything.
+                }
+                if (!matched)
+                {
+                    continue;
+                }
+            }
+
+            // The scheme, pattern and file-type criteria below all describe a URI, so a text
+            // rule skips them: the hovered run has no scheme, its pattern was already applied
+            // in full above, and "the extension of a Jira issue key" means nothing.
+            if (const auto schemes = rule.Schemes(); !isTextRule && schemes && schemes.Size() > 0)
             {
                 const auto found = std::any_of(begin(schemes), end(schemes), [&](const auto& s) {
                     return til::equals_insensitive_ascii(std::wstring_view{ scheme }, std::wstring_view{ s });
@@ -3647,7 +3701,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 }
             }
 
-            if (const auto pattern = rule.Pattern(); !pattern.empty())
+            if (const auto pattern = rule.Pattern(); !isTextRule && !pattern.empty())
             {
                 bool matched = false;
                 try
@@ -3668,7 +3722,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             const auto group = rule.FileTypeGroup();
             const auto customExtensions = rule.CustomExtensions();
             const auto hasExtensionCriteria = group != Control::HyperlinkFileTypeGroup::None || (customExtensions && customExtensions.Size() > 0);
-            if (hasExtensionCriteria)
+            if (!isTextRule && hasExtensionCriteria)
             {
                 if (extension.empty())
                 {
@@ -3714,6 +3768,14 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 }
             }
 
+            // Whether the hovered run is plain text rather than a URI is decided here and
+            // nowhere else, because only the rule that matched knows it. Everything
+            // downstream -- the punycode annotation, the target line, the two buttons that
+            // need a link -- keys off this.
+            effective.isTextMatch = isTextRule;
+            effective.integration = rule.Integration();
+            effective.showPreview = rule.ShowPreview();
+
             break;
         }
 
@@ -3746,6 +3808,20 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // annotation, which is there to be read, not to be opened or copied.
         _hoveredUri = uriText;
 
+        // A matching HyperlinkTooltipRule (if any) can override the delays, max width,
+        // built-in button visibility, and custom action list for this specific link. It is
+        // computed here rather than further down because it also says whether the hovered
+        // run is a URI at all: a text-kind rule matches plain terminal text (an issue key,
+        // say), which Windows::Foundation::Uri below would reject outright.
+        const auto target = _resolvedHyperlinkTarget();
+        _currentHyperlinkTooltipSettings = _effectiveHyperlinkTooltipSettings(_hoveredUri, !target.empty());
+
+        // A preview belongs to exactly one hover. Drop the last one before anything below
+        // reads it, and move the generation on so a fetch still in flight for the previous
+        // link is discarded rather than painted into the card this one is about to show.
+        _currentHyperlinkPreview = nullptr;
+        const auto previewGeneration = ++_hyperlinkPreviewGeneration;
+
         // A bare absolute POSIX path (no scheme, e.g. printed by a tool running
         // inside WSL) is never a valid Windows::Foundation::Uri -- schemes are
         // always [a-z][a-z0-9+.-]*:, which can't start with a slash. It's still a
@@ -3766,7 +3842,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // Such a detector however is not quite trivial and requires constant maintenance, which this project's
         // maintainers aren't currently well equipped to handle. As such we do the next best thing and show the
         // Punycode encoding side-by-side with the Unicode string for any IDN.
-        if (!looksLikeBarePosixPath)
+        // A text match is skipped for the same reason a bare POSIX path is: it is not a URI,
+        // so the Uri constructor below throws and the card would announce the user's own
+        // issue key as "Invalid URI".
+        if (!looksLikeBarePosixPath && !_currentHyperlinkTooltipSettings.isTextMatch)
         {
             try
             {
@@ -3799,26 +3878,50 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // Say where a file:// link will really go when that is not what it says. A POSIX
         // path printed inside WSL opens as \\wsl.localhost\<distro>\..., and seeing that
         // before clicking is the difference between trusting a link and finding out after.
-        const auto target = _resolvedHyperlinkTarget();
-        const auto showTarget = !target.empty() && target != std::wstring_view{ _hoveredUri };
+        // A text match gets the same line for a different reason: the match itself is not a
+        // link, so the link it stands for is the only thing that says what Open will do. It
+        // may not be known yet -- an integration that has to resolve it fills the line in
+        // when the preview lands.
+        const auto linkTarget = _hoveredLinkTarget();
+        const auto shownTarget = _currentHyperlinkTooltipSettings.isTextMatch ? std::wstring{ linkTarget } : target;
+        const auto showTarget = !shownTarget.empty() && shownTarget != std::wstring_view{ _hoveredUri };
         if (showTarget)
         {
-            HyperlinkCardTarget().Text(winrt::hstring{ L"\u2192 " + target });
+            HyperlinkCardTarget().Text(winrt::hstring{ L"\u2192 " + shownTarget });
         }
         HyperlinkCardTarget().Visibility(showTarget ? Visibility::Visible : Visibility::Collapsed);
 
-        // A matching HyperlinkTooltipRule (if any) can override the delays, max width,
-        // built-in button visibility, and custom action list for this specific link.
-        _currentHyperlinkTooltipSettings = _effectiveHyperlinkTooltipSettings(_hoveredUri, !target.empty());
-
-        // Copying a path and revealing one only mean anything for a file, on top of
-        // whatever the effective settings above already suppressed.
-        HyperlinkOpenButton().Visibility(_currentHyperlinkTooltipSettings.showOpen ? Visibility::Visible : Visibility::Collapsed);
-        HyperlinkCopyLinkButton().Visibility(_currentHyperlinkTooltipSettings.showCopyLink ? Visibility::Visible : Visibility::Collapsed);
+        // Open and Copy link need a link to act on, which for a text match only exists once
+        // something has resolved it. Copying a path and revealing one only mean anything for
+        // a file -- all four on top of whatever the effective settings already suppressed.
+        const auto hasLink = !linkTarget.empty();
+        HyperlinkOpenButton().Visibility(hasLink && _currentHyperlinkTooltipSettings.showOpen ? Visibility::Visible : Visibility::Collapsed);
+        HyperlinkCopyLinkButton().Visibility(hasLink && _currentHyperlinkTooltipSettings.showCopyLink ? Visibility::Visible : Visibility::Collapsed);
         const auto fileActions = !target.empty() && _currentHyperlinkTooltipSettings.showCopyPath;
         const auto fileReveal = !target.empty() && _currentHyperlinkTooltipSettings.showReveal;
         HyperlinkCopyPathButton().Visibility(fileActions ? Visibility::Visible : Visibility::Collapsed);
         HyperlinkRevealButton().Visibility(fileReveal ? Visibility::Visible : Visibility::Collapsed);
+
+        // Ask the integration layer for a preview, if one is possible at all: the provider
+        // is only set once the app has integrations, the matched rule may have opted out,
+        // and CanPreview is what knows whether any enabled integration claims this text.
+        // The answer decides whether the card opens with a spinner or with nothing extra.
+        auto wantPreview = false;
+        if (_hyperlinkPreviewProvider &&
+            _currentHyperlinkTooltipSettings.showPreview &&
+            _currentHyperlinkTooltipSettings.integration != L"none")
+        {
+            try
+            {
+                wantPreview = _hyperlinkPreviewProvider.CanPreview(_hoveredUri, _currentHyperlinkTooltipSettings.integration);
+            }
+            CATCH_LOG();
+        }
+        _setHyperlinkPreviewLoading(wantPreview);
+        if (wantPreview)
+        {
+            _requestHyperlinkPreview(previewGeneration, _hoveredUri, _currentHyperlinkTooltipSettings.integration);
+        }
 
         // Already up: it has only moved to a different link, so reposition and leave it.
         _hyperlinkHideTimer.Stop();
@@ -3890,6 +3993,150 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             ::Microsoft::Console::Utils::StripUriFragment(uriForm), distro);
     }
 
+    // What Open, Copy link and a click should actually act on. For an ordinary link that is
+    // the hovered URI itself. For a text match it is not: the hovered run is a bare piece of
+    // terminal text -- an issue key, a session id -- and only an integration knows which URL
+    // it stands for. Prefer what the preview already resolved, and fall back to asking the
+    // provider directly, which is both how the buttons work before the fetch completes and
+    // how they work when there is no preview to fetch at all.
+    winrt::hstring TermControl::_hoveredLinkTarget() const
+    {
+        if (_hoveredUri.empty())
+        {
+            return {};
+        }
+
+        if (!_currentHyperlinkTooltipSettings.isTextMatch)
+        {
+            return _hoveredUri;
+        }
+
+        if (_currentHyperlinkPreview)
+        {
+            if (const auto resolved = _currentHyperlinkPreview.ResolvedUri(); !resolved.empty())
+            {
+                return resolved;
+            }
+        }
+
+        if (_hyperlinkPreviewProvider)
+        {
+            try
+            {
+                return _hyperlinkPreviewProvider.ResolveLink(_hoveredUri);
+            }
+            CATCH_LOG();
+        }
+
+        return {};
+    }
+
+    // The preview section exists only while it has something to say: a fetch in flight (the
+    // ring), or the result of one. Everything is cleared on the way in either way, because
+    // the next thing to arrive belongs to a different link than whatever is on screen.
+    void TermControl::_setHyperlinkPreviewLoading(bool loading)
+    {
+        HyperlinkCardPreviewName().Text(winrt::hstring{});
+        HyperlinkCardPreviewIcon().Content(nullptr);
+        HyperlinkCardPreviewError().Text(winrt::hstring{});
+        HyperlinkCardPreviewError().Visibility(Visibility::Collapsed);
+        HyperlinkCardPreviewFields().ItemsSource(nullptr);
+
+        HyperlinkCardPreviewProgress().IsActive(loading);
+        HyperlinkCardPreviewProgress().Visibility(loading ? Visibility::Visible : Visibility::Collapsed);
+        HyperlinkCardPreview().Visibility(loading ? Visibility::Visible : Visibility::Collapsed);
+    }
+
+    // Fetching a preview is the integration layer's business and can take as long as an HTTP
+    // round trip, so it happens off this thread and comes back to it. The generation counter
+    // is the whole of the correctness argument: by the time a result arrives the pointer may
+    // be over a different link or over nothing, and a stale preview painted into the card
+    // would be worse than no preview at all.
+    safe_void_coroutine TermControl::_requestHyperlinkPreview(uint32_t generation, winrt::hstring text, winrt::hstring integration)
+    {
+        // Everything the tail of this function needs is taken now, while we are still on the
+        // UI thread and the control is still known to be alive.
+        const auto weakThis{ get_weak() };
+        const auto provider{ _hyperlinkPreviewProvider };
+        const auto dispatcher{ Dispatcher() };
+        if (!provider || !dispatcher)
+        {
+            co_return;
+        }
+
+        Control::HyperlinkPreview preview{ nullptr };
+        try
+        {
+            preview = co_await provider.GetPreviewAsync(text, integration);
+        }
+        CATCH_LOG();
+
+        co_await winrt::resume_foreground(dispatcher);
+
+        if (const auto self = weakThis.get(); self && !self->_IsClosing() && self->_hyperlinkPreviewGeneration == generation)
+        {
+            // A null preview means the fetch failed outright; _applyHyperlinkPreview reads
+            // that as "nothing to show" and takes the section back down.
+            self->_applyHyperlinkPreview(preview);
+        }
+    }
+
+    void TermControl::_applyHyperlinkPreview(const Control::HyperlinkPreview& preview)
+    {
+        _currentHyperlinkPreview = preview;
+
+        HyperlinkCardPreviewProgress().IsActive(false);
+        HyperlinkCardPreviewProgress().Visibility(Visibility::Collapsed);
+
+        if (!preview)
+        {
+            HyperlinkCardPreview().Visibility(Visibility::Collapsed);
+            return;
+        }
+
+        HyperlinkCardPreviewName().Text(preview.IntegrationName());
+        if (const auto icon = preview.IntegrationIcon(); !icon.empty())
+        {
+            HyperlinkCardPreviewIcon().Content(winrt::Microsoft::Terminal::UI::IconPathConverter::IconWUX(icon));
+        }
+        else
+        {
+            HyperlinkCardPreviewIcon().Content(nullptr);
+        }
+
+        // An integration that could not answer says why, in place of the fields it would
+        // otherwise have produced. The card stays usable either way.
+        const auto error = preview.Error();
+        HyperlinkCardPreviewError().Text(error);
+        HyperlinkCardPreviewError().Visibility(error.empty() ? Visibility::Collapsed : Visibility::Visible);
+
+        HyperlinkCardPreviewFields().ItemsSource(preview.Fields());
+        HyperlinkCardPreview().Visibility(Visibility::Visible);
+
+        // A text match's link only exists once an integration has resolved it, so the target
+        // line and the two buttons that need a link have been waiting for this moment.
+        if (_currentHyperlinkTooltipSettings.isTextMatch && !preview.ResolvedUri().empty())
+        {
+            const auto linkTarget = _hoveredLinkTarget();
+            const auto hasLink = !linkTarget.empty();
+            if (hasLink)
+            {
+                // Same arrow the file:// target line above uses, spelled the same way.
+                HyperlinkCardTarget().Text(winrt::hstring{ L"\x2192 " + std::wstring{ linkTarget } });
+            }
+            HyperlinkCardTarget().Visibility(hasLink ? Visibility::Visible : Visibility::Collapsed);
+            HyperlinkOpenButton().Visibility(hasLink && _currentHyperlinkTooltipSettings.showOpen ? Visibility::Visible : Visibility::Collapsed);
+            HyperlinkCopyLinkButton().Visibility(hasLink && _currentHyperlinkTooltipSettings.showCopyLink ? Visibility::Visible : Visibility::Collapsed);
+        }
+
+        // The card just grew by a whole section. Show it again so it is measured and placed
+        // for the size it is now, rather than staying where it fitted when it held one line.
+        if (HyperlinkCard().Visibility() == Visibility::Visible)
+        {
+            _showHyperlinkCard();
+        }
+    }
+
     void TermControl::_showHyperlinkCard()
     {
         const auto cell = _core.HoveredCell();
@@ -3957,6 +4204,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         _hyperlinkShowTimer.Stop();
         _hyperlinkHideTimer.Stop();
         _pointerInHyperlinkCard = false;
+        // A preview still in flight belongs to a hover that is over. Moving the generation on
+        // is what sends its result to the bin instead of into a card shown for something else.
+        ++_hyperlinkPreviewGeneration;
+        _currentHyperlinkPreview = nullptr;
         HyperlinkCard().Visibility(Visibility::Collapsed);
     }
 
@@ -4022,20 +4273,22 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
     void TermControl::_HyperlinkOpenClick(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
     {
-        if (!_hoveredUri.empty())
+        // The link, not the hovered run: for a text match the two differ, and it is the link
+        // the user means by pressing Open.
+        if (const auto target = _hoveredLinkTarget(); !target.empty())
         {
             // Down the same path a click takes, so the unsafe-URL prompt and the file://
             // resolution in TerminalPage still apply. The card gets no rules of its own.
-            OpenHyperlink.raise(*this, winrt::make<OpenHyperlinkEventArgs>(_hoveredUri));
+            OpenHyperlink.raise(*this, winrt::make<OpenHyperlinkEventArgs>(target));
         }
         _hideHyperlinkCard();
     }
 
     void TermControl::_HyperlinkCopyLinkClick(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
     {
-        if (!_hoveredUri.empty())
+        if (const auto target = _hoveredLinkTarget(); !target.empty())
         {
-            _core.CopyTextToClipboard(_hoveredUri);
+            _core.CopyTextToClipboard(target);
         }
         _hideHyperlinkCard();
     }

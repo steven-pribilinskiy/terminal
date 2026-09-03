@@ -92,6 +92,9 @@
     <ClInclude Include="LinkTooltip.h">
       <DependentUpon>LinkTooltip.xaml</DependentUpon>
     </ClInclude>
+    <ClInclude Include="Integrations.h">
+      <DependentUpon>Integrations.xaml</DependentUpon>
+    </ClInclude>
     <ClInclude Include="pch.h" />
     <ClInclude Include="SearchIndex.h" />
     <ClInclude Include="NavConstants.h" />
@@ -145,6 +148,10 @@
     </ClInclude>
     <ClInclude Include="LinkTooltipViewModel.h">
       <DependentUpon>LinkTooltipViewModel.idl</DependentUpon>
+      <SubType>Code</SubType>
+    </ClInclude>
+    <ClInclude Include="IntegrationsViewModel.h">
+      <DependentUpon>IntegrationsViewModel.idl</DependentUpon>
       <SubType>Code</SubType>
     </ClInclude>
     <ClInclude Include="Extensions.h">
@@ -236,6 +243,9 @@
     <Page Include="LinkTooltip.xaml">
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="Integrations.xaml">
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="MainPage.xaml">
       <SubType>Designer</SubType>
     </Page>
@@ -320,6 +330,9 @@
     <ClCompile Include="LinkTooltip.cpp">
       <DependentUpon>LinkTooltip.xaml</DependentUpon>
     </ClCompile>
+    <ClCompile Include="Integrations.cpp">
+      <DependentUpon>Integrations.xaml</DependentUpon>
+    </ClCompile>
     <ClCompile Include="NewTabMenu.cpp">
       <DependentUpon>NewTabMenu.xaml</DependentUpon>
     </ClCompile>
@@ -373,6 +386,10 @@
     </ClCompile>
     <ClCompile Include="LinkTooltipViewModel.cpp">
       <DependentUpon>LinkTooltipViewModel.idl</DependentUpon>
+      <SubType>Code</SubType>
+    </ClCompile>
+    <ClCompile Include="IntegrationsViewModel.cpp">
+      <DependentUpon>IntegrationsViewModel.idl</DependentUpon>
       <SubType>Code</SubType>
     </ClCompile>
     <ClCompile Include="NewTabMenuViewModel.cpp">
@@ -469,6 +486,10 @@
       <DependentUpon>LinkTooltip.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Midl>
+    <Midl Include="Integrations.idl">
+      <DependentUpon>Integrations.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Midl>
     <Midl Include="Interaction.idl">
       <DependentUpon>Interaction.xaml</DependentUpon>
       <SubType>Code</SubType>
@@ -500,6 +521,7 @@
     <Midl Include="LaunchViewModel.idl" />
     <Midl Include="NewTabMenuViewModel.idl" />
     <Midl Include="LinkTooltipViewModel.idl" />
+    <Midl Include="IntegrationsViewModel.idl" />
     <Midl Include="Extensions.idl">
       <DependentUpon>Extensions.xaml</DependentUpon>
       <SubType>Code</SubType>

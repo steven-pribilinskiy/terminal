@@ -101,6 +101,10 @@
     <ClInclude Include="NewTabMenuEntry.h" />
     <ClInclude Include="HyperlinkTooltipRule.h" />
     <ClInclude Include="HyperlinkTooltipAction.h" />
+    <ClInclude Include="IntegrationManifest.h" />
+    <ClInclude Include="IntegrationRegistry.h" />
+    <ClInclude Include="IntegrationCredentialStore.h" />
+    <ClInclude Include="IntegrationSettings.h" />
   </ItemGroup>
   <ItemGroup>
     <Midl Include="ActionArgs.idl" />
@@ -120,6 +124,7 @@
     <Midl Include="ApplicationState.idl" />
     <Midl Include="NewTabMenuEntry.idl" />
     <Midl Include="HyperlinkTooltipRule.idl" />
+    <Midl Include="Integrations.idl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

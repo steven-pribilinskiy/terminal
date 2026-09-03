@@ -56,6 +56,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         IControlSettings Settings() const;
 
         void KeyBindings(const Control::IKeyBindings& bindings) { _keyBindings = bindings; }
+        void HyperlinkPreviewProvider(const Control::IHyperlinkPreviewProvider& provider) { _hyperlinkPreviewProvider = provider; }
 
         uint64_t ContentId() const;
 
@@ -257,6 +258,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         Control::ControlInteractivity _interactivity{ nullptr };
         Control::ControlCore _core{ nullptr };
         Control::IKeyBindings _keyBindings{ nullptr };
+        Control::IHyperlinkPreviewProvider _hyperlinkPreviewProvider{ nullptr };
         TsfDataProvider _tsfDataProvider{ this };
         winrt::com_ptr<SearchBoxControl> _searchBox;
 
@@ -355,9 +357,24 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             bool showCopyPath{ true };
             bool showReveal{ true };
             std::vector<Control::HyperlinkTooltipAction> customActions;
+            // Preview: which integration ("" = automatic, "none" = off) and whether to
+            // show one at all, from the matched rule.
+            winrt::hstring integration;
+            bool showPreview{ true };
+            // The hovered text came from a text-kind rule's pattern, not from a URI.
+            bool isTextMatch{ false };
         };
         EffectiveHyperlinkTooltipSettings _currentHyperlinkTooltipSettings;
         EffectiveHyperlinkTooltipSettings _effectiveHyperlinkTooltipSettings(std::wstring_view uri, bool isFileLink) const;
+
+        // The integration preview for the hovered link. The generation counter is what
+        // discards a fetch that finishes after the pointer has moved on.
+        uint32_t _hyperlinkPreviewGeneration{ 0 };
+        Control::HyperlinkPreview _currentHyperlinkPreview{ nullptr };
+        winrt::hstring _hoveredLinkTarget() const;
+        void _setHyperlinkPreviewLoading(bool loading);
+        safe_void_coroutine _requestHyperlinkPreview(uint32_t generation, winrt::hstring text, winrt::hstring integration);
+        void _applyHyperlinkPreview(const Control::HyperlinkPreview& preview);
 
         bool _isBackgroundLight{ false };
         bool _detached{ false };

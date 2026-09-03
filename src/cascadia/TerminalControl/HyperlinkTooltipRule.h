@@ -34,11 +34,15 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         WINRT_PROPERTY(hstring, Name);
         WINRT_PROPERTY(bool, Enabled, true);
+        WINRT_PROPERTY(HyperlinkMatchKind, Kind, HyperlinkMatchKind::Link);
 
         WINRT_PROPERTY(Windows::Foundation::Collections::IVector<hstring>, Schemes);
         WINRT_PROPERTY(hstring, Pattern);
         WINRT_PROPERTY(HyperlinkFileTypeGroup, FileTypeGroup, HyperlinkFileTypeGroup::None);
         WINRT_PROPERTY(Windows::Foundation::Collections::IVector<hstring>, CustomExtensions);
+
+        WINRT_PROPERTY(hstring, Integration);
+        WINRT_PROPERTY(bool, ShowPreview, true);
 
         WINRT_PROPERTY(Windows::Foundation::IReference<int32_t>, TooltipShowDelay);
         WINRT_PROPERTY(Windows::Foundation::IReference<int32_t>, TooltipHideDelay);

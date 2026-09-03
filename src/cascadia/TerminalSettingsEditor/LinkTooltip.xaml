@@ -21,6 +21,17 @@
                           x:DataType="local:EnumEntry">
                 <TextBlock Text="{x:Bind EnumName, Mode=OneWay}" />
             </DataTemplate>
+
+            <DataTemplate x:Key="IntegrationChoiceComboBoxTemplate"
+                          x:DataType="local:IntegrationChoiceViewModel">
+                <TextBlock Text="{x:Bind DisplayName}" />
+            </DataTemplate>
+
+            <Style x:Key="RulePatternHintStyle"
+                   BasedOn="{StaticResource DisclaimerStyle}"
+                   TargetType="TextBlock">
+                <Setter Property="Margin" Value="0,4,0,4" />
+            </Style>
         </ResourceDictionary>
     </Page.Resources>
 
@@ -202,7 +213,16 @@
                 <TextBlock x:Uid="LinkTooltip_MatchCriteriaHeader"
                            Style="{StaticResource TextBlockSubHeaderStyle}" />
 
-                <local:SettingsCard x:Uid="LinkTooltip_RuleSchemes">
+                <local:SettingsCard x:Uid="LinkTooltip_RuleKind">
+                    <ComboBox AutomationProperties.AccessibilityView="Content"
+                              ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                              ItemsSource="{x:Bind ViewModel.CurrentRule.KindList, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.CurrentRule.CurrentKind, Mode=TwoWay}"
+                              Style="{StaticResource ComboBoxSettingStyle}" />
+                </local:SettingsCard>
+
+                <local:SettingsCard x:Uid="LinkTooltip_RuleSchemes"
+                                    Visibility="{x:Bind ViewModel.CurrentRule.IsLinkKind, Mode=OneWay}">
                     <TextBox IsSpellCheckEnabled="False"
                              Style="{StaticResource TextBoxSettingStyle}"
                              Text="{x:Bind ViewModel.CurrentRule.Schemes, Mode=TwoWay}" />
@@ -214,7 +234,12 @@
                              Text="{x:Bind ViewModel.CurrentRule.Pattern, Mode=TwoWay}" />
                 </local:SettingsCard>
 
-                <local:SettingsCard x:Uid="LinkTooltip_RuleFileTypeGroup">
+                <TextBlock x:Uid="LinkTooltip_RuleTextPatternHint"
+                           Style="{StaticResource RulePatternHintStyle}"
+                           Visibility="{x:Bind ViewModel.CurrentRule.IsTextKind, Mode=OneWay}" />
+
+                <local:SettingsCard x:Uid="LinkTooltip_RuleFileTypeGroup"
+                                    Visibility="{x:Bind ViewModel.CurrentRule.IsLinkKind, Mode=OneWay}">
                     <ComboBox AutomationProperties.AccessibilityView="Content"
                               ItemTemplate="{StaticResource EnumComboBoxTemplate}"
                               ItemsSource="{x:Bind ViewModel.CurrentRule.FileTypeGroupList, Mode=OneWay}"
@@ -222,10 +247,27 @@
                               Style="{StaticResource ComboBoxSettingStyle}" />
                 </local:SettingsCard>
 
-                <local:SettingsCard x:Uid="LinkTooltip_RuleCustomExtensions">
+                <local:SettingsCard x:Uid="LinkTooltip_RuleCustomExtensions"
+                                    Visibility="{x:Bind ViewModel.CurrentRule.IsLinkKind, Mode=OneWay}">
                     <TextBox IsSpellCheckEnabled="False"
                              Style="{StaticResource TextBoxSettingStyle}"
                              Text="{x:Bind ViewModel.CurrentRule.CustomExtensions, Mode=TwoWay}" />
+                </local:SettingsCard>
+
+                <TextBlock x:Uid="LinkTooltip_PreviewHeader"
+                           Style="{StaticResource TextBlockSubHeaderStyle}" />
+
+                <local:SettingsCard x:Uid="LinkTooltip_RuleIntegration">
+                    <ComboBox AutomationProperties.AccessibilityView="Content"
+                              ItemTemplate="{StaticResource IntegrationChoiceComboBoxTemplate}"
+                              ItemsSource="{x:Bind ViewModel.CurrentRule.IntegrationChoices, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.CurrentRule.CurrentIntegrationChoice, Mode=TwoWay}"
+                              Style="{StaticResource ComboBoxSettingStyle}" />
+                </local:SettingsCard>
+
+                <local:SettingsCard x:Uid="LinkTooltip_RuleShowPreview">
+                    <ToggleSwitch IsOn="{x:Bind ViewModel.CurrentRule.ShowPreview, Mode=TwoWay}"
+                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
                 </local:SettingsCard>
 
                 <TextBlock x:Uid="LinkTooltip_OverridesHeader"

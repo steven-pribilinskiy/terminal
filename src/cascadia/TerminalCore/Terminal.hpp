@@ -381,6 +381,10 @@ private:
     // Indices into the pattern list in Terminal::_getPatterns.
     size_t _hyperlinkPatternId = 0;
     size_t _delimitedLinkPatternId = 1;
+    // User text patterns (ICoreSettings::TextPatterns) follow the built-ins, so
+    // pattern id 2 + i is _textPatterns[i].
+    size_t _firstTextPatternId = 2;
+    std::vector<std::wstring> _textPatterns;
 
     std::wstring _answerbackMessage;
     std::wstring _workingDirectory;

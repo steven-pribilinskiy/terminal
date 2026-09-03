@@ -61,17 +61,28 @@ namespace Microsoft.Terminal.Control
     // Mirrors Microsoft.Terminal.Settings.Model.HyperlinkTooltipRule -- see that
     // type for the semantics of each field. TerminalSettings (the App-adapter
     // layer) is responsible for translating the Settings Model list into this one.
+    // Mirrors Microsoft.Terminal.Settings.Model.HyperlinkMatchKind.
+    enum HyperlinkMatchKind
+    {
+        Link = 0,
+        Text
+    };
+
     [default_interface] runtimeclass HyperlinkTooltipRule
     {
         HyperlinkTooltipRule();
 
         String Name;
         Boolean Enabled;
+        HyperlinkMatchKind Kind;
 
         Windows.Foundation.Collections.IVector<String> Schemes;
         String Pattern;
         HyperlinkFileTypeGroup FileTypeGroup;
         Windows.Foundation.Collections.IVector<String> CustomExtensions;
+
+        String Integration;
+        Boolean ShowPreview;
 
         Windows.Foundation.IReference<Int32> TooltipShowDelay;
         Windows.Foundation.IReference<Int32> TooltipHideDelay;

@@ -9,6 +9,7 @@
 #include "Tab.h"
 #include "AppKeyBindings.h"
 #include "AppCommandlineArgs.h"
+#include "HyperlinkPreviewService.h"
 #include "RenameWindowRequestedArgs.g.h"
 #include "OpenWindowRequestedArgs.g.h"
 #include "SummonWindowByIdRequestedArgs.g.h"
@@ -374,6 +375,11 @@ namespace winrt::TerminalApp::implementation
 
         winrt::com_ptr<AppKeyBindings> _bindings{ winrt::make_self<implementation::AppKeyBindings>() };
         winrt::com_ptr<ShortcutActionDispatch> _actionDispatch{ winrt::make_self<implementation::ShortcutActionDispatch>() };
+
+        // Handed to every control this page creates, and rebuilt in place on a
+        // settings reload -- the controls keep the same object, so they never
+        // have to be told about it twice.
+        winrt::com_ptr<HyperlinkPreviewService> _hyperlinkPreviewService{ winrt::make_self<implementation::HyperlinkPreviewService>() };
 
         winrt::Windows::UI::Xaml::Controls::Grid::LayoutUpdated_revoker _layoutUpdatedRevoker;
         StartupState _startupState{ StartupState::NotInitialized };

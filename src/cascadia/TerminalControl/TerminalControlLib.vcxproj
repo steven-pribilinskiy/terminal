@@ -49,6 +49,9 @@
       <DependentUpon>IControlSettings.idl</DependentUpon>
     </ClInclude>
     <ClInclude Include="HyperlinkFileTypeGroups.h" />
+    <ClInclude Include="HyperlinkPreview.h">
+      <DependentUpon>HyperlinkPreview.idl</DependentUpon>
+    </ClInclude>
     <ClInclude Include="SearchBoxControl.h">
       <DependentUpon>SearchBoxControl.xaml</DependentUpon>
     </ClInclude>
@@ -85,6 +88,9 @@
     <ClCompile Include="EventArgs.cpp">
       <DependentUpon>EventArgs.idl</DependentUpon>
     </ClCompile>
+    <ClCompile Include="HyperlinkPreview.cpp">
+      <DependentUpon>HyperlinkPreview.idl</DependentUpon>
+    </ClCompile>
     <ClCompile Include="HyperlinkTooltipRule.cpp">
       <DependentUpon>IControlSettings.idl</DependentUpon>
     </ClCompile>
@@ -120,6 +126,7 @@
     <Midl Include="ICoreState.idl" />
     <Midl Include="KeyChord.idl" />
     <Midl Include="EventArgs.idl" />
+    <Midl Include="HyperlinkPreview.idl" />
     <Midl Include="IKeyBindings.idl" />
     <Midl Include="IControlSettings.idl" />
     <Midl Include="IControlAppearance.idl" />

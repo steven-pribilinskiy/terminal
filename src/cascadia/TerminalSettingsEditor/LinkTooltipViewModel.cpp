@@ -6,6 +6,7 @@
 #include "LinkTooltipViewModel.g.cpp"
 #include "HyperlinkTooltipRuleViewModel.g.cpp"
 #include "HyperlinkTooltipActionViewModel.g.cpp"
+#include "IntegrationChoiceViewModel.g.cpp"
 #include "EnumEntry.h"
 
 using namespace winrt::Windows::Foundation::Collections;
@@ -49,6 +50,22 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         return winrt::hstring{ joined };
     }
 
+    // What to show in a rule's "Integration" picker for a given id. "" and "none"
+    // are not integration ids at all -- they're the two ways of saying "no specific
+    // integration" -- so they get their own localized labels.
+    static winrt::hstring _integrationDisplayName(const winrt::hstring& id)
+    {
+        if (id.empty())
+        {
+            return RS_(L"LinkTooltip_IntegrationAutomatic");
+        }
+        if (id == L"none")
+        {
+            return RS_(L"LinkTooltip_IntegrationNone");
+        }
+        return id;
+    }
+
     HyperlinkTooltipRuleViewModel::HyperlinkTooltipRuleViewModel(Model::HyperlinkTooltipRule rule) :
         _Rule{ rule }
     {
@@ -58,6 +75,36 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
 
         INITIALIZE_BINDABLE_ENUM_SETTING(FileTypeGroup, HyperlinkFileTypeGroup, Model::HyperlinkFileTypeGroup, L"LinkTooltip_FileTypeGroup", L"Content");
+        INITIALIZE_BINDABLE_ENUM_SETTING(Kind, HyperlinkMatchKind, Model::HyperlinkMatchKind, L"LinkTooltip_MatchKind", L"Content");
+
+        std::vector<Editor::IntegrationChoiceViewModel> choices;
+        choices.push_back(make<IntegrationChoiceViewModel>(winrt::hstring{}, _integrationDisplayName({})));
+        choices.push_back(make<IntegrationChoiceViewModel>(winrt::hstring{ L"none" }, _integrationDisplayName(winrt::hstring{ L"none" })));
+        if (const auto manifests = Model::IntegrationRegistry::All())
+        {
+            for (const auto& manifest : manifests)
+            {
+                const auto id = manifest.Id();
+                if (id.empty())
+                {
+                    continue;
+                }
+                const auto name = manifest.Name();
+                choices.push_back(make<IntegrationChoiceViewModel>(id, name.empty() ? id : name));
+            }
+        }
+
+        // Keep an id the rule already names even when no manifest provides it any
+        // more, so opening the editor can't silently retarget the rule.
+        if (const auto current = _Rule.Integration(); !current.empty())
+        {
+            const auto known = std::any_of(choices.begin(), choices.end(), [&](const auto& choice) { return choice.Id() == current; });
+            if (!known)
+            {
+                choices.push_back(make<IntegrationChoiceViewModel>(current, current));
+            }
+        }
+        _IntegrationChoices = single_threaded_vector<Editor::IntegrationChoiceViewModel>(std::move(choices));
 
         std::vector<Editor::HyperlinkTooltipActionViewModel> actionVMs;
         for (const auto& action : _Rule.CustomActions())
@@ -98,8 +145,53 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         });
     }
 
+    winrt::Windows::Foundation::IInspectable HyperlinkTooltipRuleViewModel::CurrentIntegrationChoice() const
+    {
+        const auto current = _Rule.Integration();
+        for (const auto& choice : _IntegrationChoices)
+        {
+            if (choice.Id() == current)
+            {
+                return choice;
+            }
+        }
+        // The ctor guarantees at least "Automatic" and "None" are present.
+        if (_IntegrationChoices.Size() > 0)
+        {
+            return _IntegrationChoices.GetAt(0);
+        }
+        return nullptr;
+    }
+
+    void HyperlinkTooltipRuleViewModel::CurrentIntegrationChoice(const winrt::Windows::Foundation::IInspectable& value)
+    {
+        if (!value)
+        {
+            return;
+        }
+        const auto choice = value.try_as<Editor::IntegrationChoiceViewModel>();
+        if (!choice)
+        {
+            return;
+        }
+        _Rule.Integration(choice.Id());
+        _NotifyChanges(L"Integration", L"CurrentIntegrationChoice", L"SummaryText");
+    }
+
     hstring HyperlinkTooltipRuleViewModel::SummaryText() const
     {
+        // A text rule matches terminal output rather than links, so none of the
+        // link criteria below apply to it -- what matters is the pattern and who
+        // previews what it finds.
+        if (_Rule.Kind() == Model::HyperlinkMatchKind::Text)
+        {
+            std::wstring summary{ L"text: " };
+            summary += std::wstring_view{ _Rule.Pattern() };
+            summary += L"  →  ";
+            summary += std::wstring_view{ _integrationDisplayName(_Rule.Integration()) };
+            return winrt::hstring{ summary };
+        }
+
         std::wstring parts;
         if (const auto schemes = _Rule.Schemes(); schemes && schemes.Size() > 0)
         {
@@ -234,10 +326,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _GlobalSettings{ globalSettings },
         _WindowSettings{ windowSettings }
     {
-        if (!_WindowSettings.HyperlinkTooltipRules())
+        auto rules = _WindowSettings.HyperlinkTooltipRules();
+        if (!rules)
         {
-            _WindowSettings.HyperlinkTooltipRules(winrt::single_threaded_vector<Model::HyperlinkTooltipRule>());
+            rules = winrt::single_threaded_vector<Model::HyperlinkTooltipRule>();
         }
+        // Assign unconditionally, not just when it's null: an inheritable setting
+        // the user has never set hands back a *freshly constructed* fallback on
+        // every read (see IInheritable.h), so a rule appended to what we just read
+        // would land in a temporary and vanish. Assigning pins it as the user's own.
+        _WindowSettings.HyperlinkTooltipRules(rules);
 
         std::vector<Editor::HyperlinkTooltipRuleViewModel> ruleVMs;
         for (const auto& rule : _WindowSettings.HyperlinkTooltipRules())

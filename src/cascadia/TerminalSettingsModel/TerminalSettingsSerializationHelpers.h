@@ -751,6 +751,47 @@ JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::HyperlinkFileTyp
     };
 };
 
+// Possible HyperlinkMatchKind values
+JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::HyperlinkMatchKind)
+{
+    JSON_MAPPINGS(2) = {
+        pair_type{ "link", ValueType::Link },
+        pair_type{ "text", ValueType::Text },
+    };
+};
+
+// Possible IntegrationMatcherKind values
+JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::IntegrationMatcherKind)
+{
+    JSON_MAPPINGS(2) = {
+        pair_type{ "link", ValueType::Link },
+        pair_type{ "text", ValueType::Text },
+    };
+};
+
+// Possible IntegrationFetchType values
+JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::IntegrationFetchType)
+{
+    JSON_MAPPINGS(2) = {
+        pair_type{ "http", ValueType::Http },
+        pair_type{ "command", ValueType::Command },
+    };
+};
+
+// Possible IntegrationFieldKind values
+JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::IntegrationFieldKind)
+{
+    JSON_MAPPINGS(7) = {
+        pair_type{ "text", ValueType::Text },
+        pair_type{ "title", ValueType::Title },
+        pair_type{ "subtitle", ValueType::Subtitle },
+        pair_type{ "badge", ValueType::Badge },
+        pair_type{ "link", ValueType::Link },
+        pair_type{ "image", ValueType::Image },
+        pair_type{ "multiline", ValueType::Multiline },
+    };
+};
+
 JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::SelectOutputDirection)
 {
     JSON_MAPPINGS(2) = {

@@ -20,6 +20,7 @@
 #include "ApplicationState.h"
 #include "DefaultTerminal.h"
 #include "FileUtils.h"
+#include "IntegrationRegistry.h"
 
 #include "ProfileEntry.h"
 #include "FolderEntry.h"
@@ -1267,6 +1268,10 @@ winrt::com_ptr<ExtensionPackage> SettingsLoader::_registerFragment(const winrt::
 Model::CascadiaSettings CascadiaSettings::LoadAll()
 try
 {
+    // Integration manifests are discovered alongside settings so a reload also
+    // picks up a manifest dropped into the user's Integrations directory.
+    IntegrationRegistry::Refresh();
+
     FILETIME lastWriteTime{};
     auto settingsString = til::io::read_file_as_utf8_string_if_exists(_settingsPath(), false, &lastWriteTime);
     auto firstTimeSetup = settingsString.empty();

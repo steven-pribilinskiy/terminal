@@ -1,0 +1,108 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
+namespace Microsoft.Terminal.Settings.Editor
+{
+    // One non-secret value an integration needs (Jira's site host, stith's server
+    // URL, ...). Writes land in settings.json under "integrations".
+    [default_interface] runtimeclass IntegrationSettingViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
+    {
+        String Key { get; };
+        String Label { get; };
+        String Placeholder { get; };
+        String Description { get; };
+        Boolean HasDescription { get; };
+        Boolean Required { get; };
+
+        String Value;
+    }
+
+    // One secret an integration needs. Values go straight to the Windows
+    // credential vault -- never to settings.json, and never back out of it once
+    // stored (we can only say whether something is there).
+    [default_interface] runtimeclass IntegrationCredentialViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
+    {
+        String Key { get; };
+        String Label { get; };
+        String Description { get; };
+        Boolean HasDescription { get; };
+        Boolean IsStored { get; };
+        String StatusText { get; };
+
+        // What the PasswordBox currently holds, so the Save button can read it
+        // without the page having to dig the control out of its item template.
+        String PendingValue;
+
+        void Save(String value);
+        void Clear();
+    }
+
+    // One row the integration can contribute to the hyperlink card, and whether
+    // the user wants to see it.
+    [default_interface] runtimeclass IntegrationDisplayFieldViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
+    {
+        String Key { get; };
+        String Label { get; };
+        Boolean Visible;
+    }
+
+    // A text matcher the integration suggests: "Add as rule" turns it into a
+    // text-kind rule on the Link Tooltip page.
+    [default_interface] runtimeclass IntegrationMatcherViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
+    {
+        String Description { get; };
+        String Pattern { get; };
+
+        // Returns the name of the rule that was added.
+        String AddAsRule();
+    }
+
+    [default_interface] runtimeclass IntegrationViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
+    {
+        Microsoft.Terminal.Settings.Model.IntegrationManifest Manifest { get; };
+
+        String Id { get; };
+        String Name { get; };
+        String Icon { get; };
+        String Source { get; };
+        Boolean IsBuiltIn { get; };
+        String AccessibleName { get; };
+
+        Boolean Enabled;
+
+        // Every required setting has a value and every credential is stored.
+        Boolean IsConfigured { get; };
+        Boolean IsNotConfigured { get; };
+
+        Windows.Foundation.Collections.IObservableVector<IntegrationSettingViewModel> Settings { get; };
+        Windows.Foundation.Collections.IObservableVector<IntegrationCredentialViewModel> Credentials { get; };
+        Windows.Foundation.Collections.IObservableVector<IntegrationDisplayFieldViewModel> Fields { get; };
+        Windows.Foundation.Collections.IObservableVector<IntegrationMatcherViewModel> SuggestedMatchers { get; };
+
+        Boolean HasSettings { get; };
+        Boolean HasCredentials { get; };
+        Boolean HasFields { get; };
+        Boolean HasSuggestedMatchers { get; };
+    }
+
+    runtimeclass IntegrationsViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
+    {
+        IntegrationsViewModel(Microsoft.Terminal.Settings.Model.GlobalAppSettings globalSettings,
+                              Microsoft.Terminal.Settings.Model.WindowSettings windowSettings);
+
+        Windows.Foundation.Collections.IObservableVector<IntegrationViewModel> Integrations { get; };
+        Boolean NoIntegrations { get; };
+
+        IntegrationViewModel CurrentIntegration;
+        Boolean IsEditing { get; };
+        Boolean IsNotEditing { get; };
+
+        // Where a user-provided integration.json goes.
+        String UserDirectory { get; };
+
+        // Asks MainPage to navigate to the Link Tooltip page, so a rule that was
+        // just added from here can be edited where all the other rules live.
+        void RequestNavigateToLinkTooltip();
+        event Windows.Foundation.TypedEventHandler<Object, Object> NavigateToLinkTooltipRequested;
+    }
+}

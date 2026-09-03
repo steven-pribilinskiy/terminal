@@ -34,6 +34,15 @@ namespace Microsoft.Terminal.Settings.Model
         IMediaResource Icon;
     }
 
+    // What a rule matches against. Link rules run against detected/OSC 8
+    // hyperlinks; Text rules turn plain terminal text matching Pattern into a
+    // hoverable, clickable match (an integration then resolves it to a link).
+    enum HyperlinkMatchKind
+    {
+        Link = 0,
+        Text
+    };
+
     // A rule that customizes the hyperlink tooltip card's behavior for links
     // matching its criteria. All set match criteria are ANDed together; an
     // unset criterion is skipped rather than treated as false. The first
@@ -45,12 +54,22 @@ namespace Microsoft.Terminal.Settings.Model
 
         String Name;
         Boolean Enabled;
+        HyperlinkMatchKind Kind;
 
         // --- match criteria ---
         IVector<String> Schemes;
+        // Link rules: an ECMAScript regex searched in the link text.
+        // Text rules: an ICU regex scanned over the terminal buffer; the whole
+        // match becomes the hoverable text.
         String Pattern;
         HyperlinkFileTypeGroup FileTypeGroup;
         IVector<String> CustomExtensions;
+
+        // --- preview ---
+        // Which integration previews matches: "" = pick automatically by the
+        // integrations' own matchers, "none" = no preview, else an integration id.
+        String Integration;
+        Boolean ShowPreview;
 
         // --- overrides; unset (null) means "inherit the global default" ---
         Windows.Foundation.IReference<Int32> TooltipShowDelay;

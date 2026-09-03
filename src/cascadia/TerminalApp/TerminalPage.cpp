@@ -279,6 +279,10 @@ namespace winrt::TerminalApp::implementation
         }
         _settings = settings;
 
+        // Re-read the enabled integrations (and their credentials, once) so a
+        // hover never has to touch the settings model or the credential vault.
+        _hyperlinkPreviewService->Rebuild(_settings, _currentWindowSettings());
+
         // Make sure to call SetCommands before _RefreshUIForSettingsReload.
         // SetCommands will make sure the KeyChordText of Commands is updated, which needs
         // to happen before the Settings UI is reloaded and tries to re-read those values.
@@ -593,6 +597,9 @@ namespace winrt::TerminalApp::implementation
 
         // Hookup our event handlers to the ShortcutActionDispatch
         _settings = settings;
+        // This path creates panes without ever reaching SetSettings, so the
+        // preview service would otherwise be handed to controls empty.
+        _hyperlinkPreviewService->Rebuild(_settings, _currentWindowSettings());
         _HookupKeyBindings(_settings.ActionMap());
         _RegisterActionCallbacks();
 
@@ -3910,6 +3917,10 @@ namespace winrt::TerminalApp::implementation
         }
 
         term.KeyBindings(*_bindings);
+        // Integrations and credentials belong to the page, not to a control, so
+        // the control is only handed something that can answer "what is this
+        // link" -- and it is the same object for every control here.
+        term.HyperlinkPreviewProvider(*_hyperlinkPreviewService);
 
         _RegisterTerminalEvents(term);
         return term;

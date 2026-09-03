@@ -37,7 +37,8 @@ Author(s):
     X(winrt::Windows::Foundation::Collections::IVector<winrt::hstring>, ResumeExcludedPrograms, "resumeExcludedPrograms", nullptr) \
     X(bool, PersistBufferPeriodically, "persistBufferPeriodically", true)                                                          \
     X(int32_t, BufferPersistIntervalMinutes, "bufferPersistIntervalMinutes", 5)                                                    \
-    X(Model::ResumeSessionNotification, ResumeSessionNotification, "resumeSessionNotification", Model::ResumeSessionNotification::Toast)
+    X(Model::ResumeSessionNotification, ResumeSessionNotification, "resumeSessionNotification", Model::ResumeSessionNotification::Toast) \
+    X(winrt::Windows::Foundation::Collections::IMap<winrt::hstring, Model::IntegrationSettings>, Integrations, "integrations", winrt::single_threaded_map<winrt::hstring, Model::IntegrationSettings>())
 
 // Settings that are per-window (may vary by window name in the future)
 #define MTSM_WINDOW_SETTINGS(X)                                                                                                                                                                       \

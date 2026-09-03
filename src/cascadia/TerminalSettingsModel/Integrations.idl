@@ -1,0 +1,170 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
+namespace Microsoft.Terminal.Settings.Model
+{
+    // What an integration matcher runs against: the URI of a hovered link, or
+    // plain terminal text (turned hoverable by a text-kind HyperlinkTooltipRule).
+    enum IntegrationMatcherKind
+    {
+        Link = 0,
+        Text
+    };
+
+    // How a fetch step obtains its JSON result.
+    enum IntegrationFetchType
+    {
+        Http = 0,
+        Command
+    };
+
+    // How a display field is rendered on the hyperlink card.
+    enum IntegrationFieldKind
+    {
+        Text = 0,
+        Title,
+        Subtitle,
+        Badge,
+        Link,
+        Image,
+        Multiline
+    };
+
+    // A user-provided value the integration needs: a plain setting (stored in
+    // settings.json) or a credential (stored in the Windows credential vault,
+    // never in settings.json).
+    [default_interface] runtimeclass IntegrationField
+    {
+        IntegrationField();
+
+        String Key;
+        String Label;
+        String Placeholder;
+        String Description;
+        Boolean Required;
+        Boolean Secret;
+    }
+
+    // Decides whether a link (or text match) belongs to this integration, and
+    // captures the named groups the fetch templates refer to.
+    [default_interface] runtimeclass IntegrationMatcher
+    {
+        IntegrationMatcher();
+
+        IntegrationMatcherKind Kind;
+        // ICU regular expression; named groups become template variables.
+        String Pattern;
+        // For Link matchers: the URI's host must equal the value of this setting.
+        // Keeps credentials from ever being sent because of a look-alike link.
+        String HostSetting;
+        // For Text matchers: how a match becomes a URL (Open / Copy link / click).
+        String LinkTemplate;
+        // Text matchers only: offered on the Integrations page as "Add as rule".
+        Boolean Suggested;
+        String Description;
+    }
+
+    // One request in the integration's fetch pipeline. Later steps may refer to
+    // earlier results through {{stepId:/json/pointer}} template variables.
+    [default_interface] runtimeclass IntegrationFetchStep
+    {
+        IntegrationFetchStep();
+
+        String Id;
+        IntegrationFetchType Type;
+
+        // Http
+        String Url;
+        String Method;
+        Windows.Foundation.Collections.IMap<String, String> Headers;
+        String AuthType;      // "basic" | "bearer" | "header" | ""
+        String AuthUser;      // basic: user template; header: header name
+        String AuthPassword;  // basic: password template; bearer/header: value template
+        String Body;
+        Boolean AllowUntrustedCertificate;
+
+        // Command
+        String CommandLine;
+        String Stdin;
+
+        Int32 TimeoutMs;
+        // Run only when this template expands to a non-empty string.
+        String When;
+        // Skip when this template expands to a non-empty string.
+        String Unless;
+    }
+
+    // One row of the card's representation of a fetched result.
+    [default_interface] runtimeclass IntegrationDisplayField
+    {
+        IntegrationDisplayField();
+
+        String Key;
+        String Label;
+        // JSON pointer into a step result: "/a/0/b" or "stepId:/a/0/b".
+        String Path;
+        IntegrationFieldKind Kind;
+        String IconPath;
+        String ColorPath;
+        String Color;
+        String Format;        // "relativeTime" | "date" | ""
+        Boolean DefaultVisible;
+    }
+
+    // A parsed integration.json: the plugin's knowledge of a tool (how to match
+    // it, what to call, how to authenticate) and of its representation.
+    [default_interface] runtimeclass IntegrationManifest
+    {
+        IntegrationManifest();
+
+        String Id;
+        String Name;
+        String Icon;
+        Int32 Version;
+        // Where it came from: "built-in" or the manifest's path.
+        String Source;
+        Boolean IsBuiltIn;
+        Int32 CacheSeconds;
+        // Optional HTML/CSS/JS representation; empty means "use Fields".
+        String Html;
+
+        Windows.Foundation.Collections.IVector<IntegrationField> Settings;
+        Windows.Foundation.Collections.IVector<IntegrationField> Credentials;
+        Windows.Foundation.Collections.IVector<IntegrationMatcher> Matchers;
+        Windows.Foundation.Collections.IVector<IntegrationFetchStep> FetchSteps;
+        Windows.Foundation.Collections.IVector<IntegrationDisplayField> Fields;
+    }
+
+    // The user's per-integration configuration, persisted in settings.json under
+    // "integrations": { "<id>": { ... } }. Secrets never live here.
+    [default_interface] runtimeclass IntegrationSettings
+    {
+        IntegrationSettings();
+
+        Boolean Enabled;
+        Windows.Foundation.Collections.IMap<String, String> Values;
+        // Keys of the display fields to show; null means the manifest defaults.
+        Windows.Foundation.Collections.IVector<String> Fields;
+    }
+
+    // Discovers manifests: built-ins embedded in this DLL, then
+    // %LOCALAPPDATA%\Microsoft\Windows Terminal\Integrations\<id>\integration.json
+    // (a user manifest with the same id replaces a built-in).
+    static runtimeclass IntegrationRegistry
+    {
+        static Windows.Foundation.Collections.IVector<IntegrationManifest> All();
+        static IntegrationManifest Find(String id);
+        static String UserDirectory();
+        static void Refresh();
+    }
+
+    // Credentials in the Windows credential vault (Credential Manager -> Web
+    // Credentials), keyed by integration id and field key.
+    static runtimeclass IntegrationCredentialStore
+    {
+        static String Get(String integrationId, String key);
+        static void Set(String integrationId, String key, String value);
+        static void Remove(String integrationId, String key);
+        static Boolean Has(String integrationId, String key);
+    }
+}

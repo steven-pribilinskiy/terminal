@@ -388,6 +388,9 @@ namespace winrt::Microsoft::Terminal::Settings
                 HyperlinkTooltipRule controlRule{};
                 controlRule.Name(modelRule.Name());
                 controlRule.Enabled(modelRule.Enabled());
+                controlRule.Kind(static_cast<HyperlinkMatchKind>(modelRule.Kind()));
+                controlRule.Integration(modelRule.Integration());
+                controlRule.ShowPreview(modelRule.ShowPreview());
                 controlRule.Schemes(modelRule.Schemes());
                 controlRule.Pattern(modelRule.Pattern());
                 controlRule.FileTypeGroup(static_cast<HyperlinkFileTypeGroup>(modelRule.FileTypeGroup()));
@@ -417,6 +420,19 @@ namespace winrt::Microsoft::Terminal::Settings
                 controlRules.Append(controlRule);
             }
             _HyperlinkTooltipRules = controlRules;
+
+            // Text-kind rules are scanned over the buffer by TerminalCore alongside
+            // URL detection. Same list order as the rules, so a match's pattern id
+            // (2 + index) can be mapped back if anything ever needs it.
+            auto textPatterns = winrt::single_threaded_vector<hstring>();
+            for (const auto& modelRule : modelRules)
+            {
+                if (modelRule.Enabled() && modelRule.Kind() == Model::HyperlinkMatchKind::Text && !modelRule.Pattern().empty())
+                {
+                    textPatterns.Append(modelRule.Pattern());
+                }
+            }
+            _TextPatterns = textPatterns;
         }
 
         _ScrollToChangeOpacity = windowSettings.ScrollToChangeOpacity();

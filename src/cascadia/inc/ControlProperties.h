@@ -57,6 +57,7 @@
     X(bool, AllowKittyKeyboardMode, true)                                                                         \
     X(winrt::hstring, StartingTitle)                                                                              \
     X(bool, DetectURLs, true)                                                                                     \
+    X(winrt::Windows::Foundation::Collections::IVector<winrt::hstring>, TextPatterns, nullptr)                                                                                     \
     X(bool, AutoMarkPrompts)                                                                                      \
     X(bool, RepositionCursorWithMouse, false)                                                                     \
     X(bool, RainbowSuggestions)                                                                                   \

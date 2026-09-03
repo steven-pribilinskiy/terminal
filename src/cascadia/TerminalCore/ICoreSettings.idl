@@ -127,6 +127,9 @@ namespace Microsoft.Terminal.Core
         Boolean AllowOscNotifications { get; };
         Boolean TrimBlockSelection { get; };
         Boolean DetectURLs { get; };
+        // ICU regexes scanned over the buffer alongside URL detection; each
+        // whole match becomes hoverable/clickable text (see HyperlinkTooltipRule).
+        Windows.Foundation.Collections.IVector<String> TextPatterns { get; };
 
         Windows.Foundation.IReference<Microsoft.Terminal.Core.Color> TabColor { get; };
         Windows.Foundation.IReference<Microsoft.Terminal.Core.Color> StartingTabColor { get; };

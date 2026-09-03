@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 import "IKeyBindings.idl";
+import "HyperlinkPreview.idl";
 import "IMouseWheelListener.idl";
 import "IControlSettings.idl";
 import "ControlInteractivity.idl";
@@ -61,6 +62,9 @@ namespace Microsoft.Terminal.Control
 
         // MIDL 3 does not support setter-only properties.
         void KeyBindings(Microsoft.Terminal.Control.IKeyBindings KeyBindings);
+        // The app-owned integration host that turns a hovered link (or text
+        // match) into a HyperlinkPreview for the card. Null = no previews.
+        void HyperlinkPreviewProvider(Microsoft.Terminal.Control.IHyperlinkPreviewProvider provider);
 
         event Windows.Foundation.TypedEventHandler<Object, TitleChangedEventArgs> TitleChanged;
         event Windows.Foundation.TypedEventHandler<Object, WriteToClipboardEventArgs> WriteToClipboard;

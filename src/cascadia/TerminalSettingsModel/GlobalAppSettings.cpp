@@ -102,6 +102,14 @@ winrt::com_ptr<GlobalAppSettings> GlobalAppSettings::Copy() const
             globals->_HyperlinkTooltipRules->Append(get_self<HyperlinkTooltipRule>(rule)->Copy());
         }
     }
+    if (_Integrations)
+    {
+        globals->_Integrations = winrt::single_threaded_map<hstring, Model::IntegrationSettings>();
+        for (const auto& [id, settings] : *_Integrations)
+        {
+            globals->_Integrations->Insert(id, get_self<IntegrationSettings>(settings)->Copy());
+        }
+    }
     if (_DisabledProfileSources)
     {
         globals->_DisabledProfileSources = winrt::single_threaded_vector<hstring>();

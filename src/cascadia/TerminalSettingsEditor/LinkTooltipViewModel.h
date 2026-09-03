@@ -6,11 +6,27 @@
 #include "LinkTooltipViewModel.g.h"
 #include "HyperlinkTooltipRuleViewModel.g.h"
 #include "HyperlinkTooltipActionViewModel.g.h"
+#include "IntegrationChoiceViewModel.g.h"
 #include "ViewModelHelpers.h"
 #include "Utils.h"
 
 namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 {
+    struct IntegrationChoiceViewModel : IntegrationChoiceViewModelT<IntegrationChoiceViewModel>
+    {
+    public:
+        IntegrationChoiceViewModel(hstring id, hstring displayName) :
+            _Id{ std::move(id) },
+            _DisplayName{ std::move(displayName) } {}
+
+        hstring Id() const noexcept { return _Id; }
+        hstring DisplayName() const noexcept { return _DisplayName; }
+
+    private:
+        hstring _Id;
+        hstring _DisplayName;
+    };
+
     struct HyperlinkTooltipActionViewModel : HyperlinkTooltipActionViewModelT<HyperlinkTooltipActionViewModel>, ViewModelHelper<HyperlinkTooltipActionViewModel>
     {
     public:
@@ -50,10 +66,24 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         GETSET_OBSERVABLE_PROJECTED_SETTING(_Rule, SuppressCopyLink);
         GETSET_OBSERVABLE_PROJECTED_SETTING(_Rule, SuppressCopyPath);
         GETSET_OBSERVABLE_PROJECTED_SETTING(_Rule, SuppressReveal);
+        GETSET_OBSERVABLE_PROJECTED_SETTING(_Rule, Integration);
+        GETSET_OBSERVABLE_PROJECTED_SETTING(_Rule, ShowPreview);
 
         GETSET_BINDABLE_ENUM_SETTING(FileTypeGroup, Model::HyperlinkFileTypeGroup, _Rule.FileTypeGroup);
 
+        // Unlike FileTypeGroup, Kind decides which cards the editor even shows, so
+        // its setter has to raise IsLinkKind/IsTextKind. The macro's own setter
+        // doesn't notify, hence the accessor pair below instead of _Rule.Kind.
+        GETSET_BINDABLE_ENUM_SETTING(Kind, Model::HyperlinkMatchKind, _kindAccessor);
+
     public:
+        bool IsLinkKind() const noexcept { return _Rule.Kind() == Model::HyperlinkMatchKind::Link; }
+        bool IsTextKind() const noexcept { return _Rule.Kind() == Model::HyperlinkMatchKind::Text; }
+
+        Windows::Foundation::Collections::IVector<Editor::IntegrationChoiceViewModel> IntegrationChoices() const noexcept { return _IntegrationChoices; }
+        Windows::Foundation::IInspectable CurrentIntegrationChoice() const;
+        void CurrentIntegrationChoice(const Windows::Foundation::IInspectable& value);
+
         hstring SummaryText() const;
 
         hstring Schemes() const;
@@ -86,6 +116,17 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         Model::HyperlinkTooltipRule _Rule;
         Windows::Foundation::Collections::IObservableVector<Editor::HyperlinkTooltipActionViewModel> _CustomActions;
         Windows::Foundation::Collections::IObservableVector<Editor::HyperlinkTooltipActionViewModel>::VectorChanged_revoker _customActionsChangedRevoker;
+        Windows::Foundation::Collections::IVector<Editor::IntegrationChoiceViewModel> _IntegrationChoices;
+
+        Model::HyperlinkMatchKind _kindAccessor() const { return _Rule.Kind(); }
+        void _kindAccessor(Model::HyperlinkMatchKind value)
+        {
+            if (_Rule.Kind() != value)
+            {
+                _Rule.Kind(value);
+                _NotifyChanges(L"IsLinkKind", L"IsTextKind", L"SummaryText");
+            }
+        }
     };
 
     struct LinkTooltipViewModel : LinkTooltipViewModelT<LinkTooltipViewModel>, ViewModelHelper<LinkTooltipViewModel>

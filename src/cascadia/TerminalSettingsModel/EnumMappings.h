@@ -42,6 +42,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, winrt::Microsoft::Terminal::Control::AmbiguousWidth> AmbiguousWidth();
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, winrt::Microsoft::Terminal::Control::WarnAboutMultiLinePaste> WarnAboutMultiLinePaste();
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, HyperlinkFileTypeGroup> HyperlinkFileTypeGroup();
+        static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, HyperlinkMatchKind> HyperlinkMatchKind();
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, ConfirmOnClose> ConfirmOnClose();
 
         // Profile Settings

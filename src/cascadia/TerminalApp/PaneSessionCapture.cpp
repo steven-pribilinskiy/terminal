@@ -3,6 +3,7 @@
 
 #include "pch.h"
 #include "PaneSessionCapture.h"
+#include "ProcessCapture.h"
 
 #include <TlHelp32.h>
 #include <shellapi.h>
@@ -402,94 +403,15 @@ done
 )SH";
 
         // Runs `wsl.exe -d <distro> -- sh -s`, writes the script to its stdin
-        // and reads stdout to EOF. CREATE_NO_WINDOW matters on this machine:
-        // Windows Terminal is the registered default terminal host, so a
-        // console child launched without it gets a Terminal window created for
-        // it before any hide request could apply.
+        // and reads stdout to EOF.
+        //
+        // The pipes, the CREATE_NO_WINDOW and the polled read with a deadline
+        // all live in RunProcessCapture now: the integration fetch pipeline
+        // needs exactly the same thing for its `command` steps, and two copies
+        // of that would drift.
         std::string RunWslProbe(const std::wstring& distro, DWORD timeoutMs)
         {
-            SECURITY_ATTRIBUTES sa{ sizeof(sa), nullptr, TRUE };
-
-            wil::unique_handle inRead, inWrite, outRead, outWrite;
-            if (!CreatePipe(inRead.addressof(), inWrite.addressof(), &sa, 0) ||
-                !CreatePipe(outRead.addressof(), outWrite.addressof(), &sa, 0))
-            {
-                return {};
-            }
-            SetHandleInformation(inWrite.get(), HANDLE_FLAG_INHERIT, 0);
-            SetHandleInformation(outRead.get(), HANDLE_FLAG_INHERIT, 0);
-
-            STARTUPINFOW si{};
-            si.cb = sizeof(si);
-            si.dwFlags = STARTF_USESTDHANDLES;
-            si.hStdInput = inRead.get();
-            si.hStdOutput = outWrite.get();
-            // Merged into stdout rather than left null: STARTF_USESTDHANDLES
-            // hands the child exactly these three, and a null stderr is an
-            // invalid handle it may refuse to start with. Anything the shell
-            // complains about lands in the output and is dropped by the parser,
-            // which only accepts lines with the full field count.
-            si.hStdError = outWrite.get();
-
-            auto commandLine = fmt::format(LR"(wsl.exe -d {} -- sh -s)", distro);
-
-            PROCESS_INFORMATION pi{};
-            if (!CreateProcessW(nullptr, commandLine.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
-            {
-                return {};
-            }
-            wil::unique_handle process{ pi.hProcess };
-            wil::unique_handle thread{ pi.hThread };
-
-            // Close our copies of the child's ends first, or the reads below
-            // never see EOF because this process still holds the pipe open.
-            inRead.reset();
-            outWrite.reset();
-
-            DWORD written = 0;
-            WriteFile(inWrite.get(), WslProbeScript.data(), gsl::narrow_cast<DWORD>(WslProbeScript.size()), &written, nullptr);
-            inWrite.reset();
-
-            // Polled rather than a plain blocking read loop, because a blocking
-            // ReadFile cannot be given a deadline: if the distro is cold,
-            // wedged, or mid-shutdown, the read never returns and the timeout
-            // below never gets to run. This path executes while the app is
-            // closing, so "wait forever" is not an option it may take.
-            std::string output;
-            char buffer[4096];
-            const auto deadline = GetTickCount64() + timeoutMs;
-
-            for (;;)
-            {
-                DWORD available = 0;
-                if (!PeekNamedPipe(outRead.get(), nullptr, 0, nullptr, &available, nullptr))
-                {
-                    // The child closed its end: everything it wrote is read.
-                    break;
-                }
-
-                if (available == 0)
-                {
-                    if (GetTickCount64() > deadline)
-                    {
-                        TerminateProcess(process.get(), 1);
-                        break;
-                    }
-                    Sleep(20);
-                    continue;
-                }
-
-                DWORD read = 0;
-                const auto want = std::min(static_cast<DWORD>(sizeof(buffer)), available);
-                if (!ReadFile(outRead.get(), buffer, want, &read, nullptr) || read == 0)
-                {
-                    break;
-                }
-                output.append(buffer, read);
-            }
-
-            WaitForSingleObject(process.get(), 1000);
-            return output;
+            return ::TerminalApp::RunProcessCapture(fmt::format(LR"(wsl.exe -d {} -- sh -s)", distro), WslProbeScript, timeoutMs);
         }
 
         struct WslRecord
