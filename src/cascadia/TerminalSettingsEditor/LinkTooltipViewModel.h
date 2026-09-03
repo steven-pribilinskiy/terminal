@@ -53,6 +53,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         GETSET_BINDABLE_ENUM_SETTING(FileTypeGroup, Model::HyperlinkFileTypeGroup, _Rule.FileTypeGroup);
 
+    public:
         hstring SummaryText() const;
 
         hstring Schemes() const;
