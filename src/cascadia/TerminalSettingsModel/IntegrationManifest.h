@@ -21,6 +21,9 @@ Abstract:
 
 namespace winrt::Microsoft::Terminal::Settings::Model::implementation
 {
+    // The comma in IMap<K, V> would split WINRT_PROPERTY's macro arguments.
+    using IntegrationHeaderMap = Windows::Foundation::Collections::IMap<hstring, hstring>;
+
     struct IntegrationField : IntegrationFieldT<IntegrationField>
     {
         IntegrationField() noexcept = default;
@@ -56,7 +59,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         WINRT_PROPERTY(Model::IntegrationFetchType, Type, Model::IntegrationFetchType::Http);
         WINRT_PROPERTY(hstring, Url);
         WINRT_PROPERTY(hstring, Method);
-        WINRT_PROPERTY(Windows::Foundation::Collections::IMap<hstring, hstring>, Headers);
+        WINRT_PROPERTY(IntegrationHeaderMap, Headers);
         WINRT_PROPERTY(hstring, AuthType);
         WINRT_PROPERTY(hstring, AuthUser);
         WINRT_PROPERTY(hstring, AuthPassword);

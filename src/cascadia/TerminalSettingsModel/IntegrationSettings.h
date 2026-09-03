@@ -18,6 +18,9 @@ Abstract:
 
 namespace winrt::Microsoft::Terminal::Settings::Model::implementation
 {
+    // The comma in IMap<K, V> would split WINRT_PROPERTY's macro arguments.
+    using IntegrationValueMap = Windows::Foundation::Collections::IMap<hstring, hstring>;
+
     struct IntegrationSettings : IntegrationSettingsT<IntegrationSettings>
     {
     public:
@@ -29,7 +32,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         static com_ptr<IntegrationSettings> FromJson(const Json::Value& json);
 
         WINRT_PROPERTY(bool, Enabled, false);
-        WINRT_PROPERTY(Windows::Foundation::Collections::IMap<hstring, hstring>, Values);
+        WINRT_PROPERTY(IntegrationValueMap, Values);
         WINRT_PROPERTY(Windows::Foundation::Collections::IVector<hstring>, Fields);
     };
 }
