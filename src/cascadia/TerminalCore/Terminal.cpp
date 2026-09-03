@@ -13,6 +13,7 @@
 
 #include <til/hash.h>
 #include <til/regex.h>
+#include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Microsoft.Terminal.Core.h>
 
 using namespace winrt::Microsoft::Terminal::Core;
@@ -150,8 +151,8 @@ void Terminal::UpdateSettings(ICoreSettings settings)
         _textPatterns.clear();
         if (const auto patterns = settings.TextPatterns())
         {
-            // Indexed rather than range-for: TerminalCore does not pull in the
-            // WinRT collections projection that IIterable's begin/end need.
+            // Capped because every pattern is another full scan of the viewport
+            // (plus a page either side) on each output-idle rescan.
             constexpr uint32_t maxTextPatterns = 16;
             const auto count = std::min(patterns.Size(), maxTextPatterns);
             for (uint32_t i = 0; i < count; ++i)
