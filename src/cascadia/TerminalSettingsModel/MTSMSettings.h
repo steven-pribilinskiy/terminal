@@ -18,6 +18,18 @@ Author(s):
 // Macro format (defaultArgs are optional):
 // (type, name, jsonKey, defaultArgs)
 
+// A comma inside a template argument list splits an X-macro argument, so a
+// two-parameter map type has to hide behind an alias (and its default behind
+// a function) to be usable in the tables below.
+namespace winrt::Microsoft::Terminal::Settings::Model::implementation
+{
+    using IntegrationSettingsMap = winrt::Windows::Foundation::Collections::IMap<winrt::hstring, winrt::Microsoft::Terminal::Settings::Model::IntegrationSettings>;
+    inline IntegrationSettingsMap MakeIntegrationSettingsMap()
+    {
+        return winrt::single_threaded_map<winrt::hstring, winrt::Microsoft::Terminal::Settings::Model::IntegrationSettings>();
+    }
+}
+
 // Settings that are truly app-global (not per-window)
 #define MTSM_GLOBAL_ONLY_SETTINGS(X)                                                                                               \
     X(hstring, Language, "language")                                                                                               \
@@ -38,7 +50,7 @@ Author(s):
     X(bool, PersistBufferPeriodically, "persistBufferPeriodically", true)                                                          \
     X(int32_t, BufferPersistIntervalMinutes, "bufferPersistIntervalMinutes", 5)                                                    \
     X(Model::ResumeSessionNotification, ResumeSessionNotification, "resumeSessionNotification", Model::ResumeSessionNotification::Toast) \
-    X(winrt::Windows::Foundation::Collections::IMap<winrt::hstring, Model::IntegrationSettings>, Integrations, "integrations", winrt::single_threaded_map<winrt::hstring, Model::IntegrationSettings>())
+    X(IntegrationSettingsMap, Integrations, "integrations", MakeIntegrationSettingsMap())
 
 // Settings that are per-window (may vary by window name in the future)
 #define MTSM_WINDOW_SETTINGS(X)                                                                                                                                                                       \

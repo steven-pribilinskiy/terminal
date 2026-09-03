@@ -156,7 +156,11 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(Int32, HyperlinkTooltipHideDelay);
         INHERITABLE_SETTING(Boolean, HyperlinkTooltipActions);
         INHERITABLE_SETTING(IVector<HyperlinkTooltipRule>, HyperlinkTooltipRules);
-        INHERITABLE_SETTING(IMap<String, IntegrationSettings>, Integrations);
+        // INHERITABLE_SETTING spelled out: the comma in the map type would split
+        // the macro's arguments.
+        Windows.Foundation.Collections.IMap<String, IntegrationSettings> Integrations { get; set; };
+        Boolean HasIntegrations { get; };
+        void ClearIntegrations();
         INHERITABLE_SETTING(Boolean, ScrollToChangeOpacity);
         INHERITABLE_SETTING(Boolean, TrimBlockSelection);
         INHERITABLE_SETTING(Boolean, DetectURLs);
