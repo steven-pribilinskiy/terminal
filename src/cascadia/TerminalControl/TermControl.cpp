@@ -4110,7 +4110,21 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         HyperlinkCardPreviewError().Text(error);
         HyperlinkCardPreviewError().Visibility(error.empty() ? Visibility::Collapsed : Visibility::Visible);
 
-        HyperlinkCardPreviewFields().ItemsSource(preview.Fields());
+        // Same runtime-enumerable shape as the custom actions list in
+        // _showHyperlinkCard: XAML needs IBindableVector, not IVector<T>.
+        try
+        {
+            auto fields = winrt::single_threaded_observable_vector<IInspectable>();
+            if (const auto source = preview.Fields())
+            {
+                for (const auto& field : source)
+                {
+                    fields.Append(field);
+                }
+            }
+            HyperlinkCardPreviewFields().ItemsSource(fields);
+        }
+        CATCH_LOG();
         HyperlinkCardPreview().Visibility(Visibility::Visible);
 
         // A text match's link only exists once an integration has resolved it, so the target
@@ -4159,8 +4173,23 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         // A rule's custom actions, if any, alongside the (possibly individually
         // suppressed) built-in buttons above -- see _hoveredHyperlinkChanged.
-        HyperlinkCardCustomActions().ItemsSource(winrt::single_threaded_vector<Control::HyperlinkTooltipAction>(
-            std::vector<Control::HyperlinkTooltipAction>{ _currentHyperlinkTooltipSettings.customActions }));
+        //
+        // ItemsSource set from code has to be something XAML can enumerate at runtime:
+        // IBindableVector, which C++/WinRT's observable vector of IInspectable provides
+        // (Windows.UI.Xaml.Interop.h is in the pch). A plain single_threaded_vector<T>
+        // of a projected class is not, and XAML rejected it with an exception that
+        // surfaced as a fail-fast on every hover -- with or without URL detection,
+        // since an OSC 8 link takes exactly the same path.
+        try
+        {
+            auto actions = winrt::single_threaded_observable_vector<IInspectable>();
+            for (const auto& action : _currentHyperlinkTooltipSettings.customActions)
+            {
+                actions.Append(action);
+            }
+            HyperlinkCardCustomActions().ItemsSource(actions);
+        }
+        CATCH_LOG();
 
         // Measure first: where it goes depends on how big it turned out to be, and it has
         // just been given new text.
