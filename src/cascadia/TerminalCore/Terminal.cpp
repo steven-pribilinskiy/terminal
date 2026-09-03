@@ -150,13 +150,13 @@ void Terminal::UpdateSettings(ICoreSettings settings)
         _textPatterns.clear();
         if (const auto patterns = settings.TextPatterns())
         {
-            constexpr size_t maxTextPatterns = 16;
-            for (const auto& pattern : patterns)
+            // Indexed rather than range-for: TerminalCore does not pull in the
+            // WinRT collections projection that IIterable's begin/end need.
+            constexpr uint32_t maxTextPatterns = 16;
+            const auto count = std::min(patterns.Size(), maxTextPatterns);
+            for (uint32_t i = 0; i < count; ++i)
             {
-                if (_textPatterns.size() >= maxTextPatterns)
-                {
-                    break;
-                }
+                const std::wstring pattern{ patterns.GetAt(i) };
                 UErrorCode status = U_ZERO_ERROR;
                 const auto re = til::ICU::CreateRegex(pattern, 0, &status);
                 if (re && U_SUCCESS(status))
