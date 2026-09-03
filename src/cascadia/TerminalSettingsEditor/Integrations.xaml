@@ -163,9 +163,13 @@
                             <StackPanel HorizontalAlignment="Left"
                                         Orientation="Horizontal"
                                         Spacing="8">
+                                <!--
+                                    Deliberately unbound: a Password binding plus PasswordChanged on the
+                                    same box is re-entrant. The box pushes into PendingValue as it's typed,
+                                    and the Save/Clear handlers empty it from code-behind.
+                                -->
                                 <PasswordBox x:Uid="Integrations_CredentialBox"
                                              MinWidth="248"
-                                             Password="{x:Bind PendingValue, Mode=OneWay}"
                                              PasswordChanged="CredentialPassword_Changed"
                                              Tag="{x:Bind}" />
                                 <Button x:Uid="Integrations_SaveCredentialButton"

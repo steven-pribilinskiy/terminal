@@ -209,7 +209,7 @@ parse is skipped and logged, never fatal.
         { "key": "updated",  "label": "Updated",  "path": "/fields/updated",              "kind": "text",   "format": "relativeTime", "default": true }
     ]
 
-    // "html": "…" — reserved for a later phase; see "HTML representation" below.
+    // "html": "…" — off by default in this build; see "HTML representation" below.
 }
 ```
 
@@ -229,7 +229,7 @@ Top-level keys:
 | `matchers` | array of [matcher](#matchers) | How the plugin claims a link or text match. |
 | `fetch` | array of [fetch step](#fetch-steps) | The request pipeline that produces preview data. |
 | `fields` | array of [display field](#display-fields) | How the fetched result renders on the card. |
-| `html` | string | Reserved; see [HTML representation](#html-representation-reserved). |
+| `html` | string | A full HTML document string, rendered in place of `fields`. Compiled in but off by default in this build; see [HTML representation](#html-representation-preview-off-by-default). |
 
 #### Settings / credentials fields
 
@@ -353,11 +353,38 @@ text/link — a second hover of the same link within that window skips the fetch
 Slack default to 300 seconds; Stith, whose data changes quickly, defaults to 30. Errors are
 cached briefly too, so a broken credential doesn't retry on every hover.
 
-## HTML representation (reserved)
+## HTML representation (preview, off by default)
 
-The manifest schema reserves an `"html"` key for a richer, HTML/CSS/JS-rendered card in place of
-the plain field list. It is not implemented yet — any manifest that sets it is ignored until that
-phase ships, and the plugin falls back to its `fields` list. Don't rely on `html` being rendered.
+A manifest's `html` key is a full HTML document, given inline as a string (there is no
+file-reference form). When the feature is enabled, the card renders this document in a WebView2
+control instead of the plain `fields` list.
+
+The page runs in a locked-down host: all navigation except the initial load is blocked, and there
+is no context menu, no dev tools, and no zoom. Two things are injected before the page loads:
+
+- `window.__data` — an object keyed by fetch step `id`, holding each step's JSON result (the same
+  data `path`/`iconPath`/`colorPath` pointers resolve against for a `fields` card).
+- `window.__uri` — the URI or text that was hovered.
+
+The page has two ways to talk back to the host, both through `chrome.webview.postMessage`:
+
+- `{ "height": <number> }` — resize the card to fit the content, clamped to **40–320 px**.
+- `{ "open": "https://…" }` — open a link through the Terminal's normal link handling, the same
+  path Open/Copy link use for a `fields` card.
+
+Because the host applies its color scheme from the app theme, an `html` page should declare
+`color-scheme: light dark` in its CSS rather than assuming one theme.
+
+```jsonc
+// integration.json
+"html": "<!doctype html><html><head><meta charset='utf-8'><style>:root{color-scheme:light dark}body{font:12px system-ui;margin:6px}</style></head><body><div id='s'></div><script>const d=window.__data.issue.fields;document.getElementById('s').textContent=d.summary+' — '+d.status.name;function report(){chrome.webview.postMessage({height:document.body.scrollHeight})}window.addEventListener('load',report);new ResizeObserver(report).observe(document.body);document.body.addEventListener('click',e=>{if(e.target.tagName==='A'){e.preventDefault();chrome.webview.postMessage({open:e.target.href})}});</script></body></html>"
+```
+
+**In this build, `html` is compiled in but disabled.** Rendering it requires both the
+`Feature_HyperlinkPreviewHtml` feature flag (`src/features.xml`) to be enabled and
+`WebView2Loader.dll`, plus the WebView2 Runtime, to be present next to the app. Neither is true
+today, so every plugin that sets `html` falls back to its `fields` list — don't rely on `html`
+being rendered yet.
 
 ## Adding a third-party plugin
 

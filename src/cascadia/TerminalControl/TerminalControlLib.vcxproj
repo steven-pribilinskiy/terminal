@@ -52,6 +52,7 @@
     <ClInclude Include="HyperlinkPreview.h">
       <DependentUpon>HyperlinkPreview.idl</DependentUpon>
     </ClInclude>
+    <ClInclude Include="HyperlinkHtmlHost.h" />
     <ClInclude Include="SearchBoxControl.h">
       <DependentUpon>SearchBoxControl.xaml</DependentUpon>
     </ClInclude>
@@ -91,6 +92,7 @@
     <ClCompile Include="HyperlinkPreview.cpp">
       <DependentUpon>HyperlinkPreview.idl</DependentUpon>
     </ClCompile>
+    <ClCompile Include="HyperlinkHtmlHost.cpp" />
     <ClCompile Include="HyperlinkTooltipRule.cpp">
       <DependentUpon>IControlSettings.idl</DependentUpon>
     </ClCompile>
@@ -186,7 +188,14 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(OpenConsoleDir)src\cascadia\inc;$(OpenConsoleDir)src\types\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!--
+        WebView2.h, for HyperlinkHtmlHost. Headers only: nothing here links WebView2Loader,
+        which is resolved by name at runtime precisely so the DLL stays optional. The
+        package itself comes in via WinUI, and WebView2PackageRoot is defined in
+        src\common.nugetversions.targets, which this file imports at the bottom. MSBuild
+        evaluates every property before any item definition, so that order is fine.
+      -->
+      <AdditionalIncludeDirectories>$(OpenConsoleDir)src\cascadia\inc;$(OpenConsoleDir)src\types\inc;$(WebView2PackageRoot)\build\native\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Reference>
       <Private>false</Private>

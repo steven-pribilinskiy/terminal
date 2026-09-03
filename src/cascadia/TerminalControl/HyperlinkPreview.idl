@@ -44,6 +44,9 @@ namespace Microsoft.Terminal.Control
         Windows.Foundation.Collections.IVector<HyperlinkPreviewField> Fields;
         // Optional rendered HTML representation; empty means "use Fields".
         String Html;
+        // The raw JSON the integration's steps produced, handed to an HTML representation
+        // as window.__data so a plugin can render from the data instead of from Fields.
+        String DataJson;
         // Non-empty when the fetch failed; shown in place of the fields.
         String Error;
         // For text matches: the URL the match resolves to.

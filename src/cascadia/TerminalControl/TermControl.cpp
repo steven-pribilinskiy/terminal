@@ -16,6 +16,7 @@
 #include "../../tsf/Handle.h"
 #include "HyperlinkFileTypeGroups.h"
 #include "HyperlinkPreview.h"
+#include "HyperlinkHtmlHost.h"
 
 #include "TermControl.g.cpp"
 
@@ -4041,6 +4042,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         HyperlinkCardPreviewError().Text(winrt::hstring{});
         HyperlinkCardPreviewError().Visibility(Visibility::Collapsed);
         HyperlinkCardPreviewFields().ItemsSource(nullptr);
+        _hideHyperlinkHtml();
 
         HyperlinkCardPreviewProgress().IsActive(loading);
         HyperlinkCardPreviewProgress().Visibility(loading ? Visibility::Visible : Visibility::Collapsed);
@@ -4090,6 +4092,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         if (!preview)
         {
+            // Collapsing the section is not enough for the HTML host: its WebView2 is a
+            // child of the top-level window, so it outlives the XAML that reserved its space
+            // unless it is told to go away.
+            _hideHyperlinkHtml();
             HyperlinkCardPreview().Visibility(Visibility::Collapsed);
             return;
         }
@@ -4127,6 +4133,29 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         CATCH_LOG();
         HyperlinkCardPreview().Visibility(Visibility::Visible);
 
+        // An integration can send a rendered HTML representation of its own instead of the
+        // generic field list. Hosting one needs Feature_HyperlinkPreviewHtml *and* a
+        // WebView2Loader.dll that no build ships yet, so IsAvailable() is false in every
+        // Terminal today and this is the field list behaving exactly as it did before.
+        // The host is only positioned further down, once _showHyperlinkCard has measured
+        // and placed the card whose space it borrows.
+        const auto html = preview.Html();
+        const auto hostingHtml = !html.empty() && HyperlinkHtmlHost::IsAvailable();
+        if (hostingHtml)
+        {
+            _ensureHyperlinkHtmlHost();
+            _hyperlinkHtmlHeight = 120;
+            const auto htmlHost = HyperlinkCardHtmlHost();
+            htmlHost.MinWidth(240);
+            htmlHost.Height(static_cast<double>(_hyperlinkHtmlHeight));
+            htmlHost.Visibility(Visibility::Visible);
+            HyperlinkCardPreviewFields().Visibility(Visibility::Collapsed);
+        }
+        else
+        {
+            _hideHyperlinkHtml();
+        }
+
         // A text match's link only exists once an integration has resolved it, so the target
         // line and the two buttons that need a link have been waiting for this moment.
         if (_currentHyperlinkTooltipSettings.isTextMatch && !preview.ResolvedUri().empty())
@@ -4149,6 +4178,143 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         {
             _showHyperlinkCard();
         }
+
+        // Only now does the placeholder Border have a size and a place on screen, which is
+        // what the WebView2 needs to be given. If the card is still inside its show delay
+        // there is nothing to position yet -- _showHyperlinkCard moves the host itself when
+        // the timer eventually fires.
+        if (hostingHtml)
+        {
+            auto uri = _hoveredLinkTarget();
+            if (uri.empty())
+            {
+                uri = _hoveredUri;
+            }
+
+            _hyperlinkHtmlHost->Show(reinterpret_cast<HWND>(OwningHwnd()),
+                                     _htmlHostRect(),
+                                     html,
+                                     preview.DataJson(),
+                                     uri,
+                                     ActualTheme() == ElementTheme::Dark);
+        }
+    }
+
+    void TermControl::_ensureHyperlinkHtmlHost()
+    {
+        if (_hyperlinkHtmlHost)
+        {
+            return;
+        }
+
+        _hyperlinkHtmlHost = std::make_unique<HyperlinkHtmlHost>();
+
+        // WebView2 raises its events on the thread that created the controller, which is
+        // this UI thread, so neither callback needs a dispatch of its own -- only the usual
+        // check that there is still a control here to talk to.
+        _hyperlinkHtmlHost->OnContentHeight = [weakThis = get_weak()](int32_t height) {
+            if (const auto self = weakThis.get(); self && !self->_IsClosing())
+            {
+                self->_setHyperlinkHtmlHeight(height);
+            }
+        };
+        _hyperlinkHtmlHost->OnOpenLink = [weakThis = get_weak()](winrt::hstring uri) {
+            if (const auto self = weakThis.get(); self && !self->_IsClosing())
+            {
+                // Down the same path the card's own Open button takes, so the unsafe-URL
+                // prompt and the file:// resolution in TerminalPage still apply. A page
+                // inside the card gets no rules of its own.
+                self->_hideHyperlinkCard();
+                self->OpenHyperlink.raise(*self, winrt::make<OpenHyperlinkEventArgs>(uri));
+            }
+        };
+    }
+
+    // Takes the HTML host back down and gives the field list its place back. All of it is
+    // behind the null check: nothing creates a host unless a preview actually asked for one
+    // and IsAvailable() agreed, so in every build today this is a pointer test and no more.
+    void TermControl::_hideHyperlinkHtml()
+    {
+        if (!_hyperlinkHtmlHost)
+        {
+            return;
+        }
+
+        _hyperlinkHtmlHost->Hide();
+        HyperlinkCardHtmlHost().Visibility(Visibility::Collapsed);
+        HyperlinkCardPreviewFields().Visibility(Visibility::Visible);
+    }
+
+    // The page measured itself and said how tall it wants to be. Clamped, because a card is
+    // a hover affordance: a plugin that asks for a thousand pixels does not get the pane.
+    void TermControl::_setHyperlinkHtmlHeight(int32_t height)
+    {
+        const auto clamped = std::clamp(height, 40, 320);
+        if (clamped == _hyperlinkHtmlHeight)
+        {
+            return;
+        }
+
+        _hyperlinkHtmlHeight = clamped;
+        HyperlinkCardHtmlHost().Height(static_cast<double>(clamped));
+
+        // The card just changed size, so it has to be measured and placed again -- which is
+        // also what moves the WebView2 to follow it.
+        if (HyperlinkCard().Visibility() == Visibility::Visible)
+        {
+            _showHyperlinkCard();
+        }
+    }
+
+    // Where the HTML host's WebView2 goes: the placeholder Border's rectangle, expressed in
+    // the *owning window's client pixels*, because that is the only coordinate space a
+    // WebView2 controller's bounds are in.
+    //
+    // Two approximations live here, both deliberate and both harmless while the feature is
+    // off. The XAML island's origin within the owner's client area is taken as (0, 0) --
+    // exact for a plain window, out by the non-client inset on one with a custom title bar.
+    // And ActualWidth/ActualHeight are zero until a layout pass has run, so on the very
+    // first show the card's own measured width less its padding stands in. Both are
+    // corrected by the next Move(), which every _showHyperlinkCard issues.
+    RECT TermControl::_htmlHostRect()
+    {
+        const auto host = HyperlinkCardHtmlHost();
+
+        auto scale = 1.0;
+        try
+        {
+            if (const auto root = XamlRoot())
+            {
+                scale = root.RasterizationScale();
+            }
+            else
+            {
+                scale = DisplayInformation::GetForCurrentView().RawPixelsPerViewPixel();
+            }
+        }
+        CATCH_LOG();
+
+        auto width = host.ActualWidth();
+        if (width <= 0)
+        {
+            width = std::max(0.0, static_cast<double>(HyperlinkCard().DesiredSize().Width) - 20.0);
+        }
+        auto height = host.ActualHeight();
+        if (height <= 0)
+        {
+            height = static_cast<double>(_hyperlinkHtmlHeight);
+        }
+
+        const auto origin = host.TransformToVisual(nullptr).TransformPoint({});
+        const auto left = static_cast<double>(origin.X) * scale;
+        const auto top = static_cast<double>(origin.Y) * scale;
+
+        return RECT{
+            std::lround(left),
+            std::lround(top),
+            std::lround(left + width * scale),
+            std::lround(top + height * scale),
+        };
     }
 
     void TermControl::_showHyperlinkCard()
@@ -4226,6 +4392,14 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         Controls::Canvas::SetLeft(card, left);
         Controls::Canvas::SetTop(card, top);
         card.Visibility(Visibility::Visible);
+
+        // The HTML host's WebView2 is a child of the top-level window rather than part of
+        // the card's visual tree, so it does not travel with the card -- it has to be told,
+        // every single time the card is placed.
+        if (_hyperlinkHtmlHost && HyperlinkCardHtmlHost().Visibility() == Visibility::Visible)
+        {
+            _hyperlinkHtmlHost->Move(_htmlHostRect());
+        }
     }
 
     void TermControl::_hideHyperlinkCard()
@@ -4237,6 +4411,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // is what sends its result to the bin instead of into a card shown for something else.
         ++_hyperlinkPreviewGeneration;
         _currentHyperlinkPreview = nullptr;
+        _hideHyperlinkHtml();
         HyperlinkCard().Visibility(Visibility::Collapsed);
     }
 

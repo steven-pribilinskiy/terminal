@@ -21,6 +21,12 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 {
     struct TermControl;
 
+    // Only forward-declared here: HyperlinkHtmlHost.h pulls in the whole of WebView2.h,
+    // and TermControl.cpp is the one file that has any business owning one. ~TermControl
+    // is defined out of line, so the unique_ptr below never needs the complete type
+    // anywhere else.
+    class HyperlinkHtmlHost;
+
     struct TsfDataProvider : ::Microsoft::Console::TSF::IDataProvider
     {
         explicit TsfDataProvider(TermControl* termControl) noexcept;
@@ -375,6 +381,19 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void _setHyperlinkPreviewLoading(bool loading);
         safe_void_coroutine _requestHyperlinkPreview(uint32_t generation, winrt::hstring text, winrt::hstring integration);
         void _applyHyperlinkPreview(const Control::HyperlinkPreview& preview);
+
+        // A preview whose integration returned rendered HTML is drawn by a WebView2
+        // parented to the owning window rather than by the field list. It is created
+        // lazily and only when HyperlinkHtmlHost::IsAvailable() -- which needs both
+        // Feature_HyperlinkPreviewHtml and a WebView2Loader.dll that no build ships yet --
+        // so in every build today this pointer stays null and every path below it is a
+        // null test that falls through to the field list exactly as before.
+        std::unique_ptr<HyperlinkHtmlHost> _hyperlinkHtmlHost;
+        int32_t _hyperlinkHtmlHeight{ 120 };
+        void _ensureHyperlinkHtmlHost();
+        void _hideHyperlinkHtml();
+        void _setHyperlinkHtmlHeight(int32_t height);
+        RECT _htmlHostRect();
 
         bool _isBackgroundLight{ false };
         bool _detached{ false };

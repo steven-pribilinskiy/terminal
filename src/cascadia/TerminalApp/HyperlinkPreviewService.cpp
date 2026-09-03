@@ -1118,6 +1118,23 @@ namespace
         {
             // Handed over untouched: what to do with it is the control's call.
             preview.Html(winrt::hstring{ plugin.Html });
+
+            // Only the HTML representation ever needs the raw step results --
+            // the fields path has already pulled out everything it wanted
+            // through JSON pointers -- so this is built only when there is an
+            // html template to hand it to. One object keyed by step id, exactly
+            // as a "stepId:/pointer" path spells it, even when a single step
+            // ran; a step that declared no id contributes nothing, because
+            // nothing could address it.
+            if (!results.empty())
+            {
+                JsonObject data;
+                for (const auto& [stepId, value] : results)
+                {
+                    data.SetNamedValue(winrt::hstring{ stepId }, value);
+                }
+                preview.DataJson(data.Stringify());
+            }
         }
         if (!error.empty())
         {
@@ -1134,6 +1151,12 @@ namespace winrt::TerminalApp::implementation
     {
         auto snapshot = std::make_shared<HyperlinkPreviewSnapshot>();
 
+        // GlobalAppSettings::Integrations() never hands back null: it is an
+        // inheritable setting whose default is MakeIntegrationSettingsMap(), so
+        // an unset "integrations" materialises a fresh empty map on every read.
+        // There is therefore nothing to null-check -- the case worth testing is
+        // an EMPTY map, which is what "no integrations configured" looks like,
+        // and which means no previews and no reason to walk the registry.
         IMap<hstring, Model::IntegrationSettings> configured{ nullptr };
         IVector<Model::IntegrationManifest> manifests{ nullptr };
         if (settings)
@@ -1141,11 +1164,11 @@ namespace winrt::TerminalApp::implementation
             if (const auto globals = settings.GlobalSettings())
             {
                 configured = globals.Integrations();
+                if (configured.Size() > 0)
+                {
+                    manifests = Model::IntegrationRegistry::All();
+                }
             }
-        }
-        if (configured)
-        {
-            manifests = Model::IntegrationRegistry::All();
         }
 
         if (manifests)

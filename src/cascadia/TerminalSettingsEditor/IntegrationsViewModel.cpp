@@ -57,6 +57,38 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         return entry;
     }
 
+    // Drops an entry that no longer records anything: disabled, no values, no
+    // field selection. _ensureEntry creates one the moment a box is typed in, so
+    // without this an integration the user tried and undid keeps a
+    // { "enabled": false } stub in settings.json forever.
+    static void _pruneEmptyEntry(const Model::GlobalAppSettings& globals, const hstring& id)
+    {
+        const auto map = globals.Integrations();
+        if (!map || !map.HasKey(id))
+        {
+            return;
+        }
+
+        const auto entry = map.Lookup(id);
+        if (!entry || entry.Enabled())
+        {
+            return;
+        }
+        if (const auto values = entry.Values(); values && values.Size() > 0)
+        {
+            return;
+        }
+        if (const auto fields = entry.Fields(); fields && fields.Size() > 0)
+        {
+            return;
+        }
+
+        map.Remove(id);
+        // Same inheritable-setting trap as _ensureEntry: the map has to be the
+        // user's own value, or the removal happens to a temporary.
+        globals.Integrations(map);
+    }
+
 #pragma region IntegrationSettingViewModel
 
     IntegrationSettingViewModel::IntegrationSettingViewModel(Model::IntegrationField field,
@@ -109,6 +141,8 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             {
                 values.Remove(_Field.Key());
             }
+            // Clearing the last thing the entry recorded takes the entry with it.
+            _pruneEmptyEntry(_GlobalSettings, _IntegrationId);
         }
         else
         {
@@ -168,8 +202,8 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         CATCH_LOG();
 
         _refreshStored();
-        // Empties the bound PasswordBox: the secret is in the vault now, and we
-        // can never read it back to re-fill the box anyway.
+        // The secret is in the vault now, and we can never read it back; the page
+        // empties the PasswordBox itself once this returns.
         PendingValue(hstring{});
         _NotifyChanges(L"IsStored", L"StatusText");
     }
@@ -455,6 +489,12 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             return;
         }
         _ensureEntry(_GlobalSettings, Id()).Enabled(value);
+        if (!value)
+        {
+            // Toggling an otherwise unconfigured integration back off removes the
+            // entry that toggling it on created.
+            _pruneEmptyEntry(_GlobalSettings, Id());
+        }
         _NotifyChanges(L"Enabled");
     }
 

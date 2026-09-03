@@ -45,6 +45,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         WINRT_PROPERTY(hstring, IntegrationIcon);
         WINRT_PROPERTY(Windows::Foundation::Collections::IVector<Control::HyperlinkPreviewField>, Fields);
         WINRT_PROPERTY(hstring, Html);
+        WINRT_PROPERTY(hstring, DataJson);
         WINRT_PROPERTY(hstring, Error);
         WINRT_PROPERTY(hstring, ResolvedUri);
     };

@@ -33,6 +33,9 @@
     <ClCompile Include="Toast.cpp" />
     <ClCompile Include="LanguageProfileNotifier.cpp" />
     <ClCompile Include="TerminalSettingsCache.cpp" />
+    <ClCompile Include="PaneSessionCapture.cpp" />
+    <ClCompile Include="ProcessCapture.cpp" />
+    <ClCompile Include="HyperlinkPreviewService.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -62,6 +65,9 @@
     <ClInclude Include="LanguageProfileNotifier.h" />
     <ClInclude Include="WindowsPackageManagerFactory.h" />
     <ClInclude Include="TerminalSettingsCache.h" />
+    <ClInclude Include="PaneSessionCapture.h" />
+    <ClInclude Include="ProcessCapture.h" />
+    <ClInclude Include="HyperlinkPreviewService.h" />
   </ItemGroup>
   <ItemGroup>
     <Midl Include="AppLogic.idl">

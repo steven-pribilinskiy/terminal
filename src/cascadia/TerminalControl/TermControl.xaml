@@ -1416,8 +1416,19 @@
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
 
-                                    <!--  Reserved for a plugin's own HTML representation. Nothing hosts it yet.  -->
+                                    <!--
+                                        A plugin's own HTML representation, when it sent one and the
+                                        WebView2 host is available. The Border draws nothing: it exists
+                                        to reserve layout, because the WebView2 is a child HWND of the
+                                        top-level window and paints over this rectangle rather than in
+                                        it. TermControl gives it its real height from what the page
+                                        reports, and keeps it collapsed otherwise, which is every
+                                        build today, Feature_HyperlinkPreviewHtml being off.
+                                    -->
                                     <Border x:Name="HyperlinkCardHtmlHost"
+                                            Height="120"
+                                            MinWidth="240"
+                                            Background="Transparent"
                                             Visibility="Collapsed" />
                                 </StackPanel>
 

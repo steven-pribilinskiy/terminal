@@ -194,4 +194,10 @@
         <alwaysDisabledReleaseTokens/>
     </feature>
 
+    <feature>
+        <name>Feature_HyperlinkPreviewHtml</name>
+        <description>Hosts a plugin's HTML representation in the hyperlink card via WebView2</description>
+        <stage>AlwaysDisabled</stage>
+    </feature>
+
 </featureStaging>
