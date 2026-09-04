@@ -900,7 +900,10 @@ namespace winrt::TerminalApp::implementation
         return *this;
     }
 
-    void LinkPreviewPaneContent::Focus(FocusState reason)
+    // The parameter type is spelled out: unqualified, `FocusState` binds to the
+    // inherited Control::FocusState() property rather than the enum, because
+    // class scope is searched before the namespace.
+    void LinkPreviewPaneContent::Focus(winrt::Windows::UI::Xaml::FocusState reason)
     {
         CloseButton().Focus(reason);
     }
