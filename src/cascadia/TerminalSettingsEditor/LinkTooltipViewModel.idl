@@ -94,6 +94,7 @@ namespace Microsoft.Terminal.Settings.Editor
         Windows.Foundation.Collections.IObservableVector<HyperlinkTooltipActionViewModel> CustomActions { get; };
         HyperlinkTooltipActionViewModel RequestAddCustomAction();
         void RequestDeleteCustomAction(HyperlinkTooltipActionViewModel vm);
+        void ApplyPreset(String presetId);
     }
 
     runtimeclass LinkTooltipViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
@@ -127,5 +128,6 @@ namespace Microsoft.Terminal.Settings.Editor
         void RequestReorderRule(HyperlinkTooltipRuleViewModel vm, Boolean goingUp);
         void RequestDeleteRule(HyperlinkTooltipRuleViewModel vm);
         HyperlinkTooltipRuleViewModel RequestAddRule();
+        HyperlinkTooltipRuleViewModel RequestAddRuleWithPreset(String presetId);
     }
 }

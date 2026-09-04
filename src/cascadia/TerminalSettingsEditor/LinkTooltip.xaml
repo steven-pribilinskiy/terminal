@@ -150,14 +150,19 @@
                 <TextBlock x:Uid="LinkTooltip_RulesHeader"
                            Style="{StaticResource TextBlockSubHeaderStyle}" />
 
-                <Button Click="AddRuleButton_Click">
+                <muxc:SplitButton x:Name="AddRuleButton"
+                                  Click="AddRuleButton_Click">
                     <StackPanel Orientation="Horizontal"
                                 Spacing="8">
                         <FontIcon FontSize="{StaticResource StandardIconSize}"
                                   Glyph="&#xE710;" />
                         <TextBlock x:Uid="LinkTooltip_AddRuleButtonText" />
                     </StackPanel>
-                </Button>
+                    <muxc:SplitButton.Flyout>
+                        <MenuFlyout Opening="AddRuleFlyout_Opening"
+                                    Placement="BottomEdgeAlignedLeft" />
+                    </muxc:SplitButton.Flyout>
+                </muxc:SplitButton>
 
                 <ItemsControl ItemsSource="{x:Bind ViewModel.CurrentView, Mode=OneWay}">
                     <ItemsControl.ItemTemplate>
@@ -229,6 +234,24 @@
                               Glyph="&#xE711;" />
                 </Button>
             </Grid>
+
+            <!--  Preset  -->
+            <local:SettingsCard x:Uid="LinkTooltip_RulePreset">
+                <muxc:DropDownButton x:Name="ApplyPresetButton">
+                    <muxc:DropDownButton.Content>
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="8">
+                            <FontIcon FontSize="{StaticResource StandardIconSize}"
+                                      Glyph="&#xE8B9;" />
+                            <TextBlock x:Uid="LinkTooltip_ApplyPresetButtonText" />
+                        </StackPanel>
+                    </muxc:DropDownButton.Content>
+                    <muxc:DropDownButton.Flyout>
+                        <MenuFlyout Opening="ApplyPresetFlyout_Opening"
+                                    Placement="BottomEdgeAlignedLeft" />
+                    </muxc:DropDownButton.Flyout>
+                </muxc:DropDownButton>
+            </local:SettingsCard>
 
             <local:SettingsCard x:Uid="LinkTooltip_RuleName">
                 <TextBox x:Uid="LinkTooltip_RuleNameBox"

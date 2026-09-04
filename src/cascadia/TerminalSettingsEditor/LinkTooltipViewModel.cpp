@@ -9,6 +9,7 @@
 #include "IntegrationChoiceViewModel.g.cpp"
 #include "ButtonChoiceViewModel.g.cpp"
 #include "EnumEntry.h"
+#include "LinkTooltipPresets.h"
 
 using namespace winrt::Windows::Foundation::Collections;
 using namespace winrt::Microsoft::Terminal::Settings::Model;
@@ -619,6 +620,80 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
     }
 
+    void HyperlinkTooltipRuleViewModel::ApplyPreset(const winrt::hstring& presetId)
+    {
+        const auto preset = FindLinkTooltipPreset(presetId);
+        if (!preset)
+        {
+            return;
+        }
+
+        _Rule.Name(winrt::hstring{ preset->name });
+        _Rule.Enabled(true);
+        _Rule.Kind(preset->kind);
+        _Rule.Pattern(winrt::hstring{ preset->pattern });
+        if (!preset->schemes.empty())
+        {
+            std::vector<winrt::hstring> schemes;
+            for (const auto& s : preset->schemes)
+            {
+                schemes.emplace_back(s);
+            }
+            _Rule.Schemes(winrt::single_threaded_vector<winrt::hstring>(std::move(schemes)));
+        }
+        else
+        {
+            _Rule.Schemes(nullptr);
+        }
+        _Rule.FileTypeGroup(preset->fileTypeGroup);
+        if (!preset->customExtensions.empty())
+        {
+            std::vector<winrt::hstring> exts;
+            for (const auto& e : preset->customExtensions)
+            {
+                exts.emplace_back(e);
+            }
+            _Rule.CustomExtensions(winrt::single_threaded_vector<winrt::hstring>(std::move(exts)));
+        }
+        else
+        {
+            _Rule.CustomExtensions(nullptr);
+        }
+        _Rule.Integration(winrt::hstring{ preset->integration });
+        _Rule.ShowPreview(preset->showPreview);
+        _Rule.TooltipShowDelay(nullptr);
+        _Rule.TooltipHideDelay(nullptr);
+        _Rule.TooltipMaxWidth(nullptr);
+        _Rule.Buttons(nullptr);
+        _Rule.ShowInPane(nullptr);
+
+        _NotifyChanges(L"Name",
+                       L"DisplayName",
+                       L"Enabled",
+                       L"Pattern",
+                       L"CurrentKind",
+                       L"IsLinkKind",
+                       L"IsTextKind",
+                       L"Schemes",
+                       L"CurrentFileTypeGroup",
+                       L"CustomExtensions",
+                       L"Integration",
+                       L"CurrentIntegrationChoice",
+                       L"ShowPreview",
+                       L"SummaryText",
+                       L"OverrideShowDelay",
+                       L"ShowDelay",
+                       L"OverrideHideDelay",
+                       L"HideDelay",
+                       L"OverrideMaxWidth",
+                       L"MaxWidth",
+                       L"OverrideButtons",
+                       L"OverrideShowInPane",
+                       L"ShowInPane");
+
+        NotifySelectionProperties();
+    }
+
     LinkTooltipViewModel::LinkTooltipViewModel(Model::GlobalAppSettings globalSettings, Model::WindowSettings windowSettings) :
         _GlobalSettings{ globalSettings },
         _WindowSettings{ windowSettings }
@@ -782,5 +857,17 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         const auto vm = make<HyperlinkTooltipRuleViewModel>(rule, _WindowSettings, _KindList, _KindMap, _FileTypeGroupList, _FileTypeGroupMap, _IntegrationChoices);
         CurrentView().Append(vm);
         return vm;
+    }
+
+    Editor::HyperlinkTooltipRuleViewModel LinkTooltipViewModel::RequestAddRuleWithPreset(const winrt::hstring& presetId)
+    {
+        if (const auto preset = FindLinkTooltipPreset(presetId))
+        {
+            const auto rule = CreateRuleFromPreset(*preset);
+            const auto vm = make<HyperlinkTooltipRuleViewModel>(rule, _WindowSettings, _KindList, _KindMap, _FileTypeGroupList, _FileTypeGroupMap, _IntegrationChoices);
+            CurrentView().Append(vm);
+            return vm;
+        }
+        return RequestAddRule();
     }
 }

@@ -762,7 +762,7 @@
     <comment>Header for a control to toggle debug features.</comment>
   </data>
   <data name="Globals_CiPollIntervalMinutes.Header" xml:space="preserve">
-    <value>CI build poll interval (minutes)</value>
+    <value>CI build update poll interval (minutes)</value>
     <comment>Header for a control to set how often to check for a newly built CI payload. 0 disables polling.</comment>
   </data>
   <data name="Globals_CiPollIntervalMinutes.Description" xml:space="preserve">
@@ -3067,6 +3067,22 @@
   <data name="LinkTooltip_AddRuleButtonText.Text" xml:space="preserve">
     <value>Add rule</value>
     <comment>Text for a button that adds a new link tooltip rule.</comment>
+  </data>
+  <data name="LinkTooltip_AddRuleMenu_NewBlankRule.Text" xml:space="preserve">
+    <value>New blank rule</value>
+    <comment>Text for the flyout menu item that creates an empty link tooltip rule.</comment>
+  </data>
+  <data name="LinkTooltip_RulePreset.Header" xml:space="preserve">
+    <value>Preset</value>
+    <comment>Header for a control to apply a preset to the current link tooltip rule.</comment>
+  </data>
+  <data name="LinkTooltip_RulePreset.Description" xml:space="preserve">
+    <value>Fill this rule with predefined settings for popular services or file types.</value>
+    <comment>Description for what the rule preset control does.</comment>
+  </data>
+  <data name="LinkTooltip_ApplyPresetButtonText.Text" xml:space="preserve">
+    <value>Apply preset</value>
+    <comment>Text for the button that opens the presets menu.</comment>
   </data>
   <data name="LinkTooltip_RuleName.Header" xml:space="preserve">
     <value>Name</value>

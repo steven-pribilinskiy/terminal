@@ -185,6 +185,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         Windows::Foundation::Collections::IObservableVector<Editor::HyperlinkTooltipActionViewModel> CustomActions() const noexcept { return _CustomActions; }
         Editor::HyperlinkTooltipActionViewModel RequestAddCustomAction();
         void RequestDeleteCustomAction(const Editor::HyperlinkTooltipActionViewModel& vm);
+        void ApplyPreset(const winrt::hstring& presetId);
 
         Model::HyperlinkTooltipRule Rule() const noexcept { return _Rule; }
 
@@ -239,6 +240,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         void RequestReorderRule(const Editor::HyperlinkTooltipRuleViewModel& vm, bool goingUp);
         void RequestDeleteRule(const Editor::HyperlinkTooltipRuleViewModel& vm);
         Editor::HyperlinkTooltipRuleViewModel RequestAddRule();
+        Editor::HyperlinkTooltipRuleViewModel RequestAddRuleWithPreset(const winrt::hstring& presetId);
 
     private:
         Model::GlobalAppSettings _GlobalSettings;

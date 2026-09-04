@@ -4,6 +4,7 @@
 #include "pch.h"
 #include "LinkTooltip.h"
 #include "LinkTooltip.g.cpp"
+#include "LinkTooltipPresets.h"
 
 using namespace winrt::Windows::UI::Xaml;
 using namespace winrt::Windows::UI::Xaml::Navigation;
@@ -36,6 +37,85 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     {
         const auto rule = _ViewModel.RequestAddRule();
         _ViewModel.CurrentRule(rule);
+    }
+
+    void LinkTooltip::AddRuleFlyout_Opening(const IInspectable& sender, const IInspectable& /*args*/)
+    {
+        const auto flyout = sender.try_as<Controls::MenuFlyout>();
+        if (!flyout)
+        {
+            return;
+        }
+
+        auto items = flyout.Items();
+        items.Clear();
+
+        // 1. New blank rule
+        {
+            Controls::MenuFlyoutItem blankItem;
+            blankItem.Text(RS_(L"LinkTooltip_AddRuleMenu_NewBlankRule/Text"));
+
+            Controls::FontIcon plusIcon;
+            plusIcon.FontFamily(Media::FontFamily{ L"Segoe Fluent Icons, Segoe MDL2 Assets" });
+            plusIcon.Glyph(L"\xE710");
+            blankItem.Icon(plusIcon);
+
+            blankItem.Click([this](const auto&, const auto&) {
+                const auto rule = _ViewModel.RequestAddRule();
+                _ViewModel.CurrentRule(rule);
+            });
+            items.Append(blankItem);
+        }
+
+        items.Append(Controls::MenuFlyoutSeparator{});
+
+        for (const auto& preset : GetLinkTooltipPresets())
+        {
+            Controls::MenuFlyoutItem item;
+            item.Text(winrt::hstring{ preset.name });
+            if (!preset.description.empty())
+            {
+                Controls::ToolTipService::SetToolTip(item, box_value(winrt::hstring{ preset.description }));
+            }
+
+            const winrt::hstring presetId{ preset.id };
+            item.Click([this, presetId](const auto&, const auto&) {
+                const auto rule = _ViewModel.RequestAddRuleWithPreset(presetId);
+                _ViewModel.CurrentRule(rule);
+            });
+            items.Append(item);
+        }
+    }
+
+    void LinkTooltip::ApplyPresetFlyout_Opening(const IInspectable& sender, const IInspectable& /*args*/)
+    {
+        const auto flyout = sender.try_as<Controls::MenuFlyout>();
+        if (!flyout)
+        {
+            return;
+        }
+
+        auto items = flyout.Items();
+        items.Clear();
+
+        for (const auto& preset : GetLinkTooltipPresets())
+        {
+            Controls::MenuFlyoutItem item;
+            item.Text(winrt::hstring{ preset.name });
+            if (!preset.description.empty())
+            {
+                Controls::ToolTipService::SetToolTip(item, box_value(winrt::hstring{ preset.description }));
+            }
+
+            const winrt::hstring presetId{ preset.id };
+            item.Click([this, presetId](const auto&, const auto&) {
+                if (const auto currentRule = _ViewModel.CurrentRule())
+                {
+                    currentRule.ApplyPreset(presetId);
+                }
+            });
+            items.Append(item);
+        }
     }
 
     void LinkTooltip::DeleteRule_Click(const IInspectable& sender, const RoutedEventArgs& /*e*/)
