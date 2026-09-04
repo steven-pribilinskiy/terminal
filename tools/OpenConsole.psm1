@@ -69,16 +69,46 @@ function Set-MsbuildDevEnvironment
 
     $ErrorActionPreference = 'Stop'
 
-    Import-LocalModule -Name 'VSSetup'
-
+    # vswhere ships with the VS installer, so it needs no network. The VSSetup
+    # module comes from the PowerShell Gallery, and a gallery hiccup on a CI
+    # runner otherwise fails the build before msbuild is ever reached
+    # ("No match was found ... module name 'VSSetup'"). Ask vswhere first and
+    # keep VSSetup as the fallback for a machine without the installer.
     Write-Verbose 'Searching for VC++ instances'
-    $vsinfo = `
-        Get-VSSetupInstance  -All -Prerelease:$Prerelease `
-        | Select-VSSetupInstance `
-            -Latest -Product * `
-            -Require 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'
+    $vspath = $null
 
-    $vspath = $vsinfo.InstallationPath
+    $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+    if (Test-Path $vswhere) {
+        $vswhereArgs = @(
+            '-latest'
+            '-products', '*'
+            '-requires', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'
+            '-property', 'installationPath'
+        )
+        if ($Prerelease) {
+            $vswhereArgs += '-prerelease'
+        }
+
+        # vswhere reports "no instance" by printing nothing and exiting 0, so
+        # emptiness is the check, not $LASTEXITCODE.
+        $found = (& $vswhere @vswhereArgs | Select-Object -First 1)
+        if (-not [String]::IsNullOrWhiteSpace($found)) {
+            $vspath = $found.Trim()
+        }
+    }
+
+    if ($null -eq $vspath) {
+        Write-Verbose 'vswhere found nothing usable -- falling back to VSSetup'
+        Import-LocalModule -Name 'VSSetup'
+
+        $vsinfo = `
+            Get-VSSetupInstance  -All -Prerelease:$Prerelease `
+            | Select-VSSetupInstance `
+                -Latest -Product * `
+                -Require 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'
+
+        $vspath = $vsinfo.InstallationPath
+    }
 
     switch ($env:PROCESSOR_ARCHITECTURE) {
         "amd64" { $arch = "x64" }
