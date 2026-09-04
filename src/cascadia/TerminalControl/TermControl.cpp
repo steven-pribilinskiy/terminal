@@ -4485,8 +4485,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // just been given new text.
         card.Measure({ gsl::narrow_cast<float>(viewportWidth), gsl::narrow_cast<float>(viewportHeight) });
         const auto desired = card.DesiredSize();
+        const auto desiredWidth = static_cast<double>(desired.Width);
+        const auto desiredHeight = static_cast<double>(desired.Height);
 
-        const auto offset = swapChain ? swapChain.ActualOffset() : Windows::Foundation::Numerics::float2{ 0, 0 };
+        const auto offset = SwapChainPanel().ActualOffset();
         const auto fontSize = CharacterDimensions();
         const auto pos = _toPosInDips(cell.Value());
         const auto cellLeft = static_cast<double>(pos.X) - offset.x;
@@ -4494,24 +4496,24 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         // Under the line by default, flipped above it when there is no room below.
         auto top = cellTop + fontSize.Height;
-        if (top + desired.Height > viewportHeight)
+        if (top + desiredHeight > viewportHeight)
         {
-            top = cellTop - desired.Height;
+            top = cellTop - desiredHeight;
         }
 
         // Right of the cursor by default, flipped to grow left of it instead when
         // there is no room that way -- a long URI near the right edge would
         // otherwise still spill past it even after the left edge was clamped in.
         auto left = cellLeft;
-        if (left + desired.Width > viewportWidth)
+        if (left + desiredWidth > viewportWidth)
         {
-            left = cellLeft + fontSize.Width - desired.Width;
+            left = cellLeft + fontSize.Width - desiredWidth;
         }
 
         // Final safety net on both axes either way: never let an edge land
         // outside the control's own bounds, however the flip above worked out.
-        left = std::clamp(left, 0.0, std::max(0.0, viewportWidth - desired.Width));
-        top = std::clamp(top, 0.0, std::max(0.0, viewportHeight - desired.Height));
+        left = std::clamp(left, 0.0, std::max(0.0, viewportWidth - desiredWidth));
+        top = std::clamp(top, 0.0, std::max(0.0, viewportHeight - desiredHeight));
 
         Controls::Canvas::SetLeft(card, left);
         Controls::Canvas::SetTop(card, top);
@@ -4616,11 +4618,13 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
 
         const auto newSize = e.NewSize();
+        const auto newWidth = static_cast<double>(newSize.Width);
+        const auto newHeight = static_cast<double>(newSize.Height);
         const auto currentLeft = Controls::Canvas::GetLeft(card);
         const auto currentTop = Controls::Canvas::GetTop(card);
 
-        const auto clampedLeft = std::clamp(currentLeft, 0.0, std::max(0.0, viewportWidth - newSize.Width));
-        const auto clampedTop = std::clamp(currentTop, 0.0, std::max(0.0, viewportHeight - newSize.Height));
+        const auto clampedLeft = std::clamp(currentLeft, 0.0, std::max(0.0, viewportWidth - newWidth));
+        const auto clampedTop = std::clamp(currentTop, 0.0, std::max(0.0, viewportHeight - newHeight));
 
         if (clampedLeft != currentLeft)
         {
