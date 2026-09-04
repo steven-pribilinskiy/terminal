@@ -348,7 +348,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             if (_Rule.Kind() != setting)
             {
                 _Rule.Kind(setting);
-                _NotifyChanges(L"CurrentKind", L"IsLinkKind", L"IsTextKind", L"SummaryText");
+                _NotifyChanges(L"IsLinkKind", L"IsTextKind", L"SummaryText");
             }
         }
     }
@@ -370,7 +370,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             if (_Rule.FileTypeGroup() != setting)
             {
                 _Rule.FileTypeGroup(setting);
-                _NotifyChanges(L"CurrentFileTypeGroup", L"SummaryText");
+                _NotifyChanges(L"SummaryText");
             }
         }
     }
@@ -406,8 +406,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         {
             return;
         }
-        _Rule.Integration(choice.Id());
-        _NotifyChanges(L"Integration", L"CurrentIntegrationChoice", L"SummaryText");
+        if (_Rule.Integration() != choice.Id())
+        {
+            _Rule.Integration(choice.Id());
+            _NotifyChanges(L"Integration", L"SummaryText");
+        }
     }
 
     hstring HyperlinkTooltipRuleViewModel::SummaryText() const
@@ -707,8 +710,6 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                        L"OverrideButtons",
                        L"OverrideShowInPane",
                        L"ShowInPane");
-
-        NotifySelectionProperties();
     }
 
     LinkTooltipViewModel::LinkTooltipViewModel(Model::GlobalAppSettings globalSettings, Model::WindowSettings windowSettings) :
@@ -826,13 +827,6 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             });
         }
         _NotifyChanges(L"CurrentRule", L"IsEditingRule", L"IsNotEditingRule", L"CurrentRuleName");
-        if (_CurrentRule)
-        {
-            if (auto self = get_self<HyperlinkTooltipRuleViewModel>(_CurrentRule))
-            {
-                self->NotifySelectionProperties();
-            }
-        }
     }
 
     void LinkTooltipViewModel::RequestReorderRule(const Editor::HyperlinkTooltipRuleViewModel& vm, bool goingUp)
