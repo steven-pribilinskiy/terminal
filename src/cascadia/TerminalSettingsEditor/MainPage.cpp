@@ -428,9 +428,10 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     void MainPage::_PreNavigateHelper()
     {
         _profileViewModelChangedRevoker.revoke();
-        // The Link Tooltip handler rewrites the whole breadcrumb trail, so it
-        // must not still be listening once we're building someone else's.
+        // The Link Tooltip and Integrations handlers update breadcrumbs on
+        // selection changes, so they must not be listening while on other pages.
         _linkTooltipViewModelChangedRevoker.revoke();
+        _integrationsViewModelChangedRevoker.revoke();
         _breadcrumbs.Clear();
     }
 
@@ -491,12 +492,25 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             const auto boxedTag = box_value(linkTooltipTag);
             if (settingName == L"CurrentRule")
             {
-                _breadcrumbs.Clear();
-                _breadcrumbs.Append(winrt::make<Breadcrumb>(boxedTag, RS_(L"Nav_LinkTooltip/Content"), BreadcrumbSubPage::None));
                 if (_linkTooltipVM.CurrentRule())
                 {
-                    _breadcrumbs.Append(winrt::make<Breadcrumb>(boxedTag, _linkTooltipVM.CurrentRuleName(), BreadcrumbSubPage::LinkTooltip_Rule));
+                    if (_breadcrumbs.Size() == 1)
+                    {
+                        _breadcrumbs.Append(winrt::make<Breadcrumb>(boxedTag, _linkTooltipVM.CurrentRuleName(), BreadcrumbSubPage::LinkTooltip_Rule));
+                    }
+                    else if (_breadcrumbs.Size() > 1)
+                    {
+                        _breadcrumbs.RemoveAtEnd();
+                        _breadcrumbs.Append(winrt::make<Breadcrumb>(boxedTag, _linkTooltipVM.CurrentRuleName(), BreadcrumbSubPage::LinkTooltip_Rule));
+                    }
                     SettingsMainPage_ScrollViewer().ScrollToVerticalOffset(0);
+                }
+                else
+                {
+                    while (_breadcrumbs.Size() > 1)
+                    {
+                        _breadcrumbs.RemoveAtEnd();
+                    }
                 }
             }
             else if (settingName == L"CurrentRuleName" && _breadcrumbs.Size() > 1)
@@ -504,6 +518,37 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 // Renaming the open rule has to reach the crumb that names it.
                 _breadcrumbs.RemoveAtEnd();
                 _breadcrumbs.Append(winrt::make<Breadcrumb>(boxedTag, _linkTooltipVM.CurrentRuleName(), BreadcrumbSubPage::LinkTooltip_Rule));
+            }
+        });
+    }
+
+    void MainPage::_SetupIntegrationsEventHandling()
+    {
+        _integrationsViewModelChangedRevoker = _integrationsVM.PropertyChanged(winrt::auto_revoke, [this](auto&&, const PropertyChangedEventArgs& args) {
+            const auto settingName{ args.PropertyName() };
+            const auto boxedTag = box_value(integrationsTag);
+            if (settingName == L"CurrentIntegration")
+            {
+                if (const auto currentIntegration = _integrationsVM.CurrentIntegration())
+                {
+                    if (_breadcrumbs.Size() == 1)
+                    {
+                        _breadcrumbs.Append(winrt::make<Breadcrumb>(boxedTag, currentIntegration.Name(), BreadcrumbSubPage::Integrations_Integration));
+                    }
+                    else if (_breadcrumbs.Size() > 1)
+                    {
+                        _breadcrumbs.RemoveAtEnd();
+                        _breadcrumbs.Append(winrt::make<Breadcrumb>(boxedTag, currentIntegration.Name(), BreadcrumbSubPage::Integrations_Integration));
+                    }
+                    SettingsMainPage_ScrollViewer().ScrollToVerticalOffset(0);
+                }
+                else
+                {
+                    while (_breadcrumbs.Size() > 1)
+                    {
+                        _breadcrumbs.RemoveAtEnd();
+                    }
+                }
             }
         });
     }
@@ -583,23 +628,38 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             }
             else if (*clickedItemTag == linkTooltipTag)
             {
-                // A fresh VM every time: the rules it lists are read straight
-                // from the settings clone, and starting over is also what makes
-                // the first breadcrumb come back to the list rather than to
-                // whichever rule was last open.
-                _linkTooltipVM = winrt::make<LinkTooltipViewModel>(_settingsClone.GlobalSettings(), _windowSettingsClone);
-                _SetupLinkTooltipEventHandling();
-                contentFrame().Navigate(xaml_typename<Editor::LinkTooltip>(), winrt::make<NavigateToPageArgs>(_linkTooltipVM, *this, elementToFocus));
-                _breadcrumbs.Append(winrt::make<Breadcrumb>(vm, RS_(L"Nav_LinkTooltip/Content"), BreadcrumbSubPage::None));
+                if (_linkTooltipVM && _linkTooltipVM.CurrentRule())
+                {
+                    _linkTooltipVM.CurrentRule(nullptr);
+                }
+                else
+                {
+                    // A fresh VM every time: the rules it lists are read straight
+                    // from the settings clone, and starting over is also what makes
+                    // the first breadcrumb come back to the list rather than to
+                    // whichever rule was last open.
+                    _linkTooltipVM = winrt::make<LinkTooltipViewModel>(_settingsClone.GlobalSettings(), _windowSettingsClone);
+                    _SetupLinkTooltipEventHandling();
+                    contentFrame().Navigate(xaml_typename<Editor::LinkTooltip>(), winrt::make<NavigateToPageArgs>(_linkTooltipVM, *this, elementToFocus));
+                    _breadcrumbs.Append(winrt::make<Breadcrumb>(vm, RS_(L"Nav_LinkTooltip/Content"), BreadcrumbSubPage::None));
+                }
             }
             else if (*clickedItemTag == integrationsTag)
             {
-                // "Add as rule" on this page creates a rule that lives on the Link
-                // Tooltip page, so give the VM a way to send us there afterwards.
-                const auto integrationsVM = winrt::make<IntegrationsViewModel>(_settingsClone.GlobalSettings(), _windowSettingsClone);
-                integrationsVM.NavigateToLinkTooltipRequested({ this, &MainPage::_NavigateToLinkTooltipHandler });
-                contentFrame().Navigate(xaml_typename<Editor::Integrations>(), winrt::make<NavigateToPageArgs>(integrationsVM, *this, elementToFocus));
-                _breadcrumbs.Append(winrt::make<Breadcrumb>(vm, RS_(L"Nav_Integrations/Content"), BreadcrumbSubPage::None));
+                if (_integrationsVM && _integrationsVM.CurrentIntegration())
+                {
+                    _integrationsVM.CurrentIntegration(nullptr);
+                }
+                else
+                {
+                    // "Add as rule" on this page creates a rule that lives on the Link
+                    // Tooltip page, so give the VM a way to send us there afterwards.
+                    _integrationsVM = winrt::make<IntegrationsViewModel>(_settingsClone.GlobalSettings(), _windowSettingsClone);
+                    _integrationsVM.NavigateToLinkTooltipRequested({ this, &MainPage::_NavigateToLinkTooltipHandler });
+                    _SetupIntegrationsEventHandling();
+                    contentFrame().Navigate(xaml_typename<Editor::Integrations>(), winrt::make<NavigateToPageArgs>(_integrationsVM, *this, elementToFocus));
+                    _breadcrumbs.Append(winrt::make<Breadcrumb>(vm, RS_(L"Nav_Integrations/Content"), BreadcrumbSubPage::None));
+                }
             }
             else if (*clickedItemTag == renderingTag)
             {

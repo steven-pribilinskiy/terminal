@@ -89,38 +89,51 @@
                     Style="{StaticResource SettingsStackStyle}"
                     Visibility="{x:Bind ViewModel.IsEditing, Mode=OneWay}">
 
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock VerticalAlignment="Center"
-                           Style="{StaticResource TextBlockSubHeaderStyle}"
-                           Text="{x:Bind ViewModel.CurrentIntegration.Name, Mode=OneWay}" />
-                <Button x:Uid="Integrations_CloseEditorButton"
-                        Grid.Column="1"
-                        VerticalAlignment="Center"
-                        Click="CloseIntegrationEditor_Click">
-                    <FontIcon FontSize="{StaticResource StandardIconSize}"
-                              Glyph="&#xE711;" />
-                </Button>
-            </Grid>
+            <!--  Integration Status Header matching Extensions style  -->
+            <muxc:Expander IsExpanded="True"
+                           MinHeight="64"
+                           HorizontalAlignment="Stretch"
+                           HorizontalContentAlignment="Stretch">
+                <muxc:Expander.Header>
+                    <Grid MinHeight="64">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+                            <IconSourceElement Width="32"
+                                               Height="32"
+                                               Margin="0,0,12,0"
+                                               IconSource="{x:Bind mtu:IconPathConverter.IconSourceWUX(ViewModel.CurrentIntegration.Icon), Mode=OneWay}" />
+                            <TextBlock VerticalAlignment="Center"
+                                       Style="{StaticResource TextBlockSubHeaderStyle}"
+                                       Text="{x:Bind ViewModel.CurrentIntegration.Name, Mode=OneWay}" />
+                        </StackPanel>
+
+                        <ToggleSwitch Grid.Column="1"
+                                      Margin="0"
+                                      AutomationProperties.Name="{x:Bind ViewModel.CurrentIntegration.AccessibleName, Mode=OneWay}"
+                                      IsOn="{x:Bind ViewModel.CurrentIntegration.Enabled, Mode=TwoWay}"
+                                      Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                    </Grid>
+                </muxc:Expander.Header>
+                <muxc:Expander.Content>
+                    <local:SettingsCard x:Uid="Integrations_Source"
+                                        IsTabStop="False">
+                        <TextBlock Style="{StaticResource SettingContainerCurrentValueTextBlockStyle}"
+                                   Text="{x:Bind ViewModel.CurrentIntegration.Source, Mode=OneWay}" />
+                    </local:SettingsCard>
+                </muxc:Expander.Content>
+            </muxc:Expander>
 
             <muxc:InfoBar x:Uid="Integrations_NotConfiguredInfoBar"
-                          Margin="0,0,0,8"
+                          Margin="0,4,0,8"
                           IsClosable="False"
                           IsOpen="{x:Bind ViewModel.CurrentIntegration.IsNotConfigured, Mode=OneWay}"
                           Severity="Warning" />
-
-            <local:SettingsCard x:Uid="Integrations_Enabled">
-                <ToggleSwitch IsOn="{x:Bind ViewModel.CurrentIntegration.Enabled, Mode=TwoWay}"
-                              Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-            </local:SettingsCard>
-
-            <local:SettingsCard x:Uid="Integrations_Source">
-                <TextBlock Style="{StaticResource SettingContainerCurrentValueTextBlockStyle}"
-                           Text="{x:Bind ViewModel.CurrentIntegration.Source, Mode=OneWay}" />
-            </local:SettingsCard>
 
             <!--  Settings: plain values, stored in settings.json  -->
             <TextBlock x:Uid="Integrations_SettingsHeader"
@@ -169,7 +182,8 @@
                                     and the Save/Clear handlers empty it from code-behind.
                                 -->
                                 <PasswordBox x:Uid="Integrations_CredentialBox"
-                                             MinWidth="248"
+                                             Width="{StaticResource StandardBoxMinWidth}"
+                                             MaxWidth="400"
                                              PasswordChanged="CredentialPassword_Changed"
                                              Tag="{x:Bind}" />
                                 <Button x:Uid="Integrations_SaveCredentialButton"

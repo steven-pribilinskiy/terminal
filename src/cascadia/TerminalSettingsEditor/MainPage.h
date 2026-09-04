@@ -96,6 +96,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         void _SetupColorSchemesEventHandling();
         void _SetupActionsEventHandling();
         void _SetupLinkTooltipEventHandling();
+        void _SetupIntegrationsEventHandling();
         void _SetupProfilesPageEventHandling();
         void _NavigateToProfileSubPage(const Editor::ProfileViewModel& profile, ProfileSubPage page, const IInspectable& breadcrumbTag, const hstring& elementToFocus);
 
@@ -126,6 +127,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         // the page itself doesn't), and kept only so opening a rule can push a
         // "Link Tooltip > <rule>" crumb.
         winrt::Microsoft::Terminal::Settings::Editor::LinkTooltipViewModel _linkTooltipVM{ nullptr };
+        winrt::Microsoft::Terminal::Settings::Editor::IntegrationsViewModel _integrationsVM{ nullptr };
 
         Windows::Foundation::IAsyncOperation<Windows::Foundation::Collections::IObservableVector<Windows::Foundation::IInspectable>> _currentSearch{ nullptr };
 
@@ -135,6 +137,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         Windows::UI::Xaml::Data::INotifyPropertyChanged::PropertyChanged_revoker _ntmViewModelChangedRevoker;
         Windows::UI::Xaml::Data::INotifyPropertyChanged::PropertyChanged_revoker _extensionsViewModelChangedRevoker;
         Windows::UI::Xaml::Data::INotifyPropertyChanged::PropertyChanged_revoker _linkTooltipViewModelChangedRevoker;
+        Windows::UI::Xaml::Data::INotifyPropertyChanged::PropertyChanged_revoker _integrationsViewModelChangedRevoker;
     };
 }
 

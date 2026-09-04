@@ -58,6 +58,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         bool HasDescription() const { return !_Field.Description().empty(); }
 
         bool IsStored() const noexcept { return _isStored; }
+        bool Required() const { return _Field.Required(); }
         hstring StatusText() const;
 
         void Save(const hstring& value);

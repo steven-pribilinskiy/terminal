@@ -171,6 +171,18 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 choices.push_back(make<IntegrationChoiceViewModel>(id, name.empty() ? id : name));
             }
         }
+        for (const auto& preset : GetLinkTooltipPresets())
+        {
+            if (!preset.integration.empty())
+            {
+                const winrt::hstring presetId{ preset.integration };
+                const auto known = std::any_of(choices.begin(), choices.end(), [&](const auto& choice) { return choice.Id() == presetId; });
+                if (!known)
+                {
+                    choices.push_back(make<IntegrationChoiceViewModel>(presetId, _integrationDisplayName(presetId)));
+                }
+            }
+        }
         if (rules)
         {
             for (const auto& rule : rules)
@@ -374,12 +386,6 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 {
                     return choice;
                 }
-            }
-            if (!current.empty())
-            {
-                const auto customChoice = make<IntegrationChoiceViewModel>(current, current);
-                _IntegrationChoices.Append(customChoice);
-                return customChoice;
             }
             if (_IntegrationChoices.Size() > 0)
             {
@@ -660,6 +666,17 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             _Rule.CustomExtensions(nullptr);
         }
         _Rule.Integration(winrt::hstring{ preset->integration });
+        if (!preset->integration.empty() && _IntegrationChoices)
+        {
+            const winrt::hstring intId{ preset->integration };
+            const auto known = std::any_of(begin(_IntegrationChoices), end(_IntegrationChoices), [&](const auto& choice) {
+                return choice.Id() == intId;
+            });
+            if (!known)
+            {
+                _IntegrationChoices.Append(make<IntegrationChoiceViewModel>(intId, _integrationDisplayName(intId)));
+            }
+        }
         _Rule.ShowPreview(preset->showPreview);
         _Rule.TooltipShowDelay(nullptr);
         _Rule.TooltipHideDelay(nullptr);

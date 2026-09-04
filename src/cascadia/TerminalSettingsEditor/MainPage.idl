@@ -34,7 +34,8 @@ namespace Microsoft.Terminal.Settings.Editor
         Actions_Edit,
         NewTabMenu_Folder,
         Extensions_Extension,
-        LinkTooltip_Rule
+        LinkTooltip_Rule,
+        Integrations_Integration
     };
 
     runtimeclass Breadcrumb : Windows.Foundation.IStringable

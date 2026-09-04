@@ -27,6 +27,7 @@ namespace Microsoft.Terminal.Settings.Editor
         String Description { get; };
         Boolean HasDescription { get; };
         Boolean IsStored { get; };
+        Boolean Required { get; };
         String StatusText { get; };
 
         // What the PasswordBox currently holds, so the Save button can read it

@@ -36,7 +36,12 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     void LinkTooltip::AddRuleButton_Click(const IInspectable& /*sender*/, const winrt::Microsoft::UI::Xaml::Controls::SplitButtonClickEventArgs& /*e*/)
     {
         const auto rule = _ViewModel.RequestAddRule();
-        _ViewModel.CurrentRule(rule);
+        Dispatcher().RunAsync(Windows::UI::Core::CoreDispatcherPriority::Normal, [weakThis{ get_weak() }, rule]() {
+            if (const auto self{ weakThis.get() })
+            {
+                self->_ViewModel.CurrentRule(rule);
+            }
+        });
     }
 
     void LinkTooltip::AddRuleFlyout_Opening(const IInspectable& sender, const IInspectable& /*args*/)
@@ -62,7 +67,12 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
             blankItem.Click([this](const auto&, const auto&) {
                 const auto rule = _ViewModel.RequestAddRule();
-                _ViewModel.CurrentRule(rule);
+                Dispatcher().RunAsync(Windows::UI::Core::CoreDispatcherPriority::Normal, [weakThis{ get_weak() }, rule]() {
+                    if (const auto self{ weakThis.get() })
+                    {
+                        self->_ViewModel.CurrentRule(rule);
+                    }
+                });
             });
             items.Append(blankItem);
         }
@@ -81,7 +91,12 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             const winrt::hstring presetId{ preset.id };
             item.Click([this, presetId](const auto&, const auto&) {
                 const auto rule = _ViewModel.RequestAddRuleWithPreset(presetId);
-                _ViewModel.CurrentRule(rule);
+                Dispatcher().RunAsync(Windows::UI::Core::CoreDispatcherPriority::Normal, [weakThis{ get_weak() }, rule]() {
+                    if (const auto self{ weakThis.get() })
+                    {
+                        self->_ViewModel.CurrentRule(rule);
+                    }
+                });
             });
             items.Append(item);
         }
@@ -109,10 +124,15 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
             const winrt::hstring presetId{ preset.id };
             item.Click([this, presetId](const auto&, const auto&) {
-                if (const auto currentRule = _ViewModel.CurrentRule())
-                {
-                    currentRule.ApplyPreset(presetId);
-                }
+                Dispatcher().RunAsync(Windows::UI::Core::CoreDispatcherPriority::Normal, [weakThis{ get_weak() }, presetId]() {
+                    if (const auto self{ weakThis.get() })
+                    {
+                        if (const auto currentRule = self->_ViewModel.CurrentRule())
+                        {
+                            currentRule.ApplyPreset(presetId);
+                        }
+                    }
+                });
             });
             items.Append(item);
         }

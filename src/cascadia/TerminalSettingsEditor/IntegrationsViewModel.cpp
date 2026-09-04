@@ -786,7 +786,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         {
             for (const auto& credential : _Credentials)
             {
-                if (!credential.IsStored())
+                if (credential.Required() && !credential.IsStored())
                 {
                     configured = false;
                     break;
