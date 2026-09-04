@@ -3072,6 +3072,14 @@
     <value>Name</value>
     <comment>Header for a control to set a link tooltip rule's display name.</comment>
   </data>
+  <data name="LinkTooltip_RuleNameBox.PlaceholderText" xml:space="preserve">
+    <value>New rule</value>
+    <comment>Placeholder text for the link tooltip rule name input box.</comment>
+  </data>
+  <data name="LinkTooltip_NewRulePlaceholder" xml:space="preserve">
+    <value>New rule</value>
+    <comment>Placeholder text shown for a link tooltip rule that has not been named yet.</comment>
+  </data>
   <data name="LinkTooltip_RuleEnabled.Header" xml:space="preserve">
     <value>Enabled</value>
     <comment>Header for a control to toggle whether a link tooltip rule is applied.</comment>

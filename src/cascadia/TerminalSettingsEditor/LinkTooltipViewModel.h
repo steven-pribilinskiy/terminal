@@ -99,11 +99,21 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     struct HyperlinkTooltipRuleViewModel : HyperlinkTooltipRuleViewModelT<HyperlinkTooltipRuleViewModel>, ViewModelHelper<HyperlinkTooltipRuleViewModel>
     {
     public:
+        HyperlinkTooltipRuleViewModel(Model::HyperlinkTooltipRule rule,
+                                      Model::WindowSettings windowSettings,
+                                      Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> kindList,
+                                      Windows::Foundation::Collections::IMap<Model::HyperlinkMatchKind, Editor::EnumEntry> kindMap,
+                                      Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> fileTypeGroupList,
+                                      Windows::Foundation::Collections::IMap<Model::HyperlinkFileTypeGroup, Editor::EnumEntry> fileTypeGroupMap,
+                                      Windows::Foundation::Collections::IObservableVector<Editor::IntegrationChoiceViewModel> integrationChoices);
         HyperlinkTooltipRuleViewModel(Model::HyperlinkTooltipRule rule, Model::WindowSettings windowSettings);
 
         using ViewModelHelper<HyperlinkTooltipRuleViewModel>::PropertyChanged;
 
-        GETSET_OBSERVABLE_PROJECTED_SETTING(_Rule, Name);
+        hstring Name() const { return _Rule.Name(); }
+        void Name(const hstring& value);
+        hstring DisplayName() const;
+
         GETSET_OBSERVABLE_PROJECTED_SETTING(_Rule, Enabled);
         GETSET_OBSERVABLE_PROJECTED_SETTING(_Rule, Integration);
         GETSET_OBSERVABLE_PROJECTED_SETTING(_Rule, ShowPreview);
@@ -122,20 +132,22 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             }
         }
 
-        // Same reason, and the macro's own setter doesn't notify at all: hence
-        // the accessor pairs below rather than _Rule.FileTypeGroup / _Rule.Kind.
-        GETSET_BINDABLE_ENUM_SETTING(FileTypeGroup, Model::HyperlinkFileTypeGroup, _fileTypeGroupAccessor);
+        Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> FileTypeGroupList() const noexcept { return _FileTypeGroupList; }
+        Windows::Foundation::IInspectable CurrentFileTypeGroup() const;
+        void CurrentFileTypeGroup(const Windows::Foundation::IInspectable& enumEntry);
 
-        // Kind additionally decides which cards the editor even shows.
-        GETSET_BINDABLE_ENUM_SETTING(Kind, Model::HyperlinkMatchKind, _kindAccessor);
+        Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> KindList() const noexcept { return _KindList; }
+        Windows::Foundation::IInspectable CurrentKind() const;
+        void CurrentKind(const Windows::Foundation::IInspectable& enumEntry);
 
-    public:
         bool IsLinkKind() const noexcept { return _Rule.Kind() == Model::HyperlinkMatchKind::Link; }
         bool IsTextKind() const noexcept { return _Rule.Kind() == Model::HyperlinkMatchKind::Text; }
 
         Windows::Foundation::Collections::IVector<Editor::IntegrationChoiceViewModel> IntegrationChoices() const noexcept { return _IntegrationChoices; }
         Windows::Foundation::IInspectable CurrentIntegrationChoice() const;
         void CurrentIntegrationChoice(const Windows::Foundation::IInspectable& value);
+
+        void NotifySelectionProperties();
 
         hstring SummaryText() const;
 
@@ -181,30 +193,14 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         Model::WindowSettings _WindowSettings;
         Windows::Foundation::Collections::IObservableVector<Editor::HyperlinkTooltipActionViewModel> _CustomActions;
         Windows::Foundation::Collections::IObservableVector<Editor::HyperlinkTooltipActionViewModel>::VectorChanged_revoker _customActionsChangedRevoker;
-        Windows::Foundation::Collections::IVector<Editor::IntegrationChoiceViewModel> _IntegrationChoices;
+        Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> _KindList;
+        Windows::Foundation::Collections::IMap<Model::HyperlinkMatchKind, Editor::EnumEntry> _KindMap;
+        Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> _FileTypeGroupList;
+        Windows::Foundation::Collections::IMap<Model::HyperlinkFileTypeGroup, Editor::EnumEntry> _FileTypeGroupMap;
+        Windows::Foundation::Collections::IObservableVector<Editor::IntegrationChoiceViewModel> _IntegrationChoices;
         Windows::Foundation::Collections::IObservableVector<Editor::ButtonChoiceViewModel> _ButtonChoices;
 
         void _raiseButtonChoicesChanged();
-
-        Model::HyperlinkFileTypeGroup _fileTypeGroupAccessor() const { return _Rule.FileTypeGroup(); }
-        void _fileTypeGroupAccessor(Model::HyperlinkFileTypeGroup value)
-        {
-            if (_Rule.FileTypeGroup() != value)
-            {
-                _Rule.FileTypeGroup(value);
-                _NotifyChanges(L"SummaryText");
-            }
-        }
-
-        Model::HyperlinkMatchKind _kindAccessor() const { return _Rule.Kind(); }
-        void _kindAccessor(Model::HyperlinkMatchKind value)
-        {
-            if (_Rule.Kind() != value)
-            {
-                _Rule.Kind(value);
-                _NotifyChanges(L"IsLinkKind", L"IsTextKind", L"SummaryText");
-            }
-        }
     };
 
     struct LinkTooltipViewModel : LinkTooltipViewModelT<LinkTooltipViewModel>, ViewModelHelper<LinkTooltipViewModel>
@@ -228,13 +224,17 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         Windows::Foundation::Collections::IObservableVector<Editor::ButtonChoiceViewModel> ButtonChoices() const noexcept { return _ButtonChoices; }
 
+        Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> KindList() const noexcept { return _KindList; }
+        Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> FileTypeGroupList() const noexcept { return _FileTypeGroupList; }
+        Windows::Foundation::Collections::IObservableVector<Editor::IntegrationChoiceViewModel> IntegrationChoices() const noexcept { return _IntegrationChoices; }
+
         Windows::Foundation::Collections::IObservableVector<Editor::HyperlinkTooltipRuleViewModel> CurrentView() const noexcept { return _CurrentView; }
 
         Editor::HyperlinkTooltipRuleViewModel CurrentRule() const noexcept { return _CurrentRule; }
         void CurrentRule(const Editor::HyperlinkTooltipRuleViewModel& vm);
         bool IsEditingRule() const noexcept { return static_cast<bool>(_CurrentRule); }
         bool IsNotEditingRule() const noexcept { return !_CurrentRule; }
-        hstring CurrentRuleName() const { return _CurrentRule ? _CurrentRule.Name() : hstring{}; }
+        hstring CurrentRuleName() const { return _CurrentRule ? _CurrentRule.DisplayName() : hstring{}; }
 
         void RequestReorderRule(const Editor::HyperlinkTooltipRuleViewModel& vm, bool goingUp);
         void RequestDeleteRule(const Editor::HyperlinkTooltipRuleViewModel& vm);
@@ -243,6 +243,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     private:
         Model::GlobalAppSettings _GlobalSettings;
         Model::WindowSettings _WindowSettings;
+        Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> _KindList;
+        Windows::Foundation::Collections::IMap<Model::HyperlinkMatchKind, Editor::EnumEntry> _KindMap;
+        Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> _FileTypeGroupList;
+        Windows::Foundation::Collections::IMap<Model::HyperlinkFileTypeGroup, Editor::EnumEntry> _FileTypeGroupMap;
+        Windows::Foundation::Collections::IObservableVector<Editor::IntegrationChoiceViewModel> _IntegrationChoices;
         Windows::Foundation::Collections::IObservableVector<Editor::HyperlinkTooltipRuleViewModel> _CurrentView;
         Windows::Foundation::Collections::IObservableVector<Editor::HyperlinkTooltipRuleViewModel>::VectorChanged_revoker _rulesChangedRevoker;
         Windows::Foundation::Collections::IObservableVector<Editor::ButtonChoiceViewModel> _ButtonChoices;

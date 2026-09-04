@@ -44,6 +44,7 @@ namespace Microsoft.Terminal.Settings.Editor
                                       Microsoft.Terminal.Settings.Model.WindowSettings windowSettings);
 
         String Name;
+        String DisplayName { get; };
         Boolean Enabled;
         String SummaryText { get; };
 
@@ -111,6 +112,10 @@ namespace Microsoft.Terminal.Settings.Editor
 
         // The global button list every rule inherits unless it overrides it.
         Windows.Foundation.Collections.IObservableVector<ButtonChoiceViewModel> ButtonChoices { get; };
+
+        Windows.Foundation.Collections.IObservableVector<EnumEntry> KindList { get; };
+        Windows.Foundation.Collections.IObservableVector<EnumEntry> FileTypeGroupList { get; };
+        Windows.Foundation.Collections.IObservableVector<IntegrationChoiceViewModel> IntegrationChoices { get; };
 
         Windows.Foundation.Collections.IObservableVector<HyperlinkTooltipRuleViewModel> CurrentView { get; };
         HyperlinkTooltipRuleViewModel CurrentRule;

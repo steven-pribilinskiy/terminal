@@ -152,9 +152,55 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         return id;
     }
 
-    HyperlinkTooltipRuleViewModel::HyperlinkTooltipRuleViewModel(Model::HyperlinkTooltipRule rule, Model::WindowSettings windowSettings) :
+    static std::vector<Editor::IntegrationChoiceViewModel> _buildIntegrationChoices(const IVector<Model::HyperlinkTooltipRule>& rules)
+    {
+        std::vector<Editor::IntegrationChoiceViewModel> choices;
+        choices.push_back(make<IntegrationChoiceViewModel>(winrt::hstring{}, _integrationDisplayName({})));
+        choices.push_back(make<IntegrationChoiceViewModel>(winrt::hstring{ L"none" }, _integrationDisplayName(winrt::hstring{ L"none" })));
+        if (const auto manifests = Model::IntegrationRegistry::All())
+        {
+            for (const auto& manifest : manifests)
+            {
+                const auto id = manifest.Id();
+                if (id.empty())
+                {
+                    continue;
+                }
+                const auto name = manifest.Name();
+                choices.push_back(make<IntegrationChoiceViewModel>(id, name.empty() ? id : name));
+            }
+        }
+        if (rules)
+        {
+            for (const auto& rule : rules)
+            {
+                if (const auto current = rule.Integration(); !current.empty())
+                {
+                    const auto known = std::any_of(choices.begin(), choices.end(), [&](const auto& choice) { return choice.Id() == current; });
+                    if (!known)
+                    {
+                        choices.push_back(make<IntegrationChoiceViewModel>(current, current));
+                    }
+                }
+            }
+        }
+        return choices;
+    }
+
+    HyperlinkTooltipRuleViewModel::HyperlinkTooltipRuleViewModel(Model::HyperlinkTooltipRule rule,
+                                                                 Model::WindowSettings windowSettings,
+                                                                 IObservableVector<Editor::EnumEntry> kindList,
+                                                                 IMap<Model::HyperlinkMatchKind, Editor::EnumEntry> kindMap,
+                                                                 IObservableVector<Editor::EnumEntry> fileTypeGroupList,
+                                                                 IMap<Model::HyperlinkFileTypeGroup, Editor::EnumEntry> fileTypeGroupMap,
+                                                                 IObservableVector<Editor::IntegrationChoiceViewModel> integrationChoices) :
         _Rule{ rule },
-        _WindowSettings{ windowSettings }
+        _WindowSettings{ windowSettings },
+        _KindList{ kindList },
+        _KindMap{ kindMap },
+        _FileTypeGroupList{ fileTypeGroupList },
+        _FileTypeGroupMap{ fileTypeGroupMap },
+        _IntegrationChoices{ integrationChoices }
     {
         if (!_Rule.CustomActions())
         {
@@ -196,38 +242,6 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
         _ButtonChoices = single_threaded_observable_vector<Editor::ButtonChoiceViewModel>(std::move(buttonVMs));
 
-        INITIALIZE_BINDABLE_ENUM_SETTING(FileTypeGroup, HyperlinkFileTypeGroup, Model::HyperlinkFileTypeGroup, L"LinkTooltip_FileTypeGroup", L"Content");
-        INITIALIZE_BINDABLE_ENUM_SETTING(Kind, HyperlinkMatchKind, Model::HyperlinkMatchKind, L"LinkTooltip_MatchKind", L"Content");
-
-        std::vector<Editor::IntegrationChoiceViewModel> choices;
-        choices.push_back(make<IntegrationChoiceViewModel>(winrt::hstring{}, _integrationDisplayName({})));
-        choices.push_back(make<IntegrationChoiceViewModel>(winrt::hstring{ L"none" }, _integrationDisplayName(winrt::hstring{ L"none" })));
-        if (const auto manifests = Model::IntegrationRegistry::All())
-        {
-            for (const auto& manifest : manifests)
-            {
-                const auto id = manifest.Id();
-                if (id.empty())
-                {
-                    continue;
-                }
-                const auto name = manifest.Name();
-                choices.push_back(make<IntegrationChoiceViewModel>(id, name.empty() ? id : name));
-            }
-        }
-
-        // Keep an id the rule already names even when no manifest provides it any
-        // more, so opening the editor can't silently retarget the rule.
-        if (const auto current = _Rule.Integration(); !current.empty())
-        {
-            const auto known = std::any_of(choices.begin(), choices.end(), [&](const auto& choice) { return choice.Id() == current; });
-            if (!known)
-            {
-                choices.push_back(make<IntegrationChoiceViewModel>(current, current));
-            }
-        }
-        _IntegrationChoices = single_threaded_vector<Editor::IntegrationChoiceViewModel>(std::move(choices));
-
         std::vector<Editor::HyperlinkTooltipActionViewModel> actionVMs;
         for (const auto& action : _Rule.CustomActions())
         {
@@ -267,20 +281,109 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         });
     }
 
+    HyperlinkTooltipRuleViewModel::HyperlinkTooltipRuleViewModel(Model::HyperlinkTooltipRule rule, Model::WindowSettings windowSettings) :
+        HyperlinkTooltipRuleViewModel(rule, windowSettings, nullptr, nullptr, nullptr, nullptr, nullptr)
+    {
+        INITIALIZE_BINDABLE_ENUM_SETTING(FileTypeGroup, HyperlinkFileTypeGroup, Model::HyperlinkFileTypeGroup, L"LinkTooltip_FileTypeGroup", L"Content");
+        INITIALIZE_BINDABLE_ENUM_SETTING(Kind, HyperlinkMatchKind, Model::HyperlinkMatchKind, L"LinkTooltip_MatchKind", L"Content");
+        auto choices = _buildIntegrationChoices(nullptr);
+        if (const auto current = _Rule.Integration(); !current.empty())
+        {
+            const auto known = std::any_of(choices.begin(), choices.end(), [&](const auto& choice) { return choice.Id() == current; });
+            if (!known)
+            {
+                choices.push_back(make<IntegrationChoiceViewModel>(current, current));
+            }
+        }
+        _IntegrationChoices = single_threaded_observable_vector<Editor::IntegrationChoiceViewModel>(std::move(choices));
+    }
+
+    void HyperlinkTooltipRuleViewModel::Name(const hstring& value)
+    {
+        if (_Rule.Name() != value)
+        {
+            _Rule.Name(value);
+            _NotifyChanges(L"Name", L"DisplayName");
+        }
+    }
+
+    hstring HyperlinkTooltipRuleViewModel::DisplayName() const
+    {
+        const auto name = _Rule.Name();
+        return !name.empty() ? name : RS_(L"LinkTooltip_NewRulePlaceholder");
+    }
+
+    void HyperlinkTooltipRuleViewModel::NotifySelectionProperties()
+    {
+        _NotifyChanges(L"CurrentKind", L"CurrentFileTypeGroup", L"CurrentIntegrationChoice");
+    }
+
+    winrt::Windows::Foundation::IInspectable HyperlinkTooltipRuleViewModel::CurrentKind() const
+    {
+        if (_KindMap && _KindMap.HasKey(_Rule.Kind()))
+        {
+            return winrt::box_value<Editor::EnumEntry>(_KindMap.Lookup(_Rule.Kind()));
+        }
+        return nullptr;
+    }
+
+    void HyperlinkTooltipRuleViewModel::CurrentKind(const winrt::Windows::Foundation::IInspectable& enumEntry)
+    {
+        if (auto ee = enumEntry.try_as<Editor::EnumEntry>())
+        {
+            auto setting = winrt::unbox_value<Model::HyperlinkMatchKind>(ee.EnumValue());
+            if (_Rule.Kind() != setting)
+            {
+                _Rule.Kind(setting);
+                _NotifyChanges(L"CurrentKind", L"IsLinkKind", L"IsTextKind", L"SummaryText");
+            }
+        }
+    }
+
+    winrt::Windows::Foundation::IInspectable HyperlinkTooltipRuleViewModel::CurrentFileTypeGroup() const
+    {
+        if (_FileTypeGroupMap && _FileTypeGroupMap.HasKey(_Rule.FileTypeGroup()))
+        {
+            return winrt::box_value<Editor::EnumEntry>(_FileTypeGroupMap.Lookup(_Rule.FileTypeGroup()));
+        }
+        return nullptr;
+    }
+
+    void HyperlinkTooltipRuleViewModel::CurrentFileTypeGroup(const winrt::Windows::Foundation::IInspectable& enumEntry)
+    {
+        if (auto ee = enumEntry.try_as<Editor::EnumEntry>())
+        {
+            auto setting = winrt::unbox_value<Model::HyperlinkFileTypeGroup>(ee.EnumValue());
+            if (_Rule.FileTypeGroup() != setting)
+            {
+                _Rule.FileTypeGroup(setting);
+                _NotifyChanges(L"CurrentFileTypeGroup", L"SummaryText");
+            }
+        }
+    }
+
     winrt::Windows::Foundation::IInspectable HyperlinkTooltipRuleViewModel::CurrentIntegrationChoice() const
     {
         const auto current = _Rule.Integration();
-        for (const auto& choice : _IntegrationChoices)
+        if (_IntegrationChoices)
         {
-            if (choice.Id() == current)
+            for (const auto& choice : _IntegrationChoices)
             {
-                return choice;
+                if (choice.Id() == current)
+                {
+                    return choice;
+                }
             }
-        }
-        // The ctor guarantees at least "Automatic" and "None" are present.
-        if (_IntegrationChoices.Size() > 0)
-        {
-            return _IntegrationChoices.GetAt(0);
+            if (!current.empty())
+            {
+                const auto customChoice = make<IntegrationChoiceViewModel>(current, current);
+                _IntegrationChoices.Append(customChoice);
+                return customChoice;
+            }
+            if (_IntegrationChoices.Size() > 0)
+            {
+                return _IntegrationChoices.GetAt(0);
+            }
         }
         return nullptr;
     }
@@ -547,10 +650,14 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
         _ButtonChoices = single_threaded_observable_vector<Editor::ButtonChoiceViewModel>(std::move(buttonVMs));
 
+        INITIALIZE_BINDABLE_ENUM_SETTING(FileTypeGroup, HyperlinkFileTypeGroup, Model::HyperlinkFileTypeGroup, L"LinkTooltip_FileTypeGroup", L"Content");
+        INITIALIZE_BINDABLE_ENUM_SETTING(Kind, HyperlinkMatchKind, Model::HyperlinkMatchKind, L"LinkTooltip_MatchKind", L"Content");
+        _IntegrationChoices = single_threaded_observable_vector<Editor::IntegrationChoiceViewModel>(_buildIntegrationChoices(_WindowSettings.HyperlinkTooltipRules()));
+
         std::vector<Editor::HyperlinkTooltipRuleViewModel> ruleVMs;
         for (const auto& rule : _WindowSettings.HyperlinkTooltipRules())
         {
-            ruleVMs.push_back(make<HyperlinkTooltipRuleViewModel>(rule, _WindowSettings));
+            ruleVMs.push_back(make<HyperlinkTooltipRuleViewModel>(rule, _WindowSettings, _KindList, _KindMap, _FileTypeGroupList, _FileTypeGroupMap, _IntegrationChoices));
         }
         _CurrentView = single_threaded_observable_vector<Editor::HyperlinkTooltipRuleViewModel>(std::move(ruleVMs));
 
@@ -620,13 +727,20 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         if (_CurrentRule)
         {
             _currentRuleChangedRevoker = _CurrentRule.PropertyChanged(winrt::auto_revoke, [this](auto&&, const Windows::UI::Xaml::Data::PropertyChangedEventArgs& args) {
-                if (args.PropertyName() == L"Name")
+                if (args.PropertyName() == L"Name" || args.PropertyName() == L"DisplayName")
                 {
                     _NotifyChanges(L"CurrentRuleName");
                 }
             });
         }
         _NotifyChanges(L"CurrentRule", L"IsEditingRule", L"IsNotEditingRule", L"CurrentRuleName");
+        if (_CurrentRule)
+        {
+            if (auto self = get_self<HyperlinkTooltipRuleViewModel>(_CurrentRule))
+            {
+                self->NotifySelectionProperties();
+            }
+        }
     }
 
     void LinkTooltipViewModel::RequestReorderRule(const Editor::HyperlinkTooltipRuleViewModel& vm, bool goingUp)
@@ -665,7 +779,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         Model::HyperlinkTooltipRule rule{};
         rule.Enabled(true);
         rule.CustomActions(winrt::single_threaded_vector<Model::HyperlinkTooltipAction>());
-        const auto vm = make<HyperlinkTooltipRuleViewModel>(rule, _WindowSettings);
+        const auto vm = make<HyperlinkTooltipRuleViewModel>(rule, _WindowSettings, _KindList, _KindMap, _FileTypeGroupList, _FileTypeGroupMap, _IntegrationChoices);
         CurrentView().Append(vm);
         return vm;
     }
