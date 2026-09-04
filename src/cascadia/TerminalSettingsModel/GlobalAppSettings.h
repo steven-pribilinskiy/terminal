@@ -37,6 +37,14 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
     {
         return winrt::single_threaded_map<winrt::hstring, winrt::Microsoft::Terminal::Settings::Model::IntegrationSettings>();
     }
+
+    // The hyperlink card's buttons out of the box: copy the link, or open the
+    // details in a pane. "open" is deliberately absent -- clicking the link
+    // already opens it, so the button only earns its place when asked for.
+    inline winrt::Windows::Foundation::Collections::IVector<winrt::hstring> MakeDefaultTooltipButtons()
+    {
+        return winrt::single_threaded_vector<winrt::hstring>({ winrt::hstring{ L"copyLink" }, winrt::hstring{ L"showInPane" } });
+    }
 }
 
 // fwdecl unittest classes

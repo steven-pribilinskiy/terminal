@@ -760,6 +760,16 @@ JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::HyperlinkMatchKi
     };
 };
 
+// Possible PaneTitlebarVisibility values
+JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::PaneTitlebarVisibility)
+{
+    JSON_MAPPINGS(3) = {
+        pair_type{ "never", ValueType::Never },
+        pair_type{ "multiplePanes", ValueType::MultiplePanes },
+        pair_type{ "always", ValueType::Always },
+    };
+};
+
 // Possible IntegrationMatcherKind values
 JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::IntegrationMatcherKind)
 {
@@ -789,6 +799,24 @@ JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::IntegrationField
         pair_type{ "link", ValueType::Link },
         pair_type{ "image", ValueType::Image },
         pair_type{ "multiline", ValueType::Multiline },
+    };
+};
+
+// Possible IntegrationTabKind values
+JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::IntegrationTabKind)
+{
+    JSON_MAPPINGS(2) = {
+        pair_type{ "body", ValueType::Body },
+        pair_type{ "list", ValueType::List },
+    };
+};
+
+// Possible IntegrationActionKind values
+JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::IntegrationActionKind)
+{
+    JSON_MAPPINGS(2) = {
+        pair_type{ "button", ValueType::Button },
+        pair_type{ "choice", ValueType::Choice },
     };
 };
 

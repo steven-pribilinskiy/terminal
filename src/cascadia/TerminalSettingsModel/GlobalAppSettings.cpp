@@ -102,6 +102,14 @@ winrt::com_ptr<GlobalAppSettings> GlobalAppSettings::Copy() const
             globals->_HyperlinkTooltipRules->Append(get_self<HyperlinkTooltipRule>(rule)->Copy());
         }
     }
+    if (_HyperlinkTooltipButtons && *_HyperlinkTooltipButtons)
+    {
+        globals->_HyperlinkTooltipButtons = winrt::single_threaded_vector<hstring>();
+        for (const auto& button : *_HyperlinkTooltipButtons)
+        {
+            globals->_HyperlinkTooltipButtons->Append(button);
+        }
+    }
     if (_Integrations)
     {
         globals->_Integrations = winrt::single_threaded_map<hstring, Model::IntegrationSettings>();

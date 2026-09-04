@@ -160,6 +160,10 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(Int32, HyperlinkTooltipShowDelay);
         INHERITABLE_SETTING(Int32, HyperlinkTooltipHideDelay);
         INHERITABLE_SETTING(Boolean, HyperlinkTooltipActions);
+        INHERITABLE_SETTING(IVector<String>, HyperlinkTooltipButtons);
+        INHERITABLE_SETTING(Boolean, HyperlinkTooltipHint);
+        INHERITABLE_SETTING(Boolean, HyperlinkPreviewInPane);
+        INHERITABLE_SETTING(PaneTitlebarVisibility, PaneTitlebarVisibility);
         INHERITABLE_SETTING(IVector<HyperlinkTooltipRule>, HyperlinkTooltipRules);
         INHERITABLE_SETTING(Boolean, ScrollToChangeOpacity);
         INHERITABLE_SETTING(Boolean, TrimBlockSelection);

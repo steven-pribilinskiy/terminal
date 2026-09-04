@@ -40,21 +40,27 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     void LinkTooltip::DeleteRule_Click(const IInspectable& sender, const RoutedEventArgs& /*e*/)
     {
-        const auto rule = sender.as<Controls::Button>().DataContext().as<Editor::HyperlinkTooltipRuleViewModel>();
+        const auto rule = sender.as<FrameworkElement>().Tag().as<Editor::HyperlinkTooltipRuleViewModel>();
         _ViewModel.RequestDeleteRule(rule);
     }
 
-    void LinkTooltip::ReorderRule_Click(const IInspectable& sender, const RoutedEventArgs& /*e*/)
+    void LinkTooltip::MoveRuleUp_Click(const IInspectable& sender, const RoutedEventArgs& /*e*/)
     {
-        const auto btn = sender.as<Controls::Button>();
-        const auto rule = btn.DataContext().as<Editor::HyperlinkTooltipRuleViewModel>();
-        const auto direction = unbox_value<hstring>(btn.Tag());
-        _ViewModel.RequestReorderRule(rule, direction == L"Up");
+        const auto rule = sender.as<FrameworkElement>().Tag().as<Editor::HyperlinkTooltipRuleViewModel>();
+        _ViewModel.RequestReorderRule(rule, true);
     }
 
+    void LinkTooltip::MoveRuleDown_Click(const IInspectable& sender, const RoutedEventArgs& /*e*/)
+    {
+        const auto rule = sender.as<FrameworkElement>().Tag().as<Editor::HyperlinkTooltipRuleViewModel>();
+        _ViewModel.RequestReorderRule(rule, false);
+    }
+
+    // The whole row is the affordance -- the card itself is the click target, so
+    // the rule comes from its Tag rather than from a button's data context.
     void LinkTooltip::EditRule_Click(const IInspectable& sender, const RoutedEventArgs& /*e*/)
     {
-        const auto rule = sender.as<Controls::Button>().DataContext().as<Editor::HyperlinkTooltipRuleViewModel>();
+        const auto rule = sender.as<FrameworkElement>().Tag().as<Editor::HyperlinkTooltipRuleViewModel>();
         _ViewModel.CurrentRule(rule);
     }
 
@@ -75,7 +81,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     {
         if (const auto rule = _ViewModel.CurrentRule())
         {
-            const auto action = sender.as<Controls::Button>().DataContext().as<Editor::HyperlinkTooltipActionViewModel>();
+            const auto action = sender.as<FrameworkElement>().Tag().as<Editor::HyperlinkTooltipActionViewModel>();
             rule.RequestDeleteCustomAction(action);
         }
     }

@@ -380,6 +380,10 @@ namespace winrt::TerminalApp::implementation
         // settings reload -- the controls keep the same object, so they never
         // have to be told about it twice.
         winrt::com_ptr<HyperlinkPreviewService> _hyperlinkPreviewService{ winrt::make_self<implementation::HyperlinkPreviewService>() };
+        // Set while a link preview pane has its "Pane only" switch on. Kept here as
+        // well as pushed onto every control, so a control created while the switch
+        // is on starts out silent too.
+        bool _hyperlinkTooltipsSuppressed{ false };
 
         winrt::Windows::UI::Xaml::Controls::Grid::LayoutUpdated_revoker _layoutUpdatedRevoker;
         StartupState _startupState{ StartupState::NotInitialized };
@@ -549,6 +553,9 @@ namespace winrt::TerminalApp::implementation
 
         safe_void_coroutine _OpenHyperlinkHandler(const IInspectable sender, const Microsoft::Terminal::Control::OpenHyperlinkEventArgs eventArgs);
         void _HyperlinkTooltipActionInvokedHandler(const IInspectable& sender, const Microsoft::Terminal::Control::HyperlinkTooltipActionInvokedEventArgs& eventArgs);
+        void _ShowHyperlinkPreviewRequestedHandler(const IInspectable& sender, const Microsoft::Terminal::Control::ShowHyperlinkPreviewRequestedEventArgs& eventArgs);
+        void _LinkPreviewHideTooltipsChanged(const IInspectable& sender, const IInspectable& args);
+        void _setHyperlinkTooltipsSuppressed(bool suppressed);
         static bool _IsUriSupported(const winrt::Windows::Foundation::Uri& parsedUri);
         static bool _IsLocalHostname(const std::wstring_view host) noexcept;
         std::wstring _GetWslDistroForControl(const IInspectable& sender) const;

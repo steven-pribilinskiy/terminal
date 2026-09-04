@@ -1288,6 +1288,7 @@
                             The QuickFixButton below is the same pattern.
                         -->
                         <Border x:Name="HyperlinkCard"
+                                MinWidth="200"
                                 Padding="10,8"
                                 Background="{ThemeResource FlyoutPresenterBackground}"
                                 BorderBrush="{ThemeResource FlyoutBorderThemeBrush}"
@@ -1299,16 +1300,23 @@
                                 PointerReleased="_HyperlinkCardPointerReleased"
                                 Visibility="Collapsed">
                             <StackPanel Spacing="6">
-                                <TextBlock IsTextSelectionEnabled="True"
+                                <!--
+                                    The URI and the "how to open it" hint are two TextBlocks
+                                    rather than two Runs in one, because a Run has no
+                                    Visibility of its own and the hint is a setting the user
+                                    can turn off.
+                                -->
+                                <TextBlock x:Name="HoveredUri"
+                                           IsTextSelectionEnabled="True"
                                            TextWrapping="Wrap">
                                     <TextBlock.ContextFlyout>
                                         <mtu:TextMenuFlyout />
                                     </TextBlock.ContextFlyout>
-                                    <Run x:Name="HoveredUri" /><LineBreak />
-                                    <Run x:Name="HowToOpenRun"
-                                         x:Uid="HowToOpenRun"
-                                         FontStyle="Italic" />
                                 </TextBlock>
+                                <TextBlock x:Name="HowToOpenRun"
+                                           x:Uid="HowToOpenRun"
+                                           FontStyle="Italic"
+                                           TextWrapping="Wrap" />
 
                                 <!--
                                     Where a file:// link actually resolves to, shown only when that
@@ -1351,6 +1359,17 @@
                                                           Visibility="Collapsed" />
                                     </StackPanel>
 
+                                    <!--
+                                        The tab strip, when the integration declared tabs. Built
+                                        from ToggleButtons by TermControl rather than from a Pivot
+                                        or a TabView: both are far heavier than a row of buttons,
+                                        and neither is used anywhere else in this control.
+                                    -->
+                                    <StackPanel x:Name="HyperlinkCardTabStrip"
+                                                Orientation="Horizontal"
+                                                Spacing="2"
+                                                Visibility="Collapsed" />
+
                                     <!--  Why the integration could not answer, in place of the fields it would have produced.  -->
                                     <TextBlock x:Name="HyperlinkCardPreviewError"
                                                Opacity="0.8"
@@ -1360,61 +1379,110 @@
                                     <!--
                                         One row per field the integration returned, populated
                                         per-hover by TermControl: a snapshot, not a live list.
+
+                                        It is a single Grid rather than an ItemsControl of
+                                        per-row Grids because label alignment is the whole
+                                        point: one Grid gives every row the same Auto-width
+                                        first column, and UWP XAML has no SharedSizeGroup to
+                                        get that across separate Grids. The value column is
+                                        star-sized, which is what finally lets a long value
+                                        wrap instead of dragging the card out to MaxWidth.
                                     -->
-                                    <ItemsControl x:Name="HyperlinkCardPreviewFields"
-                                                  IsTabStop="False">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="local:HyperlinkPreviewField">
-                                                <Grid ColumnSpacing="8">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto"
-                                                                          MinWidth="64" />
-                                                        <ColumnDefinition Width="*" />
-                                                    </Grid.ColumnDefinitions>
+                                    <ScrollViewer x:Name="HyperlinkCardFieldsScroll"
+                                                  MaxHeight="260"
+                                                  HorizontalScrollMode="Disabled"
+                                                  HorizontalScrollBarVisibility="Disabled"
+                                                  IsTabStop="False"
+                                                  VerticalScrollBarVisibility="Auto">
+                                        <Grid x:Name="HyperlinkCardPreviewFields"
+                                              ColumnSpacing="8"
+                                              RowSpacing="2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"
+                                                                  MinWidth="56" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                        </Grid>
+                                    </ScrollViewer>
 
-                                                    <!--  A title spans both columns: it is the subject of the card, not a labelled row.  -->
-                                                    <TextBlock Grid.ColumnSpan="2"
-                                                               FontWeight="SemiBold"
-                                                               IsTextSelectionEnabled="True"
-                                                               MaxLines="3"
-                                                               Text="{x:Bind Value}"
-                                                               TextWrapping="Wrap"
-                                                               Visibility="{x:Bind IsTitle}" />
+                                    <!--  A Body tab's text. Markdown is shown as-is here; the pane renders it properly.  -->
+                                    <ScrollViewer x:Name="HyperlinkCardBodyScroll"
+                                                  MaxHeight="260"
+                                                  HorizontalScrollMode="Disabled"
+                                                  HorizontalScrollBarVisibility="Disabled"
+                                                  IsTabStop="False"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  Visibility="Collapsed">
+                                        <TextBlock x:Name="HyperlinkCardBody"
+                                                   IsTextSelectionEnabled="True"
+                                                   TextWrapping="Wrap" />
+                                    </ScrollViewer>
 
-                                                    <TextBlock Grid.Column="0"
-                                                               VerticalAlignment="Top"
-                                                               Opacity="0.7"
-                                                               Text="{x:Bind Label}"
-                                                               Visibility="{x:Bind IsRow}" />
+                                    <!--  A Comments tab's entries, populated per-hover like the fields.  -->
+                                    <ScrollViewer x:Name="HyperlinkCardCommentsScroll"
+                                                  MaxHeight="260"
+                                                  HorizontalScrollMode="Disabled"
+                                                  HorizontalScrollBarVisibility="Disabled"
+                                                  IsTabStop="False"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  Visibility="Collapsed">
+                                        <StackPanel x:Name="HyperlinkCardComments"
+                                                    Spacing="6" />
+                                    </ScrollViewer>
 
-                                                    <StackPanel Grid.Column="1"
-                                                                Orientation="Horizontal"
-                                                                Spacing="6"
-                                                                Visibility="{x:Bind IsRow}">
-                                                        <Image Width="16"
-                                                               Height="16"
-                                                               Margin="0,2,0,0"
-                                                               VerticalAlignment="Top"
-                                                               Source="{x:Bind local:HyperlinkPreviewHelpers.ImageFromUri(IconUri)}"
-                                                               Visibility="{x:Bind HasIcon}" />
-                                                        <Border Padding="6,1"
-                                                                VerticalAlignment="Top"
-                                                                Background="{x:Bind local:HyperlinkPreviewHelpers.BadgeBrush(Color)}"
-                                                                CornerRadius="4"
-                                                                Visibility="{x:Bind IsBadge}">
-                                                            <TextBlock FontSize="12"
-                                                                       Text="{x:Bind Value}" />
-                                                        </Border>
-                                                        <TextBlock IsTextSelectionEnabled="True"
-                                                                   MaxLines="6"
-                                                                   Text="{x:Bind Value}"
-                                                                   TextWrapping="Wrap"
-                                                                   Visibility="{x:Bind IsPlain}" />
-                                                    </StackPanel>
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
+                                    <!--
+                                        What the user can do to the thing behind the link: pick an
+                                        option, fill in whatever the far end insists on, apply, and
+                                        put it back again if it offered a way.
+                                    -->
+                                    <StackPanel x:Name="HyperlinkCardActionRow"
+                                                Spacing="4"
+                                                Visibility="Collapsed">
+                                        <StackPanel Orientation="Horizontal"
+                                                    Spacing="4">
+                                            <!--
+                                                The dropdown opens in a popup of its own, outside the
+                                                card, so the pointer moving onto the list leaves the
+                                                card and would otherwise start the hide timer. The
+                                                two DropDown handlers are what hold the card open.
+                                            -->
+                                            <ComboBox x:Name="HyperlinkActionOptions"
+                                                      x:Uid="HyperlinkActionOptions"
+                                                      MinWidth="150"
+                                                      DropDownClosed="_HyperlinkActionDropDownClosed"
+                                                      DropDownOpened="_HyperlinkActionDropDownOpened"
+                                                      SelectionChanged="_HyperlinkActionOptionChanged" />
+                                            <Button x:Name="HyperlinkActionApplyButton"
+                                                    x:Uid="HyperlinkActionApplyButton"
+                                                    VerticalAlignment="Bottom"
+                                                    AllowFocusOnInteraction="False"
+                                                    Click="_HyperlinkActionApplyClick" />
+                                            <Button x:Name="HyperlinkActionUndoButton"
+                                                    x:Uid="HyperlinkActionUndoButton"
+                                                    VerticalAlignment="Bottom"
+                                                    AllowFocusOnInteraction="False"
+                                                    Click="_HyperlinkActionUndoClick"
+                                                    Visibility="Collapsed" />
+                                            <mux:ProgressRing x:Name="HyperlinkActionProgress"
+                                                              Width="16"
+                                                              Height="16"
+                                                              MinWidth="0"
+                                                              MinHeight="0"
+                                                              VerticalAlignment="Bottom"
+                                                              IsActive="False"
+                                                              Visibility="Collapsed" />
+                                        </StackPanel>
+
+                                        <!--  One control per field the chosen option said it required.  -->
+                                        <StackPanel x:Name="HyperlinkActionFields"
+                                                    Spacing="4"
+                                                    Visibility="Collapsed" />
+
+                                        <TextBlock x:Name="HyperlinkActionError"
+                                                   Opacity="0.8"
+                                                   TextWrapping="Wrap"
+                                                   Visibility="Collapsed" />
+                                    </StackPanel>
 
                                     <!--
                                         A plugin's own HTML representation, when it sent one and the
@@ -1451,6 +1519,10 @@
                                             x:Uid="HyperlinkRevealButton"
                                             AllowFocusOnInteraction="False"
                                             Click="_HyperlinkRevealClick" />
+                                    <Button x:Name="HyperlinkShowInPaneButton"
+                                            x:Uid="HyperlinkShowInPaneButton"
+                                            AllowFocusOnInteraction="False"
+                                            Click="_HyperlinkShowInPaneClick" />
 
                                     <!--
                                         A rule's custom actions (see HyperlinkTooltipRule), populated per-hover

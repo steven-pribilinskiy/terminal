@@ -10,6 +10,7 @@
 #include "PasteFromClipboardEventArgs.g.h"
 #include "OpenHyperlinkEventArgs.g.h"
 #include "HyperlinkTooltipActionInvokedEventArgs.g.h"
+#include "ShowHyperlinkPreviewRequestedEventArgs.g.h"
 #include "NoticeEventArgs.g.h"
 #include "ScrollPositionChangedArgs.g.h"
 #include "RendererWarningArgs.g.h"
@@ -127,6 +128,20 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     private:
         hstring _actionId;
         hstring _uri;
+    };
+
+    struct ShowHyperlinkPreviewRequestedEventArgs : public ShowHyperlinkPreviewRequestedEventArgsT<ShowHyperlinkPreviewRequestedEventArgs>
+    {
+    public:
+        ShowHyperlinkPreviewRequestedEventArgs(hstring uri, hstring integrationHint) :
+            _uri(uri), _integrationHint(integrationHint) {}
+
+        hstring Uri() { return _uri; };
+        hstring IntegrationHint() { return _integrationHint; };
+
+    private:
+        hstring _uri;
+        hstring _integrationHint;
     };
 
     struct NoticeEventArgs : public NoticeEventArgsT<NoticeEventArgs>
@@ -298,4 +313,5 @@ namespace winrt::Microsoft::Terminal::Control::factory_implementation
 {
     BASIC_FACTORY(OpenHyperlinkEventArgs);
     BASIC_FACTORY(HyperlinkTooltipActionInvokedEventArgs);
+    BASIC_FACTORY(ShowHyperlinkPreviewRequestedEventArgs);
 }

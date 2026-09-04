@@ -109,6 +109,29 @@ namespace winrt::TerminalApp::implementation
 
         // Use our header control as the TabViewItem's header
         TabViewItem().Header(_headerControl);
+
+        _UpdatePaneTitlebarVisibility();
+    }
+
+    // Method Description:
+    // - Re-applies the paneTitlebarVisibility setting to the pane tree. "Multiple
+    //   panes" is something only the Tab can answer, so we work it out here and
+    //   hand it down alongside the setting itself.
+    // - Call this after anything that changes the shape of the tree, so the header
+    //   appears on a split and goes away again when the tab collapses back to one
+    //   pane.
+    // Arguments:
+    // - <none>
+    // Return Value:
+    // - <none>
+    void Tab::_UpdatePaneTitlebarVisibility()
+    {
+        if (!_rootPane)
+        {
+            return;
+        }
+
+        _rootPane->SetPaneTitlebarVisibility(_paneTitlebarVisibility, _rootPane->GetLeafPaneCount() > 1);
     }
 
     // Method Description:
@@ -392,6 +415,9 @@ namespace winrt::TerminalApp::implementation
 
         // The tabWidthMode may have changed, update the header control accordingly
         _UpdateHeaderControlMaxWidth(windowSettings);
+
+        _paneTitlebarVisibility = windowSettings.PaneTitlebarVisibility();
+        _UpdatePaneTitlebarVisibility();
 
         // Update the settings on all our panes.
         _rootPane->WalkTree([&](const auto& pane) {
@@ -680,6 +706,9 @@ namespace winrt::TerminalApp::implementation
         // After split, Close Pane Menu Item should be visible
         _closePaneMenuItem.Visibility(WUX::Visibility::Visible);
 
+        // The tab now has more than one pane, which is what "multiplePanes" means.
+        _UpdatePaneTitlebarVisibility();
+
         // The active pane has an id if it is a leaf
         if (activePaneId)
         {
@@ -724,6 +753,7 @@ namespace winrt::TerminalApp::implementation
         {
             // Just make sure that the remaining pane is marked active
             _UpdateActivePane(_rootPane->GetActivePane());
+            _UpdatePaneTitlebarVisibility();
 
             return pane;
         }
@@ -885,7 +915,10 @@ namespace winrt::TerminalApp::implementation
 
         // NOTE: This _must_ be called on the root pane, so that it can propagate
         // throughout the entire tree.
-        return _rootPane->ResizePane(direction);
+        // The keyboard resize actions move the separator by 5% of the pane; a mouse
+        // drag on the divider drives Pane::_Resize with whatever the pointer says.
+        static constexpr auto keyboardResizeAmount = .05f;
+        return _rootPane->ResizePane(direction, keyboardResizeAmount);
     }
 
     // Method Description:
@@ -1373,6 +1406,8 @@ namespace winrt::TerminalApp::implementation
             _closePaneMenuItem.Visibility(WUX::Visibility::Collapsed);
         }
 
+        _UpdatePaneTitlebarVisibility();
+
         _RecalculateAndApplyReadOnly();
 
         // Raise our own ActivePaneChanged event.
@@ -1449,6 +1484,14 @@ namespace winrt::TerminalApp::implementation
                         tab->_UpdateActivePane(sender);
                         tab->_RecalculateAndApplyTabColor();
                     }
+                }
+                else
+                {
+                    // The already-active pane raised GotFocus without the active
+                    // pane changing. That happens when a pane is promoted to a leaf
+                    // during a close, so re-check whether the tab still has more
+                    // than one pane - _UpdateActivePane isn't called on this path.
+                    tab->_UpdatePaneTitlebarVisibility();
                 }
                 tab->_focusState = WUX::FocusState::Programmatic;
                 // This tab has gained focus, remove the bell indicator if it is active

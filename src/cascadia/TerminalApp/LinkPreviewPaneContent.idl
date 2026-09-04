@@ -1,0 +1,30 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
+import "IPaneContent.idl";
+
+namespace TerminalApp
+{
+    // The hyperlink card, given room: the same HyperlinkPreview the tooltip
+    // renders, but with grouped fields, a rendered markdown body and somewhere
+    // for a comment list to go. TerminalPage opens one when the card's
+    // "Show in pane" button is pressed, or on hover when the user has said the
+    // pane is where previews belong.
+    [default_interface] runtimeclass LinkPreviewPaneContent : Windows.UI.Xaml.Controls.UserControl,
+                                                             IPaneContent
+    {
+        LinkPreviewPaneContent();
+
+        // The app owns integrations and credentials, so the pane is handed the
+        // same provider the controls get rather than building one of its own.
+        void SetPreviewProvider(Microsoft.Terminal.Control.IHyperlinkPreviewProvider provider);
+        // Show this link. Safe to call again on a pane that is already open: the
+        // pane is reused rather than replaced.
+        void ShowLink(String text, String integrationHint);
+
+        // The "Pane only" switch. True means the page should stop the terminals
+        // showing hover cards at all while this pane is open.
+        Boolean HideTooltips { get; };
+        event Windows.Foundation.TypedEventHandler<Object, Object> HideTooltipsChanged;
+    }
+}

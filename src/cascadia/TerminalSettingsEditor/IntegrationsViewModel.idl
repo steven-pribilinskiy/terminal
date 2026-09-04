@@ -46,6 +46,28 @@ namespace Microsoft.Terminal.Settings.Editor
         Boolean Visible;
     }
 
+    // A named set of display fields, shown together and turned on or off as a
+    // unit. GroupChecked is three-state on purpose: null is how the header
+    // checkbox says "some of these are on". Setting it to true turns the whole
+    // group on; setting it to false -- or to null, which is where a three-state
+    // box lands on the click after "checked" -- turns the whole group off.
+    [default_interface] runtimeclass IntegrationFieldGroupViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
+    {
+        String Key { get; };
+        String Label { get; };
+        Windows.Foundation.Collections.IObservableVector<IntegrationDisplayFieldViewModel> Fields { get; };
+        Windows.Foundation.IReference<Boolean> GroupChecked;
+    }
+
+    // One tab of secondary content (a description, a comment list) the
+    // integration can add beside the fields, and whether the user wants it.
+    [default_interface] runtimeclass IntegrationTabViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
+    {
+        String Key { get; };
+        String Label { get; };
+        Boolean Visible;
+    }
+
     // A text matcher the integration suggests: "Add as rule" turns it into a
     // text-kind rule on the Link Tooltip page.
     [default_interface] runtimeclass IntegrationMatcherViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
@@ -77,11 +99,16 @@ namespace Microsoft.Terminal.Settings.Editor
         Windows.Foundation.Collections.IObservableVector<IntegrationSettingViewModel> Settings { get; };
         Windows.Foundation.Collections.IObservableVector<IntegrationCredentialViewModel> Credentials { get; };
         Windows.Foundation.Collections.IObservableVector<IntegrationDisplayFieldViewModel> Fields { get; };
+        // The same field view models as Fields, grouped for display. Fields the
+        // manifest puts in no group land in an implicit one.
+        Windows.Foundation.Collections.IObservableVector<IntegrationFieldGroupViewModel> FieldGroups { get; };
+        Windows.Foundation.Collections.IObservableVector<IntegrationTabViewModel> Tabs { get; };
         Windows.Foundation.Collections.IObservableVector<IntegrationMatcherViewModel> SuggestedMatchers { get; };
 
         Boolean HasSettings { get; };
         Boolean HasCredentials { get; };
         Boolean HasFields { get; };
+        Boolean HasTabs { get; };
         Boolean HasSuggestedMatchers { get; };
     }
 

@@ -198,6 +198,34 @@
     <value>Show in Explorer</value>
     <comment>Label of a button on the link tooltip that opens File Explorer with the linked file selected.</comment>
   </data>
+  <data name="HyperlinkShowInPaneButton.Content" xml:space="preserve">
+    <value>Show in pane</value>
+    <comment>Label of a button on the link tooltip that opens the same preview in a larger pane beside the terminal.</comment>
+  </data>
+  <data name="HyperlinkActionOptions.PlaceholderText" xml:space="preserve">
+    <value>Choose an action</value>
+    <comment>Placeholder of the dropdown on the link tooltip that lists what the user can do to the linked item, such as moving an issue to another status.</comment>
+  </data>
+  <data name="HyperlinkActionApplyButton.Content" xml:space="preserve">
+    <value>Apply</value>
+    <comment>Label of the button on the link tooltip that carries out the action chosen in the dropdown beside it.</comment>
+  </data>
+  <data name="HyperlinkActionUndoButton.Content" xml:space="preserve">
+    <value>Undo</value>
+    <comment>Label of the button on the link tooltip that reverses the action that was just applied.</comment>
+  </data>
+  <data name="HyperlinkFieldsTabLabel" xml:space="preserve">
+    <value>Details</value>
+    <comment>Name of the first tab on the link tooltip, the one showing the list of labelled values.</comment>
+  </data>
+  <data name="HyperlinkActionFailed" xml:space="preserve">
+    <value>Could not complete that action.</value>
+    <comment>Shown on the link tooltip when an action failed and the integration gave no reason of its own.</comment>
+  </data>
+  <data name="HyperlinkActionNoUndo" xml:space="preserve">
+    <value>Applied. This change cannot be undone from here.</value>
+    <comment>Shown on the link tooltip after an action succeeded but the far end offers no way to reverse it, so that no Undo button is a stated answer rather than a blank space.</comment>
+  </data>
   <data name="TermControl_NoMatch" xml:space="preserve">
     <value>No results</value>
     <comment>Will be presented near the search box when Find operation returned no results.</comment>

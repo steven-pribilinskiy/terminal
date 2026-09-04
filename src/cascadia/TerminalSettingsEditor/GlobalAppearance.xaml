@@ -107,6 +107,16 @@
                       Style="{StaticResource ComboBoxSettingStyle}" />
         </local:SettingsCard>
 
+        <!--  Pane Title Bars  -->
+        <local:SettingsCard x:Name="PaneTitlebarVisibility"
+                            x:Uid="Globals_PaneTitlebarVisibility">
+            <ComboBox AutomationProperties.AccessibilityView="Content"
+                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                      ItemsSource="{x:Bind ViewModel.PaneTitlebarVisibilityList, Mode=OneWay}"
+                      SelectedItem="{x:Bind ViewModel.CurrentPaneTitlebarVisibility, Mode=TwoWay}"
+                      Style="{StaticResource ComboBoxSettingStyle}" />
+        </local:SettingsCard>
+
         <!--  Disable Animations  -->
         <!--  NOTE: the UID is "DisablePaneAnimationsReversed" not "DisablePaneAnimations". See GH#9124 for more details.  -->
         <local:SettingsCard x:Name="DisableAnimations"

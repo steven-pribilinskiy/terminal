@@ -15,8 +15,35 @@ using namespace winrt::Microsoft::Terminal::Control;
 using namespace winrt::Microsoft::Terminal::TerminalConnection;
 using namespace winrt::TerminalApp;
 
+// Both winrt::Windows::UI and winrt::Windows::UI::Xaml are in scope above, so a
+// bare `Input::` is ambiguous between Windows.UI.Input and Windows.UI.Xaml.Input.
+namespace XamlInput = winrt::Windows::UI::Xaml::Input;
+
 static const int PaneBorderSize = 2;
 static const int CombinedPaneBorderSize = 2 * PaneBorderSize;
+
+// The per-leaf title header is a fixed height rather than an auto-sized row, so
+// that _GetMinSize() and _CalcSnappedDimension() can account for it exactly
+// instead of guessing at whatever the row happened to measure to.
+static constexpr float PaneHeaderHeight = 20.0f;
+static constexpr double PaneHeaderFontSize = 12.0;
+
+// The invisible strip that catches the pointer for a divider drag. Half of it is
+// also how far from the divider a press still counts as landing "on" it.
+static constexpr double DividerPointerHitThickness = 12.0;
+static constexpr double DividerVisibleThickness = 1.0;
+
+// How close a raw drag position has to come to a character-cell boundary before
+// the divider snaps onto it. Hold Alt to drag past the snap.
+static constexpr float DividerSnapToleranceInDips = 6.0f;
+
+// A Border with a null Background isn't hit testable, so anything that has to
+// catch the pointer without being seen gets one step of alpha instead.
+static winrt::Windows::UI::Xaml::Media::SolidColorBrush MakeInvisibleHitTestBrush()
+{
+    const winrt::Windows::UI::Color nearlyTransparent{ 1, 0, 0, 0 };
+    return winrt::Windows::UI::Xaml::Media::SolidColorBrush{ nearlyTransparent };
+}
 
 // WARNING: Don't do this! This won't work
 //   Duration duration{ std::chrono::milliseconds{ 200 } };
@@ -31,10 +58,13 @@ Pane::Pane(IPaneContent content, const bool lastFocused) :
     _lastActive{ lastFocused }
 {
     _setPaneContent(std::move(content));
-    _root.Children().Append(_borderFirst);
 
     const auto& control{ _content.GetRoot() };
-    _borderFirst.Child(control);
+
+    // Lay the leaf out as [title header | content]. The content stays a direct
+    // child of _borderFirst -- wrapping the TermControl in an extra Grid breaks
+    // SwapChainPanel rendering.
+    _SetupLeafLayout(control);
 
     // Register an event with the control to have it inform us when it gains focus.
     if (control)
@@ -72,6 +102,7 @@ Pane::Pane(std::shared_ptr<Pane> first,
 
     _root.Children().Append(_borderFirst);
     _root.Children().Append(_borderSecond);
+    _AttachDividerElements();
 
     _ApplySplitDefinitions();
 
@@ -239,25 +270,25 @@ Pane::BuildStartupState Pane::BuildStartupActions(uint32_t currentId, uint32_t n
 // Method Description:
 // - Adjust our child percentages to increase the size of one of our children
 //   and decrease the size of the other.
-// - Adjusts the separation amount by 5%
 // - Does nothing if the direction doesn't match our current split direction
 // Arguments:
 // - direction: the direction to move our separator. If it's down or right,
 //   we'll be increasing the size of the first of our children. Else, we'll be
 //   decreasing the size of our first child.
+// - amount: how far to move the separator, as a fraction of this pane's size.
 // Return Value:
 // - false if we couldn't resize this pane in the given direction, else true.
-bool Pane::_Resize(const ResizeDirection& direction)
+bool Pane::_Resize(const ResizeDirection& direction, const float amount)
 {
     if (!DirectionMatchesSplit(direction, _splitState))
     {
         return false;
     }
 
-    auto amount = .05f;
+    auto signedAmount = amount;
     if (direction == ResizeDirection::Right || direction == ResizeDirection::Down)
     {
-        amount = -amount;
+        signedAmount = -signedAmount;
     }
 
     // Make sure we're not making a pane explode here by resizing it to 0 characters.
@@ -269,7 +300,7 @@ bool Pane::_Resize(const ResizeDirection& direction)
     // resizing.
     const auto actualDimension = changeWidth ? actualSize.Width : actualSize.Height;
 
-    _desiredSplitPosition = _ClampSplitPosition(changeWidth, _desiredSplitPosition - amount, actualDimension);
+    _desiredSplitPosition = _ClampSplitPosition(changeWidth, _desiredSplitPosition - signedAmount, actualDimension);
 
     // Resize our columns to match the new percentages.
     _CreateRowColDefinitions();
@@ -286,9 +317,10 @@ bool Pane::_Resize(const ResizeDirection& direction)
 //   couldn't handle the resize.
 // Arguments:
 // - direction: The direction to move the separator in.
+// - amount: how far to move the separator, as a fraction of the resized pane.
 // Return Value:
 // - true if we or a child handled this resize request.
-bool Pane::ResizePane(const ResizeDirection& direction)
+bool Pane::ResizePane(const ResizeDirection& direction, const float amount)
 {
     // If we're a leaf, do nothing. We can't possibly have a descendant with a
     // separator the correct direction.
@@ -305,7 +337,7 @@ bool Pane::ResizePane(const ResizeDirection& direction)
     const auto secondIsFocused = _secondChild->_lastActive;
     if (firstIsFocused || secondIsFocused)
     {
-        return _Resize(direction);
+        return _Resize(direction, amount);
     }
 
     // If neither of our children were the focused pane, then recurse into
@@ -319,12 +351,12 @@ bool Pane::ResizePane(const ResizeDirection& direction)
     // either.
     if ((!_firstChild->_IsLeaf()) && _firstChild->_HasFocusedChild())
     {
-        return _firstChild->ResizePane(direction) || _Resize(direction);
+        return _firstChild->ResizePane(direction, amount) || _Resize(direction, amount);
     }
 
     if ((!_secondChild->_IsLeaf()) && _secondChild->_HasFocusedChild())
     {
-        return _secondChild->ResizePane(direction) || _Resize(direction);
+        return _secondChild->ResizePane(direction, amount) || _Resize(direction, amount);
     }
 
     return false;
@@ -651,6 +683,7 @@ bool Pane::SwapPanes(std::shared_ptr<Pane> first, std::shared_ptr<Pane> second)
 
             parent->_root.Children().Append(parent->_borderFirst);
             parent->_root.Children().Append(parent->_borderSecond);
+            parent->_AttachDividerElements();
 
             // reset split definitions to clear any set row/column
             parent->_root.ColumnDefinitions().Clear();
@@ -1232,6 +1265,12 @@ void Pane::UpdateVisuals()
     const auto& brush{ _ComputeBorderColor() };
     _borderFirst.BorderBrush(brush);
     _borderSecond.BorderBrush(brush);
+
+    if (brush)
+    {
+        _paneHeaderBorder.BorderBrush(brush);
+    }
+    _UpdateDividerBrush();
 }
 
 // Method Description:
@@ -1454,16 +1493,20 @@ void Pane::_CloseChild(const bool closeFirst)
         _root.ColumnDefinitions().Clear();
         _root.RowDefinitions().Clear();
 
-        // Reattach the TermControl to our grid.
-        _root.Children().Append(_borderFirst);
-        const auto& control{ _content.GetRoot() };
-        _borderFirst.Child(control);
-
         // Make sure to set our _splitState before focusing the control. If you
         // fail to do this, when the tab handles the GotFocus event and asks us
         // what our active control is, we won't technically be a "leaf", and
         // GetTerminalControl will return null.
+        // This also has to happen before _SetupLeafLayout, which only builds the
+        // header row for a pane that is already a leaf.
         _splitState = SplitState::None;
+
+        // Reattach the TermControl to our grid, underneath a title header of our
+        // own. We inherit the header's visibility from the state the Tab last
+        // pushed down, so a pane promoted to a leaf here doesn't silently lose its
+        // header - that is the bug that stalled upstream's PR #20068.
+        const auto& control{ _content.GetRoot() };
+        _SetupLeafLayout(control);
 
         // re-attach our handler for the control's GotFocus event.
         if (control)
@@ -1551,6 +1594,7 @@ void Pane::_CloseChild(const bool closeFirst)
 
         _root.Children().Append(_borderFirst);
         _root.Children().Append(_borderSecond);
+        _AttachDividerElements();
 
         // Propagate the new borders down to the children.
         _borders = remainingBorders;
@@ -1737,6 +1781,7 @@ void Pane::_SetupChildCloseHandlers()
 IPaneContent Pane::_takePaneContent()
 {
     _closeRequestedRevoker.revoke();
+    _titleChangedRevoker.revoke();
     return std::move(_content);
 }
 
@@ -1756,7 +1801,251 @@ void Pane::_setPaneContent(IPaneContent content)
     {
         _content = std::move(content);
         _closeRequestedRevoker = _content.CloseRequested(winrt::auto_revoke, [this](auto&&, auto&&) { Close(); });
+
+        // GH#4717: keep the pane's own title header in step with the content.
+        // Capture the WinRT objects rather than `this`: the Pane can be closed and
+        // destroyed before a queued dispatcher callback runs, and each of these is
+        // independently reference counted. The revoker unsubscribes us when this
+        // Pane (and therefore this member) goes away, so there's no cycle.
+        const auto paneContent = _content;
+        const auto headerText = _paneHeaderText;
+        const auto headerBorder = _paneHeaderBorder;
+        const auto profile = GetProfile();
+        _titleChangedRevoker = _content.TitleChanged(winrt::auto_revoke, [paneContent, headerText, headerBorder, profile](auto&&, auto&&) {
+            // TitleChanged can arrive off the UI thread, so hop back onto it
+            // before touching any XAML.
+            headerText.Dispatcher().RunAsync(winrt::Windows::UI::Core::CoreDispatcherPriority::Normal, [paneContent, headerText, headerBorder, profile]() {
+                const auto title = _ResolvePaneTitle(paneContent, profile);
+                headerText.Text(title);
+                Automation::AutomationProperties::SetName(headerBorder, title);
+            });
+        });
     }
+
+    _UpdatePaneHeaderText();
+}
+
+// Method Description:
+// - Works out what to show in a leaf's title header: the content's own title if
+//   it has one, then the profile's name, and "Terminal" as a last resort.
+// - Shells routinely set the title to the working directory. A full path fills
+//   the whole header and reads as noise, so trim it to its last segment.
+// - Static, and takes everything it needs as arguments, so the TitleChanged
+//   handler above can call it without a live Pane.
+winrt::hstring Pane::_ResolvePaneTitle(const IPaneContent& content, const Profile& profile)
+{
+    auto title = content ? content.Title() : winrt::hstring{};
+    if (title.empty() && profile)
+    {
+        title = profile.Name();
+    }
+    if (title.empty())
+    {
+        return RS_(L"PaneTitleFallback");
+    }
+
+    const std::wstring_view view{ title };
+    const auto looksLikeAPath = view.find(L' ') == std::wstring_view::npos &&
+                                ((view.size() >= 3 && view[1] == L':' && (view[2] == L'\\' || view[2] == L'/')) ||
+                                 view.front() == L'/' ||
+                                 view.front() == L'\\');
+    if (looksLikeAPath)
+    {
+        // Ignore a trailing separator, so "C:\foo\" still resolves to "foo".
+        auto end = view.size();
+        while (end > 0 && (view[end - 1] == L'\\' || view[end - 1] == L'/'))
+        {
+            --end;
+        }
+
+        if (end > 0)
+        {
+            const auto lastSeparator = view.find_last_of(L"\\/", end - 1);
+            if (lastSeparator != std::wstring_view::npos && lastSeparator + 1 < end)
+            {
+                return winrt::hstring{ view.substr(lastSeparator + 1, end - lastSeparator - 1) };
+            }
+        }
+    }
+
+    return title;
+}
+
+// Method Description:
+// - One-time setup of the elements that make up a leaf's title header. They're
+//   default-constructed members rather than created here, so that
+//   _setPaneContent() can hand the TextBlock to its TitleChanged handler even
+//   though it runs before this does.
+void Pane::_CreatePaneHeader()
+{
+    if (_paneHeaderInitialized)
+    {
+        return;
+    }
+    _paneHeaderInitialized = true;
+
+    _paneHeaderText.FontSize(PaneHeaderFontSize);
+    _paneHeaderText.Margin(ThicknessHelper::FromLengths(8, 0, 8, 0));
+    _paneHeaderText.VerticalAlignment(VerticalAlignment::Center);
+    // The header row is a fixed PaneHeaderHeight so that _GetMinSize() and
+    // _CalcSnappedDimension() can subtract it exactly. Letting the OS text scale
+    // factor grow this label would make that number a lie and clip the title, so
+    // the header opts out of scaling; the terminal's own text is unaffected.
+    _paneHeaderText.IsTextScaleFactorEnabled(false);
+    _paneHeaderText.IsTextSelectionEnabled(false);
+    _paneHeaderText.TextWrapping(TextWrapping::NoWrap);
+    _paneHeaderText.TextTrimming(TextTrimming::CharacterEllipsis);
+
+    _paneHeaderBorder.Child(_paneHeaderText);
+    _paneHeaderBorder.Visibility(Visibility::Collapsed);
+    // Without a Background the strip beside a short title isn't hit testable, and
+    // only the text itself would be clickable.
+    _paneHeaderBorder.Background(MakeInvisibleHitTestBrush());
+    // A one-DIP rule under the title in the pane's own border colour. Painting a
+    // solid background instead would need a foreground colour to match it, and
+    // there isn't a theme-safe pair to pick here.
+    _paneHeaderBorder.BorderThickness(ThicknessHelper::FromLengths(0, 0, 0, 1));
+
+    // Clicking the header focuses *this* pane. Upstream's PR routed this through
+    // the border-tapped handler, which focuses the first child of whoever handled
+    // it -- that's their reported focus bug.
+    _headerPointerPressedRevoker = _paneHeaderBorder.PointerPressed(winrt::auto_revoke, [this](auto&&, const XamlInput::PointerRoutedEventArgs& e) {
+        _PaneHeaderClicked();
+        e.Handled(true);
+    });
+    _headerTappedRevoker = _paneHeaderBorder.Tapped(winrt::auto_revoke, [this](auto&&, const XamlInput::TappedRoutedEventArgs& e) {
+        _PaneHeaderClicked();
+        e.Handled(true);
+    });
+    _headerRightTappedRevoker = _paneHeaderBorder.RightTapped(winrt::auto_revoke, [this](auto&&, const XamlInput::RightTappedRoutedEventArgs& e) {
+        _PaneHeaderClicked();
+        e.Handled(true);
+    });
+
+    _UpdatePaneHeaderText();
+    _UpdatePaneHeaderBrush();
+}
+
+// Method Description:
+// - Builds the leaf layout in _root: the title header in row 0 and _borderFirst
+//   (holding the content) in row 1.
+// - Called from the leaf constructor and again from _CloseChild when a parent is
+//   demoted back to a leaf. Both callers clear _root's children and definitions
+//   first.
+void Pane::_SetupLeafLayout(const winrt::Windows::UI::Xaml::UIElement& control)
+{
+    _CreatePaneHeader();
+
+    _paneHeaderRow = Controls::RowDefinition{};
+    auto contentRow = Controls::RowDefinition{};
+    contentRow.Height(GridLengthHelper::FromValueAndType(1, GridUnitType::Star));
+    _root.RowDefinitions().Append(_paneHeaderRow);
+    _root.RowDefinitions().Append(contentRow);
+
+    // Clear out any row/column we picked up while we were a parent.
+    Controls::Grid::SetRow(_paneHeaderBorder, 0);
+    Controls::Grid::SetColumn(_paneHeaderBorder, 0);
+    Controls::Grid::SetRow(_borderFirst, 1);
+    Controls::Grid::SetColumn(_borderFirst, 0);
+    Controls::Grid::SetRowSpan(_borderFirst, 1);
+    Controls::Grid::SetColumnSpan(_borderFirst, 1);
+
+    // A parent paints its root so a colour shows behind its children as they slide
+    // in. A leaf has nothing to slide, and the header row would otherwise inherit
+    // that colour when a parent is demoted back to a leaf here.
+    _root.Background(nullptr);
+
+    _root.Children().Append(_paneHeaderBorder);
+    _root.Children().Append(_borderFirst);
+
+    if (control)
+    {
+        _borderFirst.Child(control);
+    }
+
+    _ApplyPaneTitlebarVisibility();
+}
+
+// Method Description:
+// - Applies the paneTitlebarVisibility setting to this pane, and passes it on to
+//   both children. Every pane remembers the state so that one promoted to a leaf
+//   during a close can restore its own header without waiting to be told again.
+void Pane::SetPaneTitlebarVisibility(const PaneTitlebarVisibility visibility, const bool tabHasMultiplePanes)
+{
+    _titlebarVisibility = visibility;
+    _tabHasMultiplePanes = tabHasMultiplePanes;
+
+    if (_IsLeaf())
+    {
+        _ApplyPaneTitlebarVisibility();
+    }
+    else
+    {
+        _firstChild->SetPaneTitlebarVisibility(visibility, tabHasMultiplePanes);
+        _secondChild->SetPaneTitlebarVisibility(visibility, tabHasMultiplePanes);
+    }
+}
+
+bool Pane::_PaneHeaderVisible() const noexcept
+{
+    switch (_titlebarVisibility)
+    {
+    case PaneTitlebarVisibility::Always:
+        return true;
+    case PaneTitlebarVisibility::MultiplePanes:
+        return _tabHasMultiplePanes;
+    default:
+        return false;
+    }
+}
+
+// Method Description:
+// - How much of this pane's height the title header takes up. Parents never have
+//   one, and a hidden header takes up nothing.
+float Pane::_PaneHeaderHeight() const noexcept
+{
+    return (_IsLeaf() && _PaneHeaderVisible()) ? PaneHeaderHeight : 0.0f;
+}
+
+void Pane::_ApplyPaneTitlebarVisibility()
+{
+    if (!_IsLeaf() || !_paneHeaderRow)
+    {
+        return;
+    }
+
+    const auto visible = _PaneHeaderVisible();
+    _paneHeaderBorder.Visibility(visible ? Visibility::Visible : Visibility::Collapsed);
+    // Collapsing the border on its own leaves an auto-sized row behind, which is
+    // the "header won't go away" half of upstream's PR #20068. Pin the row to zero
+    // rather than removing it, so the row indices everything else uses stay put.
+    _paneHeaderRow.Height(GridLengthHelper::FromPixels(visible ? static_cast<double>(PaneHeaderHeight) : 0.0));
+
+    if (visible)
+    {
+        _UpdatePaneHeaderText();
+        _UpdatePaneHeaderBrush();
+    }
+}
+
+void Pane::_UpdatePaneHeaderText()
+{
+    const auto title = _ResolvePaneTitle(_content, GetProfile());
+    _paneHeaderText.Text(title);
+    Automation::AutomationProperties::SetName(_paneHeaderBorder, title);
+}
+
+void Pane::_UpdatePaneHeaderBrush()
+{
+    if (const auto& brush{ _ComputeBorderColor() })
+    {
+        _paneHeaderBorder.BorderBrush(brush);
+    }
+}
+
+void Pane::_PaneHeaderClicked()
+{
+    _Focus();
 }
 
 // Method Description:
@@ -1803,6 +2092,460 @@ void Pane::_CreateRowColDefinitions()
 
         _root.RowDefinitions().Append(firstRowDef);
         _root.RowDefinitions().Append(secondRowDef);
+    }
+
+    // The divider is positioned by margin rather than by a grid cell, so it has to
+    // be moved whenever the split position changes.
+    _UpdateDividerPlacement();
+}
+
+// Method Description:
+// - One-time creation of the four overlay elements that make up the mouse
+//   draggable divider. Only parent panes ever get them.
+// - Ported from the HelloThisWorld/winTerm fork (MIT), which answers the three
+//   objections that left upstream's PR #16895 blocked: an explicit divider
+//   element per parent pane instead of a tree walk, a cursor and hover
+//   affordance, and a resize that stays inside the existing min-size clamping.
+void Pane::_CreateDividerElements()
+{
+    if (_dividerPointerTarget)
+    {
+        return;
+    }
+
+    _dividerPointerTarget = Controls::Border{};
+    _dividerVisual = Controls::Border{};
+    _dividerThumb = Controls::Primitives::Thumb{};
+    _snapIndicator = Controls::Border{};
+    _snapIndicatorText = Controls::TextBlock{};
+
+    _dividerPointerTarget.Background(MakeInvisibleHitTestBrush());
+
+    _dividerVisual.IsHitTestVisible(false);
+
+    // The Thumb is never seen and never clicked. It exists so the divider can
+    // take focus, which is what lets Escape cancel a drag, and so that a screen
+    // reader has something to announce.
+    _dividerThumb.Opacity(0);
+    _dividerThumb.IsHitTestVisible(false);
+    _dividerThumb.IsTabStop(true);
+    _dividerThumb.Padding(ThicknessHelper::FromUniformLength(0));
+    _dividerThumb.BorderThickness(ThicknessHelper::FromUniformLength(0));
+
+    _snapIndicatorText.FontSize(PaneHeaderFontSize);
+    _snapIndicatorText.HorizontalAlignment(HorizontalAlignment::Center);
+    _snapIndicatorText.VerticalAlignment(VerticalAlignment::Center);
+    _snapIndicator.Child(_snapIndicatorText);
+    _snapIndicator.Padding(ThicknessHelper::FromLengths(6, 2, 6, 2));
+    _snapIndicator.CornerRadius(CornerRadiusHelper::FromUniformRadius(3));
+    _snapIndicator.BorderThickness(ThicknessHelper::FromUniformLength(1));
+    _snapIndicator.IsHitTestVisible(false);
+    _snapIndicator.Visibility(Visibility::Collapsed);
+
+    Automation::AutomationProperties::SetAccessibilityView(_dividerPointerTarget, Automation::Peers::AccessibilityView::Raw);
+    Automation::AutomationProperties::SetAccessibilityView(_dividerVisual, Automation::Peers::AccessibilityView::Raw);
+    Automation::AutomationProperties::SetAccessibilityView(_snapIndicator, Automation::Peers::AccessibilityView::Raw);
+
+    Controls::Canvas::SetZIndex(_dividerVisual, 99);
+    Controls::Canvas::SetZIndex(_dividerThumb, 100);
+    Controls::Canvas::SetZIndex(_dividerPointerTarget, 101);
+    Controls::Canvas::SetZIndex(_snapIndicator, 102);
+
+    _dividerPointerPressedRevoker = _dividerPointerTarget.PointerPressed(winrt::auto_revoke, [this](auto&&, const XamlInput::PointerRoutedEventArgs& e) {
+        _DividerPointerPressed(e);
+    });
+    _dividerPointerMovedRevoker = _dividerPointerTarget.PointerMoved(winrt::auto_revoke, [this](auto&&, const XamlInput::PointerRoutedEventArgs& e) {
+        _DividerPointerMoved(e);
+    });
+    _dividerPointerReleasedRevoker = _dividerPointerTarget.PointerReleased(winrt::auto_revoke, [this](auto&&, const XamlInput::PointerRoutedEventArgs& e) {
+        if (_resizePointerId && e.Pointer().PointerId() == *_resizePointerId)
+        {
+            _EndDividerResize(false, e.Pointer());
+            e.Handled(true);
+        }
+    });
+    _dividerPointerCanceledRevoker = _dividerPointerTarget.PointerCanceled(winrt::auto_revoke, [this](auto&&, const XamlInput::PointerRoutedEventArgs& e) {
+        if (_resizePointerId && e.Pointer().PointerId() == *_resizePointerId)
+        {
+            _EndDividerResize(true, e.Pointer());
+        }
+    });
+    _dividerPointerCaptureLostRevoker = _dividerPointerTarget.PointerCaptureLost(winrt::auto_revoke, [this](auto&&, const XamlInput::PointerRoutedEventArgs& e) {
+        if (_resizePointerId && e.Pointer().PointerId() == *_resizePointerId)
+        {
+            _EndDividerResize(true, e.Pointer());
+        }
+    });
+    _dividerPointerEnteredRevoker = _dividerPointerTarget.PointerEntered(winrt::auto_revoke, [this](auto&&, auto&&) {
+        _dividerPointerOver = true;
+        _UpdateDividerBrush();
+        _SetResizeCursor(true);
+    });
+    _dividerPointerExitedRevoker = _dividerPointerTarget.PointerExited(winrt::auto_revoke, [this](auto&&, auto&&) {
+        _dividerPointerOver = false;
+        _UpdateDividerBrush();
+        if (!_resizePointerId)
+        {
+            _SetResizeCursor(false);
+        }
+    });
+    _dividerKeyDownRevoker = _dividerThumb.KeyDown(winrt::auto_revoke, [this](auto&&, const XamlInput::KeyRoutedEventArgs& e) {
+        if (e.Key() == winrt::Windows::System::VirtualKey::Escape && _resizePointerId)
+        {
+            _EndDividerResize(true, nullptr);
+            e.Handled(true);
+        }
+    });
+
+    // The divider is placed by margin, so it has to move when we do.
+    _rootSizeChangedRevoker = _root.SizeChanged(winrt::auto_revoke, [this](auto&&, auto&&) {
+        _UpdateDividerPlacement();
+    });
+
+    _highContrast = winrt::Windows::UI::ViewManagement::AccessibilitySettings{}.HighContrast();
+}
+
+// Method Description:
+// - Puts the divider's overlay elements back into _root. Every caller that
+//   re-parents our children clears _root's children first, so this has to run
+//   again each time.
+void Pane::_AttachDividerElements()
+{
+    if (_IsLeaf())
+    {
+        return;
+    }
+
+    _CreateDividerElements();
+
+    uint32_t index{};
+    if (!_root.Children().IndexOf(_dividerVisual, index))
+    {
+        _root.Children().Append(_dividerVisual);
+        _root.Children().Append(_dividerThumb);
+        _root.Children().Append(_dividerPointerTarget);
+        _root.Children().Append(_snapIndicator);
+    }
+
+    Automation::AutomationProperties::SetName(_dividerThumb,
+                                              _splitState == SplitState::Vertical ?
+                                                  RS_(L"PaneDividerNameVertical") :
+                                                  RS_(L"PaneDividerNameHorizontal"));
+    Automation::AutomationProperties::SetHelpText(_dividerThumb, RS_(L"PaneDividerHelpText"));
+
+    _UpdateDividerBrush();
+    _UpdateDividerPlacement();
+}
+
+// Method Description:
+// - Moves the divider's overlay elements to sit over the split position. They
+//   span both cells and are positioned by margin, because the split itself is
+//   two grid cells with no separator column of its own.
+void Pane::_UpdateDividerPlacement()
+{
+    if (_IsLeaf() || !_dividerPointerTarget)
+    {
+        return;
+    }
+
+    const auto vertical = _splitState == SplitState::Vertical;
+    const auto unset = std::numeric_limits<double>::quiet_NaN();
+
+    for (const auto& element : { _dividerVisual, _dividerPointerTarget, _snapIndicator })
+    {
+        Controls::Grid::SetRow(element, 0);
+        Controls::Grid::SetColumn(element, 0);
+        Controls::Grid::SetRowSpan(element, vertical ? 1 : 2);
+        Controls::Grid::SetColumnSpan(element, vertical ? 2 : 1);
+    }
+    Controls::Grid::SetRow(_dividerThumb, 0);
+    Controls::Grid::SetColumn(_dividerThumb, 0);
+    Controls::Grid::SetRowSpan(_dividerThumb, vertical ? 1 : 2);
+    Controls::Grid::SetColumnSpan(_dividerThumb, vertical ? 2 : 1);
+
+    if (vertical)
+    {
+        const auto width = _root.ActualWidth();
+        const auto dividerPosition = _desiredSplitPosition * width;
+
+        _dividerPointerTarget.HorizontalAlignment(HorizontalAlignment::Left);
+        _dividerPointerTarget.VerticalAlignment(VerticalAlignment::Stretch);
+        _dividerPointerTarget.Width(DividerPointerHitThickness);
+        _dividerPointerTarget.Height(unset);
+        _dividerPointerTarget.Margin(ThicknessHelper::FromLengths(dividerPosition - (DividerPointerHitThickness / 2.0), 0.0, 0.0, 0.0));
+
+        _dividerThumb.HorizontalAlignment(HorizontalAlignment::Left);
+        _dividerThumb.VerticalAlignment(VerticalAlignment::Stretch);
+        _dividerThumb.Width(DividerPointerHitThickness);
+        _dividerThumb.Height(unset);
+        _dividerThumb.Margin(ThicknessHelper::FromLengths(dividerPosition - (DividerPointerHitThickness / 2.0), 0, 0, 0));
+
+        _dividerVisual.HorizontalAlignment(HorizontalAlignment::Left);
+        _dividerVisual.VerticalAlignment(VerticalAlignment::Stretch);
+        _dividerVisual.Width(DividerVisibleThickness);
+        _dividerVisual.Height(unset);
+        _dividerVisual.Margin(ThicknessHelper::FromLengths(dividerPosition - (DividerVisibleThickness / 2.0), 0, 0, 0));
+
+        _snapIndicator.HorizontalAlignment(HorizontalAlignment::Left);
+        _snapIndicator.VerticalAlignment(VerticalAlignment::Center);
+        _snapIndicator.Margin(ThicknessHelper::FromLengths(std::clamp(dividerPosition + 8.0, 0.0, std::max(0.0, width - 96.0)), 0, 0, 0));
+    }
+    else
+    {
+        const auto height = _root.ActualHeight();
+        const auto dividerPosition = _desiredSplitPosition * height;
+
+        _dividerPointerTarget.HorizontalAlignment(HorizontalAlignment::Stretch);
+        _dividerPointerTarget.VerticalAlignment(VerticalAlignment::Top);
+        _dividerPointerTarget.Width(unset);
+        _dividerPointerTarget.Height(DividerPointerHitThickness);
+        _dividerPointerTarget.Margin(ThicknessHelper::FromLengths(0, dividerPosition - (DividerPointerHitThickness / 2.0), 0, 0));
+
+        _dividerThumb.HorizontalAlignment(HorizontalAlignment::Stretch);
+        _dividerThumb.VerticalAlignment(VerticalAlignment::Top);
+        _dividerThumb.Width(unset);
+        _dividerThumb.Height(DividerPointerHitThickness);
+        _dividerThumb.Margin(ThicknessHelper::FromLengths(0, dividerPosition - (DividerPointerHitThickness / 2.0), 0, 0));
+
+        _dividerVisual.HorizontalAlignment(HorizontalAlignment::Stretch);
+        _dividerVisual.VerticalAlignment(VerticalAlignment::Top);
+        _dividerVisual.Width(unset);
+        _dividerVisual.Height(DividerVisibleThickness);
+        _dividerVisual.Margin(ThicknessHelper::FromLengths(0, dividerPosition - (DividerVisibleThickness / 2.0), 0, 0));
+
+        _snapIndicator.HorizontalAlignment(HorizontalAlignment::Center);
+        _snapIndicator.VerticalAlignment(VerticalAlignment::Top);
+        _snapIndicator.Margin(ThicknessHelper::FromLengths(0, std::clamp(dividerPosition + 8.0, 0.0, std::max(0.0, height - 40.0)), 0, 0));
+    }
+}
+
+// Method Description:
+// - Recolours the divider for its idle, hovered and dragging states, and the
+//   snap indicator alongside it.
+// - Under High Contrast the system owns the border colours, so we leave the
+//   divider on the theme's own brush rather than fighting it.
+void Pane::_UpdateDividerBrush()
+{
+    if (!_dividerVisual)
+    {
+        return;
+    }
+
+    const auto active = _resizePointerId.has_value() || _dividerPointerOver;
+    const auto dividerBrush = (active && !_highContrast) ?
+                                  _themeResources.focusedBorderBrush :
+                                  _themeResources.unfocusedBorderBrush;
+    if (dividerBrush)
+    {
+        _dividerVisual.Background(dividerBrush);
+    }
+
+    if (!_snapIndicator)
+    {
+        return;
+    }
+
+    if (const auto& indicatorBorder{ _themeResources.unfocusedBorderBrush })
+    {
+        _snapIndicator.BorderBrush(indicatorBorder);
+    }
+
+    // The indicator floats over the terminal, so it needs a background of its own
+    // to stay legible. Both keys are standard WinUI theme resources; if either is
+    // missing we simply leave that brush alone rather than inventing a colour.
+    if (const auto app{ Application::Current() })
+    {
+        const auto res = app.Resources();
+        const auto backgroundKey = winrt::box_value(L"SystemControlBackgroundChromeMediumLowBrush");
+        const auto foregroundKey = winrt::box_value(L"SystemControlForegroundBaseHighBrush");
+
+        if (res.HasKey(backgroundKey))
+        {
+            _snapIndicator.Background(res.Lookup(backgroundKey).try_as<Media::Brush>());
+        }
+        if (res.HasKey(foregroundKey))
+        {
+            _snapIndicatorText.Foreground(res.Lookup(foregroundKey).try_as<Media::Brush>());
+        }
+    }
+}
+
+// Method Description:
+// - Sets or restores the resize cursor. XAML Islands has no per-element cursor,
+//   so the documented technique is to set it on the window and put it back when
+//   the pointer leaves.
+void Pane::_SetResizeCursor(const bool sizing)
+{
+    if (const auto window{ CoreWindow::GetForCurrentThread() })
+    {
+        const auto type = sizing ?
+                              (_splitState == SplitState::Vertical ? CoreCursorType::SizeWestEast : CoreCursorType::SizeNorthSouth) :
+                              CoreCursorType::Arrow;
+        window.PointerCursor(CoreCursor{ type, 0 });
+    }
+}
+
+void Pane::_DividerPointerPressed(const XamlInput::PointerRoutedEventArgs& e)
+{
+    if (_IsLeaf() || _resizePointerId)
+    {
+        return;
+    }
+
+    const auto point = e.GetCurrentPoint(_root);
+    const auto properties = point.Properties();
+    if (!properties.IsLeftButtonPressed() &&
+        properties.PointerUpdateKind() != winrt::Windows::UI::Input::PointerUpdateKind::LeftButtonPressed)
+    {
+        return;
+    }
+
+    const auto vertical = _splitState == SplitState::Vertical;
+    const auto containerLength = vertical ? _root.ActualWidth() : _root.ActualHeight();
+    if (containerLength <= 0)
+    {
+        return;
+    }
+
+    // Hit test in _root's own coordinates rather than trusting which element the
+    // press landed on, so the same check holds however the event was routed.
+    const auto position = point.Position();
+    const auto dividerPosition = _desiredSplitPosition * containerLength;
+    const auto pointerPosition = vertical ? position.X : position.Y;
+    if (std::abs(pointerPosition - dividerPosition) > DividerPointerHitThickness / 2.0)
+    {
+        return;
+    }
+
+    // Take the capture *before* recording the pointer id. Capturing here makes
+    // whichever element held the implicit capture raise PointerCaptureLost, and
+    // our own handler for that must not see a drag in progress and cancel it.
+    // A failed capture isn't fatal either -- a child may already own the implicit
+    // capture, and the routed move and release still arrive.
+    _dividerPointerTarget.CapturePointer(e.Pointer());
+
+    _resizeStartPosition = _desiredSplitPosition;
+    _resizePointerId = e.Pointer().PointerId();
+    _dividerThumb.Focus(FocusState::Pointer);
+    _UpdateDividerBrush();
+    _SetResizeCursor(true);
+    e.Handled(true);
+}
+
+void Pane::_DividerPointerMoved(const XamlInput::PointerRoutedEventArgs& e)
+{
+    if (_IsLeaf() || !_resizePointerId || e.Pointer().PointerId() != *_resizePointerId)
+    {
+        return;
+    }
+
+    const auto vertical = _splitState == SplitState::Vertical;
+    const auto containerLength = vertical ? _root.ActualWidth() : _root.ActualHeight();
+    if (containerLength <= 0)
+    {
+        return;
+    }
+
+    const auto position = e.GetCurrentPoint(_root).Position();
+    const auto pointerPosition = static_cast<double>(vertical ? position.X : position.Y);
+    const auto totalSize = gsl::narrow_cast<float>(containerLength);
+
+    // Everything we commit goes through _ClampSplitPosition, so a drag can never
+    // shrink a child past its minimum size -- the same guarantee the keyboard
+    // resize has always had.
+    auto ratio = _ClampSplitPosition(vertical, gsl::narrow_cast<float>(pointerPosition / containerLength), totalSize);
+
+    auto altPressed = false;
+    if (const auto window{ CoreWindow::GetForCurrentThread() })
+    {
+        altPressed = WI_IsFlagSet(window.GetKeyState(winrt::Windows::System::VirtualKey::Menu), CoreVirtualKeyStates::Down);
+    }
+
+    // Snap the first child onto its character grid when the drag lands close to a
+    // cell boundary, so a mouse resize lands where a keyboard one would.
+    auto snapped = false;
+    if (!altPressed)
+    {
+        const auto rawFirst = ratio * totalSize;
+        const auto [lower, higher] = _firstChild->_CalcSnappedDimension(vertical, rawFirst);
+        const auto nearest = (rawFirst - lower) < (higher - rawFirst) ? lower : higher;
+        if (std::abs(nearest - rawFirst) <= DividerSnapToleranceInDips)
+        {
+            ratio = _ClampSplitPosition(vertical, nearest / totalSize, totalSize);
+            snapped = true;
+        }
+    }
+
+    _desiredSplitPosition = ratio;
+    // This also moves the divider's own elements.
+    _CreateRowColDefinitions();
+
+    const auto firstPercent = static_cast<int>(std::lround(_desiredSplitPosition * 100.0f));
+    std::wstring indicator;
+    indicator.append(std::to_wstring(firstPercent));
+    indicator.append(L"% / ");
+    indicator.append(std::to_wstring(100 - firstPercent));
+    indicator.push_back(L'%');
+    _snapIndicatorText.Text(winrt::hstring{ std::wstring_view{ indicator } });
+
+    if (const auto& snapBrush{ snapped ? _themeResources.focusedBorderBrush : _themeResources.unfocusedBorderBrush })
+    {
+        _snapIndicator.BorderBrush(snapBrush);
+    }
+    _snapIndicator.Visibility(Visibility::Visible);
+
+    e.Handled(true);
+}
+
+// Method Description:
+// - Ends a divider drag, either committing where it landed or (on Escape, or a
+//   cancelled/lost pointer) restoring the ratio it started from.
+// Arguments:
+// - cancel: true to restore the pre-drag split position.
+// - pointer: the pointer whose capture to release; null releases all of them,
+//   which is what the Escape path wants.
+void Pane::_EndDividerResize(const bool cancel, const XamlInput::Pointer& pointer)
+{
+    if (!_resizePointerId)
+    {
+        return;
+    }
+
+    if (cancel)
+    {
+        _desiredSplitPosition = _resizeStartPosition;
+        _CreateRowColDefinitions();
+    }
+
+    // Clear this before releasing the capture: releasing raises
+    // PointerCaptureLost, and that handler would otherwise re-enter here and
+    // treat a completed drag as a cancelled one.
+    _resizePointerId.reset();
+
+    if (_dividerPointerTarget)
+    {
+        if (pointer)
+        {
+            _dividerPointerTarget.ReleasePointerCapture(pointer);
+        }
+        else
+        {
+            _dividerPointerTarget.ReleasePointerCaptures();
+        }
+    }
+
+    if (_snapIndicator)
+    {
+        _snapIndicator.Visibility(Visibility::Collapsed);
+    }
+
+    _UpdateDividerBrush();
+    _SetResizeCursor(_dividerPointerOver);
+
+    // Hand focus back to whatever the drag took it from.
+    if (const auto& content{ GetLastFocusedContent() })
+    {
+        content.Focus(FocusState::Programmatic);
     }
 }
 
@@ -2228,6 +2971,10 @@ bool Pane::ToggleSplitOrientation()
         _CreateRowColDefinitions();
         _ApplySplitDefinitions();
 
+        // The divider is still attached; this re-points it along the new axis and
+        // refreshes the name a screen reader announces for it.
+        _AttachDividerElements();
+
         return true;
     }
 
@@ -2313,6 +3060,11 @@ std::pair<std::shared_ptr<Pane>, std::shared_ptr<Pane>> Pane::_Split(SplitDirect
         _firstChild->_broadcastEnabled = _broadcastEnabled;
     }
 
+    // Hand our titlebar state to both children now, so the split doesn't flash a
+    // header-less frame before the Tab gets around to telling us again.
+    _firstChild->SetPaneTitlebarVisibility(_titlebarVisibility, true);
+    newPane->SetPaneTitlebarVisibility(_titlebarVisibility, true);
+
     _splitState = actualSplitType;
     _desiredSplitPosition = 1.0f - splitSize;
     _secondChild = newPane;
@@ -2326,11 +3078,17 @@ std::pair<std::shared_ptr<Pane>, std::shared_ptr<Pane>> Pane::_Split(SplitDirect
     _root.RowDefinitions().Clear();
     _CreateRowColDefinitions();
 
+    // We were a leaf a moment ago, which puts _borderFirst in row 1 underneath the
+    // title header. As a parent it belongs back in the first cell.
+    Controls::Grid::SetRow(_borderFirst, 0);
+    Controls::Grid::SetColumn(_borderFirst, 0);
+
     _borderFirst.Child(_firstChild->GetRootElement());
     _borderSecond.Child(_secondChild->GetRootElement());
 
     _root.Children().Append(_borderFirst);
     _root.Children().Append(_borderSecond);
+    _AttachDividerElements();
 
     _ApplySplitDefinitions();
 
@@ -2414,6 +3172,7 @@ void Pane::Restore(std::shared_ptr<Pane> zoomedPane)
 
             _root.Children().Append(_borderFirst);
             _root.Children().Append(_borderSecond);
+            _AttachDividerElements();
         }
 
         // Always recurse into both children. If the (un)zoomed pane was one of
@@ -2657,8 +3416,14 @@ Pane::SnapSizeResult Pane::_CalcSnappedDimension(const bool widthOrHeight, const
             return { minDimension, minDimension };
         }
 
+        // The title header isn't part of the character grid, so take it out before
+        // snapping and put it back afterwards. Without this, snapToGridOnResize is
+        // off by the height of the header on every leaf that has one.
+        const auto headerHeight = direction == PaneSnapDirection::Height ? _PaneHeaderHeight() : 0.0f;
+
         auto lower = snappable.SnapDownToGrid(widthOrHeight ? PaneSnapDirection::Width : PaneSnapDirection::Height,
-                                              dimension);
+                                              dimension - headerHeight);
+        lower += headerHeight;
 
         if (direction == PaneSnapDirection::Width)
         {
@@ -2869,6 +3634,10 @@ Size Pane::_GetMinSize() const
         newHeight += WI_IsFlagSet(_borders, Borders::Top) ? PaneBorderSize : 0;
         newHeight += WI_IsFlagSet(_borders, Borders::Bottom) ? PaneBorderSize : 0;
 
+        // The title header sits above the content, so it costs height on top of
+        // everything the content itself needs.
+        newHeight += _PaneHeaderHeight();
+
         return { newWidth, newHeight };
     }
     else
@@ -2938,6 +3707,9 @@ float Pane::_ClampSplitPosition(const bool widthOrHeight, const float requestedV
 void Pane::UpdateResources(const PaneResources& resources)
 {
     _themeResources = resources;
+    // The theme just changed, so re-ask whether High Contrast is on: that decides
+    // whether the divider is allowed to recolour itself on hover.
+    _highContrast = winrt::Windows::UI::ViewManagement::AccessibilitySettings{}.HighContrast();
     UpdateVisuals();
 
     if (!_IsLeaf())

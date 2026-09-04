@@ -24,6 +24,10 @@ namespace Microsoft.Terminal.Control
         HyperlinkPreviewFieldKind Kind;
         String IconUri;
         String Color;
+        // The group this field belongs to, so a surface with room can show
+        // them under headings. Empty means the integration declared no groups.
+        String Group;
+        String GroupLabel;
 
         // Template conveniences (x:Bind cannot compare enums in markup).
         Boolean IsTitle { get; };
@@ -31,6 +35,84 @@ namespace Microsoft.Terminal.Control
         Boolean IsBadge { get; };
         Boolean IsPlain { get; };
         Boolean HasIcon { get; };
+    }
+
+    // What a tab holds. Fields is the built-in first tab (the label/value list).
+    enum HyperlinkPreviewTabKind
+    {
+        Fields = 0,
+        Body,
+        Comments
+    };
+
+    // One authored entry in a Comments tab.
+    [default_interface] runtimeclass HyperlinkPreviewComment
+    {
+        HyperlinkPreviewComment();
+
+        String Author;
+        String AvatarUri;
+        String Body;
+        String Time;
+    }
+
+    [default_interface] runtimeclass HyperlinkPreviewTab
+    {
+        HyperlinkPreviewTab();
+
+        String Key;
+        String Label;
+        HyperlinkPreviewTabKind Kind;
+        // Body tabs: the text, and "markdown" or "text" for how to render it.
+        String Body;
+        String Format;
+        Windows.Foundation.Collections.IVector<HyperlinkPreviewComment> Comments;
+    }
+
+    // A value the far end wants before it will accept an action.
+    [default_interface] runtimeclass HyperlinkPreviewActionField
+    {
+        HyperlinkPreviewActionField();
+
+        String Key;
+        String Label;
+        Boolean Required;
+        // Non-empty when the field is a choice of its own.
+        Windows.Foundation.Collections.IVector<String> Options;
+    }
+
+    [default_interface] runtimeclass HyperlinkPreviewActionOption
+    {
+        HyperlinkPreviewActionOption();
+
+        String Id;
+        String Label;
+        String Badge;
+        String Color;
+        Windows.Foundation.Collections.IVector<HyperlinkPreviewActionField> Fields;
+        Boolean NeedsFields { get; };
+    }
+
+    // Something the user can do to the thing behind the link.
+    [default_interface] runtimeclass HyperlinkPreviewAction
+    {
+        HyperlinkPreviewAction();
+
+        String Key;
+        String Label;
+        Windows.Foundation.Collections.IVector<HyperlinkPreviewActionOption> Options;
+    }
+
+    // What running an action did. UndoChoiceId is the option that puts things
+    // back, when the far end offers one; empty when it does not.
+    [default_interface] runtimeclass HyperlinkActionResult
+    {
+        HyperlinkActionResult();
+
+        Boolean Ok;
+        String Error;
+        String UndoChoiceId;
+        String UndoLabel;
     }
 
     // What an integration produced for a hovered link (or text match).
@@ -51,6 +133,12 @@ namespace Microsoft.Terminal.Control
         String Error;
         // For text matches: the URL the match resolves to.
         String ResolvedUri;
+        // Secondary content the user turned on, and the things they can do.
+        Windows.Foundation.Collections.IVector<HyperlinkPreviewTab> Tabs;
+        Windows.Foundation.Collections.IVector<HyperlinkPreviewAction> Actions;
+        // Echoed back so a refresh or an action can be run against the same
+        // thing without the caller having to remember what produced it.
+        String SourceText;
     }
 
     // Implemented by the app (which owns integrations and credentials) and
@@ -62,6 +150,17 @@ namespace Microsoft.Terminal.Control
         // integrationHint: "" = automatic, "none" = never, else an integration id.
         Boolean CanPreview(String text, String integrationHint);
         Windows.Foundation.IAsyncOperation<HyperlinkPreview> GetPreviewAsync(String text, String integrationHint);
+        // Same, but ignores (and replaces) anything cached -- what to call
+        // after an action has changed the thing being previewed.
+        Windows.Foundation.IAsyncOperation<HyperlinkPreview> RefreshAsync(String text, String integrationHint);
+        // Runs one of the preview's actions. choiceId is the picked option for
+        // a Choice action, empty for a Button; fieldValues carries whatever the
+        // option said it needed.
+        Windows.Foundation.IAsyncOperation<HyperlinkActionResult> InvokeActionAsync(String text,
+                                                                                   String integrationHint,
+                                                                                   String actionKey,
+                                                                                   String choiceId,
+                                                                                   Windows.Foundation.Collections.IMap<String, String> fieldValues);
     }
 
     // x:Bind helpers for the card's preview template.

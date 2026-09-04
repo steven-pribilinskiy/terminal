@@ -23,10 +23,8 @@ static constexpr std::string_view CustomExtensionsKey{ "extensions" };
 static constexpr std::string_view ShowDelayKey{ "showDelay" };
 static constexpr std::string_view HideDelayKey{ "hideDelay" };
 static constexpr std::string_view MaxWidthKey{ "maxWidth" };
-static constexpr std::string_view SuppressOpenKey{ "suppressOpen" };
-static constexpr std::string_view SuppressCopyLinkKey{ "suppressCopyLink" };
-static constexpr std::string_view SuppressCopyPathKey{ "suppressCopyPath" };
-static constexpr std::string_view SuppressRevealKey{ "suppressReveal" };
+static constexpr std::string_view ButtonsKey{ "buttons" };
+static constexpr std::string_view ShowInPaneKey{ "showInPane" };
 static constexpr std::string_view CustomActionsKey{ "actions" };
 
 namespace winrt::Microsoft::Terminal::Settings::Model::implementation
@@ -47,10 +45,8 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         JsonUtils::SetValueForKey(json, ShowDelayKey, _TooltipShowDelay);
         JsonUtils::SetValueForKey(json, HideDelayKey, _TooltipHideDelay);
         JsonUtils::SetValueForKey(json, MaxWidthKey, _TooltipMaxWidth);
-        JsonUtils::SetValueForKey(json, SuppressOpenKey, _SuppressOpen);
-        JsonUtils::SetValueForKey(json, SuppressCopyLinkKey, _SuppressCopyLink);
-        JsonUtils::SetValueForKey(json, SuppressCopyPathKey, _SuppressCopyPath);
-        JsonUtils::SetValueForKey(json, SuppressRevealKey, _SuppressReveal);
+        JsonUtils::SetValueForKey(json, ButtonsKey, _Buttons);
+        JsonUtils::SetValueForKey(json, ShowInPaneKey, _ShowInPane);
         JsonUtils::SetValueForKey(json, CustomActionsKey, _CustomActions);
 
         return json;
@@ -72,10 +68,8 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         JsonUtils::GetValueForKey(json, ShowDelayKey, rule->_TooltipShowDelay);
         JsonUtils::GetValueForKey(json, HideDelayKey, rule->_TooltipHideDelay);
         JsonUtils::GetValueForKey(json, MaxWidthKey, rule->_TooltipMaxWidth);
-        JsonUtils::GetValueForKey(json, SuppressOpenKey, rule->_SuppressOpen);
-        JsonUtils::GetValueForKey(json, SuppressCopyLinkKey, rule->_SuppressCopyLink);
-        JsonUtils::GetValueForKey(json, SuppressCopyPathKey, rule->_SuppressCopyPath);
-        JsonUtils::GetValueForKey(json, SuppressRevealKey, rule->_SuppressReveal);
+        JsonUtils::GetValueForKey(json, ButtonsKey, rule->_Buttons);
+        JsonUtils::GetValueForKey(json, ShowInPaneKey, rule->_ShowInPane);
         JsonUtils::GetValueForKey(json, CustomActionsKey, rule->_CustomActions);
 
         return rule;
@@ -94,11 +88,16 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         rule->_TooltipShowDelay = _TooltipShowDelay;
         rule->_TooltipHideDelay = _TooltipHideDelay;
         rule->_TooltipMaxWidth = _TooltipMaxWidth;
-        rule->_SuppressOpen = _SuppressOpen;
-        rule->_SuppressCopyLink = _SuppressCopyLink;
-        rule->_SuppressCopyPath = _SuppressCopyPath;
-        rule->_SuppressReveal = _SuppressReveal;
+        rule->_ShowInPane = _ShowInPane;
 
+        if (_Buttons)
+        {
+            rule->_Buttons = winrt::single_threaded_vector<winrt::hstring>();
+            for (const auto& b : _Buttons)
+            {
+                rule->_Buttons.Append(b);
+            }
+        }
         if (_Schemes)
         {
             rule->_Schemes = winrt::single_threaded_vector<winrt::hstring>();

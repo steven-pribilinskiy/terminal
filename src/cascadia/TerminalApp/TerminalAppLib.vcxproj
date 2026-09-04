@@ -80,6 +80,9 @@
     <Page Include="MarkdownPaneContent.xaml">
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="LinkPreviewPaneContent.xaml">
+      <SubType>Designer</SubType>
+    </Page>
   </ItemGroup>
   <!-- ========================= Headers ======================== -->
   <ItemGroup>
@@ -185,6 +188,9 @@
     </ClInclude>
     <ClInclude Include="MarkdownPaneContent.h">
       <DependentUpon>MarkdownPaneContent.xaml</DependentUpon>
+    </ClInclude>
+    <ClInclude Include="LinkPreviewPaneContent.h">
+      <DependentUpon>LinkPreviewPaneContent.xaml</DependentUpon>
     </ClInclude>
     <ClInclude Include="WindowsPackageManagerFactory.h" />
   </ItemGroup>
@@ -317,6 +323,10 @@
       <DependentUpon>MarkdownPaneContent.xaml</DependentUpon>
       <SubType>Code</SubType>
     </ClCompile>
+    <ClCompile Include="LinkPreviewPaneContent.cpp">
+      <DependentUpon>LinkPreviewPaneContent.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </ClCompile>
 
   </ItemGroup>
   <!-- ========================= idl Files ======================== -->
@@ -386,6 +396,10 @@
     </Midl>
     <Midl Include="MarkdownPaneContent.idl">
       <DependentUpon>MarkdownPaneContent.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Midl>
+    <Midl Include="LinkPreviewPaneContent.idl">
+      <DependentUpon>LinkPreviewPaneContent.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Midl>
   </ItemGroup>

@@ -16,6 +16,9 @@ Abstract:
 #include "IntegrationMatcher.g.h"
 #include "IntegrationFetchStep.g.h"
 #include "IntegrationDisplayField.g.h"
+#include "IntegrationFieldGroup.g.h"
+#include "IntegrationTab.g.h"
+#include "IntegrationAction.g.h"
 #include "IntegrationManifest.g.h"
 #include "JsonUtils.h"
 
@@ -70,6 +73,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         WINRT_PROPERTY(int32_t, TimeoutMs, 8000);
         WINRT_PROPERTY(hstring, When);
         WINRT_PROPERTY(hstring, Unless);
+        WINRT_PROPERTY(bool, Optional, false);
     };
 
     struct IntegrationDisplayField : IntegrationDisplayFieldT<IntegrationDisplayField>
@@ -86,6 +90,62 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         WINRT_PROPERTY(hstring, Color);
         WINRT_PROPERTY(hstring, Format);
         WINRT_PROPERTY(bool, DefaultVisible, false);
+    };
+
+    struct IntegrationFieldGroup : IntegrationFieldGroupT<IntegrationFieldGroup>
+    {
+        IntegrationFieldGroup() noexcept = default;
+        static com_ptr<IntegrationFieldGroup> FromJson(const Json::Value& json);
+
+        WINRT_PROPERTY(hstring, Key);
+        WINRT_PROPERTY(hstring, Label);
+        WINRT_PROPERTY(Windows::Foundation::Collections::IVector<hstring>, Fields);
+    };
+
+    struct IntegrationTab : IntegrationTabT<IntegrationTab>
+    {
+        IntegrationTab() noexcept = default;
+        static com_ptr<IntegrationTab> FromJson(const Json::Value& json);
+
+        WINRT_PROPERTY(hstring, Key);
+        WINRT_PROPERTY(hstring, Label);
+        WINRT_PROPERTY(Model::IntegrationTabKind, Kind, Model::IntegrationTabKind::Body);
+        WINRT_PROPERTY(hstring, Path);
+        WINRT_PROPERTY(hstring, Format);
+        WINRT_PROPERTY(hstring, ItemAuthorPath);
+        WINRT_PROPERTY(hstring, ItemAvatarPath);
+        WINRT_PROPERTY(hstring, ItemBodyPath);
+        WINRT_PROPERTY(hstring, ItemTimePath);
+        WINRT_PROPERTY(bool, DefaultVisible, false);
+    };
+
+    struct IntegrationAction : IntegrationActionT<IntegrationAction>
+    {
+        IntegrationAction() noexcept = default;
+        static com_ptr<IntegrationAction> FromJson(const Json::Value& json);
+
+        WINRT_PROPERTY(hstring, Key);
+        WINRT_PROPERTY(hstring, Label);
+        WINRT_PROPERTY(Model::IntegrationActionKind, Kind, Model::IntegrationActionKind::Button);
+
+        WINRT_PROPERTY(hstring, OptionsPath);
+        WINRT_PROPERTY(hstring, OptionIdPath);
+        WINRT_PROPERTY(hstring, OptionLabelPath);
+        WINRT_PROPERTY(hstring, OptionBadgePath);
+        WINRT_PROPERTY(hstring, OptionColorPath);
+        WINRT_PROPERTY(hstring, OptionTargetIdPath);
+        WINRT_PROPERTY(hstring, CurrentStatePath);
+        WINRT_PROPERTY(hstring, OptionFieldsPath);
+
+        WINRT_PROPERTY(hstring, Method);
+        WINRT_PROPERTY(hstring, Url);
+        WINRT_PROPERTY(hstring, Body);
+        WINRT_PROPERTY(IntegrationHeaderMap, Headers);
+        WINRT_PROPERTY(hstring, AuthType);
+        WINRT_PROPERTY(hstring, AuthUser);
+        WINRT_PROPERTY(hstring, AuthPassword);
+        WINRT_PROPERTY(bool, AllowUntrustedCertificate, false);
+        WINRT_PROPERTY(int32_t, TimeoutMs, 8000);
     };
 
     struct IntegrationManifest : IntegrationManifestT<IntegrationManifest>
@@ -110,6 +170,10 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         WINRT_PROPERTY(Windows::Foundation::Collections::IVector<Model::IntegrationMatcher>, Matchers);
         WINRT_PROPERTY(Windows::Foundation::Collections::IVector<Model::IntegrationFetchStep>, FetchSteps);
         WINRT_PROPERTY(Windows::Foundation::Collections::IVector<Model::IntegrationDisplayField>, Fields);
+        WINRT_PROPERTY(Windows::Foundation::Collections::IVector<Model::IntegrationFieldGroup>, FieldGroups);
+        WINRT_PROPERTY(Windows::Foundation::Collections::IVector<Model::IntegrationTab>, Tabs);
+        WINRT_PROPERTY(Windows::Foundation::Collections::IVector<Model::IntegrationAction>, Actions);
+        WINRT_PROPERTY(Windows::Foundation::Collections::IVector<hstring>, DetectPatterns);
     };
 }
 
@@ -119,6 +183,9 @@ namespace winrt::Microsoft::Terminal::Settings::Model::factory_implementation
     BASIC_FACTORY(IntegrationMatcher);
     BASIC_FACTORY(IntegrationFetchStep);
     BASIC_FACTORY(IntegrationDisplayField);
+    BASIC_FACTORY(IntegrationFieldGroup);
+    BASIC_FACTORY(IntegrationTab);
+    BASIC_FACTORY(IntegrationAction);
     BASIC_FACTORY(IntegrationManifest);
 }
 
@@ -154,6 +221,9 @@ namespace Microsoft::Terminal::Settings::Model::JsonUtils
     INTEGRATION_READONLY_CONVERSION_TRAIT(IntegrationMatcher)
     INTEGRATION_READONLY_CONVERSION_TRAIT(IntegrationFetchStep)
     INTEGRATION_READONLY_CONVERSION_TRAIT(IntegrationDisplayField)
+    INTEGRATION_READONLY_CONVERSION_TRAIT(IntegrationFieldGroup)
+    INTEGRATION_READONLY_CONVERSION_TRAIT(IntegrationTab)
+    INTEGRATION_READONLY_CONVERSION_TRAIT(IntegrationAction)
 }
 
 #undef INTEGRATION_READONLY_CONVERSION_TRAIT

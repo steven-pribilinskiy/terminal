@@ -163,6 +163,13 @@ namespace winrt::TerminalApp::implementation
 
         Microsoft::Terminal::Settings::Model::TabCloseButtonVisibility _closeButtonVisibility{ Microsoft::Terminal::Settings::Model::TabCloseButtonVisibility::Always };
 
+        // paneTitlebarVisibility is a per-window setting, and UpdateSettings is the
+        // only place we're handed the window settings. Remember it so the split,
+        // close and focus paths can re-apply it without them.
+        winrt::Microsoft::Terminal::Settings::Model::PaneTitlebarVisibility _paneTitlebarVisibility{
+            winrt::Microsoft::Terminal::Settings::Model::PaneTitlebarVisibility::MultiplePanes
+        };
+
         std::shared_ptr<Pane> _rootPane{ nullptr };
         std::shared_ptr<Pane> _activePane{ nullptr };
         std::shared_ptr<Pane> _zoomedPane{ nullptr };
@@ -226,6 +233,7 @@ namespace winrt::TerminalApp::implementation
         void _AttachEventHandlersToPane(std::shared_ptr<Pane> pane);
 
         void _UpdateActivePane(std::shared_ptr<Pane> pane);
+        void _UpdatePaneTitlebarVisibility();
         void _UpdateMenuItemStates();
 
         winrt::hstring _GetActiveTitle() const;

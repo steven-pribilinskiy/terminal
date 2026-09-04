@@ -110,7 +110,7 @@ public:
 
     void UpdateSettings(const winrt::Microsoft::Terminal::Settings::Model::CascadiaSettings& settings,
                         const winrt::Microsoft::Terminal::Settings::Model::WindowSettings& windowSettings);
-    bool ResizePane(const winrt::Microsoft::Terminal::Settings::Model::ResizeDirection& direction);
+    bool ResizePane(const winrt::Microsoft::Terminal::Settings::Model::ResizeDirection& direction, const float amount);
     std::shared_ptr<Pane> NavigateDirection(const std::shared_ptr<Pane> sourcePane,
                                             const winrt::Microsoft::Terminal::Settings::Model::FocusDirection& direction,
                                             const std::vector<uint32_t>& mruPanes);
@@ -151,6 +151,15 @@ public:
     bool ContainsReadOnly() const;
 
     void EnableBroadcast(bool enabled);
+
+    // Applies the tab's paneTitlebarVisibility setting to this pane and all of
+    // its descendants. tabHasMultiplePanes is what the "multiplePanes" value
+    // means - the owning Tab is the only thing that knows it, so it passes it in
+    // alongside the enum, and every pane remembers both so that a pane promoted
+    // to a leaf during a close can restore its own header without being told again.
+    void SetPaneTitlebarVisibility(const winrt::Microsoft::Terminal::Settings::Model::PaneTitlebarVisibility visibility,
+                                   const bool tabHasMultiplePanes);
+
     void BroadcastKey(const winrt::Microsoft::Terminal::Control::TermControl& sourceControl, const WORD vkey, const WORD scanCode, const winrt::Microsoft::Terminal::Core::ControlKeyStates modifiers, const bool keyDown);
     void BroadcastChar(const winrt::Microsoft::Terminal::Control::TermControl& sourceControl, const wchar_t vkey, const WORD scanCode, const winrt::Microsoft::Terminal::Core::ControlKeyStates modifiers);
     void BroadcastString(const winrt::Microsoft::Terminal::Control::TermControl& sourceControl, const winrt::hstring& text);
@@ -236,6 +245,44 @@ private:
     winrt::Windows::UI::Xaml::Controls::Border _borderFirst{};
     winrt::Windows::UI::Xaml::Controls::Border _borderSecond{};
 
+    // The per-leaf title header. It lives in row 0 of this pane's own _root, with
+    // _borderFirst (and therefore the content) in row 1. These are created eagerly
+    // rather than on demand so that _setPaneContent can hand the TextBlock to the
+    // TitleChanged handler without capturing `this`.
+    winrt::Windows::UI::Xaml::Controls::Border _paneHeaderBorder{};
+    winrt::Windows::UI::Xaml::Controls::TextBlock _paneHeaderText{};
+    winrt::Windows::UI::Xaml::Controls::RowDefinition _paneHeaderRow{ nullptr };
+    bool _paneHeaderInitialized{ false };
+
+    // The mouse-draggable divider. Only parent panes have one; the elements are
+    // created on the first split and re-attached to _root every time our children
+    // are re-parented.
+    winrt::Windows::UI::Xaml::Controls::Border _dividerPointerTarget{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::Border _dividerVisual{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::Primitives::Thumb _dividerThumb{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::Border _snapIndicator{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::TextBlock _snapIndicatorText{ nullptr };
+    // Every handler we add lives behind a revoker: these elements are in the live
+    // visual tree and can outlive the Pane by a frame, and all of the handlers
+    // below capture `this`.
+    winrt::Windows::UI::Xaml::FrameworkElement::SizeChanged_revoker _rootSizeChangedRevoker;
+    winrt::Windows::UI::Xaml::UIElement::PointerPressed_revoker _dividerPointerPressedRevoker;
+    winrt::Windows::UI::Xaml::UIElement::PointerMoved_revoker _dividerPointerMovedRevoker;
+    winrt::Windows::UI::Xaml::UIElement::PointerReleased_revoker _dividerPointerReleasedRevoker;
+    winrt::Windows::UI::Xaml::UIElement::PointerCanceled_revoker _dividerPointerCanceledRevoker;
+    winrt::Windows::UI::Xaml::UIElement::PointerCaptureLost_revoker _dividerPointerCaptureLostRevoker;
+    winrt::Windows::UI::Xaml::UIElement::PointerEntered_revoker _dividerPointerEnteredRevoker;
+    winrt::Windows::UI::Xaml::UIElement::PointerExited_revoker _dividerPointerExitedRevoker;
+    winrt::Windows::UI::Xaml::UIElement::KeyDown_revoker _dividerKeyDownRevoker;
+    winrt::Windows::UI::Xaml::UIElement::PointerPressed_revoker _headerPointerPressedRevoker;
+    winrt::Windows::UI::Xaml::UIElement::Tapped_revoker _headerTappedRevoker;
+    winrt::Windows::UI::Xaml::UIElement::RightTapped_revoker _headerRightTappedRevoker;
+
+    std::optional<uint32_t> _resizePointerId;
+    float _resizeStartPosition{ 0.0f };
+    bool _dividerPointerOver{ false };
+    bool _highContrast{ false };
+
     PaneResources _themeResources;
 
 #pragma region Properties that need to be transferred between child / parent panes upon splitting / closing
@@ -256,6 +303,12 @@ private:
     winrt::Windows::UI::Xaml::UIElement::GotFocus_revoker _gotFocusRevoker;
     winrt::Windows::UI::Xaml::UIElement::LostFocus_revoker _lostFocusRevoker;
     winrt::TerminalApp::IPaneContent::CloseRequested_revoker _closeRequestedRevoker;
+    winrt::TerminalApp::IPaneContent::TitleChanged_revoker _titleChangedRevoker;
+
+    winrt::Microsoft::Terminal::Settings::Model::PaneTitlebarVisibility _titlebarVisibility{
+        winrt::Microsoft::Terminal::Settings::Model::PaneTitlebarVisibility::MultiplePanes
+    };
+    bool _tabHasMultiplePanes{ false };
 
     Borders _borders{ Borders::None };
 
@@ -281,7 +334,29 @@ private:
     Borders _GetCommonBorders();
     winrt::Windows::UI::Xaml::Media::SolidColorBrush _ComputeBorderColor();
 
-    bool _Resize(const winrt::Microsoft::Terminal::Settings::Model::ResizeDirection& direction);
+    // Per-leaf title header.
+    void _CreatePaneHeader();
+    void _SetupLeafLayout(const winrt::Windows::UI::Xaml::UIElement& control);
+    void _ApplyPaneTitlebarVisibility();
+    void _UpdatePaneHeaderText();
+    void _UpdatePaneHeaderBrush();
+    void _PaneHeaderClicked();
+    bool _PaneHeaderVisible() const noexcept;
+    float _PaneHeaderHeight() const noexcept;
+    static winrt::hstring _ResolvePaneTitle(const winrt::TerminalApp::IPaneContent& content,
+                                            const winrt::Microsoft::Terminal::Settings::Model::Profile& profile);
+
+    // Mouse-draggable divider.
+    void _CreateDividerElements();
+    void _AttachDividerElements();
+    void _UpdateDividerPlacement();
+    void _UpdateDividerBrush();
+    void _SetResizeCursor(const bool sizing);
+    void _DividerPointerPressed(const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+    void _DividerPointerMoved(const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+    void _EndDividerResize(const bool cancel, const winrt::Windows::UI::Xaml::Input::Pointer& pointer);
+
+    bool _Resize(const winrt::Microsoft::Terminal::Settings::Model::ResizeDirection& direction, const float amount);
 
     std::shared_ptr<Pane> _FindParentOfPane(const std::shared_ptr<Pane> pane);
     std::pair<PanePoint, PanePoint> _GetOffsetsForPane(const PanePoint parentOffset) const;

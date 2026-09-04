@@ -51,6 +51,12 @@ namespace winrt::TerminalApp::implementation
         winrt::hstring ResolveLink(const winrt::hstring& text);
         bool CanPreview(const winrt::hstring& text, const winrt::hstring& integrationHint);
         winrt::Windows::Foundation::IAsyncOperation<winrt::Microsoft::Terminal::Control::HyperlinkPreview> GetPreviewAsync(winrt::hstring text, winrt::hstring integrationHint);
+        winrt::Windows::Foundation::IAsyncOperation<winrt::Microsoft::Terminal::Control::HyperlinkPreview> RefreshAsync(winrt::hstring text, winrt::hstring integrationHint);
+        winrt::Windows::Foundation::IAsyncOperation<winrt::Microsoft::Terminal::Control::HyperlinkActionResult> InvokeActionAsync(winrt::hstring text,
+                                                                                                                                 winrt::hstring integrationHint,
+                                                                                                                                 winrt::hstring actionKey,
+                                                                                                                                 winrt::hstring choiceId,
+                                                                                                                                 winrt::Windows::Foundation::Collections::IMap<winrt::hstring, winrt::hstring> fieldValues);
 
     private:
         struct CacheEntry
@@ -59,9 +65,16 @@ namespace winrt::TerminalApp::implementation
             std::chrono::steady_clock::time_point Expiry{};
         };
 
+        // GetPreviewAsync and RefreshAsync differ only in whether they are
+        // allowed to answer from the cache.
+        winrt::Windows::Foundation::IAsyncOperation<winrt::Microsoft::Terminal::Control::HyperlinkPreview> _previewAsync(winrt::hstring text,
+                                                                                                                        winrt::hstring integrationHint,
+                                                                                                                        bool bypassCache);
+
         std::shared_ptr<const HyperlinkPreviewSnapshot> _currentSnapshot() const;
         winrt::Microsoft::Terminal::Control::HyperlinkPreview _cacheLookup(const std::wstring& key);
         void _cacheStore(const std::wstring& key, const winrt::Microsoft::Terminal::Control::HyperlinkPreview& preview, int32_t seconds);
+        void _cacheErase(const std::wstring& key);
 
         mutable std::mutex _mutex;
         std::shared_ptr<const HyperlinkPreviewSnapshot> _snapshot;

@@ -24,9 +24,24 @@ namespace Microsoft.Terminal.Settings.Editor
         String DisplayName { get; };
     }
 
+    // One of the five built-in buttons a hyperlink card can carry. Selected
+    // reads and writes the id list it belongs to -- the global default list or
+    // one rule's override -- so there is no second copy of the state to keep in
+    // sync, and the list is always rewritten in the order the card draws them.
+    [default_interface] runtimeclass ButtonChoiceViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
+    {
+        String Id { get; };
+        String Label { get; };
+        Boolean Selected;
+    }
+
     [default_interface] runtimeclass HyperlinkTooltipRuleViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
     {
-        HyperlinkTooltipRuleViewModel(Microsoft.Terminal.Settings.Model.HyperlinkTooltipRule rule);
+        // The window settings come along because a rule's overrides are shown
+        // against what they inherit: ticking "override buttons" starts from the
+        // global list rather than from nothing.
+        HyperlinkTooltipRuleViewModel(Microsoft.Terminal.Settings.Model.HyperlinkTooltipRule rule,
+                                      Microsoft.Terminal.Settings.Model.WindowSettings windowSettings);
 
         String Name;
         Boolean Enabled;
@@ -65,10 +80,15 @@ namespace Microsoft.Terminal.Settings.Editor
         Boolean OverrideMaxWidth;
         Int32 MaxWidth;
 
-        Boolean SuppressOpen;
-        Boolean SuppressCopyLink;
-        Boolean SuppressCopyPath;
-        Boolean SuppressReveal;
+        // Which built-in buttons this rule's card carries. An empty list on the
+        // rule inherits the global list, so the checkboxes are only live once
+        // OverrideButtons is on.
+        Boolean OverrideButtons;
+        Windows.Foundation.Collections.IObservableVector<ButtonChoiceViewModel> ButtonChoices { get; };
+
+        // Same nullable-override shape as OverrideShowDelay/ShowDelay above.
+        Boolean OverrideShowInPane;
+        Boolean ShowInPane;
 
         Windows.Foundation.Collections.IObservableVector<HyperlinkTooltipActionViewModel> CustomActions { get; };
         HyperlinkTooltipActionViewModel RequestAddCustomAction();
@@ -85,11 +105,19 @@ namespace Microsoft.Terminal.Settings.Editor
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, HyperlinkTooltipShowDelay);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, HyperlinkTooltipHideDelay);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, HyperlinkTooltipActions);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, HyperlinkTooltipHint);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, HyperlinkPreviewInPane);
         String SafeUriSchemes;
+
+        // The global button list every rule inherits unless it overrides it.
+        Windows.Foundation.Collections.IObservableVector<ButtonChoiceViewModel> ButtonChoices { get; };
 
         Windows.Foundation.Collections.IObservableVector<HyperlinkTooltipRuleViewModel> CurrentView { get; };
         HyperlinkTooltipRuleViewModel CurrentRule;
         Boolean IsEditingRule { get; };
+        Boolean IsNotEditingRule { get; };
+        // The name of the rule being edited, so the breadcrumb can follow a rename.
+        String CurrentRuleName { get; };
 
         void RequestReorderRule(HyperlinkTooltipRuleViewModel vm, Boolean goingUp);
         void RequestDeleteRule(HyperlinkTooltipRuleViewModel vm);

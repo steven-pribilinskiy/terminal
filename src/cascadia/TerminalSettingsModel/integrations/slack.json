@@ -10,7 +10,8 @@
             "key": "token",
             "label": "Bot token",
             "description": "An xoxb- token from a Slack app installed in the workspace, with channels:history, groups:history and users:read. The bot must be a member of a channel to read it.",
-            "secret": true
+            "secret": true,
+            "required": true
         }
     ],
     "matchers": [

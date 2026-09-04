@@ -3593,6 +3593,44 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         _scheduleHyperlinkCardHide();
     }
 
+    // Turns a list of button ids into the five bools the card actually reads. An
+    // unknown id is ignored rather than rejected: the settings model is free to grow
+    // a sixth button without this becoming the place that refuses to show it.
+    void TermControl::_applyHyperlinkButtonList(EffectiveHyperlinkTooltipSettings& effective,
+                                                const Windows::Foundation::Collections::IVector<winrt::hstring>& buttons)
+    {
+        effective.showOpen = false;
+        effective.showCopyLink = false;
+        effective.showCopyPath = false;
+        effective.showReveal = false;
+        effective.showInPane = false;
+
+        for (const auto& button : buttons)
+        {
+            const std::wstring_view id{ button };
+            if (til::equals_insensitive_ascii(id, L"open"))
+            {
+                effective.showOpen = true;
+            }
+            else if (til::equals_insensitive_ascii(id, L"copyLink"))
+            {
+                effective.showCopyLink = true;
+            }
+            else if (til::equals_insensitive_ascii(id, L"copyPath"))
+            {
+                effective.showCopyPath = true;
+            }
+            else if (til::equals_insensitive_ascii(id, L"reveal"))
+            {
+                effective.showReveal = true;
+            }
+            else if (til::equals_insensitive_ascii(id, L"showInPane"))
+            {
+                effective.showInPane = true;
+            }
+        }
+    }
+
     // Walks HyperlinkTooltipRules in order and returns the show/hide delay, max width,
     // built-in button visibility and custom action list that should actually be used for
     // the given hovered link -- the global settings, overridden by the first enabled rule
@@ -3607,11 +3645,25 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             .showDelay = std::max(0, settings.HyperlinkTooltipShowDelay()),
             .hideDelay = std::max(0, settings.HyperlinkTooltipHideDelay()),
             .maxWidth = settings.HyperlinkTooltipMaxWidth(),
-            .showOpen = actionsEnabled,
-            .showCopyLink = actionsEnabled,
-            .showCopyPath = actionsEnabled,
-            .showReveal = actionsEnabled,
+            .preferPane = settings.HyperlinkPreviewInPane(),
+            .showHint = settings.HyperlinkTooltipHint(),
         };
+
+        // The global choice, which a matching rule may replace wholesale below. An
+        // unset list is the shipped default rather than "show nothing": a control
+        // whose settings never reached the adapter would otherwise lose every button.
+        if (actionsEnabled)
+        {
+            if (const auto globalButtons = settings.HyperlinkTooltipButtons(); globalButtons && globalButtons.Size() > 0)
+            {
+                _applyHyperlinkButtonList(effective, globalButtons);
+            }
+            else
+            {
+                effective.showCopyLink = true;
+                effective.showInPane = true;
+            }
+        }
 
         const auto rules = settings.HyperlinkTooltipRules();
         if (!rules || uri.empty())
@@ -3756,10 +3808,19 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             {
                 effective.maxWidth = maxWidth.Value();
             }
-            effective.showOpen = effective.showOpen && !rule.SuppressOpen();
-            effective.showCopyLink = effective.showCopyLink && !rule.SuppressCopyLink();
-            effective.showCopyPath = effective.showCopyPath && !rule.SuppressCopyPath();
-            effective.showReveal = effective.showReveal && !rule.SuppressReveal();
+            // A rule's own button list replaces the global one outright; an empty
+            // list means "inherit", which is why it is tested before being applied.
+            if (actionsEnabled)
+            {
+                if (const auto ruleButtons = rule.Buttons(); ruleButtons && ruleButtons.Size() > 0)
+                {
+                    _applyHyperlinkButtonList(effective, ruleButtons);
+                }
+            }
+            if (const auto showInPane = rule.ShowInPane())
+            {
+                effective.preferPane = showInPane.Value();
+            }
 
             if (actionsEnabled)
             {
@@ -3785,11 +3846,20 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
     void TermControl::_hoveredHyperlinkChanged(const IInspectable& /*sender*/, const IInspectable& /*args*/)
     {
+        // A link preview pane is showing "pane only". The card is off entirely until
+        // it goes away again -- not merely emptied, since the point of the switch is
+        // that nothing follows the pointer around any more.
+        if (_hyperlinkTooltipsSuppressed)
+        {
+            return;
+        }
+
         const auto lastHoveredCell = _core.HoveredCell();
         auto uriText = lastHoveredCell ? _core.HoveredUriText() : hstring{};
         if (uriText.empty())
         {
             // Off the link. Don't hide at once -- the pointer may be on its way to the card.
+            _lastPanePreviewUri = {};
             _scheduleHyperlinkCardHide();
             return;
         }
@@ -3800,7 +3870,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // is only reporting whatever hyperlink sits on the terminal cell behind the card, not
         // something the user is actually pointing at. Ignore it entirely -- don't touch the
         // card's text, buttons, or position -- until the pointer actually leaves the card.
-        if (_pointerInHyperlinkCard && HyperlinkCard().Visibility() == Visibility::Visible)
+        // The options dropdown is the same case: its popup is not part of the card, so
+        // the pointer being on the list reads as "not over the card" here too.
+        if ((_pointerInHyperlinkCard || _hyperlinkActionDropDownOpen) && HyperlinkCard().Visibility() == Visibility::Visible)
         {
             return;
         }
@@ -3816,6 +3888,23 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // say), which Windows::Foundation::Uri below would reject outright.
         const auto target = _resolvedHyperlinkTarget();
         _currentHyperlinkTooltipSettings = _effectiveHyperlinkTooltipSettings(_hoveredUri, !target.empty());
+
+        // When the pane is the preferred surface, hovering opens one instead of the
+        // card. Nothing below this point runs: there is no card to fill in, and the
+        // pane fetches its own copy of the preview from the same provider. The
+        // last-raised check matters because this fires on every pointer move across
+        // the link, and re-asking would refetch the same thing dozens of times.
+        if (_currentHyperlinkTooltipSettings.preferPane)
+        {
+            _hideHyperlinkCard();
+            if (_lastPanePreviewUri != _hoveredUri)
+            {
+                _lastPanePreviewUri = _hoveredUri;
+                _raiseShowHyperlinkPreviewRequested();
+            }
+            return;
+        }
+        _lastPanePreviewUri = {};
 
         // A preview belongs to exactly one hover. Drop the last one before anything below
         // reads it, and move the generation on so a fetch still in flight for the previous
@@ -3902,6 +3991,15 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         const auto fileReveal = !target.empty() && _currentHyperlinkTooltipSettings.showReveal;
         HyperlinkCopyPathButton().Visibility(fileActions ? Visibility::Visible : Visibility::Collapsed);
         HyperlinkRevealButton().Visibility(fileReveal ? Visibility::Visible : Visibility::Collapsed);
+        // Show in pane needs somewhere to send the request and something worth
+        // sending: a link nobody can preview would open an empty pane.
+        HyperlinkShowInPaneButton().Visibility(_currentHyperlinkTooltipSettings.showInPane ? Visibility::Visible : Visibility::Collapsed);
+
+        // The hint is about following the link, so it only makes sense when there is
+        // a link to follow -- and only when the user has asked to keep it.
+        HowToOpenRun().Visibility(_currentHyperlinkTooltipSettings.showHint && !_currentHyperlinkTooltipSettings.isTextMatch ?
+                                      Visibility::Visible :
+                                      Visibility::Collapsed);
 
         // Ask the integration layer for a preview, if one is possible at all: the provider
         // is only set once the app has integrations, the matched rule may have opted out,
@@ -4041,7 +4139,31 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         HyperlinkCardPreviewIcon().Content(nullptr);
         HyperlinkCardPreviewError().Text(winrt::hstring{});
         HyperlinkCardPreviewError().Visibility(Visibility::Collapsed);
-        HyperlinkCardPreviewFields().ItemsSource(nullptr);
+        HyperlinkCardPreviewFields().Children().Clear();
+        HyperlinkCardPreviewFields().RowDefinitions().Clear();
+        HyperlinkCardComments().Children().Clear();
+        HyperlinkCardBody().Text(winrt::hstring{});
+
+        // Tabs and actions belong to the result that declared them, so both go with it.
+        _currentHyperlinkAction = nullptr;
+        _hyperlinkUndoChoiceId = {};
+        _hyperlinkSelectedTab = -1;
+        HyperlinkCardTabStrip().Children().Clear();
+        HyperlinkCardTabStrip().Visibility(Visibility::Collapsed);
+        HyperlinkCardActionRow().Visibility(Visibility::Collapsed);
+        HyperlinkActionOptions().Items().Clear();
+        HyperlinkActionFields().Children().Clear();
+        HyperlinkActionFields().Visibility(Visibility::Collapsed);
+        HyperlinkActionUndoButton().Visibility(Visibility::Collapsed);
+        // A previous action may have relabelled Undo with the far end's own wording.
+        // The next link is a different thing entirely, so put the button's own label back.
+        if (_hyperlinkUndoDefaultContent)
+        {
+            HyperlinkActionUndoButton().Content(_hyperlinkUndoDefaultContent);
+        }
+        HyperlinkActionError().Visibility(Visibility::Collapsed);
+        _setHyperlinkActionBusy(false);
+        _showHyperlinkTab(-1);
         _hideHyperlinkHtml();
 
         HyperlinkCardPreviewProgress().IsActive(loading);
@@ -4116,19 +4238,11 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         HyperlinkCardPreviewError().Text(error);
         HyperlinkCardPreviewError().Visibility(error.empty() ? Visibility::Collapsed : Visibility::Visible);
 
-        // Same runtime-enumerable shape as the custom actions list in
-        // _showHyperlinkCard: XAML needs IBindableVector, not IVector<T>.
         try
         {
-            auto fields = winrt::single_threaded_observable_vector<IInspectable>();
-            if (const auto source = preview.Fields())
-            {
-                for (const auto& field : source)
-                {
-                    fields.Append(field);
-                }
-            }
-            HyperlinkCardPreviewFields().ItemsSource(fields);
+            _fillHyperlinkFields(preview);
+            _rebuildHyperlinkTabStrip(preview);
+            _rebuildHyperlinkActions(preview);
         }
         CATCH_LOG();
         HyperlinkCardPreview().Visibility(Visibility::Visible);
@@ -4149,7 +4263,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             htmlHost.MinWidth(240);
             htmlHost.Height(static_cast<double>(_hyperlinkHtmlHeight));
             htmlHost.Visibility(Visibility::Visible);
-            HyperlinkCardPreviewFields().Visibility(Visibility::Collapsed);
+            HyperlinkCardFieldsScroll().Visibility(Visibility::Collapsed);
         }
         else
         {
@@ -4242,7 +4356,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         _hyperlinkHtmlHost->Hide();
         HyperlinkCardHtmlHost().Visibility(Visibility::Collapsed);
-        HyperlinkCardPreviewFields().Visibility(Visibility::Visible);
+        HyperlinkCardFieldsScroll().Visibility(_hyperlinkSelectedTab < 0 ? Visibility::Visible : Visibility::Collapsed);
     }
 
     // The page measured itself and said how tall it wants to be. Clamped, because a card is
@@ -4407,6 +4521,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         _hyperlinkShowTimer.Stop();
         _hyperlinkHideTimer.Stop();
         _pointerInHyperlinkCard = false;
+        _hyperlinkActionDropDownOpen = false;
         // A preview still in flight belongs to a hover that is over. Moving the generation on
         // is what sends its result to the bin instead of into a card shown for something else.
         ++_hyperlinkPreviewGeneration;
@@ -4419,7 +4534,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     {
         _hyperlinkShowTimer.Stop();
 
-        if (_pointerInHyperlinkCard || HyperlinkCard().Visibility() != Visibility::Visible)
+        if (_pointerInHyperlinkCard || _hyperlinkActionDropDownOpen || HyperlinkCard().Visibility() != Visibility::Visible)
         {
             return;
         }
@@ -4530,6 +4645,722 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             }
         }
         _hideHyperlinkCard();
+    }
+
+    // Ask the app to put this link's preview in a pane. The card is not the place
+    // for the answer, so it goes away; the integration hint travels with the request
+    // so the pane resolves the same link with the same integration the card used.
+    void TermControl::_raiseShowHyperlinkPreviewRequested()
+    {
+        if (_hoveredUri.empty())
+        {
+            return;
+        }
+
+        ShowHyperlinkPreviewRequested.raise(*this,
+                                            winrt::make<ShowHyperlinkPreviewRequestedEventArgs>(_hoveredUri,
+                                                                                                _currentHyperlinkTooltipSettings.integration));
+    }
+
+    void TermControl::_HyperlinkShowInPaneClick(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
+    {
+        _raiseShowHyperlinkPreviewRequested();
+        _hideHyperlinkCard();
+    }
+
+    // The pane's "pane only" switch. Nothing is torn down: the card simply stops
+    // being shown, and starts again the moment this is cleared.
+    void TermControl::HyperlinkTooltipsSuppressed(bool suppressed)
+    {
+        _hyperlinkTooltipsSuppressed = suppressed;
+        if (suppressed)
+        {
+            _hideHyperlinkCard();
+        }
+    }
+
+    // One Grid row per field. This is built in code rather than by an ItemsControl
+    // with a DataTemplate because the labels have to line up with each other: a
+    // single Grid gives every row the same Auto-sized first column, and UWP XAML has
+    // no SharedSizeGroup with which to reach that across separate per-row Grids.
+    void TermControl::_fillHyperlinkFields(const Control::HyperlinkPreview& preview)
+    {
+        const auto grid = HyperlinkCardPreviewFields();
+        grid.Children().Clear();
+        grid.RowDefinitions().Clear();
+
+        const auto fields = preview ? preview.Fields() : nullptr;
+        if (!fields)
+        {
+            return;
+        }
+
+        auto row = 0;
+        for (const auto& field : fields)
+        {
+            if (!field)
+            {
+                continue;
+            }
+
+            Controls::RowDefinition rowDefinition;
+            rowDefinition.Height(GridLength{ 0, GridUnitType::Auto });
+            grid.RowDefinitions().Append(rowDefinition);
+
+            if (field.IsTitle())
+            {
+                // A title is the subject of the card, not a labelled row, so it spans
+                // both columns and wraps inside whatever width the card ended up with.
+                Controls::TextBlock title;
+                title.Text(field.Value());
+                title.FontWeight(Windows::UI::Text::FontWeight{ 600 });
+                title.TextWrapping(TextWrapping::Wrap);
+                title.MaxLines(3);
+                title.IsTextSelectionEnabled(true);
+                Controls::Grid::SetRow(title, row);
+                Controls::Grid::SetColumn(title, 0);
+                Controls::Grid::SetColumnSpan(title, 2);
+                grid.Children().Append(title);
+                ++row;
+                continue;
+            }
+
+            Controls::TextBlock label;
+            label.Text(field.Label());
+            label.Opacity(0.7);
+            label.VerticalAlignment(VerticalAlignment::Top);
+            label.TextWrapping(TextWrapping::Wrap);
+            Controls::Grid::SetRow(label, row);
+            Controls::Grid::SetColumn(label, 0);
+            grid.Children().Append(label);
+
+            // The value cell is a Grid and not a horizontal StackPanel: a horizontal
+            // StackPanel measures its children with infinite width, so TextWrapping
+            // never takes effect and one long value drags the whole card to MaxWidth.
+            Controls::Grid cell;
+            cell.ColumnSpacing(6);
+            {
+                Controls::ColumnDefinition iconColumn;
+                iconColumn.Width(GridLength{ 0, GridUnitType::Auto });
+                cell.ColumnDefinitions().Append(iconColumn);
+
+                Controls::ColumnDefinition valueColumn;
+                valueColumn.Width(GridLength{ 1, GridUnitType::Star });
+                cell.ColumnDefinitions().Append(valueColumn);
+            }
+
+            if (field.HasIcon())
+            {
+                Controls::Image icon;
+                icon.Width(16);
+                icon.Height(16);
+                icon.VerticalAlignment(VerticalAlignment::Top);
+                icon.Margin(Thickness{ 0, 2, 0, 0 });
+                icon.Source(HyperlinkPreviewHelpers::ImageFromUri(field.IconUri()));
+                Controls::Grid::SetColumn(icon, 0);
+                cell.Children().Append(icon);
+            }
+
+            if (field.IsBadge())
+            {
+                Controls::Border badge;
+                badge.Padding(Thickness{ 6, 1, 6, 1 });
+                badge.CornerRadius(Windows::UI::Xaml::CornerRadius{ 4, 4, 4, 4 });
+                badge.Background(HyperlinkPreviewHelpers::BadgeBrush(field.Color()));
+                badge.HorizontalAlignment(HorizontalAlignment::Left);
+                badge.VerticalAlignment(VerticalAlignment::Top);
+
+                Controls::TextBlock badgeText;
+                badgeText.FontSize(12);
+                badgeText.Text(field.Value());
+                badge.Child(badgeText);
+
+                Controls::Grid::SetColumn(badge, 1);
+                cell.Children().Append(badge);
+            }
+            else
+            {
+                Controls::TextBlock value;
+                value.Text(field.Value());
+                value.TextWrapping(TextWrapping::Wrap);
+                value.MaxLines(6);
+                value.IsTextSelectionEnabled(true);
+                Controls::Grid::SetColumn(value, 1);
+                cell.Children().Append(value);
+            }
+
+            Controls::Grid::SetRow(cell, row);
+            Controls::Grid::SetColumn(cell, 1);
+            grid.Children().Append(cell);
+            ++row;
+        }
+    }
+
+    void TermControl::_fillHyperlinkComments(const Control::HyperlinkPreviewTab& tab)
+    {
+        const auto host = HyperlinkCardComments();
+        host.Children().Clear();
+
+        const auto comments = tab ? tab.Comments() : nullptr;
+        if (!comments)
+        {
+            return;
+        }
+
+        for (const auto& comment : comments)
+        {
+            if (!comment)
+            {
+                continue;
+            }
+
+            Controls::Grid entry;
+            entry.ColumnSpacing(6);
+            {
+                Controls::ColumnDefinition avatarColumn;
+                avatarColumn.Width(GridLength{ 0, GridUnitType::Auto });
+                entry.ColumnDefinitions().Append(avatarColumn);
+
+                Controls::ColumnDefinition bodyColumn;
+                bodyColumn.Width(GridLength{ 1, GridUnitType::Star });
+                entry.ColumnDefinitions().Append(bodyColumn);
+            }
+
+            if (const auto avatar = comment.AvatarUri(); !avatar.empty())
+            {
+                Controls::Image image;
+                image.Width(20);
+                image.Height(20);
+                image.VerticalAlignment(VerticalAlignment::Top);
+                image.Source(HyperlinkPreviewHelpers::ImageFromUri(avatar));
+                Controls::Grid::SetColumn(image, 0);
+                entry.Children().Append(image);
+            }
+
+            Controls::StackPanel text;
+            text.Spacing(2);
+
+            Controls::TextBlock heading;
+            auto headingText = std::wstring{ comment.Author() };
+            if (const auto time = comment.Time(); !time.empty())
+            {
+                if (!headingText.empty())
+                {
+                    headingText.append(L" · ");
+                }
+                headingText.append(std::wstring_view{ time });
+            }
+            heading.Text(winrt::hstring{ headingText });
+            heading.Opacity(0.7);
+            heading.FontSize(12);
+            heading.TextWrapping(TextWrapping::Wrap);
+            text.Children().Append(heading);
+
+            Controls::TextBlock body;
+            body.Text(comment.Body());
+            body.TextWrapping(TextWrapping::Wrap);
+            body.MaxLines(6);
+            body.IsTextSelectionEnabled(true);
+            text.Children().Append(body);
+
+            Controls::Grid::SetColumn(text, 1);
+            entry.Children().Append(text);
+
+            host.Children().Append(entry);
+        }
+    }
+
+    // A row of ToggleButtons, one for the built-in field list and one for each tab
+    // the integration declared. Deliberately not a Pivot or a TabView: both bring a
+    // great deal of chrome for what is, on a tooltip, four words in a row.
+    void TermControl::_rebuildHyperlinkTabStrip(const Control::HyperlinkPreview& preview)
+    {
+        const auto strip = HyperlinkCardTabStrip();
+        strip.Children().Clear();
+        _hyperlinkSelectedTab = -1;
+
+        const auto tabs = preview ? preview.Tabs() : nullptr;
+        if (!tabs || tabs.Size() == 0)
+        {
+            strip.Visibility(Visibility::Collapsed);
+            _showHyperlinkTab(-1);
+            return;
+        }
+
+        auto addButton = [&](const winrt::hstring& label, int32_t index) {
+            Controls::Primitives::ToggleButton button;
+            button.Content(winrt::box_value(label));
+            button.Tag(winrt::box_value(index));
+            button.Padding(Thickness{ 8, 2, 8, 2 });
+            button.MinWidth(0);
+            button.FontSize(12);
+            button.IsChecked(index == _hyperlinkSelectedTab);
+            button.Click({ this, &TermControl::_HyperlinkTabClick });
+            strip.Children().Append(button);
+        };
+
+        addButton(RS_(L"HyperlinkFieldsTabLabel"), -1);
+        for (uint32_t i = 0; i < tabs.Size(); ++i)
+        {
+            const auto tab = tabs.GetAt(i);
+            addButton(tab ? tab.Label() : winrt::hstring{}, gsl::narrow_cast<int32_t>(i));
+        }
+
+        strip.Visibility(Visibility::Visible);
+        _showHyperlinkTab(-1);
+    }
+
+    void TermControl::_HyperlinkTabClick(const IInspectable& sender, const RoutedEventArgs& /*e*/)
+    {
+        if (const auto button = sender.try_as<Controls::Primitives::ToggleButton>())
+        {
+            if (const auto index = button.Tag().try_as<int32_t>())
+            {
+                _showHyperlinkTab(*index);
+            }
+        }
+
+        // The card just swapped one section for another of a different height.
+        if (HyperlinkCard().Visibility() == Visibility::Visible)
+        {
+            _showHyperlinkCard();
+        }
+    }
+
+    // -1 is the built-in field list; 0.. index into the preview's own Tabs. Anything
+    // out of range falls back to the field list rather than showing nothing at all.
+    void TermControl::_showHyperlinkTab(int32_t index)
+    {
+        Control::HyperlinkPreviewTab tab{ nullptr };
+        if (index >= 0 && _currentHyperlinkPreview)
+        {
+            if (const auto tabs = _currentHyperlinkPreview.Tabs(); tabs && gsl::narrow_cast<uint32_t>(index) < tabs.Size())
+            {
+                tab = tabs.GetAt(gsl::narrow_cast<uint32_t>(index));
+            }
+        }
+        if (!tab)
+        {
+            index = -1;
+        }
+
+        _hyperlinkSelectedTab = index;
+
+        const auto kind = tab ? tab.Kind() : Control::HyperlinkPreviewTabKind::Fields;
+        const auto showFields = !tab || kind == Control::HyperlinkPreviewTabKind::Fields;
+        const auto showBody = tab && kind == Control::HyperlinkPreviewTabKind::Body;
+        const auto showComments = tab && kind == Control::HyperlinkPreviewTabKind::Comments;
+
+        if (showBody)
+        {
+            // The card is small, so a markdown body is shown as the text it is. The
+            // detail pane is where it gets rendered properly.
+            HyperlinkCardBody().Text(tab.Body());
+        }
+        if (showComments)
+        {
+            _fillHyperlinkComments(tab);
+        }
+
+        HyperlinkCardFieldsScroll().Visibility(showFields ? Visibility::Visible : Visibility::Collapsed);
+        HyperlinkCardBodyScroll().Visibility(showBody ? Visibility::Visible : Visibility::Collapsed);
+        HyperlinkCardCommentsScroll().Visibility(showComments ? Visibility::Visible : Visibility::Collapsed);
+
+        // Only one of the toggles can be down at a time; there is no ready-made radio
+        // behaviour on ToggleButton, so it is enforced here.
+        for (const auto& child : HyperlinkCardTabStrip().Children())
+        {
+            if (const auto button = child.try_as<Controls::Primitives::ToggleButton>())
+            {
+                const auto buttonIndex = button.Tag().try_as<int32_t>();
+                button.IsChecked(buttonIndex && *buttonIndex == index);
+            }
+        }
+    }
+
+    // Only the first action is offered. The card has room for one row, and no
+    // integration declares more than one today; a second would want the pane.
+    void TermControl::_rebuildHyperlinkActions(const Control::HyperlinkPreview& preview)
+    {
+        const auto combo = HyperlinkActionOptions();
+        combo.Items().Clear();
+        HyperlinkActionFields().Children().Clear();
+        HyperlinkActionFields().Visibility(Visibility::Collapsed);
+        HyperlinkActionError().Visibility(Visibility::Collapsed);
+        _currentHyperlinkAction = nullptr;
+
+        const auto actions = preview ? preview.Actions() : nullptr;
+        if (!actions || actions.Size() == 0)
+        {
+            HyperlinkCardActionRow().Visibility(Visibility::Collapsed);
+            return;
+        }
+
+        _currentHyperlinkAction = actions.GetAt(0);
+        const auto options = _currentHyperlinkAction ? _currentHyperlinkAction.Options() : nullptr;
+        if (!options || options.Size() == 0)
+        {
+            _currentHyperlinkAction = nullptr;
+            HyperlinkCardActionRow().Visibility(Visibility::Collapsed);
+            return;
+        }
+
+        for (const auto& option : options)
+        {
+            if (!option)
+            {
+                continue;
+            }
+
+            // Jira's own menu wording: what the transition is called, then the status
+            // it lands in. The badge is the same one the field list would draw.
+            Controls::StackPanel content;
+            content.Orientation(Controls::Orientation::Horizontal);
+            content.Spacing(6);
+
+            Controls::TextBlock label;
+            label.Text(option.Label());
+            content.Children().Append(label);
+
+            if (const auto badgeText = option.Badge(); !badgeText.empty())
+            {
+                Controls::TextBlock arrow;
+                arrow.Text(winrt::hstring{ L"→" });
+                arrow.Opacity(0.7);
+                content.Children().Append(arrow);
+
+                Controls::Border badge;
+                badge.Padding(Thickness{ 6, 1, 6, 1 });
+                badge.CornerRadius(Windows::UI::Xaml::CornerRadius{ 4, 4, 4, 4 });
+                badge.Background(HyperlinkPreviewHelpers::BadgeBrush(option.Color()));
+                badge.VerticalAlignment(VerticalAlignment::Center);
+
+                Controls::TextBlock badgeLabel;
+                badgeLabel.FontSize(12);
+                badgeLabel.Text(badgeText);
+                badge.Child(badgeLabel);
+                content.Children().Append(badge);
+            }
+
+            Controls::ComboBoxItem item;
+            item.Content(content);
+            // The option itself, so the picked one never has to be looked up by index
+            // in a list that a refresh may have rebuilt underneath us.
+            item.Tag(option);
+            combo.Items().Append(item);
+        }
+
+        HyperlinkCardActionRow().Visibility(Visibility::Visible);
+        // An undo offered by an action that has already run outlives the refresh that
+        // followed it, which is what makes the button still be there afterwards.
+        HyperlinkActionUndoButton().Visibility(_hyperlinkUndoChoiceId.empty() ? Visibility::Collapsed : Visibility::Visible);
+        _updateHyperlinkActionApplyState();
+    }
+
+    Control::HyperlinkPreviewActionOption TermControl::_selectedHyperlinkActionOption()
+    {
+        if (const auto item = HyperlinkActionOptions().SelectedItem().try_as<Controls::ComboBoxItem>())
+        {
+            return item.Tag().try_as<Control::HyperlinkPreviewActionOption>();
+        }
+        return nullptr;
+    }
+
+    // The far end sometimes refuses a change without extra values -- Jira's "pick a
+    // resolution" dialog is the canonical one. The form only appears for an option
+    // that says so, and Apply stays disabled until the required boxes have something.
+    void TermControl::_updateHyperlinkActionFields()
+    {
+        const auto host = HyperlinkActionFields();
+        host.Children().Clear();
+
+        const auto option = _selectedHyperlinkActionOption();
+        const auto fields = option ? option.Fields() : nullptr;
+        if (!option || !option.NeedsFields() || !fields)
+        {
+            host.Visibility(Visibility::Collapsed);
+            _updateHyperlinkActionApplyState();
+            return;
+        }
+
+        auto onChanged = [weakThis = get_weak()]() {
+            if (const auto self = weakThis.get(); self && !self->_IsClosing())
+            {
+                self->_updateHyperlinkActionApplyState();
+            }
+        };
+
+        for (const auto& field : fields)
+        {
+            if (!field)
+            {
+                continue;
+            }
+
+            Controls::TextBlock label;
+            label.Text(field.Label());
+            label.Opacity(0.7);
+            label.FontSize(12);
+            label.TextWrapping(TextWrapping::Wrap);
+            host.Children().Append(label);
+
+            const auto options = field.Options();
+            if (options && options.Size() > 0)
+            {
+                Controls::ComboBox picker;
+                picker.Tag(winrt::box_value(field.Key()));
+                picker.MinWidth(150);
+                for (const auto& choice : options)
+                {
+                    picker.Items().Append(winrt::box_value(choice));
+                }
+                picker.SelectionChanged([onChanged](auto&&, auto&&) { onChanged(); });
+                host.Children().Append(picker);
+            }
+            else
+            {
+                Controls::TextBox box;
+                box.Tag(winrt::box_value(field.Key()));
+                box.TextChanged([onChanged](auto&&, auto&&) { onChanged(); });
+                host.Children().Append(box);
+            }
+        }
+
+        host.Visibility(host.Children().Size() > 0 ? Visibility::Visible : Visibility::Collapsed);
+        _updateHyperlinkActionApplyState();
+    }
+
+    // Apply is only live once something is picked and every required value is filled in.
+    void TermControl::_updateHyperlinkActionApplyState()
+    {
+        const auto option = _selectedHyperlinkActionOption();
+        auto ready = static_cast<bool>(option);
+
+        if (ready && option.NeedsFields())
+        {
+            const auto values = _collectHyperlinkActionFields();
+            if (const auto fields = option.Fields())
+            {
+                for (const auto& field : fields)
+                {
+                    if (!field || !field.Required())
+                    {
+                        continue;
+                    }
+                    if (!values.HasKey(field.Key()) || values.Lookup(field.Key()).empty())
+                    {
+                        ready = false;
+                        break;
+                    }
+                }
+            }
+        }
+
+        HyperlinkActionApplyButton().IsEnabled(ready);
+    }
+
+    Windows::Foundation::Collections::IMap<winrt::hstring, winrt::hstring> TermControl::_collectHyperlinkActionFields()
+    {
+        auto values = winrt::single_threaded_map<winrt::hstring, winrt::hstring>();
+
+        for (const auto& child : HyperlinkActionFields().Children())
+        {
+            if (const auto box = child.try_as<Controls::TextBox>())
+            {
+                if (const auto key = box.Tag().try_as<winrt::hstring>(); key && !key->empty())
+                {
+                    values.Insert(*key, box.Text());
+                }
+            }
+            else if (const auto picker = child.try_as<Controls::ComboBox>())
+            {
+                if (const auto key = picker.Tag().try_as<winrt::hstring>(); key && !key->empty())
+                {
+                    const auto selected = picker.SelectedItem().try_as<winrt::hstring>();
+                    values.Insert(*key, selected ? *selected : winrt::hstring{});
+                }
+            }
+        }
+
+        return values;
+    }
+
+    void TermControl::_setHyperlinkActionBusy(bool busy)
+    {
+        HyperlinkActionProgress().IsActive(busy);
+        HyperlinkActionProgress().Visibility(busy ? Visibility::Visible : Visibility::Collapsed);
+        HyperlinkActionOptions().IsEnabled(!busy);
+        HyperlinkActionUndoButton().IsEnabled(!busy);
+        HyperlinkActionFields().IsEnabled(!busy);
+        if (busy)
+        {
+            HyperlinkActionApplyButton().IsEnabled(false);
+        }
+        else
+        {
+            _updateHyperlinkActionApplyState();
+        }
+    }
+
+    void TermControl::_HyperlinkActionOptionChanged(const IInspectable& /*sender*/, const Controls::SelectionChangedEventArgs& /*e*/)
+    {
+        HyperlinkActionError().Visibility(Visibility::Collapsed);
+        _updateHyperlinkActionFields();
+
+        // The form may have just appeared or gone away underneath the card.
+        if (HyperlinkCard().Visibility() == Visibility::Visible)
+        {
+            _showHyperlinkCard();
+        }
+    }
+
+    void TermControl::_HyperlinkActionDropDownOpened(const IInspectable& /*sender*/, const IInspectable& /*e*/)
+    {
+        _hyperlinkActionDropDownOpen = true;
+        _hyperlinkHideTimer.Stop();
+    }
+
+    void TermControl::_HyperlinkActionDropDownClosed(const IInspectable& /*sender*/, const IInspectable& /*e*/)
+    {
+        _hyperlinkActionDropDownOpen = false;
+        // The pointer may have ended up outside the card while the list was open, in
+        // which case the hide the list was holding off is now due.
+        _scheduleHyperlinkCardHide();
+    }
+
+    void TermControl::_HyperlinkActionApplyClick(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
+    {
+        if (const auto option = _selectedHyperlinkActionOption())
+        {
+            _invokeHyperlinkAction(_hyperlinkPreviewGeneration, option.Id());
+        }
+    }
+
+    void TermControl::_HyperlinkActionUndoClick(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
+    {
+        const auto choiceId = _hyperlinkUndoChoiceId;
+        if (choiceId.empty())
+        {
+            return;
+        }
+
+        // Undo is the far end's own way back, not the form the user filled in for the
+        // change being undone -- clear it so nothing stale rides along with the request.
+        _hyperlinkUndoChoiceId = {};
+        HyperlinkActionUndoButton().Visibility(Visibility::Collapsed);
+        HyperlinkActionFields().Children().Clear();
+        HyperlinkActionFields().Visibility(Visibility::Collapsed);
+
+        _invokeHyperlinkAction(_hyperlinkPreviewGeneration, choiceId);
+    }
+
+    // Running an action is two round trips -- the change, then a refresh that shows
+    // it -- so it takes the same generation guard the preview fetch does: by the time
+    // either returns the pointer may be over a different link entirely.
+    safe_void_coroutine TermControl::_invokeHyperlinkAction(uint32_t generation, winrt::hstring choiceId)
+    {
+        const auto weakThis{ get_weak() };
+        const auto provider{ _hyperlinkPreviewProvider };
+        const auto dispatcher{ Dispatcher() };
+        const auto action{ _currentHyperlinkAction };
+        const auto preview{ _currentHyperlinkPreview };
+        if (!provider || !dispatcher || !action || !preview)
+        {
+            co_return;
+        }
+
+        // What the integration said this preview was made from, so an action runs
+        // against the same thing even when the hovered run was a text match.
+        auto sourceText = preview.SourceText();
+        if (sourceText.empty())
+        {
+            sourceText = _hoveredUri;
+        }
+        const auto integration = _currentHyperlinkTooltipSettings.integration;
+        const auto actionKey = action.Key();
+        const auto fieldValues = _collectHyperlinkActionFields();
+
+        _setHyperlinkActionBusy(true);
+        HyperlinkActionError().Visibility(Visibility::Collapsed);
+
+        Control::HyperlinkActionResult result{ nullptr };
+        try
+        {
+            result = co_await provider.InvokeActionAsync(sourceText, integration, actionKey, choiceId, fieldValues);
+        }
+        CATCH_LOG();
+
+        Control::HyperlinkPreview refreshed{ nullptr };
+        if (result && result.Ok())
+        {
+            try
+            {
+                refreshed = co_await provider.RefreshAsync(sourceText, integration);
+            }
+            CATCH_LOG();
+        }
+
+        co_await winrt::resume_foreground(dispatcher);
+
+        const auto self = weakThis.get();
+        if (!self || self->_IsClosing() || self->_hyperlinkPreviewGeneration != generation)
+        {
+            co_return;
+        }
+
+        self->_setHyperlinkActionBusy(false);
+
+        if (!result || !result.Ok())
+        {
+            auto message = result ? result.Error() : winrt::hstring{};
+            if (message.empty())
+            {
+                message = RS_(L"HyperlinkActionFailed");
+            }
+            self->HyperlinkActionError().Text(message);
+            self->HyperlinkActionError().Visibility(Visibility::Visible);
+            co_return;
+        }
+
+        // Repaint from the refreshed result before the undo state is written, because
+        // rebuilding the action row is what puts the Undo button back on screen.
+        if (refreshed)
+        {
+            self->_applyHyperlinkPreview(refreshed);
+        }
+
+        self->_hyperlinkUndoChoiceId = result.UndoChoiceId();
+        const auto hasUndo = !self->_hyperlinkUndoChoiceId.empty();
+        if (hasUndo)
+        {
+            if (const auto undoLabel = result.UndoLabel(); !undoLabel.empty())
+            {
+                if (!self->_hyperlinkUndoDefaultContent)
+                {
+                    self->_hyperlinkUndoDefaultContent = self->HyperlinkActionUndoButton().Content();
+                }
+                self->HyperlinkActionUndoButton().Content(winrt::box_value(undoLabel));
+            }
+        }
+        else if (self->_hyperlinkUndoDefaultContent)
+        {
+            self->HyperlinkActionUndoButton().Content(self->_hyperlinkUndoDefaultContent);
+        }
+        self->HyperlinkActionUndoButton().Visibility(hasUndo ? Visibility::Visible : Visibility::Collapsed);
+
+        // An empty UndoChoiceId is a real answer: the integration went looking for a
+        // way back and there isn't one. Left unsaid it would look exactly like a
+        // button that has not appeared yet, so the card says which of the two it is.
+        if (!hasUndo)
+        {
+            self->HyperlinkActionError().Text(RS_(L"HyperlinkActionNoUndo"));
+            self->HyperlinkActionError().Visibility(Visibility::Visible);
+        }
+
+        if (self->HyperlinkCard().Visibility() == Visibility::Visible)
+        {
+            self->_showHyperlinkCard();
+        }
     }
 
     safe_void_coroutine TermControl::_updateSelectionMarkers(IInspectable /*sender*/, Control::UpdateSelectionMarkersEventArgs args)

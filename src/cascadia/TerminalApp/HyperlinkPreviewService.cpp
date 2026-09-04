@@ -76,6 +76,10 @@ namespace winrt::TerminalApp::implementation
             std::wstring When;
             std::wstring Unless;
             unsigned long TimeoutMs{ 8000 };
+            // A failing optional step is stepped over rather than ending the
+            // pipeline: an undocumented endpoint that 400s on some servers, or
+            // a probe (`gh auth token`) that is allowed to come back empty.
+            bool Optional{ false };
         };
 
         struct Field
@@ -88,6 +92,59 @@ namespace winrt::TerminalApp::implementation
             std::wstring Color;
             std::wstring Format;
             int32_t Kind{ 0 };
+        };
+
+        // A display grouping: which field keys belong together, and what to
+        // call the heading they sit under.
+        struct FieldGroup
+        {
+            std::wstring Key;
+            std::wstring Label;
+            std::vector<std::wstring> Fields;
+        };
+
+        // Secondary content the user turned on. Body reads one value out of the
+        // step results; List repeats one entry shape over an array.
+        struct Tab
+        {
+            std::wstring Key;
+            std::wstring Label;
+            bool IsList{ false };
+            std::wstring Path;
+            std::wstring Format;
+            std::wstring ItemAuthorPath;
+            std::wstring ItemAvatarPath;
+            std::wstring ItemBodyPath;
+            std::wstring ItemTimePath;
+        };
+
+        // Something the user can do to the thing behind the link. A Choice
+        // action's options come out of the step results; a Button's request is
+        // simply fired.
+        struct Action
+        {
+            std::wstring Key;
+            std::wstring Label;
+            bool IsChoice{ false };
+
+            std::wstring OptionsPath;
+            std::wstring OptionIdPath;
+            std::wstring OptionLabelPath;
+            std::wstring OptionBadgePath;
+            std::wstring OptionColorPath;
+            std::wstring OptionTargetIdPath;
+            std::wstring CurrentStatePath;
+            std::wstring OptionFieldsPath;
+
+            std::wstring Method;
+            std::wstring Url;
+            std::wstring Body;
+            std::vector<std::pair<std::wstring, std::wstring>> Headers;
+            std::wstring AuthType;
+            std::wstring AuthUser;
+            std::wstring AuthPassword;
+            bool AllowUntrusted{ false };
+            unsigned long TimeoutMs{ 8000 };
         };
 
         struct Plugin
@@ -106,6 +163,20 @@ namespace winrt::TerminalApp::implementation
             std::vector<Step> Steps;
             // Only the fields the user chose to see, in manifest order.
             std::vector<Field> Fields;
+            // Every group the manifest declared, whether or not any of its
+            // fields survived the user's selection -- the stamping below looks
+            // a field's group up by key, so an empty group simply never hits.
+            std::vector<FieldGroup> FieldGroups;
+            // Only the tabs the user chose to see, in manifest order.
+            std::vector<Tab> Tabs;
+            std::vector<Action> Actions;
+            // ICU patterns the terminal scans output for while this integration
+            // is enabled. Nothing in the fetch reads them -- what actually puts
+            // them in front of the renderer is TerminalSettings, which builds
+            // the same list straight off the manifests. They are kept here so
+            // the snapshot stays a complete record of what an enabled
+            // integration declared.
+            std::vector<std::wstring> DetectPatterns;
         };
 
         // The window's enabled text-kind tooltip rules. These decide whether a
@@ -423,7 +494,66 @@ namespace
         const TemplateValueMap* Settings{ nullptr };
         const TemplateValueMap* Credentials{ nullptr };
         const std::map<std::wstring, IJsonValue>* Results{ nullptr };
+        // {{field.<key>}} -- what the user filled into an action's form. Null
+        // everywhere except on the action path.
+        const TemplateValueMap* ActionFields{ nullptr };
     };
+
+    // How a substituted value is quoted for the place it lands in.
+    enum class Escape
+    {
+        None,
+        Url,
+        Json
+    };
+
+    // Enough of RFC 8259 to keep a value from breaking out of the string it is
+    // being pasted into. Applied to every substitution in a JSON body, not just
+    // the data-derived ones: a password with a quote in it would break the body
+    // exactly as surely as a comment would.
+    std::wstring JsonEscape(std::wstring_view value)
+    {
+        std::wstring out;
+        out.reserve(value.size());
+        for (const auto ch : value)
+        {
+            switch (ch)
+            {
+            case L'"':
+                out.append(L"\\\"");
+                break;
+            case L'\\':
+                out.append(L"\\\\");
+                break;
+            case L'\b':
+                out.append(L"\\b");
+                break;
+            case L'\f':
+                out.append(L"\\f");
+                break;
+            case L'\n':
+                out.append(L"\\n");
+                break;
+            case L'\r':
+                out.append(L"\\r");
+                break;
+            case L'\t':
+                out.append(L"\\t");
+                break;
+            default:
+                if (ch < 0x20)
+                {
+                    out.append(fmt::format(L"\\u{:04x}", static_cast<uint32_t>(ch)));
+                }
+                else
+                {
+                    out.push_back(ch);
+                }
+                break;
+            }
+        }
+        return out;
+    }
 
     // `fromData` says whether the value came from the matched text or from an
     // earlier step's result, as opposed to from the user's own configuration.
@@ -435,6 +565,7 @@ namespace
 
         constexpr std::wstring_view settingsPrefix{ L"settings." };
         constexpr std::wstring_view credentialsPrefix{ L"credentials." };
+        constexpr std::wstring_view fieldPrefix{ L"field." };
 
         const auto lookIn = [](const TemplateValueMap* map, std::wstring_view key) -> std::wstring {
             if (!map)
@@ -452,6 +583,13 @@ namespace
         if (name.starts_with(credentialsPrefix))
         {
             return lookIn(context.Credentials, name.substr(credentialsPrefix.size()));
+        }
+        if (name.starts_with(fieldPrefix))
+        {
+            // The user typed it, so it is data even though it never came off
+            // the wire -- it gets percent-encoded in a URL like anything else.
+            fromData = true;
+            return lookIn(context.ActionFields, name.substr(fieldPrefix.size()));
         }
 
         fromData = true;
@@ -475,7 +613,7 @@ namespace
 
     // {{name}} substitution, and nothing else. An unknown name expands to
     // nothing, which is what makes `when`/`unless` work as presence tests.
-    std::wstring Expand(std::wstring_view templateText, const ExpandContext& context, bool urlEncode)
+    std::wstring Expand(std::wstring_view templateText, const ExpandContext& context, Escape escape)
     {
         std::wstring out;
         out.reserve(templateText.size());
@@ -502,9 +640,16 @@ namespace
             const auto name = Trim(templateText.substr(open + 2, close - open - 2));
             auto fromData = false;
             auto value = LookupToken(name, context, fromData);
-            if (urlEncode && fromData && !value.empty())
+            if (!value.empty())
             {
-                value = std::wstring{ Uri::EscapeComponent(winrt::hstring{ value }) };
+                if (escape == Escape::Url && fromData)
+                {
+                    value = std::wstring{ Uri::EscapeComponent(winrt::hstring{ value }) };
+                }
+                else if (escape == Escape::Json)
+                {
+                    value = JsonEscape(value);
+                }
             }
             out.append(value);
 
@@ -855,7 +1000,31 @@ namespace
         return std::wstring{ CryptographicBuffer::EncodeToBase64String(buffer) };
     }
 
-    StepOutcome RunHttpStep(const Snapshot::Step& step,
+    // One HTTP request, described independently of what asked for it: a fetch
+    // step and an action's request differ only in where their templates come
+    // from, and the auth, the timeout and the error wording must not drift
+    // between the two.
+    struct HttpCall
+    {
+        std::wstring_view Url;
+        std::wstring_view Method;
+        const std::vector<std::pair<std::wstring, std::wstring>>* Headers{ nullptr };
+        std::wstring_view AuthType;
+        std::wstring_view AuthUser;
+        std::wstring_view AuthPassword;
+        std::wstring_view Body;
+        bool AllowUntrusted{ false };
+        unsigned long TimeoutMs{ 8000 };
+        // The body is JSON when the manifest wrote one, so substitutions into
+        // it are quoted rather than pasted raw.
+        Escape BodyEscape{ Escape::None };
+        // When set, this exact string is the body and Body is ignored. The
+        // action path needs it: it has to expand its template and then edit
+        // the resulting JSON before the request goes out.
+        const std::wstring* BodyLiteral{ nullptr };
+    };
+
+    StepOutcome RunHttpCall(const HttpCall& call,
                             const ExpandContext& context,
                             const std::wstring& integrationName,
                             WWH::HttpClient& plainClient,
@@ -863,58 +1032,62 @@ namespace
     {
         StepOutcome outcome;
 
-        const auto url = Expand(step.Url, context, true);
+        const auto url = Expand(call.Url, context, Escape::Url);
         if (url.empty())
         {
             outcome.Error = fmt::format(L"{}: the step has no URL", integrationName);
             return outcome;
         }
 
-        auto& client = step.AllowUntrusted ? lenientClient : plainClient;
+        auto& client = call.AllowUntrusted ? lenientClient : plainClient;
         if (!client)
         {
-            client = MakeClient(step.AllowUntrusted);
+            client = MakeClient(call.AllowUntrusted);
         }
 
-        const WWH::HttpMethod method{ winrt::hstring{ step.Method.empty() ? std::wstring{ L"GET" } : step.Method } };
+        const WWH::HttpMethod method{ winrt::hstring{ call.Method.empty() ? std::wstring_view{ L"GET" } : call.Method } };
         const WWH::HttpRequestMessage request{ method, Uri{ winrt::hstring{ url } } };
 
-        for (const auto& header : step.Headers)
+        if (call.Headers)
         {
-            if (header.first.empty())
+            for (const auto& header : *call.Headers)
             {
-                continue;
+                if (header.first.empty())
+                {
+                    continue;
+                }
+                request.Headers().TryAppendWithoutValidation(winrt::hstring{ header.first },
+                                                             winrt::hstring{ Expand(header.second, context, Escape::None) });
             }
-            request.Headers().TryAppendWithoutValidation(winrt::hstring{ header.first },
-                                                         winrt::hstring{ Expand(header.second, context, false) });
         }
 
-        if (step.AuthType == L"basic")
+        if (call.AuthType == L"basic")
         {
-            const auto user = Expand(step.AuthUser, context, false);
-            const auto password = Expand(step.AuthPassword, context, false);
+            const auto user = Expand(call.AuthUser, context, Escape::None);
+            const auto password = Expand(call.AuthPassword, context, Escape::None);
             request.Headers().Authorization(WWH::Headers::HttpCredentialsHeaderValue{ L"Basic", winrt::hstring{ BasicAuthToken(user, password) } });
         }
-        else if (step.AuthType == L"bearer")
+        else if (call.AuthType == L"bearer")
         {
-            request.Headers().Authorization(WWH::Headers::HttpCredentialsHeaderValue{ L"Bearer", winrt::hstring{ Expand(step.AuthPassword, context, false) } });
+            request.Headers().Authorization(WWH::Headers::HttpCredentialsHeaderValue{ L"Bearer", winrt::hstring{ Expand(call.AuthPassword, context, Escape::None) } });
         }
-        else if (step.AuthType == L"header" && !step.AuthUser.empty())
+        else if (call.AuthType == L"header" && !call.AuthUser.empty())
         {
-            request.Headers().TryAppendWithoutValidation(winrt::hstring{ step.AuthUser },
-                                                         winrt::hstring{ Expand(step.AuthPassword, context, false) });
+            request.Headers().TryAppendWithoutValidation(winrt::hstring{ call.AuthUser },
+                                                         winrt::hstring{ Expand(call.AuthPassword, context, Escape::None) });
         }
 
-        if (!step.Body.empty())
+        if (call.BodyLiteral ? !call.BodyLiteral->empty() : !call.Body.empty())
         {
-            request.Content(WWH::HttpStringContent{ winrt::hstring{ Expand(step.Body, context, false) },
+            const auto body = call.BodyLiteral ? *call.BodyLiteral : Expand(call.Body, context, call.BodyEscape);
+            request.Content(WWH::HttpStringContent{ winrt::hstring{ body },
                                                     winrt::Windows::Storage::Streams::UnicodeEncoding::Utf8,
                                                     L"application/json" });
         }
 
         // HttpClient has no timeout of its own, so the deadline is imposed here.
         // (RemoteIconCache has none at all; don't copy that.)
-        const std::chrono::milliseconds timeout{ step.TimeoutMs };
+        const std::chrono::milliseconds timeout{ call.TimeoutMs };
 
         auto send = client.SendRequestAsync(request);
         if (send.wait_for(timeout) == AsyncStatus::Started)
@@ -948,18 +1121,41 @@ namespace
         return outcome;
     }
 
+    StepOutcome RunHttpStep(const Snapshot::Step& step,
+                            const ExpandContext& context,
+                            const std::wstring& integrationName,
+                            WWH::HttpClient& plainClient,
+                            WWH::HttpClient& lenientClient)
+    {
+        HttpCall call;
+        call.Url = step.Url;
+        call.Method = step.Method;
+        call.Headers = &step.Headers;
+        call.AuthType = step.AuthType;
+        call.AuthUser = step.AuthUser;
+        call.AuthPassword = step.AuthPassword;
+        call.Body = step.Body;
+        call.AllowUntrusted = step.AllowUntrusted;
+        call.TimeoutMs = step.TimeoutMs;
+        // A step's body is authored whole by the manifest and substitutes only
+        // matcher groups and settings; the action path is the one that pastes
+        // user input in, and it is the one that quotes.
+        call.BodyEscape = Escape::None;
+        return RunHttpCall(call, context, integrationName, plainClient, lenientClient);
+    }
+
     StepOutcome RunCommandStep(const Snapshot::Step& step, const ExpandContext& context, const std::wstring& integrationName)
     {
         StepOutcome outcome;
 
-        auto commandLine = Expand(step.CommandLine, context, false);
+        auto commandLine = Expand(step.CommandLine, context, Escape::None);
         if (commandLine.empty())
         {
             outcome.Error = fmt::format(L"{}: the step has no command", integrationName);
             return outcome;
         }
 
-        const auto input = til::u16u8(Expand(step.Stdin, context, false));
+        const auto input = til::u16u8(Expand(step.Stdin, context, Escape::None));
         const auto output = ::TerminalApp::RunProcessCapture(std::move(commandLine), input, step.TimeoutMs);
         if (output.empty())
         {
@@ -971,70 +1167,72 @@ namespace
         return outcome;
     }
 
-    // Runs the whole pipeline for one integration and renders the result.
-    // Blocking; always called from a background thread.
-    Control::HyperlinkPreview RunFetch(const Snapshot::Plugin& plugin, const TemplateValueMap& groups)
+    // What a whole pipeline produced.
+    struct PipelineOutcome
     {
-        Control::HyperlinkPreview preview{};
-        preview.IntegrationId(winrt::hstring{ plugin.Id });
-        preview.IntegrationName(winrt::hstring{ plugin.Name });
-        preview.IntegrationIcon(winrt::hstring{ plugin.Icon });
+        // Keyed by step id, exactly as a "stepId:/pointer" path spells it.
+        std::map<std::wstring, IJsonValue> Results;
+        // The last step that parsed at all: what an unqualified "/pointer"
+        // reads against.
+        IJsonValue Last{ nullptr };
+        std::wstring Error;
+        // Optional steps that failed. Deliberately NOT the card's error: an
+        // absent `gh` or a Jira site without dev-status is an ordinary outcome,
+        // and putting it on a hover card would train the user to ignore the
+        // error line. Surfaced only when the fetch produced nothing else.
+        std::vector<std::wstring> OptionalErrors;
+    };
 
-        auto fields = winrt::single_threaded_vector<Control::HyperlinkPreviewField>();
-        preview.Fields(fields);
-
-        std::map<std::wstring, IJsonValue> results;
-        IJsonValue last{ nullptr };
-        std::wstring error;
-
-        ExpandContext context;
-        context.Groups = &groups;
-        context.Settings = &plugin.Settings;
-        context.Credentials = &plugin.Credentials;
-        context.Results = &results;
-
-        WWH::HttpClient plainClient{ nullptr };
-        WWH::HttpClient lenientClient{ nullptr };
-
+    // Runs every step of one integration's pipeline. The caller must already
+    // have pointed `context.Results` at `outcome.Results`: steps write results
+    // into it as they go, and later templates read them back out.
+    //
+    // Blocking; always called from a background thread.
+    void RunPipeline(const Snapshot::Plugin& plugin,
+                     const ExpandContext& context,
+                     PipelineOutcome& outcome,
+                     WWH::HttpClient& plainClient,
+                     WWH::HttpClient& lenientClient)
+    {
         for (const auto& step : plugin.Steps)
         {
-            if (!step.When.empty() && Expand(step.When, context, false).empty())
+            if (!step.When.empty() && Expand(step.When, context, Escape::None).empty())
             {
                 continue;
             }
-            if (!step.Unless.empty() && !Expand(step.Unless, context, false).empty())
+            if (!step.Unless.empty() && !Expand(step.Unless, context, Escape::None).empty())
             {
                 continue;
             }
 
-            StepOutcome outcome;
+            StepOutcome stepOutcome;
             try
             {
-                outcome = step.IsCommand ? RunCommandStep(step, context, plugin.Name) :
-                                           RunHttpStep(step, context, plugin.Name, plainClient, lenientClient);
+                stepOutcome = step.IsCommand ? RunCommandStep(step, context, plugin.Name) :
+                                               RunHttpStep(step, context, plugin.Name, plainClient, lenientClient);
             }
             catch (const winrt::hresult_error& e)
             {
-                outcome.Error = fmt::format(L"{}: {}", plugin.Name, std::wstring{ e.message() });
+                stepOutcome.Error = fmt::format(L"{}: {}", plugin.Name, std::wstring{ e.message() });
             }
             catch (...)
             {
-                outcome.Error = fmt::format(L"{}: the request failed", plugin.Name);
+                stepOutcome.Error = fmt::format(L"{}: the request failed", plugin.Name);
             }
 
             // Parsed even when the step reported an error: Slack answers 200
             // with {"ok":false,"error":...}, and a 4xx body often carries the
             // only useful detail there is.
-            if (!outcome.Body.empty())
+            if (!stepOutcome.Body.empty())
             {
                 JsonObject asObject{ nullptr };
                 JsonArray asArray{ nullptr };
                 IJsonValue parsed{ nullptr };
-                if (JsonObject::TryParse(winrt::hstring{ outcome.Body }, asObject))
+                if (JsonObject::TryParse(winrt::hstring{ stepOutcome.Body }, asObject))
                 {
                     parsed = asObject;
                 }
-                else if (JsonArray::TryParse(winrt::hstring{ outcome.Body }, asArray))
+                else if (JsonArray::TryParse(winrt::hstring{ stepOutcome.Body }, asArray))
                 {
                     parsed = asArray;
                 }
@@ -1043,46 +1241,480 @@ namespace
                 {
                     if (!step.Id.empty())
                     {
-                        results[step.Id] = parsed;
+                        outcome.Results[step.Id] = parsed;
                     }
-                    last = parsed;
+                    outcome.Last = parsed;
                 }
             }
 
-            if (!outcome.Error.empty())
+            if (!stepOutcome.Error.empty())
             {
-                error = outcome.Error;
+                if (step.Optional)
+                {
+                    outcome.OptionalErrors.push_back(std::move(stepOutcome.Error));
+                    continue;
+                }
+                outcome.Error = std::move(stepOutcome.Error);
                 break;
             }
         }
+    }
 
-        // An unqualified path reads the last step that produced anything;
-        // "stepId:/pointer" names one explicitly.
-        const auto lookup = [&](const std::wstring& path) -> std::wstring {
-            if (path.empty())
+    // Reads a path out of a finished pipeline. An unqualified "/pointer" reads
+    // the last step that produced anything; "stepId:/pointer" names one.
+    //
+    // The pointer half may be empty, and "stepId:" then means the step's whole
+    // result -- RFC 6901's reading of the empty pointer, which ResolvePointer
+    // already implements. That is how a tab reads an endpoint that answers with
+    // a bare array rather than an object: GitHub's issue comments are
+    // "comments:", with nothing to reach into. A bare "stepId" with no colon
+    // at all is accepted as the same thing, since it could not mean anything
+    // else here.
+    struct ResultReader
+    {
+        const PipelineOutcome* Pipeline{ nullptr };
+
+        IJsonValue Json(std::wstring_view path) const
+        {
+            if (!Pipeline || path.empty())
             {
-                return {};
+                return nullptr;
             }
             if (path.front() != L'/')
             {
                 const auto colon = path.find(L':');
-                if (colon == std::wstring::npos)
+                const auto id = colon == std::wstring_view::npos ? path : path.substr(0, colon);
+                const auto pointer = colon == std::wstring_view::npos ? std::wstring_view{} : path.substr(colon + 1);
+
+                const auto found = Pipeline->Results.find(std::wstring{ id });
+                if (found == Pipeline->Results.end())
                 {
-                    return {};
+                    return nullptr;
                 }
-                const auto found = results.find(path.substr(0, colon));
-                if (found == results.end())
-                {
-                    return {};
-                }
-                return ValueToString(ResolvePointer(found->second, std::wstring_view{ path }.substr(colon + 1)));
+                return ResolvePointer(found->second, pointer);
             }
-            return ValueToString(ResolvePointer(last, path));
+            return ResolvePointer(Pipeline->Last, path);
+        }
+
+        std::wstring Text(std::wstring_view path) const { return ValueToString(Json(path)); }
+    };
+
+    // ---- tabs -----------------------------------------------------------
+
+    void AppendText(std::wstring& out, const winrt::hstring& text)
+    {
+        out.append(text.data(), text.size());
+    }
+
+    // A pointer relative to one element, where an empty pointer means "nothing"
+    // rather than RFC 6901's "the element itself" -- an unset item path in a
+    // manifest is an omission, not a request for the whole object.
+    IJsonValue At(const IJsonValue& element, std::wstring_view pointer)
+    {
+        return pointer.empty() ? nullptr : ResolvePointer(element, pointer);
+    }
+
+    void FlattenAdf(const IJsonValue& node, std::wstring& out, int depth);
+
+    void FlattenAdfChildren(const JsonObject& object, std::wstring& out, int depth)
+    {
+        const auto content = object.GetNamedArray(L"content", nullptr);
+        if (!content)
+        {
+            return;
+        }
+        for (uint32_t i = 0; i < content.Size(); ++i)
+        {
+            FlattenAdf(content.GetAt(i), out, depth + 1);
+        }
+    }
+
+    // Atlassian Document Format -> plain text. ADF is a JSON document tree, not
+    // markup, so there is nothing a text renderer could be handed directly.
+    // This walks it far enough to read a Jira description or comment and no
+    // further: an unrecognised node contributes its children and nothing else,
+    // and nothing in here throws or recurses without a bound.
+    void FlattenAdf(const IJsonValue& node, std::wstring& out, int depth)
+    {
+        // Bounded on both axes: hand-written JSON can nest arbitrarily, and a
+        // description long enough to matter is already longer than any surface
+        // showing it wants to render.
+        if (!node || depth > 16 || out.size() > 20000)
+        {
+            return;
+        }
+        if (node.ValueType() == JsonValueType::String)
+        {
+            AppendText(out, node.GetString());
+            return;
+        }
+        if (node.ValueType() != JsonValueType::Object)
+        {
+            return;
+        }
+
+        const auto object = node.GetObject();
+        const std::wstring type{ object.GetNamedString(L"type", L"") };
+
+        const auto endLine = [&out]() {
+            if (!out.empty() && out.back() != L'\n')
+            {
+                out.push_back(L'\n');
+            }
         };
+
+        if (type == L"text")
+        {
+            AppendText(out, object.GetNamedString(L"text", L""));
+            return;
+        }
+        if (type == L"hardBreak")
+        {
+            out.push_back(L'\n');
+            return;
+        }
+        if (type == L"mention" || type == L"emoji")
+        {
+            if (const auto attrs = object.GetNamedObject(L"attrs", nullptr))
+            {
+                auto label = attrs.GetNamedString(L"text", L"");
+                if (label.empty())
+                {
+                    label = attrs.GetNamedString(L"shortName", L"");
+                }
+                AppendText(out, label);
+            }
+            return;
+        }
+        if (type == L"rule")
+        {
+            endLine();
+            out.append(L"---\n");
+            return;
+        }
+        if (type == L"codeBlock")
+        {
+            endLine();
+            out.append(L"```\n");
+            FlattenAdfChildren(object, out, depth);
+            endLine();
+            out.append(L"```\n");
+            return;
+        }
+        if (type == L"bulletList" || type == L"orderedList")
+        {
+            const auto items = object.GetNamedArray(L"content", nullptr);
+            if (items)
+            {
+                const auto ordered = type == L"orderedList";
+                for (uint32_t i = 0; i < items.Size(); ++i)
+                {
+                    endLine();
+                    out.append(ordered ? fmt::format(L"{}. ", i + 1) : std::wstring{ L"- " });
+                    FlattenAdf(items.GetAt(i), out, depth + 1);
+                    endLine();
+                }
+            }
+            return;
+        }
+
+        FlattenAdfChildren(object, out, depth);
+
+        // Everything ADF calls a block ends the line it wrote.
+        if (type == L"paragraph" || type == L"heading" || type == L"listItem" ||
+            type == L"blockquote" || type == L"panel" || type == L"tableRow")
+        {
+            endLine();
+        }
+    }
+
+    std::wstring TrimTrailingBlank(std::wstring text)
+    {
+        while (!text.empty() && (text.back() == L'\n' || text.back() == L'\r' || text.back() == L' ' || text.back() == L'\t'))
+        {
+            text.pop_back();
+        }
+        return text;
+    }
+
+    // The secondary content the user turned on. A tab with nothing in it is
+    // dropped rather than shown empty -- an integration that offers Comments
+    // should not put a Comments tab on an issue that has none.
+    //
+    // The kinds are mapped by hand rather than cast: the manifest's Body/List
+    // pair has no counterpart for HyperlinkPreviewTabKind::Fields, which names
+    // the built-in field list the control always shows first.
+    void BuildTabs(const Snapshot::Plugin& plugin, const ResultReader& reader, const Control::HyperlinkPreview& preview)
+    {
+        auto tabs = winrt::single_threaded_vector<Control::HyperlinkPreviewTab>();
+
+        for (const auto& tab : plugin.Tabs)
+        {
+            Control::HyperlinkPreviewTab row{};
+            row.Key(winrt::hstring{ tab.Key });
+            row.Label(winrt::hstring{ tab.Label });
+
+            // ADF is flattened here, so what leaves this function is only ever
+            // "text" or "markdown" -- never a format the control would have to
+            // know how to parse. The format is stamped on a Comments tab too:
+            // GitHub's comment bodies are markdown and Jira's are flattened
+            // ADF, and nothing downstream could tell them apart otherwise.
+            const auto flatten = tab.Format == L"adf";
+            row.Format(winrt::hstring{ flatten || tab.Format.empty() ? std::wstring{ L"text" } : tab.Format });
+
+            if (!tab.IsList)
+            {
+                row.Kind(Control::HyperlinkPreviewTabKind::Body);
+
+                const auto value = reader.Json(tab.Path);
+                std::wstring body;
+                if (flatten)
+                {
+                    FlattenAdf(value, body, 0);
+                }
+                else
+                {
+                    body = ValueToString(value);
+                }
+
+                body = TrimTrailingBlank(std::move(body));
+                if (body.empty())
+                {
+                    continue;
+                }
+                row.Body(winrt::hstring{ body });
+            }
+            else
+            {
+                row.Kind(Control::HyperlinkPreviewTabKind::Comments);
+
+                const auto value = reader.Json(tab.Path);
+                if (!value || value.ValueType() != JsonValueType::Array)
+                {
+                    continue;
+                }
+
+                auto comments = winrt::single_threaded_vector<Control::HyperlinkPreviewComment>();
+                const auto array = value.GetArray();
+                // Bounded: a long-running issue can carry hundreds, and no
+                // surface here wants to render them all.
+                const auto count = std::min(array.Size(), 50u);
+                for (uint32_t i = 0; i < count; ++i)
+                {
+                    const auto item = array.GetAt(i);
+
+                    std::wstring body;
+                    const auto rawBody = At(item, tab.ItemBodyPath);
+                    if (flatten)
+                    {
+                        FlattenAdf(rawBody, body, 0);
+                    }
+                    else
+                    {
+                        body = ValueToString(rawBody);
+                    }
+                    body = TrimTrailingBlank(std::move(body));
+
+                    const auto author = ValueToString(At(item, tab.ItemAuthorPath));
+                    if (body.empty() && author.empty())
+                    {
+                        continue;
+                    }
+
+                    Control::HyperlinkPreviewComment comment{};
+                    comment.Author(winrt::hstring{ author });
+                    comment.AvatarUri(winrt::hstring{ ValueToString(At(item, tab.ItemAvatarPath)) });
+                    comment.Body(winrt::hstring{ body });
+                    // RelativeTime hands back whatever it was given when it
+                    // cannot parse it, so an unexpected shape still shows.
+                    if (const auto when = ValueToString(At(item, tab.ItemTimePath)); !when.empty())
+                    {
+                        comment.Time(winrt::hstring{ RelativeTime(when) });
+                    }
+                    comments.Append(comment);
+                }
+
+                if (comments.Size() == 0)
+                {
+                    continue;
+                }
+                row.Comments(comments);
+            }
+
+            tabs.Append(row);
+        }
+
+        preview.Tabs(tabs);
+    }
+
+    // ---- actions --------------------------------------------------------
+
+    // Jira spells a transition's demands as an object keyed by field name:
+    //   "fields": { "resolution": { "required": true, "name": "Resolution",
+    //                               "allowedValues": [ { "name": "Done" } ] } }
+    // Anything shaped like that maps; anything else contributes no fields,
+    // which simply means the action is offered without a form.
+    IVector<Control::HyperlinkPreviewActionField> BuildOptionFields(const IJsonValue& spec)
+    {
+        auto fields = winrt::single_threaded_vector<Control::HyperlinkPreviewActionField>();
+        if (!spec || spec.ValueType() != JsonValueType::Object)
+        {
+            return fields;
+        }
+
+        for (const auto& pair : spec.GetObject())
+        {
+            const auto key = pair.Key();
+            const auto value = pair.Value();
+            if (key.empty() || !value || value.ValueType() != JsonValueType::Object)
+            {
+                continue;
+            }
+            const auto detail = value.GetObject();
+
+            Control::HyperlinkPreviewActionField field{};
+            field.Key(key);
+            auto label = detail.GetNamedString(L"name", L"");
+            field.Label(label.empty() ? key : label);
+            field.Required(detail.GetNamedBoolean(L"required", false));
+
+            auto choices = winrt::single_threaded_vector<winrt::hstring>();
+            if (const auto allowed = detail.GetNamedArray(L"allowedValues", nullptr))
+            {
+                for (uint32_t i = 0; i < allowed.Size(); ++i)
+                {
+                    const auto entry = allowed.GetAt(i);
+                    if (!entry || entry.ValueType() != JsonValueType::Object)
+                    {
+                        continue;
+                    }
+                    const auto option = entry.GetObject();
+                    auto text = option.GetNamedString(L"name", L"");
+                    if (text.empty())
+                    {
+                        text = option.GetNamedString(L"value", L"");
+                    }
+                    if (text.empty())
+                    {
+                        text = option.GetNamedString(L"id", L"");
+                    }
+                    if (!text.empty())
+                    {
+                        choices.Append(text);
+                    }
+                }
+            }
+            field.Options(choices);
+
+            fields.Append(field);
+        }
+        return fields;
+    }
+
+    Control::HyperlinkPreviewActionOption BuildOption(const Snapshot::Action& action, const IJsonValue& element)
+    {
+        Control::HyperlinkPreviewActionOption option{};
+        option.Id(winrt::hstring{ ValueToString(At(element, action.OptionIdPath)) });
+        option.Label(winrt::hstring{ ValueToString(At(element, action.OptionLabelPath)) });
+        option.Badge(winrt::hstring{ ValueToString(At(element, action.OptionBadgePath)) });
+        option.Color(winrt::hstring{ ValueToString(At(element, action.OptionColorPath)) });
+        option.Fields(BuildOptionFields(At(element, action.OptionFieldsPath)));
+        return option;
+    }
+
+    void BuildActions(const Snapshot::Plugin& plugin, const ResultReader& reader, const Control::HyperlinkPreview& preview)
+    {
+        auto actions = winrt::single_threaded_vector<Control::HyperlinkPreviewAction>();
+
+        for (const auto& action : plugin.Actions)
+        {
+            Control::HyperlinkPreviewAction row{};
+            row.Key(winrt::hstring{ action.Key });
+            row.Label(winrt::hstring{ action.Label });
+
+            auto options = winrt::single_threaded_vector<Control::HyperlinkPreviewActionOption>();
+            if (action.IsChoice)
+            {
+                const auto value = reader.Json(action.OptionsPath);
+                if (!value || value.ValueType() != JsonValueType::Array)
+                {
+                    // Nothing to choose from -- most often because the step
+                    // that would have listed the options never ran.
+                    continue;
+                }
+                const auto array = value.GetArray();
+                for (uint32_t i = 0; i < array.Size(); ++i)
+                {
+                    auto option = BuildOption(action, array.GetAt(i));
+                    if (option.Id().empty())
+                    {
+                        continue;
+                    }
+                    if (option.Label().empty())
+                    {
+                        option.Label(option.Id());
+                    }
+                    options.Append(option);
+                }
+                if (options.Size() == 0)
+                {
+                    continue;
+                }
+            }
+            row.Options(options);
+
+            actions.Append(row);
+        }
+
+        preview.Actions(actions);
+    }
+
+    // Runs the whole pipeline for one integration and renders the result.
+    // Blocking; always called from a background thread.
+    Control::HyperlinkPreview RunFetch(const Snapshot::Plugin& plugin, const std::wstring& text, const TemplateValueMap& groups)
+    {
+        Control::HyperlinkPreview preview{};
+        preview.IntegrationId(winrt::hstring{ plugin.Id });
+        preview.IntegrationName(winrt::hstring{ plugin.Name });
+        preview.IntegrationIcon(winrt::hstring{ plugin.Icon });
+        // Echoed back so a refresh or an action can be run against the same
+        // thing without the caller having to remember what produced it.
+        preview.SourceText(winrt::hstring{ text });
+
+        auto fields = winrt::single_threaded_vector<Control::HyperlinkPreviewField>();
+        preview.Fields(fields);
+
+        PipelineOutcome pipeline;
+
+        ExpandContext context;
+        context.Groups = &groups;
+        context.Settings = &plugin.Settings;
+        context.Credentials = &plugin.Credentials;
+        context.Results = &pipeline.Results;
+
+        WWH::HttpClient plainClient{ nullptr };
+        WWH::HttpClient lenientClient{ nullptr };
+        RunPipeline(plugin, context, pipeline, plainClient, lenientClient);
+
+        const ResultReader reader{ &pipeline };
+
+        // Which group each field belongs to. A manifest declares the
+        // relationship the other way round -- a group lists the field keys it
+        // owns -- so it is inverted once here rather than searched per field.
+        // A key no group claims simply never hits, which is what leaves both
+        // Group and GroupLabel empty on an ungrouped field.
+        std::map<std::wstring, std::pair<std::wstring, std::wstring>> groupOfField;
+        for (const auto& group : plugin.FieldGroups)
+        {
+            for (const auto& key : group.Fields)
+            {
+                groupOfField.try_emplace(key, group.Key, group.Label);
+            }
+        }
 
         for (const auto& field : plugin.Fields)
         {
-            auto value = lookup(field.Path);
+            auto value = reader.Text(field.Path);
             if (field.Format == L"relativeTime")
             {
                 value = RelativeTime(value);
@@ -1099,20 +1731,32 @@ namespace
             Control::HyperlinkPreviewField row{};
             row.Label(winrt::hstring{ field.Label });
             row.Value(winrt::hstring{ value });
-            // The two enums are declared in the same order on purpose.
+            // Model::IntegrationFieldKind and Control::HyperlinkPreviewFieldKind
+            // declare the same members in the same order on purpose, so the two
+            // sides can be cast rather than switched over.
             row.Kind(static_cast<Control::HyperlinkPreviewFieldKind>(field.Kind));
             if (!field.IconPath.empty())
             {
-                row.IconUri(winrt::hstring{ lookup(field.IconPath) });
+                row.IconUri(winrt::hstring{ reader.Text(field.IconPath) });
             }
-            auto color = field.ColorPath.empty() ? std::wstring{} : lookup(field.ColorPath);
+            auto color = field.ColorPath.empty() ? std::wstring{} : reader.Text(field.ColorPath);
             if (color.empty())
             {
                 color = field.Color;
             }
             row.Color(winrt::hstring{ color });
+            // A field no group claimed keeps both empty, which is what a
+            // surface with room reads as "no heading".
+            if (const auto group = groupOfField.find(field.Key); group != groupOfField.end())
+            {
+                row.Group(winrt::hstring{ group->second.first });
+                row.GroupLabel(winrt::hstring{ group->second.second });
+            }
             fields.Append(row);
         }
+
+        BuildTabs(plugin, reader, preview);
+        BuildActions(plugin, reader, preview);
 
         if (!plugin.Html.empty())
         {
@@ -1126,21 +1770,323 @@ namespace
             // as a "stepId:/pointer" path spells it, even when a single step
             // ran; a step that declared no id contributes nothing, because
             // nothing could address it.
-            if (!results.empty())
+            if (!pipeline.Results.empty())
             {
                 JsonObject data;
-                for (const auto& [stepId, value] : results)
+                for (const auto& [stepId, value] : pipeline.Results)
                 {
                     data.SetNamedValue(winrt::hstring{ stepId }, value);
                 }
                 preview.DataJson(data.Stringify());
             }
         }
+
+        auto error = pipeline.Error;
+        if (error.empty() &&
+            fields.Size() == 0 &&
+            preview.Tabs().Size() == 0 &&
+            preview.Actions().Size() == 0 &&
+            !pipeline.OptionalErrors.empty())
+        {
+            // Everything that ran was allowed to fail and did, and there is
+            // nothing to show -- so the reason one of them failed is the most
+            // useful thing left to say.
+            error = pipeline.OptionalErrors.front();
+        }
         if (!error.empty())
         {
             preview.Error(winrt::hstring{ error });
         }
         return preview;
+    }
+
+    // ---- actions, run ---------------------------------------------------
+
+    // The shape the far end wants one of an action's extra values in.
+    //
+    // A value has to be spelled the way its own field spelled it: Jira takes a
+    // resolution as {"name":"Done"}, a select custom field as {"value":"..."},
+    // and free text as a bare string. The submitted text came out of that
+    // field's allowedValues in the first place (BuildOptionFields picks
+    // name, then value, then id), so it is matched back to the entry it was
+    // taken from and re-wrapped under whichever key matched.
+    IJsonValue ActionFieldValue(const IJsonValue& fieldSpec, const std::wstring& text)
+    {
+        if (fieldSpec && fieldSpec.ValueType() == JsonValueType::Object)
+        {
+            const auto detail = fieldSpec.GetObject();
+            if (const auto allowed = detail.GetNamedArray(L"allowedValues", nullptr))
+            {
+                for (uint32_t i = 0; i < allowed.Size(); ++i)
+                {
+                    const auto entry = allowed.GetAt(i);
+                    if (!entry || entry.ValueType() != JsonValueType::Object)
+                    {
+                        continue;
+                    }
+                    const auto option = entry.GetObject();
+                    for (const auto key : { L"name", L"value", L"id" })
+                    {
+                        const auto candidate = option.GetNamedString(key, L"");
+                        if (candidate.empty() || std::wstring{ candidate } != text)
+                        {
+                            continue;
+                        }
+                        JsonObject wrapped;
+                        wrapped.SetNamedValue(key, JsonValue::CreateStringValue(candidate));
+                        return wrapped;
+                    }
+                }
+
+                // A choice whose text matched nothing that was offered. It is
+                // still a choice field, so it is sent the way the great
+                // majority of them are spelled rather than as a bare string.
+                JsonObject wrapped;
+                wrapped.SetNamedValue(L"name", JsonValue::CreateStringValue(winrt::hstring{ text }));
+                return wrapped;
+            }
+        }
+        return JsonValue::CreateStringValue(winrt::hstring{ text });
+    }
+
+    // What the user filled in, as the object the far end expects. `spec` is the
+    // chosen option's own fields declaration, or null when it declared none.
+    JsonObject BuildActionFields(const IJsonValue& spec, const TemplateValueMap& values)
+    {
+        JsonObject fields;
+        for (const auto& [key, text] : values)
+        {
+            if (key.empty() || text.empty())
+            {
+                continue;
+            }
+
+            IJsonValue fieldSpec{ nullptr };
+            if (spec && spec.ValueType() == JsonValueType::Object)
+            {
+                const auto object = spec.GetObject();
+                const winrt::hstring name{ key };
+                if (object.HasKey(name))
+                {
+                    fieldSpec = object.Lookup(name);
+                }
+            }
+            fields.SetNamedValue(winrt::hstring{ key }, ActionFieldValue(fieldSpec, text));
+        }
+        return fields;
+    }
+
+    // Puts those values into the request as a top-level "fields" object, beside
+    // whatever the manifest's template produced. Done by parsing and
+    // re-serialising rather than by splicing strings, so the quoting is the
+    // JSON writer's problem and not a regex's.
+    //
+    // A body that is not a JSON object is left exactly as written: there is
+    // nothing safe to merge into, and the far end gets to say what it makes of
+    // the request rather than this silently rewriting it.
+    std::wstring MergeActionFields(std::wstring body, const JsonObject& extra)
+    {
+        if (!extra || extra.Size() == 0)
+        {
+            return body;
+        }
+
+        JsonObject parsed{ nullptr };
+        if (!body.empty() && !JsonObject::TryParse(winrt::hstring{ body }, parsed))
+        {
+            return body;
+        }
+        if (!parsed)
+        {
+            parsed = JsonObject{};
+        }
+
+        // A template that already wrote "fields" keeps what it put there; the
+        // user's answers are added beside it.
+        JsonObject target{ nullptr };
+        if (parsed.HasKey(L"fields"))
+        {
+            if (const auto existing = parsed.Lookup(L"fields"); existing && existing.ValueType() == JsonValueType::Object)
+            {
+                target = existing.GetObject();
+            }
+        }
+        if (!target)
+        {
+            target = JsonObject{};
+        }
+
+        for (const auto& pair : extra)
+        {
+            target.SetNamedValue(pair.Key(), pair.Value());
+        }
+        parsed.SetNamedValue(L"fields", target);
+        return std::wstring{ parsed.Stringify() };
+    }
+
+    // Runs one action end to end: re-runs the fetch pipeline so the action's
+    // templates have the same results the card was built from, fires the
+    // action's own request, and then looks for a way back.
+    //
+    // Blocking; always called from a background thread. The request itself is
+    // guarded here, so a normal failure comes back as an error line; anything
+    // else is caught by InvokeActionAsync, which is what keeps an unexpected
+    // WinRT failure from escaping into a coroutine.
+    Control::HyperlinkActionResult RunAction(const Snapshot::Plugin& plugin,
+                                             const Snapshot::Action& action,
+                                             const TemplateValueMap& groups,
+                                             const std::wstring& choiceId,
+                                             const TemplateValueMap& fieldValues)
+    {
+        Control::HyperlinkActionResult result{};
+
+        // {{choice}} is the picked option's id. It joins the matcher's own
+        // capture groups rather than getting a namespace of its own, so a
+        // manifest spells it the same way it spells {{issue}}.
+        auto templateGroups = groups;
+        templateGroups[L"choice"] = choiceId;
+
+        PipelineOutcome pipeline;
+
+        ExpandContext context;
+        context.Groups = &templateGroups;
+        context.Settings = &plugin.Settings;
+        context.Credentials = &plugin.Credentials;
+        context.Results = &pipeline.Results;
+        context.ActionFields = &fieldValues;
+
+        WWH::HttpClient plainClient{ nullptr };
+        WWH::HttpClient lenientClient{ nullptr };
+        RunPipeline(plugin, context, pipeline, plainClient, lenientClient);
+
+        if (!pipeline.Error.empty())
+        {
+            result.Error(winrt::hstring{ pipeline.Error });
+            return result;
+        }
+
+        const ResultReader reader{ &pipeline };
+
+        // Read before the change, so the undo below has something to aim at.
+        const auto stateBefore = action.CurrentStatePath.empty() ? std::wstring{} : reader.Text(action.CurrentStatePath);
+
+        // What the chosen option said it needed, so each answer can be shaped
+        // the way its own field wants it.
+        IJsonValue chosenFields{ nullptr };
+        if (!fieldValues.empty() && action.IsChoice && !action.OptionsPath.empty() && !action.OptionFieldsPath.empty())
+        {
+            if (const auto options = reader.Json(action.OptionsPath); options && options.ValueType() == JsonValueType::Array)
+            {
+                const auto array = options.GetArray();
+                for (uint32_t i = 0; i < array.Size(); ++i)
+                {
+                    const auto element = array.GetAt(i);
+                    if (ValueToString(At(element, action.OptionIdPath)) == choiceId)
+                    {
+                        chosenFields = At(element, action.OptionFieldsPath);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Expanded here rather than inside RunHttpCall, because the user's
+        // answers cannot be baked into a static template: which fields a Jira
+        // transition demands differs per transition, so the body carries only
+        // {"transition":{"id":"{{choice}}"}} and the answers are merged into
+        // the expanded JSON afterwards.
+        //
+        // Escape::Json for the expansion, since {{choice}} and any
+        // {{field.<key>}} the manifest DID spell out land inside string
+        // literals; the merge below quotes its own values.
+        auto body = Expand(action.Body, context, Escape::Json);
+        if (!fieldValues.empty())
+        {
+            body = MergeActionFields(std::move(body), BuildActionFields(chosenFields, fieldValues));
+        }
+
+        HttpCall call;
+        call.Url = action.Url;
+        call.Method = action.Method.empty() ? std::wstring_view{ L"POST" } : std::wstring_view{ action.Method };
+        call.Headers = &action.Headers;
+        call.AuthType = action.AuthType;
+        call.AuthUser = action.AuthUser;
+        call.AuthPassword = action.AuthPassword;
+        call.AllowUntrusted = action.AllowUntrusted;
+        call.TimeoutMs = action.TimeoutMs;
+        call.BodyLiteral = &body;
+
+        StepOutcome outcome;
+        try
+        {
+            outcome = RunHttpCall(call, context, plugin.Name, plainClient, lenientClient);
+        }
+        catch (const winrt::hresult_error& e)
+        {
+            outcome.Error = fmt::format(L"{}: {}", plugin.Name, std::wstring{ e.message() });
+        }
+        catch (...)
+        {
+            outcome.Error = fmt::format(L"{}: the request failed", plugin.Name);
+        }
+
+        if (!outcome.Error.empty())
+        {
+            result.Error(winrt::hstring{ outcome.Error });
+            return result;
+        }
+        result.Ok(true);
+
+        // The way back, when the far end offers one: an option that moves the
+        // thing to the state it was in before the change.
+        //
+        // Looked up AFTER the change, not before, and that is the whole trick:
+        // Jira lists the transitions available FROM the current status, so the
+        // one that returns to the previous status can only appear once the
+        // change has happened. Searching the pre-action list would only ever
+        // find a self-loop. It costs one more pipeline run, which the card is
+        // about to pay for anyway when it refreshes.
+        //
+        // Often there is no way back at all -- a workflow that only moves
+        // forward -- and then both fields stay empty, which the card is
+        // expected to report honestly rather than paper over.
+        if (action.IsChoice && !stateBefore.empty() && !action.OptionTargetIdPath.empty() && !action.OptionsPath.empty())
+        {
+            PipelineOutcome after;
+            auto afterContext = context;
+            afterContext.Results = &after.Results;
+            RunPipeline(plugin, afterContext, after, plainClient, lenientClient);
+
+            const ResultReader afterReader{ &after };
+            const auto value = afterReader.Json(action.OptionsPath);
+            if (value && value.ValueType() == JsonValueType::Array)
+            {
+                const auto array = value.GetArray();
+                for (uint32_t i = 0; i < array.Size(); ++i)
+                {
+                    const auto element = array.GetAt(i);
+                    if (ValueToString(At(element, action.OptionTargetIdPath)) != stateBefore)
+                    {
+                        continue;
+                    }
+                    const auto id = ValueToString(At(element, action.OptionIdPath));
+                    if (id.empty() || id == choiceId)
+                    {
+                        continue;
+                    }
+                    auto label = ValueToString(At(element, action.OptionLabelPath));
+                    if (label.empty())
+                    {
+                        label = id;
+                    }
+                    result.UndoChoiceId(winrt::hstring{ id });
+                    result.UndoLabel(winrt::hstring{ label });
+                    break;
+                }
+            }
+        }
+
+        return result;
     }
 }
 
@@ -1241,12 +2187,22 @@ namespace winrt::TerminalApp::implementation
                         }
                         catch (...)
                         {
-                            // Nothing stored, or the vault refused: not configured.
+                            // Nothing stored, or the vault refused.
                         }
-                        if (value.empty())
+                        // Only a REQUIRED credential decides whether the
+                        // integration is configured, exactly as the settings
+                        // loop above treats a required setting. GitHub declares
+                        // its token optional because `gh auth token` is tried
+                        // first; without this test an integration that works
+                        // perfectly through the CLI would be permanently "not
+                        // configured" and never fetch anything.
+                        if (value.empty() && field.Required())
                         {
                             configuredFully = false;
                         }
+                        // Stored either way, empty included: {{credentials.x}}
+                        // expanding to nothing is what makes a step's `when` /
+                        // `unless` work as a presence test.
                         plugin->Credentials[std::wstring{ field.Key() }] = std::move(value);
                     }
                 }
@@ -1299,6 +2255,7 @@ namespace winrt::TerminalApp::implementation
                         entryStep.Stdin = std::wstring{ step.Stdin() };
                         entryStep.When = std::wstring{ step.When() };
                         entryStep.Unless = std::wstring{ step.Unless() };
+                        entryStep.Optional = step.Optional();
                         entryStep.TimeoutMs = step.TimeoutMs() > 0 ? static_cast<unsigned long>(step.TimeoutMs()) : 8000ul;
 
                         if (const auto headers = step.Headers())
@@ -1349,6 +2306,128 @@ namespace winrt::TerminalApp::implementation
                         entryField.Format = std::wstring{ field.Format() };
                         entryField.Kind = static_cast<int32_t>(field.Kind());
                         plugin->Fields.push_back(std::move(entryField));
+                    }
+                }
+
+                if (const auto groups = manifest.FieldGroups())
+                {
+                    for (const auto& group : groups)
+                    {
+                        if (!group)
+                        {
+                            continue;
+                        }
+                        HyperlinkPreviewSnapshot::FieldGroup entryGroup;
+                        entryGroup.Key = std::wstring{ group.Key() };
+                        entryGroup.Label = std::wstring{ group.Label() };
+                        if (const auto members = group.Fields())
+                        {
+                            for (const auto& key : members)
+                            {
+                                entryGroup.Fields.push_back(std::wstring{ key });
+                            }
+                        }
+                        plugin->FieldGroups.push_back(std::move(entryGroup));
+                    }
+                }
+
+                // Same contract as Fields: a null Tabs collection means "the
+                // manifest's own defaults", an empty one means the user turned
+                // every tab off.
+                const auto chosenTabs = entry.Tabs();
+                std::set<std::wstring> selectedTabs;
+                if (chosenTabs)
+                {
+                    for (const auto& key : chosenTabs)
+                    {
+                        selectedTabs.insert(std::wstring{ key });
+                    }
+                }
+
+                if (const auto tabs = manifest.Tabs())
+                {
+                    for (const auto& tab : tabs)
+                    {
+                        if (!tab)
+                        {
+                            continue;
+                        }
+                        const std::wstring key{ tab.Key() };
+                        const auto visible = chosenTabs ? selectedTabs.count(key) != 0 : tab.DefaultVisible();
+                        if (!visible)
+                        {
+                            continue;
+                        }
+
+                        HyperlinkPreviewSnapshot::Tab entryTab;
+                        entryTab.Key = key;
+                        entryTab.Label = std::wstring{ tab.Label() };
+                        // NOT a static_cast, unlike the field kinds.
+                        // Model::IntegrationTabKind is { Body, List } and
+                        // Control::HyperlinkPreviewTabKind is { Fields, Body,
+                        // Comments } -- the control has a member for the
+                        // built-in field list that no manifest can ask for, so
+                        // the two enums do not line up and the mapping is
+                        // written out (see BuildTabs).
+                        entryTab.IsList = tab.Kind() == Model::IntegrationTabKind::List;
+                        entryTab.Path = std::wstring{ tab.Path() };
+                        entryTab.Format = std::wstring{ tab.Format() };
+                        entryTab.ItemAuthorPath = std::wstring{ tab.ItemAuthorPath() };
+                        entryTab.ItemAvatarPath = std::wstring{ tab.ItemAvatarPath() };
+                        entryTab.ItemBodyPath = std::wstring{ tab.ItemBodyPath() };
+                        entryTab.ItemTimePath = std::wstring{ tab.ItemTimePath() };
+                        plugin->Tabs.push_back(std::move(entryTab));
+                    }
+                }
+
+                if (const auto actions = manifest.Actions())
+                {
+                    for (const auto& action : actions)
+                    {
+                        if (!action || action.Key().empty())
+                        {
+                            continue;
+                        }
+                        HyperlinkPreviewSnapshot::Action entryAction;
+                        entryAction.Key = std::wstring{ action.Key() };
+                        entryAction.Label = std::wstring{ action.Label() };
+                        entryAction.IsChoice = action.Kind() == Model::IntegrationActionKind::Choice;
+                        entryAction.OptionsPath = std::wstring{ action.OptionsPath() };
+                        entryAction.OptionIdPath = std::wstring{ action.OptionIdPath() };
+                        entryAction.OptionLabelPath = std::wstring{ action.OptionLabelPath() };
+                        entryAction.OptionBadgePath = std::wstring{ action.OptionBadgePath() };
+                        entryAction.OptionColorPath = std::wstring{ action.OptionColorPath() };
+                        entryAction.OptionTargetIdPath = std::wstring{ action.OptionTargetIdPath() };
+                        entryAction.CurrentStatePath = std::wstring{ action.CurrentStatePath() };
+                        entryAction.OptionFieldsPath = std::wstring{ action.OptionFieldsPath() };
+                        entryAction.Method = std::wstring{ action.Method() };
+                        entryAction.Url = std::wstring{ action.Url() };
+                        entryAction.Body = std::wstring{ action.Body() };
+                        entryAction.AuthType = std::wstring{ action.AuthType() };
+                        entryAction.AuthUser = std::wstring{ action.AuthUser() };
+                        entryAction.AuthPassword = std::wstring{ action.AuthPassword() };
+                        entryAction.AllowUntrusted = action.AllowUntrustedCertificate();
+                        entryAction.TimeoutMs = action.TimeoutMs() > 0 ? static_cast<unsigned long>(action.TimeoutMs()) : 8000ul;
+
+                        if (const auto headers = action.Headers())
+                        {
+                            for (const auto& pair : headers)
+                            {
+                                entryAction.Headers.emplace_back(std::wstring{ pair.Key() }, std::wstring{ pair.Value() });
+                            }
+                        }
+                        plugin->Actions.push_back(std::move(entryAction));
+                    }
+                }
+
+                if (const auto patterns = manifest.DetectPatterns())
+                {
+                    for (const auto& pattern : patterns)
+                    {
+                        if (!pattern.empty())
+                        {
+                            plugin->DetectPatterns.push_back(std::wstring{ pattern });
+                        }
                     }
                 }
 
@@ -1409,6 +2488,12 @@ namespace winrt::TerminalApp::implementation
         return found->second.Preview;
     }
 
+    void HyperlinkPreviewService::_cacheErase(const std::wstring& key)
+    {
+        std::scoped_lock lock{ _mutex };
+        _cache.erase(key);
+    }
+
     void HyperlinkPreviewService::_cacheStore(const std::wstring& key, const Control::HyperlinkPreview& preview, int32_t seconds)
     {
         std::scoped_lock lock{ _mutex };
@@ -1437,7 +2522,7 @@ namespace winrt::TerminalApp::implementation
         context.Groups = &found->Groups;
         context.Settings = &found->Owner->Settings;
         context.Credentials = &found->Owner->Credentials;
-        return hstring{ Expand(found->Matcher->LinkTemplate, context, false) };
+        return hstring{ Expand(found->Matcher->LinkTemplate, context, Escape::None) };
     }
     catch (...)
     {
@@ -1459,6 +2544,18 @@ namespace winrt::TerminalApp::implementation
 
     IAsyncOperation<Control::HyperlinkPreview> HyperlinkPreviewService::GetPreviewAsync(hstring text, hstring integrationHint)
     {
+        return _previewAsync(std::move(text), std::move(integrationHint), false);
+    }
+
+    // The same fetch, with whatever is cached thrown away first -- what to call
+    // once an action has changed the thing the card is describing.
+    IAsyncOperation<Control::HyperlinkPreview> HyperlinkPreviewService::RefreshAsync(hstring text, hstring integrationHint)
+    {
+        return _previewAsync(std::move(text), std::move(integrationHint), true);
+    }
+
+    IAsyncOperation<Control::HyperlinkPreview> HyperlinkPreviewService::_previewAsync(hstring text, hstring integrationHint, bool bypassCache)
+    {
         auto strongThis = get_strong();
 
         // Resolved here, on the caller's thread, and then copied out: the
@@ -1467,19 +2564,27 @@ namespace winrt::TerminalApp::implementation
         // underneath it.
         std::shared_ptr<HyperlinkPreviewSnapshot::Plugin> plugin;
         TemplateValueMap groups;
+        std::wstring source;
         std::wstring cacheKey;
         Control::HyperlinkPreview cached{ nullptr };
 
         try
         {
-            const std::wstring value{ text };
-            if (auto found = FindMatch(strongThis->_currentSnapshot(), value, std::wstring{ integrationHint }, false);
+            source = std::wstring{ text };
+            if (auto found = FindMatch(strongThis->_currentSnapshot(), source, std::wstring{ integrationHint }, false);
                 found && found->Owner->Configured && !found->Owner->Steps.empty())
             {
                 plugin = found->Owner;
                 groups = std::move(found->Groups);
-                cacheKey = plugin->Id + L"|" + value;
-                cached = strongThis->_cacheLookup(cacheKey);
+                cacheKey = plugin->Id + L"|" + source;
+                if (bypassCache)
+                {
+                    strongThis->_cacheErase(cacheKey);
+                }
+                else
+                {
+                    cached = strongThis->_cacheLookup(cacheKey);
+                }
             }
         }
         catch (...)
@@ -1505,7 +2610,10 @@ namespace winrt::TerminalApp::implementation
             broken.IntegrationId(hstring{ plugin->Id });
             broken.IntegrationName(hstring{ plugin->Name });
             broken.IntegrationIcon(hstring{ plugin->Icon });
+            broken.SourceText(hstring{ source });
             broken.Fields(winrt::single_threaded_vector<Control::HyperlinkPreviewField>());
+            broken.Tabs(winrt::single_threaded_vector<Control::HyperlinkPreviewTab>());
+            broken.Actions(winrt::single_threaded_vector<Control::HyperlinkPreviewAction>());
             broken.Error(hstring{ message });
             return broken;
         };
@@ -1513,7 +2621,7 @@ namespace winrt::TerminalApp::implementation
         Control::HyperlinkPreview preview{ nullptr };
         try
         {
-            preview = RunFetch(*plugin, groups);
+            preview = RunFetch(*plugin, source, groups);
         }
         catch (const winrt::hresult_error& e)
         {
@@ -1531,5 +2639,103 @@ namespace winrt::TerminalApp::implementation
         strongThis->_cacheStore(cacheKey, preview, seconds);
 
         co_return preview;
+    }
+
+    IAsyncOperation<Control::HyperlinkActionResult> HyperlinkPreviewService::InvokeActionAsync(hstring text,
+                                                                                              hstring integrationHint,
+                                                                                              hstring actionKey,
+                                                                                              hstring choiceId,
+                                                                                              IMap<hstring, hstring> fieldValues)
+    {
+        auto strongThis = get_strong();
+
+        // Same discipline as a preview: everything is resolved and copied on
+        // the caller's thread, so a settings reload mid-flight cannot pull the
+        // plugin (or the action) out from under the request.
+        std::shared_ptr<HyperlinkPreviewSnapshot::Plugin> plugin;
+        const HyperlinkPreviewSnapshot::Action* action{ nullptr };
+        TemplateValueMap groups;
+        TemplateValueMap values;
+        std::wstring cacheKey;
+        std::wstring failure;
+
+        try
+        {
+            const std::wstring source{ text };
+            const std::wstring key{ actionKey };
+            if (auto found = FindMatch(strongThis->_currentSnapshot(), source, std::wstring{ integrationHint }, false);
+                found && found->Owner->Configured)
+            {
+                for (const auto& candidate : found->Owner->Actions)
+                {
+                    if (candidate.Key == key)
+                    {
+                        action = &candidate;
+                        break;
+                    }
+                }
+                if (action)
+                {
+                    plugin = found->Owner;
+                    groups = std::move(found->Groups);
+                    cacheKey = plugin->Id + L"|" + source;
+                }
+            }
+
+            if (!action)
+            {
+                failure = L"That action is no longer available.";
+            }
+            else if (fieldValues)
+            {
+                for (const auto& pair : fieldValues)
+                {
+                    values[std::wstring{ pair.Key() }] = std::wstring{ pair.Value() };
+                }
+            }
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            failure = L"That action could not be started.";
+        }
+
+        if (!plugin || !action)
+        {
+            Control::HyperlinkActionResult refused{};
+            refused.Error(hstring{ failure.empty() ? std::wstring{ L"That action is no longer available." } : failure });
+            co_return refused;
+        }
+
+        // `plugin` and `action` both live in the coroutine frame across the
+        // suspension below, and a published snapshot is never mutated, so the
+        // pointer into the plugin's Actions vector stays good even if a
+        // settings reload replaces the snapshot while the request is in flight.
+        const std::wstring choice{ choiceId };
+
+        co_await winrt::resume_background();
+
+        Control::HyperlinkActionResult result{ nullptr };
+        try
+        {
+            result = RunAction(*plugin, *action, groups, choice, values);
+        }
+        catch (const winrt::hresult_error& e)
+        {
+            result = Control::HyperlinkActionResult{};
+            result.Error(hstring{ fmt::format(L"{}: {}", plugin->Name, std::wstring{ e.message() }) });
+        }
+        catch (...)
+        {
+            result = Control::HyperlinkActionResult{};
+            result.Error(hstring{ fmt::format(L"{}: the action could not be run", plugin->Name) });
+        }
+
+        // Whatever the card is showing described the state before the action.
+        // Even a failed one may have got far enough to change something, so the
+        // entry goes either way and the next read repopulates it.
+        strongThis->_cacheErase(cacheKey);
+
+        co_return result;
     }
 }

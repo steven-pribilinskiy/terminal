@@ -188,14 +188,51 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <!--  Which of the integration's fields the hyperlink card shows  -->
+            <!--
+                Which of the integration's fields the hyperlink card shows, in
+                the groups the manifest declares. The group header is
+                three-state: indeterminate while only some of its fields are on,
+                and clicking it turns the whole group on or off.
+            -->
             <TextBlock x:Uid="Integrations_FieldsHeader"
                        Style="{StaticResource TextBlockSubHeaderStyle}"
                        Visibility="{x:Bind ViewModel.CurrentIntegration.HasFields, Mode=OneWay}" />
 
-            <ItemsControl ItemsSource="{x:Bind ViewModel.CurrentIntegration.Fields, Mode=OneWay}">
+            <ItemsControl ItemsSource="{x:Bind ViewModel.CurrentIntegration.FieldGroups, Mode=OneWay}">
                 <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="local:IntegrationDisplayFieldViewModel">
+                    <DataTemplate x:DataType="local:IntegrationFieldGroupViewModel">
+                        <StackPanel Margin="0,4,0,8"
+                                    Spacing="2">
+                            <CheckBox Content="{x:Bind Label}"
+                                      FontWeight="SemiBold"
+                                      IsChecked="{x:Bind GroupChecked, Mode=TwoWay}"
+                                      IsThreeState="True" />
+                            <ItemsControl Margin="24,0,0,0"
+                                          ItemsSource="{x:Bind Fields}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="local:IntegrationDisplayFieldViewModel">
+                                        <CheckBox Content="{x:Bind Label}"
+                                                  IsChecked="{x:Bind Visible, Mode=TwoWay}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!--  Extra panels of content the card can carry beside its fields  -->
+            <TextBlock x:Uid="Integrations_TabsHeader"
+                       Style="{StaticResource TextBlockSubHeaderStyle}"
+                       Visibility="{x:Bind ViewModel.CurrentIntegration.HasTabs, Mode=OneWay}" />
+
+            <TextBlock x:Uid="Integrations_TabsDescription"
+                       Style="{StaticResource DisclaimerStyle}"
+                       Visibility="{x:Bind ViewModel.CurrentIntegration.HasTabs, Mode=OneWay}" />
+
+            <ItemsControl ItemsSource="{x:Bind ViewModel.CurrentIntegration.Tabs, Mode=OneWay}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="local:IntegrationTabViewModel">
                         <CheckBox Content="{x:Bind Label}"
                                   IsChecked="{x:Bind Visible, Mode=TwoWay}" />
                     </DataTemplate>

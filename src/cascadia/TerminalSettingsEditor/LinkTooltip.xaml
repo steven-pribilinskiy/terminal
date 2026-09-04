@@ -27,6 +27,13 @@
                 <TextBlock Text="{x:Bind DisplayName}" />
             </DataTemplate>
 
+            <!--  Shared by the global button list and by a rule's override of it.  -->
+            <DataTemplate x:Key="ButtonChoiceTemplate"
+                          x:DataType="local:ButtonChoiceViewModel">
+                <CheckBox Content="{x:Bind Label}"
+                          IsChecked="{x:Bind Selected, Mode=TwoWay}" />
+            </DataTemplate>
+
             <Style x:Key="RulePatternHintStyle"
                    BasedOn="{StaticResource DisclaimerStyle}"
                    TargetType="TextBlock">
@@ -36,356 +43,386 @@
     </Page.Resources>
 
     <StackPanel>
-        <!--  Defaults, moved here from the Interaction page  -->
-        <StackPanel Spacing="2"
-                    Style="{StaticResource SettingsStackStyle}">
-            <TextBlock x:Uid="LinkTooltip_DefaultsHeader"
-                       Style="{StaticResource TextBlockSubHeaderStyle}" />
+        <!--
+            The defaults and the list of rules. Hidden while a rule is open, so
+            editing a rule reads as a page of its own rather than as a block
+            grafted onto the bottom of this one.
+        -->
+        <StackPanel Visibility="{x:Bind ViewModel.IsNotEditingRule, Mode=OneWay}">
+            <!--  Defaults, moved here from the Interaction page  -->
+            <StackPanel Spacing="2"
+                        Style="{StaticResource SettingsStackStyle}">
+                <TextBlock x:Uid="LinkTooltip_DefaultsHeader"
+                           Style="{StaticResource TextBlockSubHeaderStyle}" />
 
-            <local:SettingsCard x:Name="DetectURLs"
-                                x:Uid="Globals_DetectURLs">
-                <ToggleSwitch IsOn="{x:Bind ViewModel.DetectURLs, Mode=TwoWay}"
-                              Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-            </local:SettingsCard>
-
-            <local:SettingsCard x:Name="OpenLinksOnSingleClick"
-                                x:Uid="Globals_OpenLinksOnSingleClick">
-                <ToggleSwitch IsOn="{x:Bind ViewModel.OpenLinksOnSingleClick, Mode=TwoWay}"
-                              Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-            </local:SettingsCard>
-
-            <local:SettingsCard x:Name="HyperlinkTooltipMaxWidth"
-                                x:Uid="Globals_HyperlinkTooltipMaxWidth">
-                <muxc:NumberBox x:Uid="Globals_HyperlinkTooltipMaxWidthBox"
-                                LargeChange="100"
-                                Maximum="4000"
-                                Minimum="0"
-                                SmallChange="20"
-                                Style="{StaticResource NumberBoxSettingStyle}"
-                                Value="{x:Bind ViewModel.HyperlinkTooltipMaxWidth, Mode=TwoWay}" />
-            </local:SettingsCard>
-
-            <local:SettingsCard x:Name="HyperlinkTooltipShowDelay"
-                                x:Uid="Globals_HyperlinkTooltipShowDelay">
-                <muxc:NumberBox x:Uid="Globals_HyperlinkTooltipShowDelayBox"
-                                LargeChange="100"
-                                Maximum="5000"
-                                Minimum="0"
-                                SmallChange="50"
-                                Style="{StaticResource NumberBoxSettingStyle}"
-                                Value="{x:Bind ViewModel.HyperlinkTooltipShowDelay, Mode=TwoWay}" />
-            </local:SettingsCard>
-
-            <local:SettingsCard x:Name="HyperlinkTooltipHideDelay"
-                                x:Uid="Globals_HyperlinkTooltipHideDelay">
-                <muxc:NumberBox x:Uid="Globals_HyperlinkTooltipHideDelayBox"
-                                LargeChange="100"
-                                Maximum="5000"
-                                Minimum="0"
-                                SmallChange="50"
-                                Style="{StaticResource NumberBoxSettingStyle}"
-                                Value="{x:Bind ViewModel.HyperlinkTooltipHideDelay, Mode=TwoWay}" />
-            </local:SettingsCard>
-
-            <local:SettingsCard x:Name="HyperlinkTooltipActions"
-                                x:Uid="Globals_HyperlinkTooltipActions">
-                <ToggleSwitch IsOn="{x:Bind ViewModel.HyperlinkTooltipActions, Mode=TwoWay}"
-                              Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-            </local:SettingsCard>
-
-            <local:SettingsCard x:Name="SafeUriSchemes"
-                                x:Uid="Globals_SafeUriSchemes">
-                <TextBox IsSpellCheckEnabled="False"
-                         Style="{StaticResource TextBoxSettingStyle}"
-                         Text="{x:Bind ViewModel.SafeUriSchemes, Mode=TwoWay}" />
-            </local:SettingsCard>
-        </StackPanel>
-
-        <!--  Rules  -->
-        <StackPanel Spacing="2"
-                    Style="{StaticResource SettingsStackStyle}">
-            <TextBlock x:Uid="LinkTooltip_RulesHeader"
-                       Style="{StaticResource TextBlockSubHeaderStyle}" />
-
-            <Button Click="AddRuleButton_Click">
-                <StackPanel Orientation="Horizontal"
-                            Spacing="8">
-                    <FontIcon FontSize="{StaticResource StandardIconSize}"
-                              Glyph="&#xE710;" />
-                    <TextBlock x:Uid="LinkTooltip_AddRuleButtonText" />
-                </StackPanel>
-            </Button>
-
-            <ListView x:Name="RulesListView"
-                      ItemsSource="{x:Bind ViewModel.CurrentView, Mode=OneWay}"
-                      SelectionMode="None">
-                <ListView.ItemTemplate>
-                    <DataTemplate x:DataType="local:HyperlinkTooltipRuleViewModel">
-                        <Grid ColumnSpacing="8"
-                              Padding="0,4">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-
-                            <ToggleSwitch Grid.Column="0"
-                                          IsOn="{x:Bind Enabled, Mode=TwoWay}"
-                                          OffContent=""
-                                          OnContent="" />
-
-                            <StackPanel Grid.Column="1"
-                                        VerticalAlignment="Center">
-                                <TextBlock FontWeight="SemiBold"
-                                           Text="{x:Bind Name, Mode=OneWay}" />
-                                <TextBlock FontSize="12"
-                                           Opacity="0.7"
-                                           Text="{x:Bind SummaryText, Mode=OneWay}"
-                                           TextWrapping="Wrap" />
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="2"
-                                        Orientation="Horizontal"
-                                        Spacing="4">
-                                <Button AutomationProperties.Name="Edit rule"
-                                        Click="EditRule_Click">
-                                    <FontIcon FontSize="{StaticResource StandardIconSize}"
-                                              Glyph="&#xE70F;" />
-                                </Button>
-                                <Button AutomationProperties.Name="Move rule up"
-                                        Click="ReorderRule_Click"
-                                        Tag="Up">
-                                    <FontIcon FontSize="{StaticResource StandardIconSize}"
-                                              Glyph="&#xF0AD;" />
-                                </Button>
-                                <Button AutomationProperties.Name="Move rule down"
-                                        Click="ReorderRule_Click"
-                                        Tag="Down">
-                                    <FontIcon FontSize="{StaticResource StandardIconSize}"
-                                              Glyph="&#xF0AE;" />
-                                </Button>
-                                <Button AutomationProperties.Name="Delete rule"
-                                        Click="DeleteRule_Click">
-                                    <FontIcon FontSize="{StaticResource StandardIconSize}"
-                                              Glyph="&#xE74D;" />
-                                </Button>
-                            </StackPanel>
-                        </Grid>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
-
-            <!--  Rule editor: master-detail, edits ViewModel.CurrentRule in place  -->
-            <StackPanel Margin="0,12,0,0"
-                        Padding="12"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource FlyoutBorderThemeBrush}"
-                        BorderThickness="1"
-                        CornerRadius="{ThemeResource OverlayCornerRadius}"
-                        Spacing="2"
-                        Visibility="{x:Bind ViewModel.IsEditingRule, Mode=OneWay}">
-
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock x:Uid="LinkTooltip_RuleEditorHeader"
-                               Style="{StaticResource TextBlockSubHeaderStyle}" />
-                    <Button Grid.Column="1"
-                            AutomationProperties.Name="Close rule editor"
-                            Click="CloseRuleEditor_Click">
-                        <FontIcon FontSize="{StaticResource StandardIconSize}"
-                                  Glyph="&#xE711;" />
-                    </Button>
-                </Grid>
-
-                <local:SettingsCard x:Uid="LinkTooltip_RuleName">
-                    <TextBox Style="{StaticResource TextBoxSettingStyle}"
-                             Text="{x:Bind ViewModel.CurrentRule.Name, Mode=TwoWay}" />
-                </local:SettingsCard>
-
-                <local:SettingsCard x:Uid="LinkTooltip_RuleEnabled">
-                    <ToggleSwitch IsOn="{x:Bind ViewModel.CurrentRule.Enabled, Mode=TwoWay}"
+                <local:SettingsCard x:Name="DetectURLs"
+                                    x:Uid="Globals_DetectURLs">
+                    <ToggleSwitch IsOn="{x:Bind ViewModel.DetectURLs, Mode=TwoWay}"
                                   Style="{StaticResource ToggleSwitchInExpanderStyle}" />
                 </local:SettingsCard>
 
-                <TextBlock x:Uid="LinkTooltip_MatchCriteriaHeader"
-                           Style="{StaticResource TextBlockSubHeaderStyle}" />
-
-                <local:SettingsCard x:Uid="LinkTooltip_RuleKind">
-                    <ComboBox AutomationProperties.AccessibilityView="Content"
-                              ItemTemplate="{StaticResource EnumComboBoxTemplate}"
-                              ItemsSource="{x:Bind ViewModel.CurrentRule.KindList, Mode=OneWay}"
-                              SelectedItem="{x:Bind ViewModel.CurrentRule.CurrentKind, Mode=TwoWay}"
-                              Style="{StaticResource ComboBoxSettingStyle}" />
+                <local:SettingsCard x:Name="OpenLinksOnSingleClick"
+                                    x:Uid="Globals_OpenLinksOnSingleClick">
+                    <ToggleSwitch IsOn="{x:Bind ViewModel.OpenLinksOnSingleClick, Mode=TwoWay}"
+                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
                 </local:SettingsCard>
 
-                <local:SettingsCard x:Uid="LinkTooltip_RuleSchemes"
-                                    Visibility="{x:Bind ViewModel.CurrentRule.IsLinkKind, Mode=OneWay}">
+                <local:SettingsCard x:Name="HyperlinkTooltipMaxWidth"
+                                    x:Uid="Globals_HyperlinkTooltipMaxWidth">
+                    <muxc:NumberBox x:Uid="Globals_HyperlinkTooltipMaxWidthBox"
+                                    LargeChange="100"
+                                    Maximum="4000"
+                                    Minimum="0"
+                                    SmallChange="20"
+                                    Style="{StaticResource NumberBoxSettingStyle}"
+                                    Value="{x:Bind ViewModel.HyperlinkTooltipMaxWidth, Mode=TwoWay}" />
+                </local:SettingsCard>
+
+                <local:SettingsCard x:Name="HyperlinkTooltipShowDelay"
+                                    x:Uid="Globals_HyperlinkTooltipShowDelay">
+                    <muxc:NumberBox x:Uid="Globals_HyperlinkTooltipShowDelayBox"
+                                    LargeChange="100"
+                                    Maximum="5000"
+                                    Minimum="0"
+                                    SmallChange="50"
+                                    Style="{StaticResource NumberBoxSettingStyle}"
+                                    Value="{x:Bind ViewModel.HyperlinkTooltipShowDelay, Mode=TwoWay}" />
+                </local:SettingsCard>
+
+                <local:SettingsCard x:Name="HyperlinkTooltipHideDelay"
+                                    x:Uid="Globals_HyperlinkTooltipHideDelay">
+                    <muxc:NumberBox x:Uid="Globals_HyperlinkTooltipHideDelayBox"
+                                    LargeChange="100"
+                                    Maximum="5000"
+                                    Minimum="0"
+                                    SmallChange="50"
+                                    Style="{StaticResource NumberBoxSettingStyle}"
+                                    Value="{x:Bind ViewModel.HyperlinkTooltipHideDelay, Mode=TwoWay}" />
+                </local:SettingsCard>
+
+                <!--
+                    Two settings about the buttons, kept adjacent because their
+                    names are close: this one is the whole row's on/off switch,
+                    the list under it chooses which buttons the row carries.
+                -->
+                <local:SettingsCard x:Name="HyperlinkTooltipActions"
+                                    x:Uid="Globals_HyperlinkTooltipActions">
+                    <ToggleSwitch IsOn="{x:Bind ViewModel.HyperlinkTooltipActions, Mode=TwoWay}"
+                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                </local:SettingsCard>
+
+                <local:SettingsCard x:Name="HyperlinkTooltipButtons"
+                                    x:Uid="Globals_HyperlinkTooltipButtons"
+                                    ContentAlignment="Vertical"
+                                    IsEnabled="{x:Bind ViewModel.HyperlinkTooltipActions, Mode=OneWay}">
+                    <ItemsControl ItemTemplate="{StaticResource ButtonChoiceTemplate}"
+                                  ItemsSource="{x:Bind ViewModel.ButtonChoices, Mode=OneWay}" />
+                </local:SettingsCard>
+
+                <local:SettingsCard x:Name="HyperlinkTooltipHint"
+                                    x:Uid="Globals_HyperlinkTooltipHint">
+                    <ToggleSwitch IsOn="{x:Bind ViewModel.HyperlinkTooltipHint, Mode=TwoWay}"
+                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                </local:SettingsCard>
+
+                <!--
+                    Which surface a hover uses, not which buttons it carries: on,
+                    hovering opens the detail pane instead of the tooltip card.
+                    Independent of the "Show in pane" button in the list above.
+                -->
+                <local:SettingsCard x:Name="HyperlinkPreviewInPane"
+                                    x:Uid="Globals_HyperlinkPreviewInPane">
+                    <ToggleSwitch IsOn="{x:Bind ViewModel.HyperlinkPreviewInPane, Mode=TwoWay}"
+                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                </local:SettingsCard>
+
+                <local:SettingsCard x:Name="SafeUriSchemes"
+                                    x:Uid="Globals_SafeUriSchemes">
                     <TextBox IsSpellCheckEnabled="False"
                              Style="{StaticResource TextBoxSettingStyle}"
-                             Text="{x:Bind ViewModel.CurrentRule.Schemes, Mode=TwoWay}" />
+                             Text="{x:Bind ViewModel.SafeUriSchemes, Mode=TwoWay}" />
                 </local:SettingsCard>
+            </StackPanel>
 
-                <local:SettingsCard x:Uid="LinkTooltip_RulePattern">
-                    <TextBox IsSpellCheckEnabled="False"
-                             Style="{StaticResource TextBoxSettingStyle}"
-                             Text="{x:Bind ViewModel.CurrentRule.Pattern, Mode=TwoWay}" />
-                </local:SettingsCard>
-
-                <TextBlock x:Uid="LinkTooltip_RuleTextPatternHint"
-                           Style="{StaticResource RulePatternHintStyle}"
-                           Visibility="{x:Bind ViewModel.CurrentRule.IsTextKind, Mode=OneWay}" />
-
-                <local:SettingsCard x:Uid="LinkTooltip_RuleFileTypeGroup"
-                                    Visibility="{x:Bind ViewModel.CurrentRule.IsLinkKind, Mode=OneWay}">
-                    <ComboBox AutomationProperties.AccessibilityView="Content"
-                              ItemTemplate="{StaticResource EnumComboBoxTemplate}"
-                              ItemsSource="{x:Bind ViewModel.CurrentRule.FileTypeGroupList, Mode=OneWay}"
-                              SelectedItem="{x:Bind ViewModel.CurrentRule.CurrentFileTypeGroup, Mode=TwoWay}"
-                              Style="{StaticResource ComboBoxSettingStyle}" />
-                </local:SettingsCard>
-
-                <local:SettingsCard x:Uid="LinkTooltip_RuleCustomExtensions"
-                                    Visibility="{x:Bind ViewModel.CurrentRule.IsLinkKind, Mode=OneWay}">
-                    <TextBox IsSpellCheckEnabled="False"
-                             Style="{StaticResource TextBoxSettingStyle}"
-                             Text="{x:Bind ViewModel.CurrentRule.CustomExtensions, Mode=TwoWay}" />
-                </local:SettingsCard>
-
-                <TextBlock x:Uid="LinkTooltip_PreviewHeader"
+            <!--  Rules: read-only rows. Clicking one opens it as a nested view.  -->
+            <StackPanel Spacing="2"
+                        Style="{StaticResource SettingsStackStyle}">
+                <TextBlock x:Uid="LinkTooltip_RulesHeader"
                            Style="{StaticResource TextBlockSubHeaderStyle}" />
 
-                <local:SettingsCard x:Uid="LinkTooltip_RuleIntegration">
-                    <ComboBox AutomationProperties.AccessibilityView="Content"
-                              ItemTemplate="{StaticResource IntegrationChoiceComboBoxTemplate}"
-                              ItemsSource="{x:Bind ViewModel.CurrentRule.IntegrationChoices, Mode=OneWay}"
-                              SelectedItem="{x:Bind ViewModel.CurrentRule.CurrentIntegrationChoice, Mode=TwoWay}"
-                              Style="{StaticResource ComboBoxSettingStyle}" />
-                </local:SettingsCard>
-
-                <local:SettingsCard x:Uid="LinkTooltip_RuleShowPreview">
-                    <ToggleSwitch IsOn="{x:Bind ViewModel.CurrentRule.ShowPreview, Mode=TwoWay}"
-                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-                </local:SettingsCard>
-
-                <TextBlock x:Uid="LinkTooltip_OverridesHeader"
-                           Style="{StaticResource TextBlockSubHeaderStyle}" />
-
-                <local:SettingsCard x:Uid="LinkTooltip_OverrideShowDelay">
-                    <StackPanel Orientation="Horizontal"
-                                Spacing="8">
-                        <CheckBox IsChecked="{x:Bind ViewModel.CurrentRule.OverrideShowDelay, Mode=TwoWay}" />
-                        <muxc:NumberBox LargeChange="100"
-                                        Maximum="5000"
-                                        Minimum="0"
-                                        SmallChange="50"
-                                        IsEnabled="{x:Bind ViewModel.CurrentRule.OverrideShowDelay, Mode=OneWay}"
-                                        Style="{StaticResource NumberBoxSettingStyle}"
-                                        Value="{x:Bind ViewModel.CurrentRule.ShowDelay, Mode=TwoWay}" />
-                    </StackPanel>
-                </local:SettingsCard>
-
-                <local:SettingsCard x:Uid="LinkTooltip_OverrideHideDelay">
-                    <StackPanel Orientation="Horizontal"
-                                Spacing="8">
-                        <CheckBox IsChecked="{x:Bind ViewModel.CurrentRule.OverrideHideDelay, Mode=TwoWay}" />
-                        <muxc:NumberBox LargeChange="100"
-                                        Maximum="5000"
-                                        Minimum="0"
-                                        SmallChange="50"
-                                        IsEnabled="{x:Bind ViewModel.CurrentRule.OverrideHideDelay, Mode=OneWay}"
-                                        Style="{StaticResource NumberBoxSettingStyle}"
-                                        Value="{x:Bind ViewModel.CurrentRule.HideDelay, Mode=TwoWay}" />
-                    </StackPanel>
-                </local:SettingsCard>
-
-                <local:SettingsCard x:Uid="LinkTooltip_OverrideMaxWidth">
-                    <StackPanel Orientation="Horizontal"
-                                Spacing="8">
-                        <CheckBox IsChecked="{x:Bind ViewModel.CurrentRule.OverrideMaxWidth, Mode=TwoWay}" />
-                        <muxc:NumberBox LargeChange="100"
-                                        Maximum="4000"
-                                        Minimum="0"
-                                        SmallChange="20"
-                                        IsEnabled="{x:Bind ViewModel.CurrentRule.OverrideMaxWidth, Mode=OneWay}"
-                                        Style="{StaticResource NumberBoxSettingStyle}"
-                                        Value="{x:Bind ViewModel.CurrentRule.MaxWidth, Mode=TwoWay}" />
-                    </StackPanel>
-                </local:SettingsCard>
-
-                <TextBlock x:Uid="LinkTooltip_BuiltInButtonsHeader"
-                           Style="{StaticResource TextBlockSubHeaderStyle}" />
-
-                <local:SettingsCard x:Uid="LinkTooltip_SuppressOpen">
-                    <ToggleSwitch IsOn="{x:Bind ViewModel.CurrentRule.SuppressOpen, Mode=TwoWay}"
-                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-                </local:SettingsCard>
-
-                <local:SettingsCard x:Uid="LinkTooltip_SuppressCopyLink">
-                    <ToggleSwitch IsOn="{x:Bind ViewModel.CurrentRule.SuppressCopyLink, Mode=TwoWay}"
-                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-                </local:SettingsCard>
-
-                <local:SettingsCard x:Uid="LinkTooltip_SuppressCopyPath">
-                    <ToggleSwitch IsOn="{x:Bind ViewModel.CurrentRule.SuppressCopyPath, Mode=TwoWay}"
-                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-                </local:SettingsCard>
-
-                <local:SettingsCard x:Uid="LinkTooltip_SuppressReveal">
-                    <ToggleSwitch IsOn="{x:Bind ViewModel.CurrentRule.SuppressReveal, Mode=TwoWay}"
-                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-                </local:SettingsCard>
-
-                <TextBlock x:Uid="LinkTooltip_CustomActionsHeader"
-                           Style="{StaticResource TextBlockSubHeaderStyle}" />
-
-                <Button Click="AddCustomActionButton_Click">
+                <Button Click="AddRuleButton_Click">
                     <StackPanel Orientation="Horizontal"
                                 Spacing="8">
                         <FontIcon FontSize="{StaticResource StandardIconSize}"
                                   Glyph="&#xE710;" />
-                        <TextBlock x:Uid="LinkTooltip_AddCustomActionButtonText" />
+                        <TextBlock x:Uid="LinkTooltip_AddRuleButtonText" />
                     </StackPanel>
                 </Button>
 
-                <ItemsControl ItemsSource="{x:Bind ViewModel.CurrentRule.CustomActions, Mode=OneWay}">
+                <ItemsControl ItemsSource="{x:Bind ViewModel.CurrentView, Mode=OneWay}">
                     <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="local:HyperlinkTooltipActionViewModel">
-                            <Border Margin="0,4"
-                                    Padding="12"
-                                    BorderBrush="{ThemeResource FlyoutBorderThemeBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="{ThemeResource ControlCornerRadius}">
-                                <StackPanel Spacing="8">
-                                    <Grid ColumnSpacing="8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox x:Uid="LinkTooltip_CustomActionNameBox"
-                                                 Grid.Column="0"
-                                                 Text="{x:Bind Name, Mode=TwoWay}" />
-                                        <TextBox x:Uid="LinkTooltip_CustomActionIdBox"
-                                                 Grid.Column="1"
-                                                 Text="{x:Bind ActionId, Mode=TwoWay}" />
-                                        <Button Grid.Column="2"
-                                                AutomationProperties.Name="Delete action"
-                                                Click="DeleteCustomAction_Click">
-                                            <FontIcon FontSize="{StaticResource StandardIconSize}"
-                                                      Glyph="&#xE74D;" />
-                                        </Button>
-                                    </Grid>
-                                    <local:IconPicker CurrentIconPath="{x:Bind Icon, Mode=TwoWay}"
-                                                       Loaded="CustomActionIconPicker_Loaded" />
+                        <DataTemplate x:DataType="local:HyperlinkTooltipRuleViewModel">
+                            <local:SettingsCard x:Uid="LinkTooltip_RuleNavigator"
+                                                Margin="0,2,0,0"
+                                                AutomationProperties.Name="{x:Bind Name, Mode=OneWay}"
+                                                Click="EditRule_Click"
+                                                Description="{x:Bind SummaryText, Mode=OneWay}"
+                                                Header="{x:Bind Name, Mode=OneWay}"
+                                                IsClickEnabled="True"
+                                                Tag="{x:Bind}">
+                                <StackPanel Orientation="Horizontal"
+                                            VerticalAlignment="Center"
+                                            Spacing="4">
+                                    <ToggleSwitch VerticalAlignment="Center"
+                                                  IsOn="{x:Bind Enabled, Mode=TwoWay}"
+                                                  OffContent=""
+                                                  OnContent=""
+                                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                                    <Button x:Uid="LinkTooltip_MoveRuleUpButton"
+                                            Click="MoveRuleUp_Click"
+                                            Tag="{x:Bind}">
+                                        <FontIcon FontSize="{StaticResource StandardIconSize}"
+                                                  Glyph="&#xF0AD;" />
+                                    </Button>
+                                    <Button x:Uid="LinkTooltip_MoveRuleDownButton"
+                                            Click="MoveRuleDown_Click"
+                                            Tag="{x:Bind}">
+                                        <FontIcon FontSize="{StaticResource StandardIconSize}"
+                                                  Glyph="&#xF0AE;" />
+                                    </Button>
+                                    <Button x:Uid="LinkTooltip_DeleteRuleButton"
+                                            Click="DeleteRule_Click"
+                                            Tag="{x:Bind}">
+                                        <FontIcon FontSize="{StaticResource StandardIconSize}"
+                                                  Glyph="&#xE74D;" />
+                                    </Button>
                                 </StackPanel>
-                            </Border>
+                            </local:SettingsCard>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </StackPanel>
+        </StackPanel>
+
+        <!--
+            One rule, as a nested full-viewport view. MainPage watches
+            ViewModel.CurrentRule and shows "Link Tooltip > <rule>" in the
+            breadcrumb; clicking the first crumb comes back here.
+        -->
+        <StackPanel Spacing="2"
+                    Style="{StaticResource SettingsStackStyle}"
+                    Visibility="{x:Bind ViewModel.IsEditingRule, Mode=OneWay}">
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock VerticalAlignment="Center"
+                           Style="{StaticResource TextBlockSubHeaderStyle}"
+                           Text="{x:Bind ViewModel.CurrentRuleName, Mode=OneWay}" />
+                <Button x:Uid="LinkTooltip_CloseRuleEditorButton"
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Click="CloseRuleEditor_Click">
+                    <FontIcon FontSize="{StaticResource StandardIconSize}"
+                              Glyph="&#xE711;" />
+                </Button>
+            </Grid>
+
+            <local:SettingsCard x:Uid="LinkTooltip_RuleName">
+                <TextBox Style="{StaticResource TextBoxSettingStyle}"
+                         Text="{x:Bind ViewModel.CurrentRule.Name, Mode=TwoWay}" />
+            </local:SettingsCard>
+
+            <local:SettingsCard x:Uid="LinkTooltip_RuleEnabled">
+                <ToggleSwitch IsOn="{x:Bind ViewModel.CurrentRule.Enabled, Mode=TwoWay}"
+                              Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+            </local:SettingsCard>
+
+            <TextBlock x:Uid="LinkTooltip_MatchCriteriaHeader"
+                       Style="{StaticResource TextBlockSubHeaderStyle}" />
+
+            <local:SettingsCard x:Uid="LinkTooltip_RuleKind">
+                <ComboBox AutomationProperties.AccessibilityView="Content"
+                          ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                          ItemsSource="{x:Bind ViewModel.CurrentRule.KindList, Mode=OneWay}"
+                          SelectedItem="{x:Bind ViewModel.CurrentRule.CurrentKind, Mode=TwoWay}"
+                          Style="{StaticResource ComboBoxSettingStyle}" />
+            </local:SettingsCard>
+
+            <local:SettingsCard x:Uid="LinkTooltip_RuleSchemes"
+                                Visibility="{x:Bind ViewModel.CurrentRule.IsLinkKind, Mode=OneWay}">
+                <TextBox IsSpellCheckEnabled="False"
+                         Style="{StaticResource TextBoxSettingStyle}"
+                         Text="{x:Bind ViewModel.CurrentRule.Schemes, Mode=TwoWay}" />
+            </local:SettingsCard>
+
+            <local:SettingsCard x:Uid="LinkTooltip_RulePattern">
+                <TextBox IsSpellCheckEnabled="False"
+                         Style="{StaticResource TextBoxSettingStyle}"
+                         Text="{x:Bind ViewModel.CurrentRule.Pattern, Mode=TwoWay}" />
+            </local:SettingsCard>
+
+            <TextBlock x:Uid="LinkTooltip_RuleTextPatternHint"
+                       Style="{StaticResource RulePatternHintStyle}"
+                       Visibility="{x:Bind ViewModel.CurrentRule.IsTextKind, Mode=OneWay}" />
+
+            <local:SettingsCard x:Uid="LinkTooltip_RuleFileTypeGroup"
+                                Visibility="{x:Bind ViewModel.CurrentRule.IsLinkKind, Mode=OneWay}">
+                <ComboBox AutomationProperties.AccessibilityView="Content"
+                          ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                          ItemsSource="{x:Bind ViewModel.CurrentRule.FileTypeGroupList, Mode=OneWay}"
+                          SelectedItem="{x:Bind ViewModel.CurrentRule.CurrentFileTypeGroup, Mode=TwoWay}"
+                          Style="{StaticResource ComboBoxSettingStyle}" />
+            </local:SettingsCard>
+
+            <local:SettingsCard x:Uid="LinkTooltip_RuleCustomExtensions"
+                                Visibility="{x:Bind ViewModel.CurrentRule.IsLinkKind, Mode=OneWay}">
+                <TextBox IsSpellCheckEnabled="False"
+                         Style="{StaticResource TextBoxSettingStyle}"
+                         Text="{x:Bind ViewModel.CurrentRule.CustomExtensions, Mode=TwoWay}" />
+            </local:SettingsCard>
+
+            <TextBlock x:Uid="LinkTooltip_PreviewHeader"
+                       Style="{StaticResource TextBlockSubHeaderStyle}" />
+
+            <local:SettingsCard x:Uid="LinkTooltip_RuleIntegration">
+                <ComboBox AutomationProperties.AccessibilityView="Content"
+                          ItemTemplate="{StaticResource IntegrationChoiceComboBoxTemplate}"
+                          ItemsSource="{x:Bind ViewModel.CurrentRule.IntegrationChoices, Mode=OneWay}"
+                          SelectedItem="{x:Bind ViewModel.CurrentRule.CurrentIntegrationChoice, Mode=TwoWay}"
+                          Style="{StaticResource ComboBoxSettingStyle}" />
+            </local:SettingsCard>
+
+            <local:SettingsCard x:Uid="LinkTooltip_RuleShowPreview">
+                <ToggleSwitch IsOn="{x:Bind ViewModel.CurrentRule.ShowPreview, Mode=TwoWay}"
+                              Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+            </local:SettingsCard>
+
+            <TextBlock x:Uid="LinkTooltip_OverridesHeader"
+                       Style="{StaticResource TextBlockSubHeaderStyle}" />
+
+            <local:SettingsCard x:Uid="LinkTooltip_OverrideShowDelay">
+                <StackPanel Orientation="Horizontal"
+                            Spacing="8">
+                    <CheckBox IsChecked="{x:Bind ViewModel.CurrentRule.OverrideShowDelay, Mode=TwoWay}" />
+                    <muxc:NumberBox LargeChange="100"
+                                    Maximum="5000"
+                                    Minimum="0"
+                                    SmallChange="50"
+                                    IsEnabled="{x:Bind ViewModel.CurrentRule.OverrideShowDelay, Mode=OneWay}"
+                                    Style="{StaticResource NumberBoxSettingStyle}"
+                                    Value="{x:Bind ViewModel.CurrentRule.ShowDelay, Mode=TwoWay}" />
+                </StackPanel>
+            </local:SettingsCard>
+
+            <local:SettingsCard x:Uid="LinkTooltip_OverrideHideDelay">
+                <StackPanel Orientation="Horizontal"
+                            Spacing="8">
+                    <CheckBox IsChecked="{x:Bind ViewModel.CurrentRule.OverrideHideDelay, Mode=TwoWay}" />
+                    <muxc:NumberBox LargeChange="100"
+                                    Maximum="5000"
+                                    Minimum="0"
+                                    SmallChange="50"
+                                    IsEnabled="{x:Bind ViewModel.CurrentRule.OverrideHideDelay, Mode=OneWay}"
+                                    Style="{StaticResource NumberBoxSettingStyle}"
+                                    Value="{x:Bind ViewModel.CurrentRule.HideDelay, Mode=TwoWay}" />
+                </StackPanel>
+            </local:SettingsCard>
+
+            <local:SettingsCard x:Uid="LinkTooltip_OverrideMaxWidth">
+                <StackPanel Orientation="Horizontal"
+                            Spacing="8">
+                    <CheckBox IsChecked="{x:Bind ViewModel.CurrentRule.OverrideMaxWidth, Mode=TwoWay}" />
+                    <muxc:NumberBox LargeChange="100"
+                                    Maximum="4000"
+                                    Minimum="0"
+                                    SmallChange="20"
+                                    IsEnabled="{x:Bind ViewModel.CurrentRule.OverrideMaxWidth, Mode=OneWay}"
+                                    Style="{StaticResource NumberBoxSettingStyle}"
+                                    Value="{x:Bind ViewModel.CurrentRule.MaxWidth, Mode=TwoWay}" />
+                </StackPanel>
+            </local:SettingsCard>
+
+            <!--
+                Which surface a hover uses for links this rule matches. Nothing
+                to do with the "Show in pane" button below, which this rule can
+                also add or remove; the two are independent.
+            -->
+            <local:SettingsCard x:Uid="LinkTooltip_RuleShowInPane">
+                <StackPanel Orientation="Horizontal"
+                            Spacing="8">
+                    <CheckBox IsChecked="{x:Bind ViewModel.CurrentRule.OverrideShowInPane, Mode=TwoWay}" />
+                    <ToggleSwitch IsEnabled="{x:Bind ViewModel.CurrentRule.OverrideShowInPane, Mode=OneWay}"
+                                  IsOn="{x:Bind ViewModel.CurrentRule.ShowInPane, Mode=TwoWay}"
+                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                </StackPanel>
+            </local:SettingsCard>
+
+            <TextBlock x:Uid="LinkTooltip_BuiltInButtonsHeader"
+                       Style="{StaticResource TextBlockSubHeaderStyle}" />
+
+            <local:SettingsCard x:Uid="LinkTooltip_RuleButtons"
+                                ContentAlignment="Vertical">
+                <StackPanel Spacing="4">
+                    <CheckBox x:Uid="LinkTooltip_RuleOverrideButtons"
+                              IsChecked="{x:Bind ViewModel.CurrentRule.OverrideButtons, Mode=TwoWay}" />
+                    <ItemsControl Margin="24,0,0,0"
+                                  IsEnabled="{x:Bind ViewModel.CurrentRule.OverrideButtons, Mode=OneWay}"
+                                  ItemTemplate="{StaticResource ButtonChoiceTemplate}"
+                                  ItemsSource="{x:Bind ViewModel.CurrentRule.ButtonChoices, Mode=OneWay}" />
+                </StackPanel>
+            </local:SettingsCard>
+
+            <TextBlock x:Uid="LinkTooltip_CustomActionsHeader"
+                       Style="{StaticResource TextBlockSubHeaderStyle}" />
+
+            <Button Click="AddCustomActionButton_Click">
+                <StackPanel Orientation="Horizontal"
+                            Spacing="8">
+                    <FontIcon FontSize="{StaticResource StandardIconSize}"
+                              Glyph="&#xE710;" />
+                    <TextBlock x:Uid="LinkTooltip_AddCustomActionButtonText" />
+                </StackPanel>
+            </Button>
+
+            <ItemsControl ItemsSource="{x:Bind ViewModel.CurrentRule.CustomActions, Mode=OneWay}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="local:HyperlinkTooltipActionViewModel">
+                        <Border Margin="0,4"
+                                Padding="12"
+                                BorderBrush="{ThemeResource FlyoutBorderThemeBrush}"
+                                BorderThickness="1"
+                                CornerRadius="{ThemeResource ControlCornerRadius}">
+                            <StackPanel Spacing="8">
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Uid="LinkTooltip_CustomActionNameBox"
+                                             Grid.Column="0"
+                                             Text="{x:Bind Name, Mode=TwoWay}" />
+                                    <TextBox x:Uid="LinkTooltip_CustomActionIdBox"
+                                             Grid.Column="1"
+                                             Text="{x:Bind ActionId, Mode=TwoWay}" />
+                                    <Button x:Uid="LinkTooltip_DeleteCustomActionButton"
+                                            Grid.Column="2"
+                                            Click="DeleteCustomAction_Click"
+                                            Tag="{x:Bind}">
+                                        <FontIcon FontSize="{StaticResource StandardIconSize}"
+                                                  Glyph="&#xE74D;" />
+                                    </Button>
+                                </Grid>
+                                <local:IconPicker CurrentIconPath="{x:Bind Icon, Mode=TwoWay}"
+                                                  Loaded="CustomActionIconPicker_Loaded" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
         </StackPanel>
     </StackPanel>
 </Page>

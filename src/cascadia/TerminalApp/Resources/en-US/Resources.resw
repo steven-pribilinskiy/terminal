@@ -1093,6 +1093,70 @@ Applying on next launch closes nothing now: the swap happens once you have close
   <data name="InvalidRegex" xml:space="preserve">
     <value>An invalid regular expression was found.</value>
   </data>
+  <data name="LinkPreviewRefreshButton.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Refresh</value>
+    <comment>Accessible name of the button in the link preview pane that fetches the linked item again.</comment>
+  </data>
+  <data name="LinkPreviewRefreshButton.[using:Windows.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Refresh</value>
+    <comment>Tooltip of the button in the link preview pane that fetches the linked item again.</comment>
+  </data>
+  <data name="LinkPreviewCloseButton.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Close pane</value>
+    <comment>Accessible name of the button that closes the link preview pane.</comment>
+  </data>
+  <data name="LinkPreviewCloseButton.[using:Windows.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Close pane</value>
+    <comment>Tooltip of the button that closes the link preview pane.</comment>
+  </data>
+  <data name="LinkPreviewActionOptions.PlaceholderText" xml:space="preserve">
+    <value>Choose an action</value>
+    <comment>Placeholder of the dropdown in the link preview pane that lists what the user can do to the linked item, such as moving an issue to another status.</comment>
+  </data>
+  <data name="LinkPreviewApplyButton.Content" xml:space="preserve">
+    <value>Apply</value>
+    <comment>Label of the button in the link preview pane that carries out the action chosen in the dropdown beside it.</comment>
+  </data>
+  <data name="LinkPreviewUndoButton.Content" xml:space="preserve">
+    <value>Undo</value>
+    <comment>Label of the button in the link preview pane that reverses the action that was just applied.</comment>
+  </data>
+  <data name="LinkPreviewHideTooltipsSwitch.Header" xml:space="preserve">
+    <value>Pane only — hide tooltips</value>
+    <comment>Label of the switch in the link preview pane that stops link previews appearing as hover cards over the terminal while the pane is open.</comment>
+  </data>
+  <data name="LinkPreviewFieldsTabLabel" xml:space="preserve">
+    <value>Details</value>
+    <comment>Name of the first tab in the link preview pane, the one showing the list of labelled values.</comment>
+  </data>
+  <data name="LinkPreviewUnavailable" xml:space="preserve">
+    <value>No preview is available for this link.</value>
+    <comment>Shown in the link preview pane when no integration could say anything about the link.</comment>
+  </data>
+  <data name="LinkPreviewActionFailed" xml:space="preserve">
+    <value>Could not complete that action.</value>
+    <comment>Shown in the link preview pane when an action failed and the integration gave no reason of its own.</comment>
+  </data>
+  <data name="LinkPreviewNoUndo" xml:space="preserve">
+    <value>Applied. This change cannot be undone from here.</value>
+    <comment>Shown in the link preview pane after an action succeeded but the far end offers no way to reverse it, so that no Undo button is a stated answer rather than a blank space.</comment>
+  </data>
+  <data name="PaneDividerNameVertical" xml:space="preserve">
+    <value>Resize the left and right panes</value>
+    <comment>Screen reader name for the draggable divider between two side-by-side panes.</comment>
+  </data>
+  <data name="PaneDividerNameHorizontal" xml:space="preserve">
+    <value>Resize the top and bottom panes</value>
+    <comment>Screen reader name for the draggable divider between two stacked panes.</comment>
+  </data>
+  <data name="PaneDividerHelpText" xml:space="preserve">
+    <value>Drag to resize. Hold Alt to resize freely. Press Escape to cancel.</value>
+    <comment>Screen reader help text for the draggable divider between two panes.</comment>
+  </data>
+  <data name="PaneTitleFallback" xml:space="preserve">
+    <value>Terminal</value>
+    <comment>Shown in a pane's title bar when neither the running program nor its profile named it.</comment>
+  </data>
   <data name="CmdAppHelpFooter" xml:space="preserve">
     <value>Note: Unrecognized arguments are automatically passed to the 'new-tab' subcommand.
 For example, 'wt -p "Ubuntu" -d C:\' is equivalent to 'wt new-tab -p "Ubuntu" -d C:\'.

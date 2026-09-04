@@ -268,6 +268,26 @@
     <value>After the current tab</value>
     <comment>An option to choose from for the "Position of newly created tabs" setting. When selected new tab appears after the current tab.</comment>
   </data>
+  <data name="Globals_PaneTitlebarVisibility.Header" xml:space="preserve">
+    <value>Pane title bars</value>
+    <comment>Header for a control to choose when each pane shows a title bar of its own.</comment>
+  </data>
+  <data name="Globals_PaneTitlebarVisibility.Description" xml:space="preserve">
+    <value>Choose when a pane shows its own title bar above its contents.</value>
+    <comment>A description for what the "Pane title bars" setting does.</comment>
+  </data>
+  <data name="Globals_PaneTitlebarVisibilityNever.Content" xml:space="preserve">
+    <value>Never</value>
+    <comment>An option to choose from for the "Pane title bars" setting. When selected, panes never show a title bar.</comment>
+  </data>
+  <data name="Globals_PaneTitlebarVisibilityMultiplePanes.Content" xml:space="preserve">
+    <value>When a tab has more than one pane</value>
+    <comment>An option to choose from for the "Pane title bars" setting. When selected, panes show a title bar only while the tab is split.</comment>
+  </data>
+  <data name="Globals_PaneTitlebarVisibilityAlways.Content" xml:space="preserve">
+    <value>Always</value>
+    <comment>An option to choose from for the "Pane title bars" setting. When selected, every pane shows a title bar.</comment>
+  </data>
   <data name="Globals_CopyOnSelect.Header" xml:space="preserve">
     <value>Automatically copy selection to clipboard</value>
     <comment>Header for a control to toggle whether selected text should be copied to the clipboard automatically, or not.</comment>
@@ -320,12 +340,36 @@
     <value>Delay before the link tooltip disappears</value>
     <comment>Name for a control to choose how long the link tooltip stays on screen after the pointer leaves the link.</comment>
   </data>
+  <data name="Globals_HyperlinkTooltipButtons.Header" xml:space="preserve">
+    <value>Buttons on the tooltip</value>
+    <comment>Header for a group of check boxes choosing which built-in buttons the link tooltip carries.</comment>
+  </data>
+  <data name="Globals_HyperlinkTooltipButtons.Description" xml:space="preserve">
+    <value>Which of the built-in buttons the tooltip carries. A rule can override this for the links it matches.</value>
+    <comment>Additional text presented near "Globals_HyperlinkTooltipButtons.Header".</comment>
+  </data>
+  <data name="Globals_HyperlinkTooltipHint.Header" xml:space="preserve">
+    <value>Show the "Click to follow link" hint</value>
+    <comment>{Locked="Click to follow link"} Header for a control to toggle the hint line at the bottom of the link tooltip.</comment>
+  </data>
+  <data name="Globals_HyperlinkTooltipHint.Description" xml:space="preserve">
+    <value>The line at the bottom of the tooltip explaining how to open the link.</value>
+    <comment>Additional text presented near "Globals_HyperlinkTooltipHint.Header".</comment>
+  </data>
+  <data name="Globals_HyperlinkPreviewInPane.Header" xml:space="preserve">
+    <value>Show link details in a pane instead of a tooltip</value>
+    <comment>Header for a control to make hovering a link open its details in a pane rather than showing a tooltip card.</comment>
+  </data>
+  <data name="Globals_HyperlinkPreviewInPane.Description" xml:space="preserve">
+    <value>Chooses where a hovered link's details appear. Separate from the "Show in pane" button, which puts a link in a pane on demand.</value>
+    <comment>{Locked="Show in pane"} Additional text presented near "Globals_HyperlinkPreviewInPane.Header".</comment>
+  </data>
   <data name="Globals_HyperlinkTooltipActions.Header" xml:space="preserve">
     <value>Show buttons on the link tooltip</value>
     <comment>Header for a control to toggle whether the link tooltip carries action buttons.</comment>
   </data>
   <data name="Globals_HyperlinkTooltipActions.Description" xml:space="preserve">
-    <value>Open the link, copy it, and — for links to files — copy the path it resolves to or show it in File Explorer.</value>
+    <value>Turns the whole row of buttons off. Which buttons the row carries is chosen below.</value>
     <comment>Additional text presented near "Globals_HyperlinkTooltipActions.Header".</comment>
   </data>
   <data name="Globals_SafeUriSchemes.Header" xml:space="preserve">
@@ -3024,10 +3068,6 @@
     <value>Add rule</value>
     <comment>Text for a button that adds a new link tooltip rule.</comment>
   </data>
-  <data name="LinkTooltip_RuleEditorHeader.Text" xml:space="preserve">
-    <value>Edit rule</value>
-    <comment>Header for the panel used to edit a single link tooltip rule.</comment>
-  </data>
   <data name="LinkTooltip_RuleName.Header" xml:space="preserve">
     <value>Name</value>
     <comment>Header for a control to set a link tooltip rule's display name.</comment>
@@ -3102,23 +3142,67 @@
   </data>
   <data name="LinkTooltip_BuiltInButtonsHeader.Text" xml:space="preserve">
     <value>Built-in buttons</value>
-    <comment>Header for a group of settings that let a link tooltip rule hide specific built-in tooltip buttons.</comment>
+    <comment>Header for a group of settings that choose which built-in buttons the link tooltip carries for links matching this rule.</comment>
   </data>
-  <data name="LinkTooltip_SuppressOpen.Header" xml:space="preserve">
-    <value>Hide "Open" button</value>
-    <comment>{Locked="Open"} Header for a control to hide the "Open" button on the link tooltip for links matching this rule.</comment>
+  <data name="LinkTooltip_RuleButtons.Header" xml:space="preserve">
+    <value>Buttons on the tooltip</value>
+    <comment>Header for the group of check boxes choosing which built-in buttons the link tooltip carries for links matching this rule.</comment>
   </data>
-  <data name="LinkTooltip_SuppressCopyLink.Header" xml:space="preserve">
-    <value>Hide "Copy link" button</value>
-    <comment>{Locked="Copy link"} Header for a control to hide the "Copy link" button on the link tooltip for links matching this rule.</comment>
+  <data name="LinkTooltip_RuleButtons.Description" xml:space="preserve">
+    <value>Which of the built-in buttons the tooltip carries for links this rule matches. Leave the override unchecked to use the default list.</value>
+    <comment>Additional text presented near "LinkTooltip_RuleButtons.Header".</comment>
   </data>
-  <data name="LinkTooltip_SuppressCopyPath.Header" xml:space="preserve">
-    <value>Hide "Copy path" button</value>
-    <comment>{Locked="Copy path"} Header for a control to hide the "Copy path" button on the link tooltip for links matching this rule.</comment>
+  <data name="LinkTooltip_RuleOverrideButtons.Content" xml:space="preserve">
+    <value>Override the default buttons for this rule</value>
+    <comment>Text for a check box that lets a link tooltip rule choose its own set of built-in buttons.</comment>
   </data>
-  <data name="LinkTooltip_SuppressReveal.Header" xml:space="preserve">
-    <value>Hide "Show in Explorer" button</value>
-    <comment>{Locked="Show in Explorer"} Header for a control to hide the "Show in Explorer" button on the link tooltip for links matching this rule.</comment>
+  <data name="LinkTooltip_RuleShowInPane.Header" xml:space="preserve">
+    <value>Show link details in a pane instead of a tooltip</value>
+    <comment>Header for a control to override, for links matching this rule, whether hovering opens a pane rather than showing a tooltip card.</comment>
+  </data>
+  <data name="LinkTooltip_RuleShowInPane.Description" xml:space="preserve">
+    <value>Where a hovered link's details appear, for links this rule matches. Leave unchecked to use the default.</value>
+    <comment>Additional text presented near "LinkTooltip_RuleShowInPane.Header".</comment>
+  </data>
+  <data name="LinkTooltip_ButtonOpen" xml:space="preserve">
+    <value>Open</value>
+    <comment>Label for the link tooltip button that opens the link.</comment>
+  </data>
+  <data name="LinkTooltip_ButtonCopyLink" xml:space="preserve">
+    <value>Copy link</value>
+    <comment>Label for the link tooltip button that copies the link's address.</comment>
+  </data>
+  <data name="LinkTooltip_ButtonCopyPath" xml:space="preserve">
+    <value>Copy path</value>
+    <comment>Label for the link tooltip button that copies a file link's path.</comment>
+  </data>
+  <data name="LinkTooltip_ButtonReveal" xml:space="preserve">
+    <value>Show in Explorer</value>
+    <comment>{Locked="Explorer"} Label for the link tooltip button that shows a file link in File Explorer.</comment>
+  </data>
+  <data name="LinkTooltip_ButtonShowInPane" xml:space="preserve">
+    <value>Show in pane</value>
+    <comment>Label for the link tooltip button that opens the link's details in a pane.</comment>
+  </data>
+  <data name="LinkTooltip_MoveRuleUpButton.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Move rule up</value>
+    <comment>The name of a button that moves a link tooltip rule earlier in the list.</comment>
+  </data>
+  <data name="LinkTooltip_MoveRuleDownButton.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Move rule down</value>
+    <comment>The name of a button that moves a link tooltip rule later in the list.</comment>
+  </data>
+  <data name="LinkTooltip_DeleteRuleButton.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Delete rule</value>
+    <comment>The name of a button that removes a link tooltip rule.</comment>
+  </data>
+  <data name="LinkTooltip_CloseRuleEditorButton.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Close rule</value>
+    <comment>The name of a button that returns from one rule's settings to the list of rules.</comment>
+  </data>
+  <data name="LinkTooltip_DeleteCustomActionButton.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Delete action</value>
+    <comment>The name of a button that removes a custom action from a link tooltip rule.</comment>
   </data>
   <data name="LinkTooltip_CustomActionsHeader.Text" xml:space="preserve">
     <value>Custom actions</value>
@@ -3299,6 +3383,18 @@
   <data name="Integrations_FieldsHeader.Text" xml:space="preserve">
     <value>Show in tooltip</value>
     <comment>Header for the group of check boxes choosing which of an integration's fields appear on the link tooltip.</comment>
+  </data>
+  <data name="Integrations_DefaultFieldGroup" xml:space="preserve">
+    <value>Details</value>
+    <comment>The name given to the group of an integration's fields that its definition puts in no group of its own.</comment>
+  </data>
+  <data name="Integrations_TabsHeader.Text" xml:space="preserve">
+    <value>Show as tabs</value>
+    <comment>Header for the group of check boxes choosing which extra panels of content appear on the link tooltip.</comment>
+  </data>
+  <data name="Integrations_TabsDescription.Text" xml:space="preserve">
+    <value>Longer content this integration can fetch, shown beside the fields rather than among them.</value>
+    <comment>A description of the extra content panels listed below it.</comment>
   </data>
   <data name="Integrations_MatchersHeader.Text" xml:space="preserve">
     <value>Detect in output</value>

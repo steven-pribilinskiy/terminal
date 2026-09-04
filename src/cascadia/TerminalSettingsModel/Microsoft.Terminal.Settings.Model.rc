@@ -29,6 +29,7 @@ IDR_ENABLE_COLOR_SELECTION RCDATA "Generated Files\enableColorSelection.json"
 IDR_INTEGRATION_JIRA RCDATA "Generated Files\integration-jira.json"
 IDR_INTEGRATION_SLACK RCDATA "Generated Files\integration-slack.json"
 IDR_INTEGRATION_STITH RCDATA "Generated Files\integration-stith.json"
+IDR_INTEGRATION_GITHUB RCDATA "Generated Files\integration-github.json"
 
 #endif    // English (United States) resources
 /////////////////////////////////////////////////////////////////////////////

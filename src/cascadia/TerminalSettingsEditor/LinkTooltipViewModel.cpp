@@ -7,6 +7,7 @@
 #include "HyperlinkTooltipRuleViewModel.g.cpp"
 #include "HyperlinkTooltipActionViewModel.g.cpp"
 #include "IntegrationChoiceViewModel.g.cpp"
+#include "ButtonChoiceViewModel.g.cpp"
 #include "EnumEntry.h"
 
 using namespace winrt::Windows::Foundation::Collections;
@@ -50,6 +51,91 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         return winrt::hstring{ joined };
     }
 
+    // The built-in card buttons, in the order the card draws them. The ids are
+    // the ones stored in "hyperlink.tooltipButtons" and in a rule's "buttons".
+    static constexpr std::wstring_view KnownButtonIds[]{
+        L"open",
+        L"copyLink",
+        L"copyPath",
+        L"reveal",
+        L"showInPane",
+    };
+
+    static winrt::hstring _buttonLabel(const std::wstring_view id)
+    {
+        if (id == L"open")
+        {
+            return RS_(L"LinkTooltip_ButtonOpen");
+        }
+        if (id == L"copyLink")
+        {
+            return RS_(L"LinkTooltip_ButtonCopyLink");
+        }
+        if (id == L"copyPath")
+        {
+            return RS_(L"LinkTooltip_ButtonCopyPath");
+        }
+        if (id == L"reveal")
+        {
+            return RS_(L"LinkTooltip_ButtonReveal");
+        }
+        if (id == L"showInPane")
+        {
+            return RS_(L"LinkTooltip_ButtonShowInPane");
+        }
+        return winrt::hstring{ id };
+    }
+
+    static bool _listContains(const IVector<winrt::hstring>& list, const winrt::hstring& id)
+    {
+        if (!list)
+        {
+            return false;
+        }
+        for (const auto& value : list)
+        {
+            if (value == id)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static bool _isKnownButtonId(const winrt::hstring& id)
+    {
+        return std::find(std::begin(KnownButtonIds), std::end(KnownButtonIds), std::wstring_view{ id }) != std::end(KnownButtonIds);
+    }
+
+    // Rebuilds an id list with one button turned on or off. The result is always
+    // in KnownButtonIds order -- so the card draws them the same way however the
+    // boxes were ticked -- and keeps any id we don't know about, which is how a
+    // hand-written settings.json survives a round trip through this page.
+    static IVector<winrt::hstring> _withButton(const IVector<winrt::hstring>& list, const winrt::hstring& id, bool selected)
+    {
+        std::vector<winrt::hstring> ordered;
+        for (const auto& known : KnownButtonIds)
+        {
+            const winrt::hstring knownId{ known };
+            const auto wanted = knownId == id ? selected : _listContains(list, knownId);
+            if (wanted)
+            {
+                ordered.push_back(knownId);
+            }
+        }
+        if (list)
+        {
+            for (const auto& value : list)
+            {
+                if (!_isKnownButtonId(value))
+                {
+                    ordered.push_back(value);
+                }
+            }
+        }
+        return single_threaded_vector<winrt::hstring>(std::move(ordered));
+    }
+
     // What to show in a rule's "Integration" picker for a given id. "" and "none"
     // are not integration ids at all -- they're the two ways of saying "no specific
     // integration" -- so they get their own localized labels.
@@ -66,13 +152,49 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         return id;
     }
 
-    HyperlinkTooltipRuleViewModel::HyperlinkTooltipRuleViewModel(Model::HyperlinkTooltipRule rule) :
-        _Rule{ rule }
+    HyperlinkTooltipRuleViewModel::HyperlinkTooltipRuleViewModel(Model::HyperlinkTooltipRule rule, Model::WindowSettings windowSettings) :
+        _Rule{ rule },
+        _WindowSettings{ windowSettings }
     {
         if (!_Rule.CustomActions())
         {
             _Rule.CustomActions(winrt::single_threaded_vector<Model::HyperlinkTooltipAction>());
         }
+
+        // A rule with no list of its own inherits the global one, so the boxes
+        // show what the card would actually do -- greyed out until the override
+        // is switched on.
+        std::vector<Editor::ButtonChoiceViewModel> buttonVMs;
+        for (const auto& id : KnownButtonIds)
+        {
+            const winrt::hstring buttonId{ id };
+            buttonVMs.push_back(make<ButtonChoiceViewModel>(
+                buttonId,
+                _buttonLabel(id),
+                [this](const winrt::hstring& which) {
+                    const auto own = _Rule.Buttons();
+                    return _listContains(own && own.Size() > 0 ? own : _WindowSettings.HyperlinkTooltipButtons(), which);
+                },
+                [this](const winrt::hstring& which, bool selected) {
+                    if (!OverrideButtons())
+                    {
+                        // The boxes are disabled while the rule inherits; don't
+                        // let a stray write turn the override on by accident.
+                        return;
+                    }
+                    const auto updated = _withButton(_Rule.Buttons(), which, selected);
+                    if (updated.Size() == 0)
+                    {
+                        // An empty list is how a rule says "inherit", so it can't
+                        // also mean "show nothing": refuse to clear the last box.
+                        // ButtonChoiceViewModel re-reads Selected afterwards, so
+                        // the checkbox snaps back on its own.
+                        return;
+                    }
+                    _Rule.Buttons(updated);
+                }));
+        }
+        _ButtonChoices = single_threaded_observable_vector<Editor::ButtonChoiceViewModel>(std::move(buttonVMs));
 
         INITIALIZE_BINDABLE_ENUM_SETTING(FileTypeGroup, HyperlinkFileTypeGroup, Model::HyperlinkFileTypeGroup, L"LinkTooltip_FileTypeGroup", L"Content");
         INITIALIZE_BINDABLE_ENUM_SETTING(Kind, HyperlinkMatchKind, Model::HyperlinkMatchKind, L"LinkTooltip_MatchKind", L"Content");
@@ -305,6 +427,78 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _NotifyChanges(L"MaxWidth", L"OverrideMaxWidth");
     }
 
+    bool HyperlinkTooltipRuleViewModel::OverrideButtons() const noexcept
+    {
+        const auto buttons = _Rule.Buttons();
+        return buttons && buttons.Size() > 0;
+    }
+
+    void HyperlinkTooltipRuleViewModel::OverrideButtons(bool value)
+    {
+        if (OverrideButtons() == value)
+        {
+            return;
+        }
+
+        if (value)
+        {
+            // Start from what the rule was already inheriting, so switching the
+            // override on doesn't silently change which buttons the card shows.
+            std::vector<winrt::hstring> inherited;
+            if (const auto defaults = _WindowSettings.HyperlinkTooltipButtons())
+            {
+                for (const auto& id : defaults)
+                {
+                    inherited.push_back(id);
+                }
+            }
+            if (inherited.empty())
+            {
+                // There is nothing to copy, and an empty list would read as
+                // "inherit" again -- so seed it with the one button that is
+                // useful for every link.
+                inherited.emplace_back(L"copyLink");
+            }
+            _Rule.Buttons(single_threaded_vector<winrt::hstring>(std::move(inherited)));
+        }
+        else
+        {
+            _Rule.Buttons(nullptr);
+        }
+
+        _NotifyChanges(L"OverrideButtons");
+        _raiseButtonChoicesChanged();
+    }
+
+    void HyperlinkTooltipRuleViewModel::_raiseButtonChoicesChanged()
+    {
+        for (const auto& choice : _ButtonChoices)
+        {
+            get_self<ButtonChoiceViewModel>(choice)->RaiseSelectedChanged();
+        }
+    }
+
+    void HyperlinkTooltipRuleViewModel::OverrideShowInPane(bool value)
+    {
+        _Rule.ShowInPane(value ? winrt::Windows::Foundation::IReference<bool>{ ShowInPane() } : nullptr);
+        _NotifyChanges(L"OverrideShowInPane", L"ShowInPane");
+    }
+
+    bool HyperlinkTooltipRuleViewModel::ShowInPane() const noexcept
+    {
+        if (const auto value = _Rule.ShowInPane())
+        {
+            return value.Value();
+        }
+        return false;
+    }
+
+    void HyperlinkTooltipRuleViewModel::ShowInPane(bool value)
+    {
+        _Rule.ShowInPane(winrt::Windows::Foundation::IReference<bool>{ value });
+        _NotifyChanges(L"ShowInPane", L"OverrideShowInPane");
+    }
+
     Editor::HyperlinkTooltipActionViewModel HyperlinkTooltipRuleViewModel::RequestAddCustomAction()
     {
         Model::HyperlinkTooltipAction action{};
@@ -337,10 +531,26 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         // would land in a temporary and vanish. Assigning pins it as the user's own.
         _WindowSettings.HyperlinkTooltipRules(rules);
 
+        std::vector<Editor::ButtonChoiceViewModel> buttonVMs;
+        for (const auto& id : KnownButtonIds)
+        {
+            const winrt::hstring buttonId{ id };
+            buttonVMs.push_back(make<ButtonChoiceViewModel>(
+                buttonId,
+                _buttonLabel(id),
+                [this](const winrt::hstring& which) {
+                    return _listContains(_WindowSettings.HyperlinkTooltipButtons(), which);
+                },
+                [this](const winrt::hstring& which, bool selected) {
+                    _WindowSettings.HyperlinkTooltipButtons(_withButton(_WindowSettings.HyperlinkTooltipButtons(), which, selected));
+                }));
+        }
+        _ButtonChoices = single_threaded_observable_vector<Editor::ButtonChoiceViewModel>(std::move(buttonVMs));
+
         std::vector<Editor::HyperlinkTooltipRuleViewModel> ruleVMs;
         for (const auto& rule : _WindowSettings.HyperlinkTooltipRules())
         {
-            ruleVMs.push_back(make<HyperlinkTooltipRuleViewModel>(rule));
+            ruleVMs.push_back(make<HyperlinkTooltipRuleViewModel>(rule, _WindowSettings));
         }
         _CurrentView = single_threaded_observable_vector<Editor::HyperlinkTooltipRuleViewModel>(std::move(ruleVMs));
 
@@ -399,6 +609,26 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _NotifyChanges(L"SafeUriSchemes");
     }
 
+    // Opening or closing a rule is what swaps the page between the list and the
+    // editor, and it is also what MainPage watches to push (or pop) the
+    // "Link Tooltip > <rule>" breadcrumb. Renaming the open rule has to reach
+    // the breadcrumb too, hence the subscription.
+    void LinkTooltipViewModel::CurrentRule(const Editor::HyperlinkTooltipRuleViewModel& vm)
+    {
+        _currentRuleChangedRevoker.revoke();
+        _CurrentRule = vm;
+        if (_CurrentRule)
+        {
+            _currentRuleChangedRevoker = _CurrentRule.PropertyChanged(winrt::auto_revoke, [this](auto&&, const Windows::UI::Xaml::Data::PropertyChangedEventArgs& args) {
+                if (args.PropertyName() == L"Name")
+                {
+                    _NotifyChanges(L"CurrentRuleName");
+                }
+            });
+        }
+        _NotifyChanges(L"CurrentRule", L"IsEditingRule", L"IsNotEditingRule", L"CurrentRuleName");
+    }
+
     void LinkTooltipViewModel::RequestReorderRule(const Editor::HyperlinkTooltipRuleViewModel& vm, bool goingUp)
     {
         uint32_t idx;
@@ -435,7 +665,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         Model::HyperlinkTooltipRule rule{};
         rule.Enabled(true);
         rule.CustomActions(winrt::single_threaded_vector<Model::HyperlinkTooltipAction>());
-        const auto vm = make<HyperlinkTooltipRuleViewModel>(rule);
+        const auto vm = make<HyperlinkTooltipRuleViewModel>(rule, _WindowSettings);
         CurrentView().Append(vm);
         return vm;
     }

@@ -8,6 +8,8 @@
 #include "IntegrationSettingViewModel.g.cpp"
 #include "IntegrationCredentialViewModel.g.cpp"
 #include "IntegrationDisplayFieldViewModel.g.cpp"
+#include "IntegrationFieldGroupViewModel.g.cpp"
+#include "IntegrationTabViewModel.g.cpp"
 #include "IntegrationMatcherViewModel.g.cpp"
 
 using namespace winrt::Windows::Foundation::Collections;
@@ -82,11 +84,64 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         {
             return;
         }
+        if (const auto tabs = entry.Tabs(); tabs && tabs.Size() > 0)
+        {
+            return;
+        }
 
         map.Remove(id);
         // Same inheritable-setting trap as _ensureEntry: the map has to be the
         // user's own value, or the removal happens to a temporary.
         globals.Integrations(map);
+    }
+
+    // Which group a display field belongs to. A field no group names belongs to
+    // the implicit one, whose key is empty -- an id a manifest cannot collide
+    // with, since a group without a key is not a group.
+    static hstring _groupKeyForField(const Model::IntegrationManifest& manifest, const hstring& fieldKey)
+    {
+        if (const auto groups = manifest.FieldGroups())
+        {
+            for (const auto& group : groups)
+            {
+                const auto groupKey = group.Key();
+                if (groupKey.empty())
+                {
+                    continue;
+                }
+                if (const auto members = group.Fields())
+                {
+                    for (const auto& member : members)
+                    {
+                        if (member == fieldKey)
+                        {
+                            return groupKey;
+                        }
+                    }
+                }
+            }
+        }
+        return {};
+    }
+
+    static hstring _groupLabel(const Model::IntegrationManifest& manifest, const hstring& groupKey)
+    {
+        if (groupKey.empty())
+        {
+            return RS_(L"Integrations_DefaultFieldGroup");
+        }
+        if (const auto groups = manifest.FieldGroups())
+        {
+            for (const auto& group : groups)
+            {
+                if (group.Key() == groupKey)
+                {
+                    const auto label = group.Label();
+                    return label.empty() ? groupKey : label;
+                }
+            }
+        }
+        return groupKey;
     }
 
 #pragma region IntegrationSettingViewModel
@@ -328,6 +383,182 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
 #pragma endregion
 
+#pragma region IntegrationFieldGroupViewModel
+
+    IntegrationFieldGroupViewModel::IntegrationFieldGroupViewModel(hstring key,
+                                                                   hstring label,
+                                                                   std::vector<Editor::IntegrationDisplayFieldViewModel> fields) :
+        _Key{ std::move(key) },
+        _Label{ std::move(label) },
+        _Fields{ single_threaded_observable_vector<Editor::IntegrationDisplayFieldViewModel>(std::move(fields)) }
+    {
+        // Ticking any one box changes what the header should show, so the header
+        // listens to every field it owns.
+        for (const auto& field : _Fields)
+        {
+            _childRevokers.push_back(field.PropertyChanged(winrt::auto_revoke, [this](auto&&, const Windows::UI::Xaml::Data::PropertyChangedEventArgs& args) {
+                if (!_applying && args.PropertyName() == L"Visible")
+                {
+                    _NotifyChanges(L"GroupChecked");
+                }
+            }));
+        }
+    }
+
+    // null is the indeterminate state: some of the group's fields are on.
+    Windows::Foundation::IReference<bool> IntegrationFieldGroupViewModel::GroupChecked() const
+    {
+        uint32_t visible = 0;
+        uint32_t total = 0;
+        for (const auto& field : _Fields)
+        {
+            ++total;
+            if (field.Visible())
+            {
+                ++visible;
+            }
+        }
+
+        if (total == 0 || visible == 0)
+        {
+            return Windows::Foundation::IReference<bool>{ false };
+        }
+        if (visible == total)
+        {
+            return Windows::Foundation::IReference<bool>{ true };
+        }
+        return nullptr;
+    }
+
+    void IntegrationFieldGroupViewModel::GroupChecked(const Windows::Foundation::IReference<bool>& value)
+    {
+        // A three-state box cycles unchecked -> checked -> indeterminate, so the
+        // click after "all on" arrives here as null. Treating that as "turn the
+        // group off" is what makes one click clear a full or partial group.
+        const auto selectAll = value && value.Value();
+
+        _applying = true;
+        for (const auto& field : _Fields)
+        {
+            field.Visible(selectAll);
+        }
+        _applying = false;
+
+        // Raised once for the whole bulk change, and it also snaps the checkbox
+        // back off the indeterminate state the click left it in.
+        _NotifyChanges(L"GroupChecked");
+    }
+
+#pragma endregion
+
+#pragma region IntegrationTabViewModel
+
+    IntegrationTabViewModel::IntegrationTabViewModel(Model::IntegrationTab tab,
+                                                     Model::IntegrationManifest manifest,
+                                                     Model::GlobalAppSettings globalSettings,
+                                                     hstring integrationId) :
+        _Tab{ std::move(tab) },
+        _Manifest{ std::move(manifest) },
+        _GlobalSettings{ std::move(globalSettings) },
+        _IntegrationId{ std::move(integrationId) }
+    {
+    }
+
+    hstring IntegrationTabViewModel::Label() const
+    {
+        const auto label = _Tab.Label();
+        return label.empty() ? _Tab.Key() : label;
+    }
+
+    // Same shape as IntegrationDisplayFieldViewModel::Visible, against the
+    // "tabs" list instead of the "fields" one.
+    bool IntegrationTabViewModel::Visible() const
+    {
+        if (const auto entry = _findEntry(_GlobalSettings, _IntegrationId))
+        {
+            if (const auto tabs = entry.Tabs())
+            {
+                for (const auto& key : tabs)
+                {
+                    if (key == _Tab.Key())
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+        return _Tab.DefaultVisible();
+    }
+
+    void IntegrationTabViewModel::Visible(bool value)
+    {
+        if (Visible() == value)
+        {
+            return;
+        }
+
+        const auto entry = _ensureEntry(_GlobalSettings, _IntegrationId);
+
+        std::vector<hstring> keys;
+        if (const auto existing = entry.Tabs())
+        {
+            for (const auto& key : existing)
+            {
+                keys.push_back(key);
+            }
+        }
+        else if (const auto manifestTabs = _Manifest.Tabs())
+        {
+            // First edit: start from what the manifest shows by default, so
+            // ticking one box doesn't silently hide everything else.
+            for (const auto& tab : manifestTabs)
+            {
+                if (tab.DefaultVisible())
+                {
+                    keys.push_back(tab.Key());
+                }
+            }
+        }
+
+        const auto key = _Tab.Key();
+        const auto existingKey = std::find(keys.begin(), keys.end(), key);
+        if (value)
+        {
+            if (existingKey == keys.end())
+            {
+                keys.push_back(key);
+            }
+        }
+        else if (existingKey != keys.end())
+        {
+            keys.erase(existingKey);
+        }
+
+        // Store them in manifest order, so the card draws the tab strip the way
+        // the integration intended however the boxes were ticked.
+        if (const auto manifestTabs = _Manifest.Tabs())
+        {
+            std::vector<hstring> ordered;
+            for (const auto& tab : manifestTabs)
+            {
+                if (std::find(keys.begin(), keys.end(), tab.Key()) != keys.end())
+                {
+                    ordered.push_back(tab.Key());
+                }
+            }
+            keys = std::move(ordered);
+        }
+
+        // An empty list is stored rather than pruned: "the user turned every tab
+        // off" and "the user has never said" are different states, and pruning
+        // would turn the first back into the second on the next read.
+        entry.Tabs(single_threaded_vector<hstring>(std::move(keys)));
+        _NotifyChanges(L"Visible");
+    }
+
+#pragma endregion
+
 #pragma region IntegrationMatcherViewModel
 
     IntegrationMatcherViewModel::IntegrationMatcherViewModel(Model::IntegrationMatcher matcher,
@@ -412,15 +643,55 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
         _Credentials = single_threaded_observable_vector<Editor::IntegrationCredentialViewModel>(std::move(credentialVMs));
 
+        // Build the field view models and their grouping in one pass. Walking the
+        // manifest's own field order (rather than its group order) is what keeps
+        // an implicit group of ungrouped fields in the place the manifest author
+        // clearly meant it to be, instead of always last.
         std::vector<Editor::IntegrationDisplayFieldViewModel> fieldVMs;
+        std::vector<hstring> groupOrder;
+        std::vector<std::vector<Editor::IntegrationDisplayFieldViewModel>> groupedFields;
+        std::vector<hstring> groupLabels;
+
         if (const auto fields = _Manifest.Fields())
         {
             for (const auto& field : fields)
             {
-                fieldVMs.push_back(make<IntegrationDisplayFieldViewModel>(field, _Manifest, _GlobalSettings, id));
+                const auto fieldVM = make<IntegrationDisplayFieldViewModel>(field, _Manifest, _GlobalSettings, id);
+                fieldVMs.push_back(fieldVM);
+
+                const auto groupKey = _groupKeyForField(_Manifest, field.Key());
+                const auto existing = std::find(groupOrder.begin(), groupOrder.end(), groupKey);
+                if (existing == groupOrder.end())
+                {
+                    groupOrder.push_back(groupKey);
+                    groupLabels.push_back(_groupLabel(_Manifest, groupKey));
+                    groupedFields.emplace_back();
+                    groupedFields.back().push_back(fieldVM);
+                }
+                else
+                {
+                    groupedFields[static_cast<size_t>(existing - groupOrder.begin())].push_back(fieldVM);
+                }
             }
         }
         _Fields = single_threaded_observable_vector<Editor::IntegrationDisplayFieldViewModel>(std::move(fieldVMs));
+
+        std::vector<Editor::IntegrationFieldGroupViewModel> groupVMs;
+        for (size_t i = 0; i < groupOrder.size(); ++i)
+        {
+            groupVMs.push_back(make<IntegrationFieldGroupViewModel>(groupOrder[i], groupLabels[i], std::move(groupedFields[i])));
+        }
+        _FieldGroups = single_threaded_observable_vector<Editor::IntegrationFieldGroupViewModel>(std::move(groupVMs));
+
+        std::vector<Editor::IntegrationTabViewModel> tabVMs;
+        if (const auto tabs = _Manifest.Tabs())
+        {
+            for (const auto& tab : tabs)
+            {
+                tabVMs.push_back(make<IntegrationTabViewModel>(tab, _Manifest, _GlobalSettings, id));
+            }
+        }
+        _Tabs = single_threaded_observable_vector<Editor::IntegrationTabViewModel>(std::move(tabVMs));
 
         // Only text matchers the manifest flags as "suggested" are offered here --
         // link matchers need no rule of their own, they run against hovered links.

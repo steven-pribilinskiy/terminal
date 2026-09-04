@@ -368,7 +368,7 @@
 
   <!-- PowerShell version check, outputs error if the wrong version is installed. -->
   <Import Project="$(SolutionDir)build\rules\CollectWildcardResources.targets" />
-  <Target Name="BeforeResourceCompile" Inputs="defaults.json;userDefaults.json;enableColorSelection.json;integrations\jira.json;integrations\slack.json;integrations\stith.json" Outputs="Generated Files\defaults.json;Generated Files\userDefaults.json;Generated Files\enableColorSelection.json;Generated Files\integration-jira.json;Generated Files\integration-slack.json;Generated Files\integration-stith.json">
+  <Target Name="BeforeResourceCompile" Inputs="defaults.json;userDefaults.json;enableColorSelection.json;integrations\jira.json;integrations\slack.json;integrations\stith.json;integrations\github.json" Outputs="Generated Files\defaults.json;Generated Files\userDefaults.json;Generated Files\enableColorSelection.json;Generated Files\integration-jira.json;Generated Files\integration-slack.json;Generated Files\integration-stith.json;Generated Files\integration-github.json">
     <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Unrestricted -File &quot;$(OpenConsoleDir)\tools\WindowsCheckPSVersion.ps1&quot;" />
     <Exec Command="pwsh.exe -NoProfile -ExecutionPolicy Unrestricted &quot;$(OpenConsoleDir)\tools\CheckPSVersion.ps1&quot;" />
     <Exec Command="pwsh.exe -NoProfile -ExecutionPolicy Unrestricted &quot;$(OpenConsoleDir)\tools\CompressJson.ps1&quot; -JsonFile defaults.json -OutPath &quot;Generated Files\defaults.json&quot;" />
@@ -377,6 +377,7 @@
     <Exec Command="pwsh.exe -NoProfile -ExecutionPolicy Unrestricted &quot;$(OpenConsoleDir)\tools\CompressJson.ps1&quot; -JsonFile integrations\jira.json -OutPath &quot;Generated Files\integration-jira.json&quot;" />
     <Exec Command="pwsh.exe -NoProfile -ExecutionPolicy Unrestricted &quot;$(OpenConsoleDir)\tools\CompressJson.ps1&quot; -JsonFile integrations\slack.json -OutPath &quot;Generated Files\integration-slack.json&quot;" />
     <Exec Command="pwsh.exe -NoProfile -ExecutionPolicy Unrestricted &quot;$(OpenConsoleDir)\tools\CompressJson.ps1&quot; -JsonFile integrations\stith.json -OutPath &quot;Generated Files\integration-stith.json&quot;" />
+    <Exec Command="pwsh.exe -NoProfile -ExecutionPolicy Unrestricted &quot;$(OpenConsoleDir)\tools\CompressJson.ps1&quot; -JsonFile integrations\github.json -OutPath &quot;Generated Files\integration-github.json&quot;" />
   </Target>
 
 </Project>

@@ -65,12 +65,16 @@ namespace Microsoft.Terminal.Control
         // The app-owned integration host that turns a hovered link (or text
         // match) into a HyperlinkPreview for the card. Null = no previews.
         void HyperlinkPreviewProvider(Microsoft.Terminal.Control.IHyperlinkPreviewProvider provider);
+        // Set while a link preview pane is showing "pane only": the card stops
+        // appearing on hover entirely until it is cleared again.
+        void HyperlinkTooltipsSuppressed(Boolean suppressed);
 
         event Windows.Foundation.TypedEventHandler<Object, TitleChangedEventArgs> TitleChanged;
         event Windows.Foundation.TypedEventHandler<Object, WriteToClipboardEventArgs> WriteToClipboard;
         event Windows.Foundation.TypedEventHandler<Object, PasteFromClipboardEventArgs> PasteFromClipboard;
         event Windows.Foundation.TypedEventHandler<Object, OpenHyperlinkEventArgs> OpenHyperlink;
         event Windows.Foundation.TypedEventHandler<Object, HyperlinkTooltipActionInvokedEventArgs> HyperlinkTooltipActionInvoked;
+        event Windows.Foundation.TypedEventHandler<Object, ShowHyperlinkPreviewRequestedEventArgs> ShowHyperlinkPreviewRequested;
         event Windows.Foundation.TypedEventHandler<Object, Object> SetTaskbarProgress;
         event Windows.Foundation.TypedEventHandler<Object, NoticeEventArgs> RaiseNotice;
         event Windows.Foundation.TypedEventHandler<Object, Object> WarningBell;

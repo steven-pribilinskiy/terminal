@@ -30,6 +30,91 @@ namespace Microsoft.Terminal.Settings.Model
         Multiline
     };
 
+    // What a tab holds: one long value (a description) or a repeating list of
+    // authored entries (comments).
+    enum IntegrationTabKind
+    {
+        Body = 0,
+        List
+    };
+
+    // What running an action does: fire one request, or pick from a list the
+    // fetch produced and then fire a request for the chosen one.
+    enum IntegrationActionKind
+    {
+        Button = 0,
+        Choice
+    };
+
+    // A tab of secondary content, shown beside the fields when the user turns
+    // it on. Body reads one value; List repeats one entry shape over an array.
+    [default_interface] runtimeclass IntegrationTab
+    {
+        IntegrationTab();
+
+        String Key;
+        String Label;
+        IntegrationTabKind Kind;
+        // Body: the value itself. List: the array to repeat over.
+        String Path;
+        // "markdown", "adf" (Atlassian Document Format) or "text".
+        String Format;
+        // List only, relative to each element of Path.
+        String ItemAuthorPath;
+        String ItemAvatarPath;
+        String ItemBodyPath;
+        String ItemTimePath;
+        Boolean DefaultVisible;
+    }
+
+    // Something the user can do to the thing behind the link -- a Jira
+    // transition, say. Choice actions offer the options a fetch step produced.
+    [default_interface] runtimeclass IntegrationAction
+    {
+        IntegrationAction();
+
+        String Key;
+        String Label;
+        IntegrationActionKind Kind;
+
+        // --- Choice: where the options are and how to read one ---
+        String OptionsPath;
+        String OptionIdPath;
+        String OptionLabelPath;
+        String OptionBadgePath;
+        String OptionColorPath;
+        // The state this option moves the thing to, and where the thing's
+        // current state is: together they let an undo find the way back.
+        String OptionTargetIdPath;
+        String CurrentStatePath;
+        // Per-option fields the far end demands before it will accept the
+        // change (Jira's "pick a resolution" dialog).
+        String OptionFieldsPath;
+
+        // --- The request. {{choice}} is the chosen option's id and
+        //     {{field.<key>}} a value the user filled in. ---
+        String Method;
+        String Url;
+        String Body;
+        Windows.Foundation.Collections.IMap<String, String> Headers;
+        String AuthType;
+        String AuthUser;
+        String AuthPassword;
+        Boolean AllowUntrustedCertificate;
+        Int32 TimeoutMs;
+    }
+
+    // A named set of display fields, shown together and turned on or off as a
+    // unit in the settings.
+    [default_interface] runtimeclass IntegrationFieldGroup
+    {
+        IntegrationFieldGroup();
+
+        String Key;
+        String Label;
+        Windows.Foundation.Collections.IVector<String> Fields;
+    }
+
     // A user-provided value the integration needs: a plain setting (stored in
     // settings.json) or a credential (stored in the Windows credential vault,
     // never in settings.json).
@@ -92,6 +177,10 @@ namespace Microsoft.Terminal.Settings.Model
         String When;
         // Skip when this template expands to a non-empty string.
         String Unless;
+        // A failing optional step is recorded and stepped over rather than
+        // ending the fetch -- for an endpoint that may not exist on every
+        // server, or a probe that is allowed to come back empty.
+        Boolean Optional;
     }
 
     // One row of the card's representation of a fetched result.
@@ -133,6 +222,13 @@ namespace Microsoft.Terminal.Settings.Model
         Windows.Foundation.Collections.IVector<IntegrationMatcher> Matchers;
         Windows.Foundation.Collections.IVector<IntegrationFetchStep> FetchSteps;
         Windows.Foundation.Collections.IVector<IntegrationDisplayField> Fields;
+        Windows.Foundation.Collections.IVector<IntegrationFieldGroup> FieldGroups;
+        Windows.Foundation.Collections.IVector<IntegrationTab> Tabs;
+        Windows.Foundation.Collections.IVector<IntegrationAction> Actions;
+        // Patterns the terminal scans output for while this integration is
+        // enabled, so a scheme it owns (stith://, say) is hoverable even when
+        // nothing marked it as a link.
+        Windows.Foundation.Collections.IVector<String> DetectPatterns;
     }
 
     // The user's per-integration configuration, persisted in settings.json under
@@ -145,6 +241,8 @@ namespace Microsoft.Terminal.Settings.Model
         Windows.Foundation.Collections.IMap<String, String> Values;
         // Keys of the display fields to show; null means the manifest defaults.
         Windows.Foundation.Collections.IVector<String> Fields;
+        // Keys of the tabs to show; null means the manifest defaults.
+        Windows.Foundation.Collections.IVector<String> Tabs;
     }
 
     // Discovers manifests: built-ins embedded in this DLL, then

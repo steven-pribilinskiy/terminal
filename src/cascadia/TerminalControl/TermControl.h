@@ -63,6 +63,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         void KeyBindings(const Control::IKeyBindings& bindings) { _keyBindings = bindings; }
         void HyperlinkPreviewProvider(const Control::IHyperlinkPreviewProvider& provider) { _hyperlinkPreviewProvider = provider; }
+        void HyperlinkTooltipsSuppressed(bool suppressed);
 
         uint64_t ContentId() const;
 
@@ -216,6 +217,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         til::typed_event<IInspectable, Control::OpenHyperlinkEventArgs> OpenHyperlink;
         til::typed_event<IInspectable, Control::HyperlinkTooltipActionInvokedEventArgs> HyperlinkTooltipActionInvoked;
+        til::typed_event<IInspectable, Control::ShowHyperlinkPreviewRequestedEventArgs> ShowHyperlinkPreviewRequested;
         til::typed_event<IInspectable, Control::NoticeEventArgs> RaiseNotice;
         til::typed_event<> HidePointerCursor;
         til::typed_event<> RestorePointerCursor;
@@ -358,10 +360,20 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             int32_t showDelay{ 0 };
             int32_t hideDelay{ 0 };
             int32_t maxWidth{ 0 };
-            bool showOpen{ true };
-            bool showCopyLink{ true };
-            bool showCopyPath{ true };
-            bool showReveal{ true };
+            // Which built-in buttons this particular link gets. They come from a
+            // list of ids -- "open", "copyLink", "copyPath", "reveal",
+            // "showInPane" -- taken from the matched rule when it names any and
+            // from hyperlink.tooltipButtons when it doesn't, so a rule replaces
+            // the global choice rather than subtracting from it.
+            bool showOpen{ false };
+            bool showCopyLink{ false };
+            bool showCopyPath{ false };
+            bool showReveal{ false };
+            bool showInPane{ false };
+            // The pane, not the card, is where this link's preview belongs.
+            bool preferPane{ false };
+            // The "Ctrl+Click to follow link" line.
+            bool showHint{ true };
             std::vector<Control::HyperlinkTooltipAction> customActions;
             // Preview: which integration ("" = automatic, "none" = off) and whether to
             // show one at all, from the matched rule.
@@ -372,6 +384,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         };
         EffectiveHyperlinkTooltipSettings _currentHyperlinkTooltipSettings;
         EffectiveHyperlinkTooltipSettings _effectiveHyperlinkTooltipSettings(std::wstring_view uri, bool isFileLink) const;
+        static void _applyHyperlinkButtonList(EffectiveHyperlinkTooltipSettings& effective,
+                                              const Windows::Foundation::Collections::IVector<winrt::hstring>& buttons);
 
         // The integration preview for the hovered link. The generation counter is what
         // discards a fetch that finishes after the pointer has moved on.
@@ -381,6 +395,49 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void _setHyperlinkPreviewLoading(bool loading);
         safe_void_coroutine _requestHyperlinkPreview(uint32_t generation, winrt::hstring text, winrt::hstring integration);
         void _applyHyperlinkPreview(const Control::HyperlinkPreview& preview);
+
+        // While a link preview pane is showing "pane only", hovering does nothing at all.
+        bool _hyperlinkTooltipsSuppressed{ false };
+        // The link the pane was last asked to show, so that hovering along a link --
+        // which reports a change on every pointer move -- asks exactly once.
+        winrt::hstring _lastPanePreviewUri;
+
+        // The card's tab strip. -1 is the built-in field list, 0.. index into the
+        // preview's own Tabs. Rebuilt from scratch for every preview, because the
+        // tabs an integration offers belong to that one result.
+        int32_t _hyperlinkSelectedTab{ -1 };
+        void _rebuildHyperlinkTabStrip(const Control::HyperlinkPreview& preview);
+        void _showHyperlinkTab(int32_t index);
+        void _HyperlinkTabClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
+        void _fillHyperlinkFields(const Control::HyperlinkPreview& preview);
+        void _fillHyperlinkComments(const Control::HyperlinkPreviewTab& tab);
+
+        // The action the card is currently offering, plus the id that would put the
+        // last applied one back. Only the first action is shown: the card is small,
+        // and no integration declares more than one today.
+        Control::HyperlinkPreviewAction _currentHyperlinkAction{ nullptr };
+        winrt::hstring _hyperlinkUndoChoiceId;
+        // The Undo button's own localized label, kept so that relabelling it with the
+        // far end's wording for one action can be undone for the next link.
+        Windows::Foundation::IInspectable _hyperlinkUndoDefaultContent{ nullptr };
+        void _rebuildHyperlinkActions(const Control::HyperlinkPreview& preview);
+        void _updateHyperlinkActionFields();
+        void _updateHyperlinkActionApplyState();
+        // Not const: the XAML-generated element accessors these read are not.
+        Control::HyperlinkPreviewActionOption _selectedHyperlinkActionOption();
+        Windows::Foundation::Collections::IMap<winrt::hstring, winrt::hstring> _collectHyperlinkActionFields();
+        void _setHyperlinkActionBusy(bool busy);
+        safe_void_coroutine _invokeHyperlinkAction(uint32_t generation, winrt::hstring choiceId);
+        void _HyperlinkActionOptionChanged(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Controls::SelectionChangedEventArgs& e);
+        // The options dropdown is a popup outside the card, so the pointer reaching
+        // the list counts as leaving the card. These hold the card open across that.
+        bool _hyperlinkActionDropDownOpen{ false };
+        void _HyperlinkActionDropDownOpened(const Windows::Foundation::IInspectable& sender, const Windows::Foundation::IInspectable& e);
+        void _HyperlinkActionDropDownClosed(const Windows::Foundation::IInspectable& sender, const Windows::Foundation::IInspectable& e);
+        void _HyperlinkActionApplyClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
+        void _HyperlinkActionUndoClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
+        void _HyperlinkShowInPaneClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
+        void _raiseShowHyperlinkPreviewRequested();
 
         // A preview whose integration returned rendered HTML is drawn by a WebView2
         // parented to the owning window rather than by the field list. It is created

@@ -88,10 +88,8 @@ namespace Microsoft.Terminal.Control
         Windows.Foundation.IReference<Int32> TooltipHideDelay;
         Windows.Foundation.IReference<Int32> TooltipMaxWidth;
 
-        Boolean SuppressOpen;
-        Boolean SuppressCopyLink;
-        Boolean SuppressCopyPath;
-        Boolean SuppressReveal;
+        Windows.Foundation.Collections.IVector<String> Buttons;
+        Windows.Foundation.IReference<Boolean> ShowInPane;
 
         Windows.Foundation.Collections.IVector<HyperlinkTooltipAction> CustomActions;
     }
@@ -128,6 +126,14 @@ namespace Microsoft.Terminal.Control
         Int32 HyperlinkTooltipShowDelay { get; };
         Int32 HyperlinkTooltipHideDelay { get; };
         Boolean HyperlinkTooltipActions { get; };
+        // Which of the card's built-in buttons to show, by id: "open",
+        // "copyLink", "copyPath", "reveal", "showInPane". Null or empty means
+        // the shipped default rather than "no buttons at all".
+        Windows.Foundation.Collections.IVector<String> HyperlinkTooltipButtons { get; };
+        // The "Ctrl+Click to follow link" line under the URI.
+        Boolean HyperlinkTooltipHint { get; };
+        // Hovering opens the detail pane instead of the card.
+        Boolean HyperlinkPreviewInPane { get; };
         Windows.Foundation.Collections.IVector<HyperlinkTooltipRule> HyperlinkTooltipRules { get; };
         Boolean ScrollToChangeOpacity { get; };
 

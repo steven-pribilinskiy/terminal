@@ -10,6 +10,9 @@
 #include "IntegrationMatcher.g.cpp"
 #include "IntegrationFetchStep.g.cpp"
 #include "IntegrationDisplayField.g.cpp"
+#include "IntegrationFieldGroup.g.cpp"
+#include "IntegrationTab.g.cpp"
+#include "IntegrationAction.g.cpp"
 #include "IntegrationManifest.g.cpp"
 
 using namespace Microsoft::Terminal::Settings::Model;
@@ -47,6 +50,7 @@ namespace
     constexpr std::string_view TimeoutMsKey{ "timeoutMs" };
     constexpr std::string_view WhenKey{ "when" };
     constexpr std::string_view UnlessKey{ "unless" };
+    constexpr std::string_view OptionalKey{ "optional" };
 
     constexpr std::string_view PathKey{ "path" };
     constexpr std::string_view IconPathKey{ "iconPath" };
@@ -54,6 +58,20 @@ namespace
     constexpr std::string_view ColorKey{ "color" };
     constexpr std::string_view FormatKey{ "format" };
     constexpr std::string_view DefaultKey{ "default" };
+
+    constexpr std::string_view ItemAuthorPathKey{ "itemAuthorPath" };
+    constexpr std::string_view ItemAvatarPathKey{ "itemAvatarPath" };
+    constexpr std::string_view ItemBodyPathKey{ "itemBodyPath" };
+    constexpr std::string_view ItemTimePathKey{ "itemTimePath" };
+
+    constexpr std::string_view OptionsPathKey{ "optionsPath" };
+    constexpr std::string_view OptionIdPathKey{ "optionIdPath" };
+    constexpr std::string_view OptionLabelPathKey{ "optionLabelPath" };
+    constexpr std::string_view OptionBadgePathKey{ "optionBadgePath" };
+    constexpr std::string_view OptionColorPathKey{ "optionColorPath" };
+    constexpr std::string_view OptionTargetIdPathKey{ "optionTargetIdPath" };
+    constexpr std::string_view CurrentStatePathKey{ "currentStatePath" };
+    constexpr std::string_view OptionFieldsPathKey{ "optionFieldsPath" };
 
     constexpr std::string_view NameKey{ "name" };
     constexpr std::string_view IconKey{ "icon" };
@@ -65,10 +83,44 @@ namespace
     constexpr std::string_view MatchersKey{ "matchers" };
     constexpr std::string_view FetchKey{ "fetch" };
     constexpr std::string_view FieldsKey{ "fields" };
+    constexpr std::string_view FieldGroupsKey{ "fieldGroups" };
+    constexpr std::string_view TabsKey{ "tabs" };
+    constexpr std::string_view ActionsKey{ "actions" };
+    constexpr std::string_view DetectPatternsKey{ "detectPatterns" };
 }
 
 namespace winrt::Microsoft::Terminal::Settings::Model::implementation
 {
+    // "auth": { "type": "basic", "user": "…", "password": "…" }
+    //         { "type": "bearer", "value": "…" }
+    //         { "type": "header", "header": "X-Api-Key", "value": "…" }
+    // Fetch steps and actions authenticate the same way, so they read the same
+    // nested object into the same three fields.
+    static void ParseAuth(const Json::Value& json, hstring& authType, hstring& authUser, hstring& authPassword)
+    {
+        const auto auth = json.find(AuthKey.data(), AuthKey.data() + AuthKey.size());
+        if (!auth || !auth->isObject())
+        {
+            return;
+        }
+
+        JsonUtils::GetValueForKey(*auth, TypeKey, authType);
+        if (authType == L"basic")
+        {
+            JsonUtils::GetValueForKey(*auth, AuthUserKey, authUser);
+            JsonUtils::GetValueForKey(*auth, AuthPasswordKey, authPassword);
+        }
+        else if (authType == L"header")
+        {
+            JsonUtils::GetValueForKey(*auth, AuthHeaderKey, authUser);
+            JsonUtils::GetValueForKey(*auth, AuthValueKey, authPassword);
+        }
+        else
+        {
+            JsonUtils::GetValueForKey(*auth, AuthValueKey, authPassword);
+        }
+    }
+
     com_ptr<IntegrationField> IntegrationField::FromJson(const Json::Value& json)
     {
         auto field = winrt::make_self<IntegrationField>();
@@ -112,28 +164,9 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         JsonUtils::GetValueForKey(json, TimeoutMsKey, step->_TimeoutMs);
         JsonUtils::GetValueForKey(json, WhenKey, step->_When);
         JsonUtils::GetValueForKey(json, UnlessKey, step->_Unless);
+        JsonUtils::GetValueForKey(json, OptionalKey, step->_Optional);
 
-        // "auth": { "type": "basic", "user": "…", "password": "…" }
-        //         { "type": "bearer", "value": "…" }
-        //         { "type": "header", "header": "X-Api-Key", "value": "…" }
-        if (const auto auth = json.find(AuthKey.data(), AuthKey.data() + AuthKey.size()); auth && auth->isObject())
-        {
-            JsonUtils::GetValueForKey(*auth, TypeKey, step->_AuthType);
-            if (step->_AuthType == L"basic")
-            {
-                JsonUtils::GetValueForKey(*auth, AuthUserKey, step->_AuthUser);
-                JsonUtils::GetValueForKey(*auth, AuthPasswordKey, step->_AuthPassword);
-            }
-            else if (step->_AuthType == L"header")
-            {
-                JsonUtils::GetValueForKey(*auth, AuthHeaderKey, step->_AuthUser);
-                JsonUtils::GetValueForKey(*auth, AuthValueKey, step->_AuthPassword);
-            }
-            else
-            {
-                JsonUtils::GetValueForKey(*auth, AuthValueKey, step->_AuthPassword);
-            }
-        }
+        ParseAuth(json, step->_AuthType, step->_AuthUser, step->_AuthPassword);
 
         if (step->_Method.empty())
         {
@@ -165,6 +198,89 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         return field;
     }
 
+    com_ptr<IntegrationFieldGroup> IntegrationFieldGroup::FromJson(const Json::Value& json)
+    {
+        auto group = winrt::make_self<IntegrationFieldGroup>();
+        JsonUtils::GetValueForKey(json, KeyKey, group->_Key);
+        JsonUtils::GetValueForKey(json, LabelKey, group->_Label);
+        JsonUtils::GetValueForKey(json, FieldsKey, group->_Fields);
+        if (group->_Label.empty())
+        {
+            group->_Label = group->_Key;
+        }
+        if (!group->_Fields)
+        {
+            group->_Fields = winrt::single_threaded_vector<hstring>();
+        }
+        return group;
+    }
+
+    com_ptr<IntegrationTab> IntegrationTab::FromJson(const Json::Value& json)
+    {
+        auto tab = winrt::make_self<IntegrationTab>();
+        JsonUtils::GetValueForKey(json, KeyKey, tab->_Key);
+        JsonUtils::GetValueForKey(json, LabelKey, tab->_Label);
+        JsonUtils::GetValueForKey(json, KindKey, tab->_Kind);
+        JsonUtils::GetValueForKey(json, PathKey, tab->_Path);
+        JsonUtils::GetValueForKey(json, FormatKey, tab->_Format);
+        JsonUtils::GetValueForKey(json, ItemAuthorPathKey, tab->_ItemAuthorPath);
+        JsonUtils::GetValueForKey(json, ItemAvatarPathKey, tab->_ItemAvatarPath);
+        JsonUtils::GetValueForKey(json, ItemBodyPathKey, tab->_ItemBodyPath);
+        JsonUtils::GetValueForKey(json, ItemTimePathKey, tab->_ItemTimePath);
+        JsonUtils::GetValueForKey(json, DefaultKey, tab->_DefaultVisible);
+        if (tab->_Label.empty())
+        {
+            tab->_Label = tab->_Key;
+        }
+        if (tab->_Format.empty())
+        {
+            tab->_Format = L"text";
+        }
+        return tab;
+    }
+
+    com_ptr<IntegrationAction> IntegrationAction::FromJson(const Json::Value& json)
+    {
+        auto action = winrt::make_self<IntegrationAction>();
+        JsonUtils::GetValueForKey(json, KeyKey, action->_Key);
+        JsonUtils::GetValueForKey(json, LabelKey, action->_Label);
+        JsonUtils::GetValueForKey(json, KindKey, action->_Kind);
+
+        JsonUtils::GetValueForKey(json, OptionsPathKey, action->_OptionsPath);
+        JsonUtils::GetValueForKey(json, OptionIdPathKey, action->_OptionIdPath);
+        JsonUtils::GetValueForKey(json, OptionLabelPathKey, action->_OptionLabelPath);
+        JsonUtils::GetValueForKey(json, OptionBadgePathKey, action->_OptionBadgePath);
+        JsonUtils::GetValueForKey(json, OptionColorPathKey, action->_OptionColorPath);
+        JsonUtils::GetValueForKey(json, OptionTargetIdPathKey, action->_OptionTargetIdPath);
+        JsonUtils::GetValueForKey(json, CurrentStatePathKey, action->_CurrentStatePath);
+        JsonUtils::GetValueForKey(json, OptionFieldsPathKey, action->_OptionFieldsPath);
+
+        JsonUtils::GetValueForKey(json, MethodKey, action->_Method);
+        JsonUtils::GetValueForKey(json, UrlKey, action->_Url);
+        JsonUtils::GetValueForKey(json, BodyKey, action->_Body);
+        JsonUtils::GetValueForKey(json, HeadersKey, action->_Headers);
+        JsonUtils::GetValueForKey(json, AllowUntrustedCertificateKey, action->_AllowUntrustedCertificate);
+        JsonUtils::GetValueForKey(json, TimeoutMsKey, action->_TimeoutMs);
+
+        ParseAuth(json, action->_AuthType, action->_AuthUser, action->_AuthPassword);
+
+        if (action->_Label.empty())
+        {
+            action->_Label = action->_Key;
+        }
+        // An action changes something on the far end, so POST is the sane
+        // default where a fetch step's is GET.
+        if (action->_Method.empty())
+        {
+            action->_Method = L"POST";
+        }
+        if (action->_TimeoutMs <= 0)
+        {
+            action->_TimeoutMs = 8000;
+        }
+        return action;
+    }
+
     com_ptr<IntegrationManifest> IntegrationManifest::FromJson(const Json::Value& json, const hstring& source, bool isBuiltIn)
     {
         if (!json.isObject())
@@ -187,6 +303,10 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         JsonUtils::GetValueForKey(json, MatchersKey, manifest->_Matchers);
         JsonUtils::GetValueForKey(json, FetchKey, manifest->_FetchSteps);
         JsonUtils::GetValueForKey(json, FieldsKey, manifest->_Fields);
+        JsonUtils::GetValueForKey(json, FieldGroupsKey, manifest->_FieldGroups);
+        JsonUtils::GetValueForKey(json, TabsKey, manifest->_Tabs);
+        JsonUtils::GetValueForKey(json, ActionsKey, manifest->_Actions);
+        JsonUtils::GetValueForKey(json, DetectPatternsKey, manifest->_DetectPatterns);
 
         if (manifest->_Id.empty())
         {
@@ -221,6 +341,22 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         if (!manifest->_Fields)
         {
             manifest->_Fields = winrt::single_threaded_vector<Model::IntegrationDisplayField>();
+        }
+        if (!manifest->_FieldGroups)
+        {
+            manifest->_FieldGroups = winrt::single_threaded_vector<Model::IntegrationFieldGroup>();
+        }
+        if (!manifest->_Tabs)
+        {
+            manifest->_Tabs = winrt::single_threaded_vector<Model::IntegrationTab>();
+        }
+        if (!manifest->_Actions)
+        {
+            manifest->_Actions = winrt::single_threaded_vector<Model::IntegrationAction>();
+        }
+        if (!manifest->_DetectPatterns)
+        {
+            manifest->_DetectPatterns = winrt::single_threaded_vector<hstring>();
         }
         // Credentials are secret unless the manifest says otherwise.
         for (const auto& credential : manifest->_Credentials)

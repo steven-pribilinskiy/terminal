@@ -14,6 +14,9 @@
         }
     ],
     "credentials": [],
+    "detectPatterns": [
+        "stith://(?:session|focus)/[A-Za-z0-9-]{4,64}"
+    ],
     "matchers": [
         {
             "kind": "link",

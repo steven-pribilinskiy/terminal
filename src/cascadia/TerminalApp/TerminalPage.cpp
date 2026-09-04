@@ -16,6 +16,7 @@
 #include "../TerminalSettingsAppAdapterLib/TerminalSettings.h"
 #include "App.h"
 #include "DebugTapConnection.h"
+#include "LinkPreviewPaneContent.h"
 #include "MarkdownPaneContent.h"
 #include "PaneSessionCapture.h"
 #include "Remoting.h"
@@ -2058,6 +2059,15 @@ namespace winrt::TerminalApp::implementation
 
         term.OpenHyperlink({ this, &TerminalPage::_OpenHyperlinkHandler });
         term.HyperlinkTooltipActionInvoked({ this, &TerminalPage::_HyperlinkTooltipActionInvokedHandler });
+        term.ShowHyperlinkPreviewRequested({ this, &TerminalPage::_ShowHyperlinkPreviewRequestedHandler });
+
+        // A pane may already be silencing hover cards. A control created after that
+        // switch was flipped has to be told, or it is the one terminal in the window
+        // still showing them.
+        if (_hyperlinkTooltipsSuppressed)
+        {
+            term.HyperlinkTooltipsSuppressed(true);
+        }
 
         // Add an event handler for when the terminal or tab wants to set a
         // progress indicator on the taskbar
@@ -3433,6 +3443,90 @@ namespace winrt::TerminalApp::implementation
         _actionDispatch->DoAction(toRun);
     }
 
+    // The card's "Show in pane" button, or a hover when the pane is the preferred
+    // surface. One preview pane per tab: a second link retargets the one that is
+    // already open rather than splitting again, the same singleton trick the
+    // snippets pane uses, because two panes both saying "the link under the
+    // pointer" would be two answers to one question.
+    void TerminalPage::_ShowHyperlinkPreviewRequestedHandler(const IInspectable& sender,
+                                                             const Microsoft::Terminal::Control::ShowHyperlinkPreviewRequestedEventArgs& eventArgs)
+    {
+        if (!eventArgs || eventArgs.Uri().empty())
+        {
+            return;
+        }
+
+        const auto focusedTab{ _senderOrFocusedTab(sender) };
+
+        winrt::com_ptr<LinkPreviewPaneContent> existing{ nullptr };
+        if (focusedTab)
+        {
+            if (const auto rootPane{ focusedTab->GetRootPane() })
+            {
+                rootPane->WalkTree([&](const auto& p) -> bool {
+                    if (const auto& preview{ p->GetContent().try_as<LinkPreviewPaneContent>() })
+                    {
+                        existing = preview;
+                        return true;
+                    }
+                    return false;
+                });
+            }
+        }
+
+        if (existing)
+        {
+            existing->ShowLink(eventArgs.Uri(), eventArgs.IntegrationHint());
+            return;
+        }
+
+        const auto& previewContent{ winrt::make_self<LinkPreviewPaneContent>() };
+        previewContent->UpdateSettings(_settings, _currentWindowSettings());
+        previewContent->GetRoot().KeyDown({ this, &TerminalPage::_KeyDownHandler });
+        previewContent->SetPreviewProvider(*_hyperlinkPreviewService);
+        previewContent->HideTooltipsChanged({ get_weak(), &TerminalPage::_LinkPreviewHideTooltipsChanged });
+        previewContent->ShowLink(eventArgs.Uri(), eventArgs.IntegrationHint());
+
+        // Built directly rather than through INewContentArgs, which today can only
+        // carry a type string and so has nowhere to put the link.
+        _SplitPane(focusedTab, SplitDirection::Automatic, 0.5f, std::make_shared<Pane>(*previewContent));
+    }
+
+    // The preview pane's "Pane only" switch, and the same event raised with the
+    // switch off when the pane closes -- which is what makes the hover cards come
+    // back rather than leaving the window mute with nothing to explain why.
+    void TerminalPage::_LinkPreviewHideTooltipsChanged(const IInspectable& sender, const IInspectable& /*args*/)
+    {
+        const auto content{ sender.try_as<LinkPreviewPaneContent>() };
+        if (!content)
+        {
+            return;
+        }
+
+        _setHyperlinkTooltipsSuppressed(content->HideTooltips());
+    }
+
+    void TerminalPage::_setHyperlinkTooltipsSuppressed(bool suppressed)
+    {
+        _hyperlinkTooltipsSuppressed = suppressed;
+
+        for (const auto& tab : _tabs)
+        {
+            if (const auto tabImpl{ _GetTabImpl(tab) })
+            {
+                if (const auto rootPane{ tabImpl->GetRootPane() })
+                {
+                    rootPane->WalkTree([suppressed](auto&& pane) {
+                        if (const auto& control{ pane->GetTerminalControl() })
+                        {
+                            control.HyperlinkTooltipsSuppressed(suppressed);
+                        }
+                    });
+                }
+            }
+        }
+    }
+
     // Reads a string value out of an open registry key, or an empty string if it isn't there.
     // The distro lookup itself lives in Utils, because TermControl needs the same answer to
     // show where a file:// link will actually go before it is clicked. All this adds is the
@@ -4146,6 +4240,37 @@ namespace winrt::TerminalApp::implementation
             }
 
             content = *tasksContent;
+        }
+        else if (paneType == L"x-link-preview")
+        {
+            // One per tab, like the snippets pane above: if the focused tab already
+            // has one, focus it rather than opening a second.
+            if (const auto& focusedTab{ _GetFocusedTabImpl() })
+            {
+                const auto rootPane{ focusedTab->GetRootPane() };
+                const bool found = rootPane == nullptr ? false : rootPane->WalkTree([](const auto& p) -> bool {
+                    if (const auto& preview{ p->GetContent().try_as<LinkPreviewPaneContent>() })
+                    {
+                        preview->Focus(FocusState::Programmatic);
+                        return true;
+                    }
+                    return false;
+                });
+                if (found)
+                {
+                    return nullptr;
+                }
+            }
+
+            // Restored from a persisted layout, so there is no link to show yet: the
+            // args can only carry a type string. It fills in on the next request.
+            const auto& previewContent{ winrt::make_self<LinkPreviewPaneContent>() };
+            previewContent->UpdateSettings(_settings, _currentWindowSettings());
+            previewContent->GetRoot().KeyDown({ this, &TerminalPage::_KeyDownHandler });
+            previewContent->SetPreviewProvider(*_hyperlinkPreviewService);
+            previewContent->HideTooltipsChanged({ get_weak(), &TerminalPage::_LinkPreviewHideTooltipsChanged });
+
+            content = *previewContent;
         }
         else if (paneType == L"x-markdown")
         {

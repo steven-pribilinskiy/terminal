@@ -34,6 +34,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         WINRT_PROPERTY(bool, Enabled, false);
         WINRT_PROPERTY(IntegrationValueMap, Values);
         WINRT_PROPERTY(Windows::Foundation::Collections::IVector<hstring>, Fields);
+        WINRT_PROPERTY(Windows::Foundation::Collections::IVector<hstring>, Tabs);
     };
 }
 

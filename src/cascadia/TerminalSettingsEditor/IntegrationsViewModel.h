@@ -8,6 +8,8 @@
 #include "IntegrationSettingViewModel.g.h"
 #include "IntegrationCredentialViewModel.g.h"
 #include "IntegrationDisplayFieldViewModel.g.h"
+#include "IntegrationFieldGroupViewModel.g.h"
+#include "IntegrationTabViewModel.g.h"
 #include "IntegrationMatcherViewModel.g.h"
 #include "ViewModelHelpers.h"
 #include "Utils.h"
@@ -91,6 +93,57 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         hstring _IntegrationId;
     };
 
+    struct IntegrationFieldGroupViewModel : IntegrationFieldGroupViewModelT<IntegrationFieldGroupViewModel>, ViewModelHelper<IntegrationFieldGroupViewModel>
+    {
+    public:
+        IntegrationFieldGroupViewModel(hstring key,
+                                       hstring label,
+                                       std::vector<Editor::IntegrationDisplayFieldViewModel> fields);
+
+        using ViewModelHelper<IntegrationFieldGroupViewModel>::PropertyChanged;
+
+        hstring Key() const noexcept { return _Key; }
+        hstring Label() const noexcept { return _Label; }
+        Windows::Foundation::Collections::IObservableVector<Editor::IntegrationDisplayFieldViewModel> Fields() const noexcept { return _Fields; }
+
+        Windows::Foundation::IReference<bool> GroupChecked() const;
+        void GroupChecked(const Windows::Foundation::IReference<bool>& value);
+
+    private:
+        hstring _Key;
+        hstring _Label;
+        Windows::Foundation::Collections::IObservableVector<Editor::IntegrationDisplayFieldViewModel> _Fields;
+        // One per field, so ticking a single box re-evaluates the header's
+        // three-state value.
+        std::vector<Windows::UI::Xaml::Data::INotifyPropertyChanged::PropertyChanged_revoker> _childRevokers;
+        // Set while the header is applying itself to every child, so the bulk
+        // change raises GroupChecked once instead of once per field.
+        bool _applying{ false };
+    };
+
+    struct IntegrationTabViewModel : IntegrationTabViewModelT<IntegrationTabViewModel>, ViewModelHelper<IntegrationTabViewModel>
+    {
+    public:
+        IntegrationTabViewModel(Model::IntegrationTab tab,
+                                Model::IntegrationManifest manifest,
+                                Model::GlobalAppSettings globalSettings,
+                                hstring integrationId);
+
+        using ViewModelHelper<IntegrationTabViewModel>::PropertyChanged;
+
+        hstring Key() const { return _Tab.Key(); }
+        hstring Label() const;
+
+        bool Visible() const;
+        void Visible(bool value);
+
+    private:
+        Model::IntegrationTab _Tab;
+        Model::IntegrationManifest _Manifest;
+        Model::GlobalAppSettings _GlobalSettings;
+        hstring _IntegrationId;
+    };
+
     struct IntegrationMatcherViewModel : IntegrationMatcherViewModelT<IntegrationMatcherViewModel>, ViewModelHelper<IntegrationMatcherViewModel>
     {
     public:
@@ -140,11 +193,14 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         Windows::Foundation::Collections::IObservableVector<Editor::IntegrationSettingViewModel> Settings() const noexcept { return _Settings; }
         Windows::Foundation::Collections::IObservableVector<Editor::IntegrationCredentialViewModel> Credentials() const noexcept { return _Credentials; }
         Windows::Foundation::Collections::IObservableVector<Editor::IntegrationDisplayFieldViewModel> Fields() const noexcept { return _Fields; }
+        Windows::Foundation::Collections::IObservableVector<Editor::IntegrationFieldGroupViewModel> FieldGroups() const noexcept { return _FieldGroups; }
+        Windows::Foundation::Collections::IObservableVector<Editor::IntegrationTabViewModel> Tabs() const noexcept { return _Tabs; }
         Windows::Foundation::Collections::IObservableVector<Editor::IntegrationMatcherViewModel> SuggestedMatchers() const noexcept { return _SuggestedMatchers; }
 
         bool HasSettings() const noexcept { return _Settings.Size() > 0; }
         bool HasCredentials() const noexcept { return _Credentials.Size() > 0; }
         bool HasFields() const noexcept { return _Fields.Size() > 0; }
+        bool HasTabs() const noexcept { return _Tabs.Size() > 0; }
         bool HasSuggestedMatchers() const noexcept { return _SuggestedMatchers.Size() > 0; }
 
     private:
@@ -155,6 +211,8 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         Windows::Foundation::Collections::IObservableVector<Editor::IntegrationSettingViewModel> _Settings;
         Windows::Foundation::Collections::IObservableVector<Editor::IntegrationCredentialViewModel> _Credentials;
         Windows::Foundation::Collections::IObservableVector<Editor::IntegrationDisplayFieldViewModel> _Fields;
+        Windows::Foundation::Collections::IObservableVector<Editor::IntegrationFieldGroupViewModel> _FieldGroups;
+        Windows::Foundation::Collections::IObservableVector<Editor::IntegrationTabViewModel> _Tabs;
         Windows::Foundation::Collections::IObservableVector<Editor::IntegrationMatcherViewModel> _SuggestedMatchers;
 
         // One per settings/credentials child, so a value typed into any of them

@@ -50,6 +50,66 @@ namespace winrt::Microsoft::Terminal::Settings
         return { horizAlign, vertAlign };
     }
 
+    // The patterns every enabled integration asked the terminal to scan output
+    // for. They join the text-kind tooltip rules in ICoreSettings::TextPatterns,
+    // which is what makes a bare "stith://..." printed as plain text hoverable
+    // even though nothing marked it as a link.
+    //
+    // Read here rather than in _ApplyWindowSettings because the integrations
+    // live on the app's global settings, not on the window's.
+    static std::vector<winrt::hstring> IntegrationDetectPatterns(const Model::CascadiaSettings& appSettings)
+    {
+        std::vector<winrt::hstring> patterns;
+        if (!appSettings)
+        {
+            return patterns;
+        }
+
+        const auto globals = appSettings.GlobalSettings();
+        if (!globals)
+        {
+            return patterns;
+        }
+
+        // Integrations() never hands back null -- it materialises an empty map
+        // when nothing is configured -- and an empty one means there is no
+        // reason to walk the registry at all.
+        const auto configured = globals.Integrations();
+        if (!configured || configured.Size() == 0)
+        {
+            return patterns;
+        }
+
+        for (const auto& manifest : Model::IntegrationRegistry::All())
+        {
+            if (!manifest)
+            {
+                continue;
+            }
+            const auto id = manifest.Id();
+            if (id.empty() || !configured.HasKey(id))
+            {
+                continue;
+            }
+            const auto entry = configured.Lookup(id);
+            if (!entry || !entry.Enabled())
+            {
+                continue;
+            }
+            if (const auto declared = manifest.DetectPatterns())
+            {
+                for (const auto& pattern : declared)
+                {
+                    if (!pattern.empty())
+                    {
+                        patterns.push_back(pattern);
+                    }
+                }
+            }
+        }
+        return patterns;
+    }
+
     winrt::com_ptr<TerminalSettings> TerminalSettings::_CreateWithProfileCommon(const Model::CascadiaSettings& appSettings, const Model::WindowSettings& windowSettings, const Model::Profile& profile)
     {
         auto settings{ winrt::make_self<TerminalSettings>() };
@@ -58,6 +118,22 @@ namespace winrt::Microsoft::Terminal::Settings
         settings->_ApplyProfileSettings(profile);
         settings->_ApplyWindowSettings(windowSettings);
         settings->_ApplyAppearanceSettings(profile.DefaultAppearance(), globals.ColorSchemes(), globals.CurrentTheme(windowSettings));
+
+        // Appended after the rules, so the pattern ids the rules already own
+        // (2 + index) keep meaning what they meant.
+        if (auto extra = IntegrationDetectPatterns(appSettings); !extra.empty())
+        {
+            auto textPatterns = settings->_TextPatterns.value_or(nullptr);
+            if (!textPatterns)
+            {
+                textPatterns = winrt::single_threaded_vector<winrt::hstring>();
+            }
+            for (const auto& pattern : extra)
+            {
+                textPatterns.Append(pattern);
+            }
+            settings->_TextPatterns = textPatterns;
+        }
 
         return settings;
     }
@@ -379,6 +455,9 @@ namespace winrt::Microsoft::Terminal::Settings
         _HyperlinkTooltipShowDelay = windowSettings.HyperlinkTooltipShowDelay();
         _HyperlinkTooltipHideDelay = windowSettings.HyperlinkTooltipHideDelay();
         _HyperlinkTooltipActions = windowSettings.HyperlinkTooltipActions();
+        _HyperlinkTooltipButtons = windowSettings.HyperlinkTooltipButtons();
+        _HyperlinkTooltipHint = windowSettings.HyperlinkTooltipHint();
+        _HyperlinkPreviewInPane = windowSettings.HyperlinkPreviewInPane();
 
         if (const auto modelRules = windowSettings.HyperlinkTooltipRules())
         {
@@ -398,10 +477,12 @@ namespace winrt::Microsoft::Terminal::Settings
                 controlRule.TooltipShowDelay(modelRule.TooltipShowDelay());
                 controlRule.TooltipHideDelay(modelRule.TooltipHideDelay());
                 controlRule.TooltipMaxWidth(modelRule.TooltipMaxWidth());
-                controlRule.SuppressOpen(modelRule.SuppressOpen());
-                controlRule.SuppressCopyLink(modelRule.SuppressCopyLink());
-                controlRule.SuppressCopyPath(modelRule.SuppressCopyPath());
-                controlRule.SuppressReveal(modelRule.SuppressReveal());
+                // Which buttons this rule's card carries. An empty (or unset)
+                // list inherits the window's hyperlink.tooltipButtons, and an
+                // unset ShowInPane inherits hyperlink.previewInPane -- the
+                // control resolves both, so both are mirrored as they are.
+                controlRule.Buttons(modelRule.Buttons());
+                controlRule.ShowInPane(modelRule.ShowInPane());
 
                 auto controlActions = winrt::single_threaded_vector<HyperlinkTooltipAction>();
                 if (const auto modelActions = modelRule.CustomActions())

@@ -87,6 +87,17 @@ namespace Microsoft.Terminal.Control
         String Uri { get; };
     }
 
+    // "Show this preview somewhere with room" -- the card asking the app to put
+    // the hovered link in a pane instead. IntegrationHint is the same "" /
+    // "none" / integration-id value the card itself resolved the preview with,
+    // so the pane fetches exactly what the card would have shown.
+    runtimeclass ShowHyperlinkPreviewRequestedEventArgs
+    {
+        ShowHyperlinkPreviewRequestedEventArgs(String uri, String integrationHint);
+        String Uri { get; };
+        String IntegrationHint { get; };
+    }
+
     enum NoticeLevel
     {
         Debug = 10,

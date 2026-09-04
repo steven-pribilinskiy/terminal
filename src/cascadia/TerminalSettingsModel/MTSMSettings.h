@@ -22,6 +22,9 @@ Author(s):
 // Integrations entry below names IntegrationSettingsMap / MakeIntegrationSettingsMap(),
 // which GlobalAppSettings.h defines (the only place the global table expands).
 // They cannot live here: Theme.h includes this header before any projection.
+// MakeDefaultTooltipButtons() is declared there too, for the same reason: the
+// hyperlink card shows Copy link and Show in pane unless told otherwise, and
+// Open stays off because following a link is what clicking it already does.
 
 // Settings that are truly app-global (not per-window)
 #define MTSM_GLOBAL_ONLY_SETTINGS(X)                                                                                               \
@@ -58,6 +61,10 @@ Author(s):
     X(int32_t, HyperlinkTooltipShowDelay, "hyperlink.tooltipShowDelay", 250)                                                                                                                          \
     X(int32_t, HyperlinkTooltipHideDelay, "hyperlink.tooltipHideDelay", 400)                                                                                                                          \
     X(bool, HyperlinkTooltipActions, "hyperlink.tooltipActions", true)                                                                                                                                \
+    X(winrt::Windows::Foundation::Collections::IVector<winrt::hstring>, HyperlinkTooltipButtons, "hyperlink.tooltipButtons", MakeDefaultTooltipButtons())                                            \
+    X(bool, HyperlinkTooltipHint, "hyperlink.tooltipHint", true)                                                                                                                                      \
+    X(bool, HyperlinkPreviewInPane, "hyperlink.previewInPane", false)                                                                                                                                 \
+    X(Model::PaneTitlebarVisibility, PaneTitlebarVisibility, "paneTitlebarVisibility", Model::PaneTitlebarVisibility::MultiplePanes)                                                                   \
     X(winrt::Windows::Foundation::Collections::IVector<Model::HyperlinkTooltipRule>, HyperlinkTooltipRules, "hyperlink.tooltipRules", winrt::single_threaded_vector<Model::HyperlinkTooltipRule>())   \
     X(bool, ScrollToChangeOpacity, "experimental.scrollToChangeOpacity", false)                                                                                                                       \
     X(winrt::Microsoft::Terminal::Control::GraphicsAPI, GraphicsAPI, "rendering.graphicsAPI")                                                                                                         \

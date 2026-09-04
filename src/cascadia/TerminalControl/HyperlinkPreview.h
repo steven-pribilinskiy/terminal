@@ -13,6 +13,12 @@ Abstract:
 #pragma once
 
 #include "HyperlinkPreviewField.g.h"
+#include "HyperlinkPreviewComment.g.h"
+#include "HyperlinkPreviewTab.g.h"
+#include "HyperlinkPreviewActionField.g.h"
+#include "HyperlinkPreviewActionOption.g.h"
+#include "HyperlinkPreviewAction.g.h"
+#include "HyperlinkActionResult.g.h"
 #include "HyperlinkPreview.g.h"
 #include "HyperlinkPreviewHelpers.g.h"
 
@@ -27,13 +33,108 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         WINRT_PROPERTY(HyperlinkPreviewFieldKind, Kind, HyperlinkPreviewFieldKind::Text);
         WINRT_PROPERTY(hstring, IconUri);
         WINRT_PROPERTY(hstring, Color);
+        WINRT_PROPERTY(hstring, Group);
+        WINRT_PROPERTY(hstring, GroupLabel);
 
+        // WINRT_PROPERTY leaves the class `protected:`, so anything written by
+        // hand after one has to say `public:` again or it vanishes from the
+        // projection -- which shows up as an unrelated-looking link error.
     public:
         bool IsTitle() const noexcept { return _Kind == HyperlinkPreviewFieldKind::Title; }
         bool IsRow() const noexcept { return !IsTitle(); }
         bool IsBadge() const noexcept { return _Kind == HyperlinkPreviewFieldKind::Badge; }
         bool IsPlain() const noexcept { return !IsTitle() && !IsBadge(); }
         bool HasIcon() const noexcept { return !_IconUri.empty(); }
+    };
+
+    struct HyperlinkPreviewComment : HyperlinkPreviewCommentT<HyperlinkPreviewComment>
+    {
+        HyperlinkPreviewComment() = default;
+
+        WINRT_PROPERTY(hstring, Author);
+        WINRT_PROPERTY(hstring, AvatarUri);
+        WINRT_PROPERTY(hstring, Body);
+        WINRT_PROPERTY(hstring, Time);
+    };
+
+    struct HyperlinkPreviewTab : HyperlinkPreviewTabT<HyperlinkPreviewTab>
+    {
+        HyperlinkPreviewTab() = default;
+
+        WINRT_PROPERTY(hstring, Key);
+        WINRT_PROPERTY(hstring, Label);
+        WINRT_PROPERTY(HyperlinkPreviewTabKind, Kind, HyperlinkPreviewTabKind::Fields);
+        WINRT_PROPERTY(hstring, Body);
+        WINRT_PROPERTY(hstring, Format);
+        WINRT_PROPERTY(Windows::Foundation::Collections::IVector<Control::HyperlinkPreviewComment>, Comments);
+    };
+
+    struct HyperlinkPreviewActionField : HyperlinkPreviewActionFieldT<HyperlinkPreviewActionField>
+    {
+        HyperlinkPreviewActionField() = default;
+
+        WINRT_PROPERTY(hstring, Key);
+        WINRT_PROPERTY(hstring, Label);
+        WINRT_PROPERTY(bool, Required, false);
+        WINRT_PROPERTY(Windows::Foundation::Collections::IVector<hstring>, Options);
+    };
+
+    struct HyperlinkPreviewActionOption : HyperlinkPreviewActionOptionT<HyperlinkPreviewActionOption>
+    {
+        HyperlinkPreviewActionOption() = default;
+
+        WINRT_PROPERTY(hstring, Id);
+        WINRT_PROPERTY(hstring, Label);
+        WINRT_PROPERTY(hstring, Badge);
+        WINRT_PROPERTY(hstring, Color);
+        WINRT_PROPERTY(Windows::Foundation::Collections::IVector<Control::HyperlinkPreviewActionField>, Fields);
+
+    public:
+        // The card only puts a form in front of the user when the far end says
+        // it will refuse the change without one.
+        //
+        // noexcept because x:Bind reads it during layout: walking a WinRT
+        // collection is a COM call and can fail, and "no form" is a far better
+        // answer there than an exception escaping into the XAML generated code.
+        bool NeedsFields() const noexcept
+        try
+        {
+            if (!_Fields)
+            {
+                return false;
+            }
+            for (const auto& field : _Fields)
+            {
+                if (field && field.Required())
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        catch (...)
+        {
+            return false;
+        }
+    };
+
+    struct HyperlinkPreviewAction : HyperlinkPreviewActionT<HyperlinkPreviewAction>
+    {
+        HyperlinkPreviewAction() = default;
+
+        WINRT_PROPERTY(hstring, Key);
+        WINRT_PROPERTY(hstring, Label);
+        WINRT_PROPERTY(Windows::Foundation::Collections::IVector<Control::HyperlinkPreviewActionOption>, Options);
+    };
+
+    struct HyperlinkActionResult : HyperlinkActionResultT<HyperlinkActionResult>
+    {
+        HyperlinkActionResult() = default;
+
+        WINRT_PROPERTY(bool, Ok, false);
+        WINRT_PROPERTY(hstring, Error);
+        WINRT_PROPERTY(hstring, UndoChoiceId);
+        WINRT_PROPERTY(hstring, UndoLabel);
     };
 
     struct HyperlinkPreview : HyperlinkPreviewT<HyperlinkPreview>
@@ -48,6 +149,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         WINRT_PROPERTY(hstring, DataJson);
         WINRT_PROPERTY(hstring, Error);
         WINRT_PROPERTY(hstring, ResolvedUri);
+        WINRT_PROPERTY(Windows::Foundation::Collections::IVector<Control::HyperlinkPreviewTab>, Tabs);
+        WINRT_PROPERTY(Windows::Foundation::Collections::IVector<Control::HyperlinkPreviewAction>, Actions);
+        WINRT_PROPERTY(hstring, SourceText);
     };
 
     struct HyperlinkPreviewHelpers
@@ -62,6 +166,12 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 namespace winrt::Microsoft::Terminal::Control::factory_implementation
 {
     BASIC_FACTORY(HyperlinkPreviewField);
+    BASIC_FACTORY(HyperlinkPreviewComment);
+    BASIC_FACTORY(HyperlinkPreviewTab);
+    BASIC_FACTORY(HyperlinkPreviewActionField);
+    BASIC_FACTORY(HyperlinkPreviewActionOption);
+    BASIC_FACTORY(HyperlinkPreviewAction);
+    BASIC_FACTORY(HyperlinkActionResult);
     BASIC_FACTORY(HyperlinkPreview);
 
     struct HyperlinkPreviewHelpers : HyperlinkPreviewHelpersT<HyperlinkPreviewHelpers, implementation::HyperlinkPreviewHelpers>

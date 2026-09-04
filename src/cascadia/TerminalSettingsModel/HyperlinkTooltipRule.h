@@ -44,10 +44,8 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         WINRT_PROPERTY(winrt::Windows::Foundation::IReference<int32_t>, TooltipHideDelay);
         WINRT_PROPERTY(winrt::Windows::Foundation::IReference<int32_t>, TooltipMaxWidth);
 
-        WINRT_PROPERTY(bool, SuppressOpen, false);
-        WINRT_PROPERTY(bool, SuppressCopyLink, false);
-        WINRT_PROPERTY(bool, SuppressCopyPath, false);
-        WINRT_PROPERTY(bool, SuppressReveal, false);
+        WINRT_PROPERTY(winrt::Windows::Foundation::Collections::IVector<winrt::hstring>, Buttons);
+        WINRT_PROPERTY(winrt::Windows::Foundation::IReference<bool>, ShowInPane);
 
         WINRT_PROPERTY(winrt::Windows::Foundation::Collections::IVector<Model::HyperlinkTooltipAction>, CustomActions);
     };
