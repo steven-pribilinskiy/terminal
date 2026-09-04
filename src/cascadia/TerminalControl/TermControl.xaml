@@ -1298,6 +1298,7 @@
                                 PointerExited="_HyperlinkCardPointerExited"
                                 PointerPressed="_HyperlinkCardPointerPressed"
                                 PointerReleased="_HyperlinkCardPointerReleased"
+                                SizeChanged="_HyperlinkCardSizeChanged"
                                 Visibility="Collapsed">
                             <StackPanel Spacing="6">
                                 <!--
@@ -1308,6 +1309,7 @@
                                 -->
                                 <TextBlock x:Name="HoveredUri"
                                            IsTextSelectionEnabled="True"
+                                           TextTrimming="CharacterEllipsis"
                                            TextWrapping="Wrap">
                                     <TextBlock.ContextFlyout>
                                         <mtu:TextMenuFlyout />

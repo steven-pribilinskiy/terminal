@@ -4440,8 +4440,13 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
 
         const auto card = HyperlinkCard();
-        const auto viewportWidth = ActualWidth();
-        const auto viewportHeight = ActualHeight();
+        const auto swapChain = SwapChainPanel();
+        const auto viewportWidth = swapChain ? swapChain.ActualWidth() : ActualWidth();
+        const auto viewportHeight = swapChain ? swapChain.ActualHeight() : ActualHeight();
+        if (viewportWidth <= 0 || viewportHeight <= 0)
+        {
+            return;
+        }
 
         // Cap at the viewport itself, not just the configured setting -- a pane
         // narrower than hyperlink.tooltipMaxWidth (or with wrapping disabled,
@@ -4450,6 +4455,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // clamp to and the card overflows the pane regardless of where it sits.
         const auto configuredMaxWidth = static_cast<double>(_currentHyperlinkTooltipSettings.maxWidth);
         card.MaxWidth(configuredMaxWidth > 0 ? std::min(configuredMaxWidth, viewportWidth) : viewportWidth);
+        card.MinWidth(std::min(200.0, viewportWidth));
 
         // A rule's custom actions, if any, alongside the (possibly individually
         // suppressed) built-in buttons above -- see _hoveredHyperlinkChanged.
@@ -4471,12 +4477,16 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
         CATCH_LOG();
 
+        // Must be visible before measuring, because XAML skips layout on Collapsed elements
+        // and returns {0, 0} for DesiredSize.
+        card.Visibility(Visibility::Visible);
+
         // Measure first: where it goes depends on how big it turned out to be, and it has
         // just been given new text.
         card.Measure({ gsl::narrow_cast<float>(viewportWidth), gsl::narrow_cast<float>(viewportHeight) });
         const auto desired = card.DesiredSize();
 
-        const auto offset = SwapChainPanel().ActualOffset();
+        const auto offset = swapChain ? swapChain.ActualOffset() : Windows::Foundation::Numerics::float2{ 0, 0 };
         const auto fontSize = CharacterDimensions();
         const auto pos = _toPosInDips(cell.Value());
         const auto cellLeft = static_cast<double>(pos.X) - offset.x;
@@ -4505,7 +4515,6 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         Controls::Canvas::SetLeft(card, left);
         Controls::Canvas::SetTop(card, top);
-        card.Visibility(Visibility::Visible);
 
         // The HTML host's WebView2 is a child of the top-level window rather than part of
         // the card's visual tree, so it does not travel with the card -- it has to be told,
@@ -4588,6 +4597,44 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     void TermControl::_HyperlinkCardPointerReleased(const IInspectable& /*sender*/, const PointerRoutedEventArgs& e)
     {
         e.Handled(true);
+    }
+
+    void TermControl::_HyperlinkCardSizeChanged(const Windows::Foundation::IInspectable& /*sender*/, const Windows::UI::Xaml::SizeChangedEventArgs& e)
+    {
+        const auto card = HyperlinkCard();
+        if (card.Visibility() != Visibility::Visible)
+        {
+            return;
+        }
+
+        const auto swapChain = SwapChainPanel();
+        const auto viewportWidth = swapChain ? swapChain.ActualWidth() : ActualWidth();
+        const auto viewportHeight = swapChain ? swapChain.ActualHeight() : ActualHeight();
+        if (viewportWidth <= 0 || viewportHeight <= 0)
+        {
+            return;
+        }
+
+        const auto newSize = e.NewSize();
+        const auto currentLeft = Controls::Canvas::GetLeft(card);
+        const auto currentTop = Controls::Canvas::GetTop(card);
+
+        const auto clampedLeft = std::clamp(currentLeft, 0.0, std::max(0.0, viewportWidth - newSize.Width));
+        const auto clampedTop = std::clamp(currentTop, 0.0, std::max(0.0, viewportHeight - newSize.Height));
+
+        if (clampedLeft != currentLeft)
+        {
+            Controls::Canvas::SetLeft(card, clampedLeft);
+        }
+        if (clampedTop != currentTop)
+        {
+            Controls::Canvas::SetTop(card, clampedTop);
+        }
+
+        if (_hyperlinkHtmlHost && HyperlinkCardHtmlHost().Visibility() == Visibility::Visible)
+        {
+            _hyperlinkHtmlHost->Move(_htmlHostRect());
+        }
     }
 
     void TermControl::_HyperlinkOpenClick(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)

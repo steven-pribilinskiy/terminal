@@ -170,7 +170,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 return values.Lookup(_Field.Key());
             }
         }
-        return {};
+        return _Field.DefaultValue();
     }
 
     void IntegrationSettingViewModel::Value(const hstring& value)
@@ -188,9 +188,9 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             entry.Values(values);
         }
 
-        // An emptied box removes the key rather than storing "", so settings.json
-        // goes back to not mentioning it at all.
-        if (value.empty())
+        // An emptied box or reset to default removes the key rather than storing it,
+        // so settings.json goes back to not mentioning it at all.
+        if (value.empty() || value == _Field.DefaultValue())
         {
             if (values.HasKey(_Field.Key()))
             {

@@ -130,6 +130,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         JsonUtils::GetValueForKey(json, DescriptionKey, field->_Description);
         JsonUtils::GetValueForKey(json, RequiredKey, field->_Required);
         JsonUtils::GetValueForKey(json, SecretKey, field->_Secret);
+        JsonUtils::GetValueForKey(json, DefaultKey, field->_DefaultValue);
         if (field->_Label.empty())
         {
             field->_Label = field->_Key;

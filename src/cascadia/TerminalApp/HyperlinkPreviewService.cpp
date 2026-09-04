@@ -724,7 +724,8 @@ namespace
         const auto seconds = std::wcstod(text.c_str(), &end);
         if (end != text.c_str() && seconds > 0.0 && std::isfinite(seconds))
         {
-            return static_cast<int64_t>(seconds);
+            const auto epochSeconds = seconds > 1e11 ? (seconds / 1000.0) : seconds;
+            return static_cast<int64_t>(epochSeconds);
         }
         return std::nullopt;
     }
@@ -983,8 +984,13 @@ namespace
         if (allowUntrustedCertificate)
         {
             // Only what the manifest asked for. A self-signed development cert
-            // is Untrusted; a name mismatch is a different error and stays fatal.
-            filter.IgnorableServerCertificateErrors().Append(winrt::Windows::Security::Cryptography::Certificates::ChainValidationResult::Untrusted);
+            // is Untrusted; local dev certs (e.g. mkcert/lvh.me) also have no
+            // revocation servers and incomplete chains, so ignore revocation failures too.
+            using namespace winrt::Windows::Security::Cryptography::Certificates;
+            filter.IgnorableServerCertificateErrors().Append(ChainValidationResult::Untrusted);
+            filter.IgnorableServerCertificateErrors().Append(ChainValidationResult::RevocationInformationMissing);
+            filter.IgnorableServerCertificateErrors().Append(ChainValidationResult::RevocationFailure);
+            filter.IgnorableServerCertificateErrors().Append(ChainValidationResult::IncompleteChain);
         }
 
         WWH::HttpClient client{ filter };
@@ -2144,11 +2150,34 @@ namespace winrt::TerminalApp::implementation
                 plugin->Html = std::wstring{ manifest.Html() };
                 plugin->CacheSeconds = manifest.CacheSeconds();
 
+                if (const auto settingFields = manifest.Settings())
+                {
+                    for (const auto& field : settingFields)
+                    {
+                        if (!field || field.Key().empty())
+                        {
+                            continue;
+                        }
+                        if (!field.DefaultValue().empty())
+                        {
+                            plugin->Settings[std::wstring{ field.Key() }] = std::wstring{ field.DefaultValue() };
+                        }
+                        else if (!field.Placeholder().empty() &&
+                                 (field.Placeholder().starts_with(L"http://") || field.Placeholder().starts_with(L"https://")))
+                        {
+                            plugin->Settings[std::wstring{ field.Key() }] = std::wstring{ field.Placeholder() };
+                        }
+                    }
+                }
+
                 if (const auto values = entry.Values())
                 {
                     for (const auto& pair : values)
                     {
-                        plugin->Settings[std::wstring{ pair.Key() }] = std::wstring{ pair.Value() };
+                        if (!pair.Value().empty())
+                        {
+                            plugin->Settings[std::wstring{ pair.Key() }] = std::wstring{ pair.Value() };
+                        }
                     }
                 }
 

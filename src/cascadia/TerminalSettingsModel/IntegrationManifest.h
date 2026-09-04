@@ -38,6 +38,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         WINRT_PROPERTY(hstring, Description);
         WINRT_PROPERTY(bool, Required, false);
         WINRT_PROPERTY(bool, Secret, false);
+        WINRT_PROPERTY(hstring, DefaultValue);
     };
 
     struct IntegrationMatcher : IntegrationMatcherT<IntegrationMatcher>

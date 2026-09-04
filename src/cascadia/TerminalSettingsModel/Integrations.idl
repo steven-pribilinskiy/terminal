@@ -128,6 +128,7 @@ namespace Microsoft.Terminal.Settings.Model
         String Description;
         Boolean Required;
         Boolean Secret;
+        String DefaultValue;
     }
 
     // Decides whether a link (or text match) belongs to this integration, and

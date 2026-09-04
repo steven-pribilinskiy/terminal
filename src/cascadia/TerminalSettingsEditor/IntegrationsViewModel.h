@@ -27,7 +27,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         hstring Key() const { return _Field.Key(); }
         hstring Label() const;
-        hstring Placeholder() const { return _Field.Placeholder(); }
+        hstring Placeholder() const
+        {
+            const auto placeholder = _Field.Placeholder();
+            return !placeholder.empty() ? placeholder : _Field.DefaultValue();
+        }
         hstring Description() const { return _Field.Description(); }
         bool HasDescription() const { return !_Field.Description().empty(); }
         bool Required() const { return _Field.Required(); }
