@@ -33,7 +33,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage));
     }
 
-    void LinkTooltip::AddRuleButton_Click(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
+    void LinkTooltip::AddRuleButton_Click(const IInspectable& /*sender*/, const winrt::Microsoft::UI::Xaml::Controls::SplitButtonClickEventArgs& /*e*/)
     {
         const auto rule = _ViewModel.RequestAddRule();
         _ViewModel.CurrentRule(rule);
