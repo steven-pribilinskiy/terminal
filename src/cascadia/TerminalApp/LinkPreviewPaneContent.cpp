@@ -723,7 +723,10 @@ namespace winrt::TerminalApp::implementation
         ActionProgress().Visibility(busy ? Visibility::Visible : Visibility::Collapsed);
         ActionOptions().IsEnabled(!busy);
         UndoButton().IsEnabled(!busy);
-        ActionFields().IsEnabled(!busy);
+        // A StackPanel is not a Control, so it has no IsEnabled: block the input
+        // and dim it instead, which is what IsEnabled would have looked like.
+        ActionFields().IsHitTestVisible(!busy);
+        ActionFields().Opacity(busy ? 0.5 : 1.0);
         if (busy)
         {
             ApplyButton().IsEnabled(false);
