@@ -68,6 +68,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         // Every card built so far, weakly. Weak because XAML owns their lifetime and
         // a settings window opens and closes many times in a session; dead entries
         // are dropped on the next walk rather than needing an unregister step.
+        bool _registeredForImprint{ false };
         static inline bool _imprintEnabled{ false };
         static inline std::vector<winrt::weak_ref<Editor::SettingsCard>> _liveCards;
 

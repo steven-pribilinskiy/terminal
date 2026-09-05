@@ -73,10 +73,6 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     SettingsCard::SettingsCard()
     {
         _InitializeProperties();
-
-        // Registered here rather than on first use, so a card built while the mark
-        // is already on still gets refreshed when it is later switched off.
-        _liveCards.emplace_back(get_weak());
     }
 
     bool SettingsCard::ImprintEnabled() noexcept
@@ -259,6 +255,17 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _UpdateDescriptionVisibility();
         _UpdateHeaderIconVisibility();
         _UpdateContentVisibility();
+
+        // Register for imprint refreshes here, not in the constructor. get_weak() on
+        // a composed XAML control wants the outer object, which is not necessarily
+        // in place while the derived constructor is still running -- and every other
+        // get_weak() in this file is likewise taken from OnApplyTemplate or later.
+        // Once, however many times a template is re-applied.
+        if (!_registeredForImprint)
+        {
+            _registeredForImprint = true;
+            _liveCards.emplace_back(get_weak());
+        }
         _UpdateForkImprint();
         // Initial visual states.
         _CheckInitialVisualState();
