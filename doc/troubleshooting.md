@@ -103,6 +103,52 @@ whenever any process was already running under the payload — so once a zombie
 existed, every later deploy quietly stopped verifying. The boot check now clears
 windowless processes first, and only then decides whether something real is up.
 
+## The whole Terminal vanishes while you are in Settings
+
+What you see: you change something on a settings page, carry on, and every window
+disappears at once. No dialog, no error. The event log has:
+
+```
+Faulting application name: WindowsTerminal.exe
+Faulting module name:      Windows.UI.Xaml.dll
+Exception code:            0xc000041d
+```
+
+`0xC000041D` is `STATUS_FATAL_USER_CALLBACK_EXCEPTION`: an exception escaped a
+callback XAML invoked, so the process is failed fast rather than unwound. The
+faulting module being `Windows.UI.Xaml.dll` says the throw happened inside XAML's
+own dispatch, which is the tell that it came out of a binding.
+
+**It is almost never the click you were making.** A reproducible instance on the
+Link Tooltip page:
+
+1. Open Settings, go to Link Tooltip.
+2. Scroll down and change **Integration logo display** to a different value.
+3. Scroll back up.
+
+The process dies on step 3. Selecting the value only stores it; what throws is the
+*next realisation* of a row whose getter cannot resolve it, and XAML re-realises
+virtualised rows on scroll. So the crash lands one interaction after the cause,
+which is why it reads as "everything crashes at random".
+
+### The shape to look for
+
+A binding getter that can throw. `IMap::Lookup` is the usual one — it throws
+`hresult_out_of_bounds` for an absent key, and settings view models are full of
+`_SomethingMap.Lookup(_Settings.Something())`. In a getter reached by `x:Bind`
+that is not a failed binding, it is a dead process.
+
+`GETSET_BINDABLE_ENUM_SETTING` in `Utils.h` generates one of these for every
+bindable enum in the editor, so the guard lives there now and covers all of them;
+hand-written getters need their own, which is what `_lookupEnumEntry` is for in
+`LinkTooltipViewModel.cpp`. Returning `nullptr` leaves the combo box showing
+nothing selected, which is the correct outcome for a value the list does not have.
+
+The same class of bug also arrives as a use-after-free: a lambda that captured a
+raw `this` and now lives inside a view model object XAML still holds through an
+`ItemsSource`, read during teardown. Weak references, or capture the settings
+object rather than the view model.
+
 ## The Dev slot went *backwards* after pressing promote
 
 What you see: you promote, `wtd` relaunches, and the tab row or About dialog now

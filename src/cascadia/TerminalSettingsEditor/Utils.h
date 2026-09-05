@@ -51,6 +51,18 @@
 // of EnumEntries so that we may display all possible values of the given
 // enum type and its localized names. It also provides a getter and setter
 // for the setting we wish to bind to.
+// Current##name() checks HasKey before Lookup, and that guard is load-bearing.
+//
+// IMap::Lookup throws hresult_out_of_bounds when the key is absent, and XAML calls
+// this getter while dispatching PropertyChanged and while re-realising virtualised
+// rows on scroll. A throw there does not degrade to a failed binding: it escapes the
+// callback and fails the process fast -- 0xC000041D,
+// STATUS_FATAL_USER_CALLBACK_EXCEPTION, faulting in Windows.UI.Xaml.dll -- taking
+// every window with it, not just the settings page.
+//
+// That was reproduced on the Link Tooltip page: change a dropdown, scroll the row
+// back into view, and the whole Terminal disappears with no dialog. A combo box
+// showing nothing selected is the right failure for a value the list does not have.
 #define GETSET_BINDABLE_ENUM_SETTING(name, enumType, viewModelSettingGetSet)                                                             \
 public:                                                                                                                                  \
     winrt::Windows::Foundation::Collections::IObservableVector<winrt::Microsoft::Terminal::Settings::Editor::EnumEntry> name##List()     \
@@ -60,7 +72,12 @@ public:                                                                         
                                                                                                                                          \
     winrt::Windows::Foundation::IInspectable Current##name()                                                                             \
     {                                                                                                                                    \
-        return winrt::box_value<winrt::Microsoft::Terminal::Settings::Editor::EnumEntry>(_##name##Map.Lookup(viewModelSettingGetSet())); \
+        const auto key = viewModelSettingGetSet();                                                                                       \
+        if (!_##name##Map || !_##name##Map.HasKey(key))                                                                                  \
+        {                                                                                                                                \
+            return nullptr;                                                                                                              \
+        }                                                                                                                                \
+        return winrt::box_value<winrt::Microsoft::Terminal::Settings::Editor::EnumEntry>(_##name##Map.Lookup(key));                      \
     }                                                                                                                                    \
                                                                                                                                          \
     void Current##name(const winrt::Windows::Foundation::IInspectable& enumEntry)                                                        \
