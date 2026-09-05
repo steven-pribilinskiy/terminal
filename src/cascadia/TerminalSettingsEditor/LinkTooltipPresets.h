@@ -106,7 +106,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor
                 L"Matches Slack message archive URLs",
                 Model::HyperlinkMatchKind::Link,
                 { L"https" },
-                LR"(^https://(?<workspace>[a-zA-Z0-9_.-]+)\.slack\.com/archives/(?<channel>[A-Z0-9]+)/p(?<ts_s>\d{10})(?<ts_us>\d{6}))",
+                LR"(^https://(?<workspace>[a-zA-Z0-9_.-]+)\.slack\.com/archives/(?<channel>[A-Z0-9]+)/p(?<tsSeconds>\d{10})(?<tsMicros>\d{6}))",
                 Model::HyperlinkFileTypeGroup::None,
                 {},
                 L"slack",

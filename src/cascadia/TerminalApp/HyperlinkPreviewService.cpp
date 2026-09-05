@@ -267,9 +267,17 @@ namespace
             }
 
             const auto name = pattern.substr(i + 3, close - i - 3);
-            const auto usable = !name.empty() && std::all_of(name.begin(), name.end(), [](wchar_t ch) {
-                return (ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z') || (ch >= L'0' && ch <= L'9') || ch == L'_';
-            });
+            // ICU's own rule for a capture group name: a letter followed by letters
+            // and digits. Underscores are NOT allowed -- uregex_open rejects the
+            // whole pattern with U_REGEX_INVALID_CAPTURE_GROUP_NAME, so a rule
+            // written with "(?<ts_s>...)" never compiles and therefore never matches
+            // anywhere: not here, and not in Terminal::_getPatterns either. Accepting
+            // '_' here only advertised a name that could never come back.
+            const auto usable = !name.empty() &&
+                                ((name.front() >= L'a' && name.front() <= L'z') || (name.front() >= L'A' && name.front() <= L'Z')) &&
+                                std::all_of(name.begin(), name.end(), [](wchar_t ch) {
+                                    return (ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z') || (ch >= L'0' && ch <= L'9');
+                                });
             if (usable)
             {
                 names.emplace_back(name);
