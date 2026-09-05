@@ -57,6 +57,8 @@ struct PaneResources
     winrt::Windows::UI::Xaml::Media::SolidColorBrush focusedBorderBrush{ nullptr };
     winrt::Windows::UI::Xaml::Media::SolidColorBrush unfocusedBorderBrush{ nullptr };
     winrt::Windows::UI::Xaml::Media::SolidColorBrush broadcastBorderBrush{ nullptr };
+    winrt::Windows::UI::Xaml::Media::Brush headerBackgroundBrush{ nullptr };
+    winrt::Windows::UI::Xaml::Media::Brush headerForegroundBrush{ nullptr };
 };
 
 class Pane : public std::enable_shared_from_this<Pane>

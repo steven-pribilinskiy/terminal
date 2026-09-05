@@ -43,7 +43,10 @@
     X(bool, CopyOnSelect, false)                                                                                  \
     X(bool, FocusFollowMouse, false)                                                                              \
     X(bool, ScrollToZoom, true)                                                                                   \
-    X(bool, OpenLinksOnSingleClick, true)                                                                         \
+    X(bool, HyperlinkClickable, true)                                                                             \
+    X(winrt::Windows::Foundation::Collections::IVector<winrt::hstring>, HyperlinkClickableKinds, nullptr)         \
+    X(winrt::hstring, HyperlinkPrimaryAction)                                                                     \
+    X(winrt::hstring, HyperlinkAlternativeAction)                                                                 \
     X(int32_t, HyperlinkTooltipMaxWidth, 640)                                                                     \
     X(int32_t, HyperlinkTooltipShowDelay, 250)                                                                    \
     X(int32_t, HyperlinkTooltipHideDelay, 400)                                                                    \
@@ -98,4 +101,10 @@
     X(winrt::Microsoft::Terminal::Control::CopyFormat, CopyFormatting, 0)                                                                                \
     X(bool, RightClickContextMenu, false)                                                                                                                \
     X(winrt::Microsoft::Terminal::Control::PathTranslationStyle, PathTranslationStyle, winrt::Microsoft::Terminal::Control::PathTranslationStyle::None)  \
+    X(winrt::Microsoft::Terminal::Control::HyperlinkClickModifier, HyperlinkPrimaryClickModifier, winrt::Microsoft::Terminal::Control::HyperlinkClickModifier::None) \                    \
+    X(winrt::Microsoft::Terminal::Control::HyperlinkClickGesture, HyperlinkPrimaryClickGesture, winrt::Microsoft::Terminal::Control::HyperlinkClickGesture::LeftClick) \                  \
+    X(winrt::Microsoft::Terminal::Control::HyperlinkClickModifier, HyperlinkAlternativeClickModifier, winrt::Microsoft::Terminal::Control::HyperlinkClickModifier::Ctrl) \                \
+    X(winrt::Microsoft::Terminal::Control::HyperlinkClickGesture, HyperlinkAlternativeClickGesture, winrt::Microsoft::Terminal::Control::HyperlinkClickGesture::LeftClick) \              \
+    X(winrt::Microsoft::Terminal::Control::HyperlinkIntegrationDisplayMode, HyperlinkIntegrationDisplayMode, winrt::Microsoft::Terminal::Control::HyperlinkIntegrationDisplayMode::Above) \
+    X(winrt::Microsoft::Terminal::Control::HyperlinkActionPlacement, HyperlinkActionPlacement, winrt::Microsoft::Terminal::Control::HyperlinkActionPlacement::Footer) \
     X(winrt::hstring, DragDropDelimiter, L" ")

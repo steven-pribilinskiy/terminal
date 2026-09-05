@@ -107,13 +107,15 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     struct OpenHyperlinkEventArgs : public OpenHyperlinkEventArgsT<OpenHyperlinkEventArgs>
     {
     public:
-        OpenHyperlinkEventArgs(hstring uri) :
-            _uri(uri) {}
+        OpenHyperlinkEventArgs(hstring uri, bool isAlternative = false) :
+            _uri(uri), _isAlternative(isAlternative) {}
 
         hstring Uri() { return _uri; };
+        bool IsAlternative() { return _isAlternative; };
 
     private:
         hstring _uri;
+        bool _isAlternative{ false };
     };
 
     struct HyperlinkTooltipActionInvokedEventArgs : public HyperlinkTooltipActionInvokedEventArgsT<HyperlinkTooltipActionInvokedEventArgs>

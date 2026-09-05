@@ -25,6 +25,8 @@ static constexpr std::string_view HideDelayKey{ "hideDelay" };
 static constexpr std::string_view MaxWidthKey{ "maxWidth" };
 static constexpr std::string_view ButtonsKey{ "buttons" };
 static constexpr std::string_view ShowInPaneKey{ "showInPane" };
+static constexpr std::string_view PrimaryActionKey{ "primaryAction" };
+static constexpr std::string_view AlternativeActionKey{ "alternativeAction" };
 static constexpr std::string_view CustomActionsKey{ "actions" };
 
 namespace winrt::Microsoft::Terminal::Settings::Model::implementation
@@ -47,6 +49,8 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         JsonUtils::SetValueForKey(json, MaxWidthKey, _TooltipMaxWidth);
         JsonUtils::SetValueForKey(json, ButtonsKey, _Buttons);
         JsonUtils::SetValueForKey(json, ShowInPaneKey, _ShowInPane);
+        JsonUtils::SetValueForKey(json, PrimaryActionKey, _PrimaryAction);
+        JsonUtils::SetValueForKey(json, AlternativeActionKey, _AlternativeAction);
         JsonUtils::SetValueForKey(json, CustomActionsKey, _CustomActions);
 
         return json;
@@ -70,6 +74,8 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         JsonUtils::GetValueForKey(json, MaxWidthKey, rule->_TooltipMaxWidth);
         JsonUtils::GetValueForKey(json, ButtonsKey, rule->_Buttons);
         JsonUtils::GetValueForKey(json, ShowInPaneKey, rule->_ShowInPane);
+        JsonUtils::GetValueForKey(json, PrimaryActionKey, rule->_PrimaryAction);
+        JsonUtils::GetValueForKey(json, AlternativeActionKey, rule->_AlternativeAction);
         JsonUtils::GetValueForKey(json, CustomActionsKey, rule->_CustomActions);
 
         return rule;
@@ -89,6 +95,8 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         rule->_TooltipHideDelay = _TooltipHideDelay;
         rule->_TooltipMaxWidth = _TooltipMaxWidth;
         rule->_ShowInPane = _ShowInPane;
+        rule->_PrimaryAction = _PrimaryAction;
+        rule->_AlternativeAction = _AlternativeAction;
 
         if (_Buttons)
         {

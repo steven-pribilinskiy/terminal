@@ -27,6 +27,10 @@ namespace Microsoft.Terminal.Settings.Model
         static Windows.Foundation.Collections.IMap<String, Microsoft.Terminal.Settings.Model.HyperlinkFileTypeGroup> HyperlinkFileTypeGroup { get; };
         static Windows.Foundation.Collections.IMap<String, Microsoft.Terminal.Settings.Model.HyperlinkMatchKind> HyperlinkMatchKind { get; };
         static Windows.Foundation.Collections.IMap<String, Microsoft.Terminal.Settings.Model.PaneTitlebarVisibility> PaneTitlebarVisibility { get; };
+        static Windows.Foundation.Collections.IMap<String, Microsoft.Terminal.Settings.Model.HyperlinkIntegrationDisplayMode> HyperlinkIntegrationDisplayMode { get; };
+        static Windows.Foundation.Collections.IMap<String, Microsoft.Terminal.Settings.Model.HyperlinkActionPlacement> HyperlinkActionPlacement { get; };
+        static Windows.Foundation.Collections.IMap<String, Microsoft.Terminal.Settings.Model.HyperlinkClickModifier> HyperlinkClickModifier { get; };
+        static Windows.Foundation.Collections.IMap<String, Microsoft.Terminal.Settings.Model.HyperlinkClickGesture> HyperlinkClickGesture { get; };
         static Windows.Foundation.Collections.IMap<String, Microsoft.Terminal.Settings.Model.ConfirmOnClose> ConfirmOnClose { get; };
 
         // Profile Settings

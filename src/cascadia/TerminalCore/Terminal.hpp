@@ -39,6 +39,18 @@ namespace Microsoft::Console::VirtualTerminal
 namespace Microsoft::Terminal::Core
 {
     class Terminal;
+
+    // Where a hyperlink under the cursor came from. The pattern interval tree
+    // stores only an id, so this is how a caller learns whether a match was a
+    // link the program marked itself, one of the built-in URL regexes, or one
+    // of the user's own rules -- which is what hyperlink.clickableKinds gates on.
+    enum class HyperlinkSource
+    {
+        None = 0,
+        Osc8,
+        Detected,
+        Rule,
+    };
 }
 
 // fwdecl unittest classes
@@ -188,8 +200,8 @@ public:
     bool IsTrackingMouseInput() const noexcept;
     bool ShouldSendAlternateScroll(const unsigned int uiButton, const int32_t delta) const noexcept;
 
-    std::wstring GetHyperlinkAtViewportPosition(const til::point viewportPos);
-    std::wstring GetHyperlinkAtBufferPosition(const til::point bufferPos);
+    std::wstring GetHyperlinkAtViewportPosition(const til::point viewportPos, HyperlinkSource* source = nullptr);
+    std::wstring GetHyperlinkAtBufferPosition(const til::point bufferPos, HyperlinkSource* source = nullptr);
     uint16_t GetHyperlinkIdAtViewportPosition(const til::point viewportPos);
     std::optional<interval_tree::IntervalTree<til::point, size_t>::interval> GetHyperlinkIntervalFromViewportPosition(const til::point viewportPos);
 #pragma endregion

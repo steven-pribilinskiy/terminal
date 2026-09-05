@@ -44,6 +44,10 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, HyperlinkFileTypeGroup> HyperlinkFileTypeGroup();
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, HyperlinkMatchKind> HyperlinkMatchKind();
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, PaneTitlebarVisibility> PaneTitlebarVisibility();
+        static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, HyperlinkIntegrationDisplayMode> HyperlinkIntegrationDisplayMode();
+        static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, HyperlinkActionPlacement> HyperlinkActionPlacement();
+        static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, HyperlinkClickModifier> HyperlinkClickModifier();
+        static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, HyperlinkClickGesture> HyperlinkClickGesture();
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, ConfirmOnClose> ConfirmOnClose();
 
         // Profile Settings

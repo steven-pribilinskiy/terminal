@@ -56,7 +56,14 @@ Author(s):
     X(bool, CopyOnSelect, "copyOnSelect", false)                                                                                                                                                      \
     X(bool, FocusFollowMouse, "focusFollowMouse", false)                                                                                                                                              \
     X(bool, ScrollToZoom, "experimental.scrollToZoom", false)                                                                                                                                         \
-    X(bool, OpenLinksOnSingleClick, "openLinksOnSingleClick", true)                                                                                                                                   \
+    X(bool, HyperlinkClickable, "hyperlink.clickable", true)                                                                                                                                          \
+    X(winrt::Windows::Foundation::Collections::IVector<winrt::hstring>, HyperlinkClickableKinds, "hyperlink.clickableKinds", MakeDefaultClickableKinds())                                             \
+    X(Model::HyperlinkClickModifier, HyperlinkPrimaryClickModifier, "hyperlink.primaryClickModifier", Model::HyperlinkClickModifier::None)                                                            \
+    X(Model::HyperlinkClickGesture, HyperlinkPrimaryClickGesture, "hyperlink.primaryClickGesture", Model::HyperlinkClickGesture::LeftClick)                                                           \
+    X(hstring, HyperlinkPrimaryAction, "hyperlink.primaryAction", L"open")                                                                                                                            \
+    X(Model::HyperlinkClickModifier, HyperlinkAlternativeClickModifier, "hyperlink.alternativeClickModifier", Model::HyperlinkClickModifier::Ctrl)                                                    \
+    X(Model::HyperlinkClickGesture, HyperlinkAlternativeClickGesture, "hyperlink.alternativeClickGesture", Model::HyperlinkClickGesture::LeftClick)                                                   \
+    X(hstring, HyperlinkAlternativeAction, "hyperlink.alternativeAction", L"open")                                                                                                                    \
     X(int32_t, HyperlinkTooltipMaxWidth, "hyperlink.tooltipMaxWidth", 640)                                                                                                                            \
     X(int32_t, HyperlinkTooltipShowDelay, "hyperlink.tooltipShowDelay", 250)                                                                                                                          \
     X(int32_t, HyperlinkTooltipHideDelay, "hyperlink.tooltipHideDelay", 400)                                                                                                                          \
@@ -65,7 +72,10 @@ Author(s):
     X(bool, HyperlinkTooltipHint, "hyperlink.tooltipHint", true)                                                                                                                                      \
     X(bool, HyperlinkPreviewInPane, "hyperlink.previewInPane", false)                                                                                                                                 \
     X(Model::PaneTitlebarVisibility, PaneTitlebarVisibility, "paneTitlebarVisibility", Model::PaneTitlebarVisibility::MultiplePanes)                                                                   \
+    X(Model::HyperlinkIntegrationDisplayMode, HyperlinkIntegrationDisplayMode, "hyperlink.integrationDisplayMode", Model::HyperlinkIntegrationDisplayMode::Above)                                    \
+    X(Model::HyperlinkActionPlacement, HyperlinkActionPlacement, "hyperlink.actionPlacement", Model::HyperlinkActionPlacement::Footer)                                                               \
     X(winrt::Windows::Foundation::Collections::IVector<Model::HyperlinkTooltipRule>, HyperlinkTooltipRules, "hyperlink.tooltipRules", winrt::single_threaded_vector<Model::HyperlinkTooltipRule>())   \
+    X(bool, HyperlinkManualRuleOrder, "hyperlink.manualRuleOrder", false)                                                                                                                             \
     X(bool, ScrollToChangeOpacity, "experimental.scrollToChangeOpacity", false)                                                                                                                       \
     X(winrt::Microsoft::Terminal::Control::GraphicsAPI, GraphicsAPI, "rendering.graphicsAPI")                                                                                                         \
     X(bool, DisablePartialInvalidation, "rendering.disablePartialInvalidation", false)                                                                                                                \

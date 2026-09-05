@@ -164,7 +164,7 @@ use `LoadLibraryExW(..., LOAD_WITH_ALTERED_SEARCH_PATH)`.
 **Checking out `upstream/main` in the working tree.** It regenerates the WinRT
 projections, so coming back to `main` leaves `Microsoft.Terminal.Settings.Model.winmd`
 without fork-only members and the next build fails with
-`error C2039: 'OpenLinksOnSingleClick': is not a member of ...`. Recover with a
+`error C2039: 'HyperlinkClickable': is not a member of ...`. Recover with a
 full solution build. Bisect in a separate worktree at a short path instead (see
 `CLAUDE.md` on `MAX_PATH` and on WSL and `git worktree prune`).
 

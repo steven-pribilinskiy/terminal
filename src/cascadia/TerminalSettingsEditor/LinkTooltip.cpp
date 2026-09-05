@@ -79,26 +79,90 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         items.Append(Controls::MenuFlyoutSeparator{});
 
-        for (const auto& preset : GetLinkTooltipPresets())
+        struct PresetCategory
         {
-            Controls::MenuFlyoutItem item;
-            item.Text(winrt::hstring{ preset.name });
-            if (!preset.description.empty())
+            std::wstring name;
+            std::vector<const LinkTooltipPreset*> presets;
+        };
+
+        auto getCategorizedPresets = []() {
+            std::vector<PresetCategory> categories = {
+                { L"GitHub", {} },
+                { L"Jira", {} },
+                { L"Slack", {} },
+                { L"Stith", {} },
+                { L"Git", {} },
+                { L"Files & Media", {} },
+                { L"General", {} }
+            };
+
+            for (const auto& preset : GetLinkTooltipPresets())
             {
-                Controls::ToolTipService::SetToolTip(item, box_value(winrt::hstring{ preset.description }));
+                const std::wstring_view id{ preset.id };
+                if (id.rfind(L"github", 0) == 0)
+                {
+                    categories[0].presets.push_back(&preset);
+                }
+                else if (id.rfind(L"jira", 0) == 0)
+                {
+                    categories[1].presets.push_back(&preset);
+                }
+                else if (id.rfind(L"slack", 0) == 0)
+                {
+                    categories[2].presets.push_back(&preset);
+                }
+                else if (id.rfind(L"stith", 0) == 0)
+                {
+                    categories[3].presets.push_back(&preset);
+                }
+                else if (id.rfind(L"git", 0) == 0)
+                {
+                    categories[4].presets.push_back(&preset);
+                }
+                else if (id.rfind(L"file", 0) == 0)
+                {
+                    categories[5].presets.push_back(&preset);
+                }
+                else
+                {
+                    categories[6].presets.push_back(&preset);
+                }
+            }
+            return categories;
+        };
+
+        for (const auto& cat : getCategorizedPresets())
+        {
+            if (cat.presets.empty())
+            {
+                continue;
             }
 
-            const winrt::hstring presetId{ preset.id };
-            item.Click([this, presetId](const auto&, const auto&) {
-                const auto rule = _ViewModel.RequestAddRuleWithPreset(presetId);
-                Dispatcher().RunAsync(Windows::UI::Core::CoreDispatcherPriority::Normal, [weakThis{ get_weak() }, rule]() {
-                    if (const auto self{ weakThis.get() })
-                    {
-                        self->_ViewModel.CurrentRule(rule);
-                    }
+            Controls::MenuFlyoutSubItem subMenu;
+            subMenu.Text(winrt::hstring{ cat.name });
+
+            for (const auto* preset : cat.presets)
+            {
+                Controls::MenuFlyoutItem item;
+                item.Text(winrt::hstring{ preset->name });
+                if (!preset->description.empty())
+                {
+                    Controls::ToolTipService::SetToolTip(item, box_value(winrt::hstring{ preset->description }));
+                }
+
+                const winrt::hstring presetId{ preset->id };
+                item.Click([this, presetId](const auto&, const auto&) {
+                    const auto rule = _ViewModel.RequestAddRuleWithPreset(presetId);
+                    Dispatcher().RunAsync(Windows::UI::Core::CoreDispatcherPriority::Normal, [weakThis{ get_weak() }, rule]() {
+                        if (const auto self{ weakThis.get() })
+                        {
+                            self->_ViewModel.CurrentRule(rule);
+                        }
+                    });
                 });
-            });
-            items.Append(item);
+                subMenu.Items().Append(item);
+            }
+            items.Append(subMenu);
         }
     }
 
@@ -113,28 +177,92 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         auto items = flyout.Items();
         items.Clear();
 
-        for (const auto& preset : GetLinkTooltipPresets())
+        struct PresetCategory
         {
-            Controls::MenuFlyoutItem item;
-            item.Text(winrt::hstring{ preset.name });
-            if (!preset.description.empty())
+            std::wstring name;
+            std::vector<const LinkTooltipPreset*> presets;
+        };
+
+        auto getCategorizedPresets = []() {
+            std::vector<PresetCategory> categories = {
+                { L"GitHub", {} },
+                { L"Jira", {} },
+                { L"Slack", {} },
+                { L"Stith", {} },
+                { L"Git", {} },
+                { L"Files & Media", {} },
+                { L"General", {} }
+            };
+
+            for (const auto& preset : GetLinkTooltipPresets())
             {
-                Controls::ToolTipService::SetToolTip(item, box_value(winrt::hstring{ preset.description }));
+                const std::wstring_view id{ preset.id };
+                if (id.rfind(L"github", 0) == 0)
+                {
+                    categories[0].presets.push_back(&preset);
+                }
+                else if (id.rfind(L"jira", 0) == 0)
+                {
+                    categories[1].presets.push_back(&preset);
+                }
+                else if (id.rfind(L"slack", 0) == 0)
+                {
+                    categories[2].presets.push_back(&preset);
+                }
+                else if (id.rfind(L"stith", 0) == 0)
+                {
+                    categories[3].presets.push_back(&preset);
+                }
+                else if (id.rfind(L"git", 0) == 0)
+                {
+                    categories[4].presets.push_back(&preset);
+                }
+                else if (id.rfind(L"file", 0) == 0)
+                {
+                    categories[5].presets.push_back(&preset);
+                }
+                else
+                {
+                    categories[6].presets.push_back(&preset);
+                }
+            }
+            return categories;
+        };
+
+        for (const auto& cat : getCategorizedPresets())
+        {
+            if (cat.presets.empty())
+            {
+                continue;
             }
 
-            const winrt::hstring presetId{ preset.id };
-            item.Click([this, presetId](const auto&, const auto&) {
-                Dispatcher().RunAsync(Windows::UI::Core::CoreDispatcherPriority::Normal, [weakThis{ get_weak() }, presetId]() {
-                    if (const auto self{ weakThis.get() })
-                    {
-                        if (const auto currentRule = self->_ViewModel.CurrentRule())
+            Controls::MenuFlyoutSubItem subMenu;
+            subMenu.Text(winrt::hstring{ cat.name });
+
+            for (const auto* preset : cat.presets)
+            {
+                Controls::MenuFlyoutItem item;
+                item.Text(winrt::hstring{ preset->name });
+                if (!preset->description.empty())
+                {
+                    Controls::ToolTipService::SetToolTip(item, box_value(winrt::hstring{ preset->description }));
+                }
+
+                const winrt::hstring presetId{ preset->id };
+                item.Click([this, presetId](const auto&, const auto&) {
+                    Dispatcher().RunAsync(Windows::UI::Core::CoreDispatcherPriority::Normal, [weakThis{ get_weak() }, presetId]() {
+                        if (const auto self{ weakThis.get() })
                         {
-                            currentRule.ApplyPreset(presetId);
+                            if (const auto currentRule = self->_ViewModel.CurrentRule())
+                            {
+                                currentRule.ApplyPreset(presetId);
+                            }
                         }
-                    }
+                    });
                 });
-            });
-            items.Append(item);
+                subMenu.Items().Append(item);
+            }
+            items.Append(subMenu);
         }
     }
 
@@ -142,18 +270,6 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     {
         const auto rule = sender.as<FrameworkElement>().Tag().as<Editor::HyperlinkTooltipRuleViewModel>();
         _ViewModel.RequestDeleteRule(rule);
-    }
-
-    void LinkTooltip::MoveRuleUp_Click(const IInspectable& sender, const RoutedEventArgs& /*e*/)
-    {
-        const auto rule = sender.as<FrameworkElement>().Tag().as<Editor::HyperlinkTooltipRuleViewModel>();
-        _ViewModel.RequestReorderRule(rule, true);
-    }
-
-    void LinkTooltip::MoveRuleDown_Click(const IInspectable& sender, const RoutedEventArgs& /*e*/)
-    {
-        const auto rule = sender.as<FrameworkElement>().Tag().as<Editor::HyperlinkTooltipRuleViewModel>();
-        _ViewModel.RequestReorderRule(rule, false);
     }
 
     // The whole row is the affordance -- the card itself is the click target, so

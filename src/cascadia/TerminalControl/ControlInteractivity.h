@@ -126,14 +126,17 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         Timestamp _lastMouseClickTimestamp;
         std::optional<Core::Point> _lastMouseClickPos;
         std::optional<Core::Point> _singleClickTouchdownPos;
-        // Link pressed without ctrl while openLinksOnSingleClick is on; opened on
-        // release, but only if it did not turn into a selection drag. The position
-        // and time of that press let the release tell a click from a drag, and the
-        // first click of a double-click from the second, without relying on the
-        // selection - which an app with VT mouse mode on never gets to make.
+        // Link pressed with a left-click chord; activated on release, but only if it
+        // did not turn into a selection drag. The position and time of that press let
+        // the release tell a click from a drag, and the first click of a double-click
+        // from the second, without relying on the selection - which an app with VT
+        // mouse mode on never gets to make.
         winrt::hstring _pendingSingleClickHyperlink;
         std::optional<Core::Point> _pendingSingleClickPos;
         Timestamp _pendingSingleClickTimestamp{ 0 };
+        // Which of the two chords armed the pending link, so the release runs
+        // the matching action rather than always the primary one.
+        bool _pendingSingleClickAlternative{ false };
         std::optional<Core::Point> _lastMouseClickPosNoSelection;
         // This field tracks whether the selection has changed meaningfully
         // since it was last copied. It's generally used to prevent copyOnSelect
@@ -162,8 +165,25 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                                  const Core::Point terminalPosition,
                                  const bool isLeftButtonPressed);
 
-        void _hyperlinkHandler(const std::wstring_view uri);
+        void _hyperlinkHandler(const std::wstring_view uri, const bool isAlternative = false);
         bool _canSendVTMouseInput(const ::Microsoft::Terminal::Core::ControlKeyStates modifiers);
+
+        // Which configured click chord, if any, a press matches. Chords are
+        // (modifier, gesture) pairs -- see hyperlink.primaryClick* and
+        // hyperlink.alternativeClick*.
+        enum class HyperlinkChord
+        {
+            None = 0,
+            Primary,
+            Alternative,
+        };
+        HyperlinkChord _matchHyperlinkChord(const ::Microsoft::Terminal::Core::ControlKeyStates modifiers,
+                                            const Control::MouseButtonState buttonState,
+                                            const unsigned int clickCount) const;
+        Control::HyperlinkClickGesture _hyperlinkChordGesture(const HyperlinkChord chord) const;
+        // What _numberOfClicks would return, without advancing its state -- a
+        // chord has to be identified before we know which branch consumes it.
+        unsigned int _peekClickCount(Core::Point clickPos, Timestamp clickTime) const;
         bool _shouldSendAlternateScroll(const ::Microsoft::Terminal::Core::ControlKeyStates modifiers, const Core::Point delta);
 
         til::point _getTerminalPosition(const til::point pixelPosition, bool roundToNearestCell);

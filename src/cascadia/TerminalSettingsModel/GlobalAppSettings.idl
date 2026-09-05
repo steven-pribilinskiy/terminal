@@ -155,7 +155,14 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(String, StartupActions);
         INHERITABLE_SETTING(Boolean, FocusFollowMouse);
         INHERITABLE_SETTING(Boolean, ScrollToZoom);
-        INHERITABLE_SETTING(Boolean, OpenLinksOnSingleClick);
+        INHERITABLE_SETTING(Boolean, HyperlinkClickable);
+        INHERITABLE_SETTING(IVector<String>, HyperlinkClickableKinds);
+        INHERITABLE_SETTING(HyperlinkClickModifier, HyperlinkPrimaryClickModifier);
+        INHERITABLE_SETTING(HyperlinkClickGesture, HyperlinkPrimaryClickGesture);
+        INHERITABLE_SETTING(String, HyperlinkPrimaryAction);
+        INHERITABLE_SETTING(HyperlinkClickModifier, HyperlinkAlternativeClickModifier);
+        INHERITABLE_SETTING(HyperlinkClickGesture, HyperlinkAlternativeClickGesture);
+        INHERITABLE_SETTING(String, HyperlinkAlternativeAction);
         INHERITABLE_SETTING(Int32, HyperlinkTooltipMaxWidth);
         INHERITABLE_SETTING(Int32, HyperlinkTooltipShowDelay);
         INHERITABLE_SETTING(Int32, HyperlinkTooltipHideDelay);
@@ -164,7 +171,10 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(Boolean, HyperlinkTooltipHint);
         INHERITABLE_SETTING(Boolean, HyperlinkPreviewInPane);
         INHERITABLE_SETTING(PaneTitlebarVisibility, PaneTitlebarVisibility);
+        INHERITABLE_SETTING(HyperlinkIntegrationDisplayMode, HyperlinkIntegrationDisplayMode);
+        INHERITABLE_SETTING(HyperlinkActionPlacement, HyperlinkActionPlacement);
         INHERITABLE_SETTING(IVector<HyperlinkTooltipRule>, HyperlinkTooltipRules);
+        INHERITABLE_SETTING(Boolean, HyperlinkManualRuleOrder);
         INHERITABLE_SETTING(Boolean, ScrollToChangeOpacity);
         INHERITABLE_SETTING(Boolean, TrimBlockSelection);
         INHERITABLE_SETTING(Boolean, DetectURLs);

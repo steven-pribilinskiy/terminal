@@ -182,8 +182,8 @@
                                     and the Save/Clear handlers empty it from code-behind.
                                 -->
                                 <PasswordBox x:Uid="Integrations_CredentialBox"
-                                             Width="{StaticResource StandardBoxMinWidth}"
-                                             MaxWidth="400"
+                                             Width="240"
+                                             MaxWidth="280"
                                              PasswordChanged="CredentialPassword_Changed"
                                              Tag="{x:Bind}" />
                                 <Button x:Uid="Integrations_SaveCredentialButton"

@@ -5644,6 +5644,26 @@ namespace winrt::TerminalApp::implementation
             // will eat focus.
             _paneResources.broadcastBorderBrush = SolidColorBrush{ Colors::Black() };
         }
+
+        const auto tabViewBackgroundKey = winrt::box_value(L"TabViewBackground");
+        if (res.HasKey(tabViewBackgroundKey))
+        {
+            _paneResources.headerBackgroundBrush = ThemeLookup(res, requestedTheme, tabViewBackgroundKey).try_as<winrt::Windows::UI::Xaml::Media::Brush>();
+        }
+        else
+        {
+            const auto pageBgKey = winrt::box_value(L"ApplicationPageBackgroundThemeBrush");
+            if (res.HasKey(pageBgKey))
+            {
+                _paneResources.headerBackgroundBrush = ThemeLookup(res, requestedTheme, pageBgKey).try_as<winrt::Windows::UI::Xaml::Media::Brush>();
+            }
+        }
+
+        const auto foregroundKey = winrt::box_value(L"DefaultTextForegroundThemeBrush");
+        if (res.HasKey(foregroundKey))
+        {
+            _paneResources.headerForegroundBrush = ThemeLookup(res, requestedTheme, foregroundKey).try_as<winrt::Windows::UI::Xaml::Media::Brush>();
+        }
     }
 
     void TerminalPage::_adjustProcessPriority() const

@@ -381,6 +381,13 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             bool showPreview{ true };
             // The hovered text came from a text-kind rule's pattern, not from a URI.
             bool isTextMatch{ false };
+            // The action id each click chord runs for this link: from the matched
+            // rule when it names one, otherwise the global hyperlink.primaryAction /
+            // hyperlink.alternativeAction. "none" means that chord does nothing here.
+            winrt::hstring primaryAction;
+            winrt::hstring alternativeAction;
+            Control::HyperlinkIntegrationDisplayMode integrationDisplayMode{ Control::HyperlinkIntegrationDisplayMode::Above };
+            Control::HyperlinkActionPlacement actionPlacement{ Control::HyperlinkActionPlacement::Footer };
         };
         EffectiveHyperlinkTooltipSettings _currentHyperlinkTooltipSettings;
         EffectiveHyperlinkTooltipSettings _effectiveHyperlinkTooltipSettings(std::wstring_view uri, bool isFileLink) const;
@@ -511,11 +518,20 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void _HyperlinkCardPointerPressed(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
         void _HyperlinkCardPointerReleased(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
         void _HyperlinkCardSizeChanged(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::SizeChangedEventArgs& e);
+        // The one place that decides what an action id means, so a card button and
+        // a click chord bound to the same id behave identically.
+        void _invokeHyperlinkActionById(const winrt::hstring& actionId);
+        winrt::hstring _followLinkHintText(const Control::IControlSettings& settings) const;
         void _HyperlinkOpenClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
         void _HyperlinkCopyLinkClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
         void _HyperlinkCopyPathClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
         void _HyperlinkRevealClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
         void _HyperlinkCustomActionClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
+        void _HyperlinkCommitCopyShaClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
+        void _formatHighlightedUri(const winrt::hstring& uriText);
+        void _applyActionPlacement();
+        void _applyIntegrationDisplayMode();
+        std::wstring _currentCommitFullSha;
         void _showHyperlinkCard();
         void _hideHyperlinkCard();
         void _scheduleHyperlinkCardHide();

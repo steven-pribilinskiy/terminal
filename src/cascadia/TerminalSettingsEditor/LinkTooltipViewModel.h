@@ -4,6 +4,7 @@
 #pragma once
 
 #include "LinkTooltipViewModel.g.h"
+#include "RuleGroupViewModel.g.h"
 #include "HyperlinkTooltipRuleViewModel.g.h"
 #include "HyperlinkTooltipActionViewModel.g.h"
 #include "IntegrationChoiceViewModel.g.h"
@@ -182,6 +183,12 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         bool ShowInPane() const noexcept;
         void ShowInPane(bool value);
 
+        Windows::Foundation::Collections::IVector<Editor::IntegrationChoiceViewModel> ActionChoices() const noexcept { return _ActionChoices; }
+        Windows::Foundation::IInspectable CurrentPrimaryAction() const;
+        void CurrentPrimaryAction(const Windows::Foundation::IInspectable& value);
+        Windows::Foundation::IInspectable CurrentAlternativeAction() const;
+        void CurrentAlternativeAction(const Windows::Foundation::IInspectable& value);
+
         Windows::Foundation::Collections::IObservableVector<Editor::HyperlinkTooltipActionViewModel> CustomActions() const noexcept { return _CustomActions; }
         Editor::HyperlinkTooltipActionViewModel RequestAddCustomAction();
         void RequestDeleteCustomAction(const Editor::HyperlinkTooltipActionViewModel& vm);
@@ -200,8 +207,49 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         Windows::Foundation::Collections::IMap<Model::HyperlinkFileTypeGroup, Editor::EnumEntry> _FileTypeGroupMap;
         Windows::Foundation::Collections::IObservableVector<Editor::IntegrationChoiceViewModel> _IntegrationChoices;
         Windows::Foundation::Collections::IObservableVector<Editor::ButtonChoiceViewModel> _ButtonChoices;
+        Windows::Foundation::Collections::IVector<Editor::IntegrationChoiceViewModel> _ActionChoices;
 
         void _raiseButtonChoicesChanged();
+    };
+
+    struct RuleGroupViewModel : RuleGroupViewModelT<RuleGroupViewModel>, ViewModelHelper<RuleGroupViewModel>
+    {
+    public:
+        RuleGroupViewModel(winrt::hstring platformId,
+                           winrt::hstring platformName,
+                           winrt::hstring platformIcon,
+                           std::vector<Editor::HyperlinkTooltipRuleViewModel> rules);
+
+        using ViewModelHelper<RuleGroupViewModel>::PropertyChanged;
+
+        winrt::hstring PlatformId() const noexcept { return _platformId; }
+        winrt::hstring PlatformName() const noexcept { return _platformName; }
+        winrt::hstring PlatformIcon() const noexcept { return _platformIcon; }
+        winrt::hstring CountBadge() const;
+
+        bool IsEnabled() const;
+        void IsEnabled(bool value);
+
+        bool IsExpanded() const noexcept { return _isExpanded; }
+        void IsExpanded(bool value)
+        {
+            if (_isExpanded != value)
+            {
+                _isExpanded = value;
+                _NotifyChanges(L"IsExpanded");
+            }
+        }
+
+        Windows::Foundation::Collections::IObservableVector<Editor::HyperlinkTooltipRuleViewModel> Rules() const noexcept { return _rules; }
+
+        void RefreshState();
+
+    private:
+        winrt::hstring _platformId;
+        winrt::hstring _platformName;
+        winrt::hstring _platformIcon;
+        bool _isExpanded{ true };
+        Windows::Foundation::Collections::IObservableVector<Editor::HyperlinkTooltipRuleViewModel> _rules;
     };
 
     struct LinkTooltipViewModel : LinkTooltipViewModelT<LinkTooltipViewModel>, ViewModelHelper<LinkTooltipViewModel>
@@ -212,13 +260,50 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         using ViewModelHelper<LinkTooltipViewModel>::PropertyChanged;
 
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, DetectURLs);
-        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, OpenLinksOnSingleClick);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkClickable);
+
+        // Hand-written rather than the macro: flipping this off has to re-sort
+        // the rules, which a plain projected setter would not do.
+        bool HyperlinkManualRuleOrder() const { return _WindowSettings.HyperlinkManualRuleOrder(); }
+        void HyperlinkManualRuleOrder(bool value);
+        bool HasHyperlinkManualRuleOrder() const { return _WindowSettings.HasHyperlinkManualRuleOrder(); }
+        // The grouped view's Visibility, since XAML has no way to negate a binding.
+        bool IsAutomaticRuleOrder() const { return !_WindowSettings.HyperlinkManualRuleOrder(); }
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkTooltipMaxWidth);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkTooltipShowDelay);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkTooltipHideDelay);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkTooltipActions);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkTooltipHint);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkPreviewInPane);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkIntegrationDisplayMode);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkActionPlacement);
+
+        Windows::Foundation::IInspectable CurrentIntegrationDisplayMode() const;
+        void CurrentIntegrationDisplayMode(const Windows::Foundation::IInspectable& enumEntry);
+        Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> IntegrationDisplayModeList() const noexcept { return _IntegrationDisplayModeList; }
+
+        Windows::Foundation::IInspectable CurrentActionPlacement() const;
+        void CurrentActionPlacement(const Windows::Foundation::IInspectable& enumEntry);
+        Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> ActionPlacementList() const noexcept { return _ActionPlacementList; }
+
+        Windows::Foundation::Collections::IObservableVector<Editor::ButtonChoiceViewModel> ClickableKindChoices() const noexcept { return _ClickableKindChoices; }
+
+        Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> ClickModifierList() const noexcept { return _ClickModifierList; }
+        Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> ClickGestureList() const noexcept { return _ClickGestureList; }
+        Windows::Foundation::IInspectable CurrentPrimaryClickModifier() const;
+        void CurrentPrimaryClickModifier(const Windows::Foundation::IInspectable& enumEntry);
+        Windows::Foundation::IInspectable CurrentPrimaryClickGesture() const;
+        void CurrentPrimaryClickGesture(const Windows::Foundation::IInspectable& enumEntry);
+        Windows::Foundation::IInspectable CurrentAlternativeClickModifier() const;
+        void CurrentAlternativeClickModifier(const Windows::Foundation::IInspectable& enumEntry);
+        Windows::Foundation::IInspectable CurrentAlternativeClickGesture() const;
+        void CurrentAlternativeClickGesture(const Windows::Foundation::IInspectable& enumEntry);
+
+        Windows::Foundation::Collections::IObservableVector<Editor::IntegrationChoiceViewModel> ActionChoices() const noexcept { return _ActionChoices; }
+        Windows::Foundation::IInspectable CurrentPrimaryAction() const;
+        void CurrentPrimaryAction(const Windows::Foundation::IInspectable& value);
+        Windows::Foundation::IInspectable CurrentAlternativeAction() const;
+        void CurrentAlternativeAction(const Windows::Foundation::IInspectable& value);
 
         winrt::hstring SafeUriSchemes() const;
         void SafeUriSchemes(const winrt::hstring& value);
@@ -230,6 +315,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         Windows::Foundation::Collections::IObservableVector<Editor::IntegrationChoiceViewModel> IntegrationChoices() const noexcept { return _IntegrationChoices; }
 
         Windows::Foundation::Collections::IObservableVector<Editor::HyperlinkTooltipRuleViewModel> CurrentView() const noexcept { return _CurrentView; }
+        Windows::Foundation::Collections::IObservableVector<Editor::RuleGroupViewModel> RuleGroups() const noexcept { return _RuleGroups; }
 
         Editor::HyperlinkTooltipRuleViewModel CurrentRule() const noexcept { return _CurrentRule; }
         void CurrentRule(const Editor::HyperlinkTooltipRuleViewModel& vm);
@@ -237,7 +323,6 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         bool IsNotEditingRule() const noexcept { return !_CurrentRule; }
         hstring CurrentRuleName() const { return _CurrentRule ? _CurrentRule.DisplayName() : hstring{}; }
 
-        void RequestReorderRule(const Editor::HyperlinkTooltipRuleViewModel& vm, bool goingUp);
         void RequestDeleteRule(const Editor::HyperlinkTooltipRuleViewModel& vm);
         Editor::HyperlinkTooltipRuleViewModel RequestAddRule();
         Editor::HyperlinkTooltipRuleViewModel RequestAddRuleWithPreset(const winrt::hstring& presetId);
@@ -250,12 +335,30 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> _FileTypeGroupList;
         Windows::Foundation::Collections::IMap<Model::HyperlinkFileTypeGroup, Editor::EnumEntry> _FileTypeGroupMap;
         Windows::Foundation::Collections::IObservableVector<Editor::IntegrationChoiceViewModel> _IntegrationChoices;
+        Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> _IntegrationDisplayModeList;
+        Windows::Foundation::Collections::IMap<Model::HyperlinkIntegrationDisplayMode, Editor::EnumEntry> _IntegrationDisplayModeMap;
+        Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> _ActionPlacementList;
+        Windows::Foundation::Collections::IMap<Model::HyperlinkActionPlacement, Editor::EnumEntry> _ActionPlacementMap;
         Windows::Foundation::Collections::IObservableVector<Editor::HyperlinkTooltipRuleViewModel> _CurrentView;
+        Windows::Foundation::Collections::IObservableVector<Editor::RuleGroupViewModel> _RuleGroups;
         Windows::Foundation::Collections::IObservableVector<Editor::HyperlinkTooltipRuleViewModel>::VectorChanged_revoker _rulesChangedRevoker;
         Windows::Foundation::Collections::IObservableVector<Editor::ButtonChoiceViewModel> _ButtonChoices;
+        Windows::Foundation::Collections::IObservableVector<Editor::ButtonChoiceViewModel> _ClickableKindChoices;
+        Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> _ClickModifierList;
+        Windows::Foundation::Collections::IMap<Model::HyperlinkClickModifier, Editor::EnumEntry> _ClickModifierMap;
+        Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> _ClickGestureList;
+        Windows::Foundation::Collections::IMap<Model::HyperlinkClickGesture, Editor::EnumEntry> _ClickGestureMap;
+        Windows::Foundation::Collections::IObservableVector<Editor::IntegrationChoiceViewModel> _ActionChoices;
         Editor::HyperlinkTooltipRuleViewModel _CurrentRule{ nullptr };
         // Watches the rule being edited so a rename reaches the breadcrumb.
         Windows::UI::Xaml::Data::INotifyPropertyChanged::PropertyChanged_revoker _currentRuleChangedRevoker;
+
+        // Guards _applyAutomaticOrder against re-entering through the
+        // VectorChanged handler its own ReplaceAll raises.
+        bool _reorderingInProgress{ false };
+
+        void _applyAutomaticOrder();
+        void _updateRuleGroups();
     };
 }
 
@@ -264,7 +367,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::factory_implementation
     BASIC_FACTORY(HyperlinkTooltipActionViewModel);
     BASIC_FACTORY(HyperlinkTooltipRuleViewModel);
     BASIC_FACTORY(LinkTooltipViewModel);
-    // ButtonChoiceViewModel and IntegrationChoiceViewModel declare no
-    // constructor in the IDL -- their owner builds them -- so neither has an
-    // activation factory.
+    // ButtonChoiceViewModel, IntegrationChoiceViewModel and RuleGroupViewModel
+    // declare no constructor in the IDL -- their owner builds them -- so none
+    // has an activation factory.
 }

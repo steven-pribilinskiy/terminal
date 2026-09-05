@@ -264,26 +264,31 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         const auto altEnabled = modifiers.IsAltPressed();
         const auto shiftEnabled = modifiers.IsShiftPressed();
-        const auto ctrlEnabled = modifiers.IsCtrlPressed();
 
         // Mark that this pointer event actually started within our bounds.
         // We'll need this later, for PointerMoved events.
         _pointerPressedInBounds = true;
 
         // GH#9396: we prioritize hyper-link over VT mouse events
-        auto hyperlink = _core->GetHyperlink(terminalPosition.to_core_point());
+        ::Microsoft::Terminal::Core::HyperlinkSource hyperlinkSource{};
+        auto hyperlink = _core->GetHyperlink(terminalPosition.to_core_point(), &hyperlinkSource);
 
-        // Plain click on a link, with openLinksOnSingleClick enabled. Do NOT open it
-        // here: a press is also the start of a selection drag, so opening on press
-        // would make it impossible to select text sitting inside a URL. Record it and
-        // let PointerReleased decide, once it knows whether a drag happened. This
-        // deliberately does not consume the event -- the normal selection handling
-        // below still runs.
+        // A link is only a click target if clicking is on at all and this kind of
+        // link is in hyperlink.clickableKinds. Otherwise it stays hoverable and
+        // previewable, and the tooltip's buttons are the way to act on it.
+        const auto chord = (!hyperlink.empty() && _core->IsHyperlinkClickable(hyperlinkSource)) ?
+                               _matchHyperlinkChord(modifiers, buttonState, _peekClickCount(pixelPosition, timestamp)) :
+                               HyperlinkChord::None;
+        const auto chordIsLeftClick = chord != HyperlinkChord::None &&
+                                      _hyperlinkChordGesture(chord) == Control::HyperlinkClickGesture::LeftClick;
+
+        // A plain left click on a link. Do NOT open it here: a press is also the
+        // start of a selection drag, so opening on press would make it impossible to
+        // select text sitting inside a URL. Record it and let PointerReleased decide,
+        // once it knows whether a drag happened. This deliberately does not consume
+        // the event -- the normal selection handling below still runs.
         _pendingSingleClickHyperlink.clear();
-        if (WI_IsFlagSet(buttonState, MouseButtonState::IsLeftButtonDown) &&
-            !ctrlEnabled &&
-            !hyperlink.empty() &&
-            _core->Settings().OpenLinksOnSingleClick())
+        if (chordIsLeftClick)
         {
             // Only the first click of a multi-click sequence arms the link. Normally
             // the double-click's word selection stops the second click from opening
@@ -298,17 +303,22 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             if (!isRepeatClick)
             {
                 _pendingSingleClickHyperlink = hyperlink;
+                _pendingSingleClickAlternative = chord == HyperlinkChord::Alternative;
             }
         }
-        if (WI_IsFlagSet(buttonState, MouseButtonState::IsLeftButtonDown) &&
-            ctrlEnabled &&
-            !hyperlink.empty())
+        // Middle-click and double-click chords have no drag to wait out, so they
+        // resolve here and consume the press.
+        if (chord != HyperlinkChord::None && !chordIsLeftClick)
         {
-            const auto clickCount = _numberOfClicks(pixelPosition, timestamp);
-            // Handle hyper-link only on the first click to prevent multiple activations
-            if (clickCount == 1)
+            // Only a double-click chord cares how many clicks this is. A middle
+            // click activates once per press, and running it through
+            // _numberOfClicks would fold middle presses into the multi-click
+            // state that word and line selection rely on.
+            const auto fire = _hyperlinkChordGesture(chord) != Control::HyperlinkClickGesture::DoubleClick ||
+                              _numberOfClicks(pixelPosition, timestamp) == 2;
+            if (fire)
             {
-                _hyperlinkHandler(hyperlink);
+                _hyperlinkHandler(hyperlink, chord == HyperlinkChord::Alternative);
             }
         }
         else if (_canSendVTMouseInput(modifiers))
@@ -539,7 +549,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 !_core->HasSelection() &&
                 _core->GetHyperlink(terminalPosition.to_core_point()) == pending)
             {
-                _hyperlinkHandler(pending);
+                _hyperlinkHandler(pending, _pendingSingleClickAlternative);
             }
         }
 
@@ -743,9 +753,122 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
     }
 
-    void ControlInteractivity::_hyperlinkHandler(const std::wstring_view uri)
+    void ControlInteractivity::_hyperlinkHandler(const std::wstring_view uri, const bool isAlternative)
     {
-        OpenHyperlink.raise(*this, winrt::make<OpenHyperlinkEventArgs>(winrt::hstring{ uri }));
+        OpenHyperlink.raise(*this, winrt::make<OpenHyperlinkEventArgs>(winrt::hstring{ uri }, isAlternative));
+    }
+
+    unsigned int ControlInteractivity::_peekClickCount(Core::Point clickPos, Timestamp clickTime) const
+    {
+        Timestamp delta;
+        THROW_IF_FAILED(UInt64Sub(clickTime, _lastMouseClickTimestamp, &delta));
+        if (clickPos != _lastMouseClickPos || delta > _multiClickTimer)
+        {
+            return 1;
+        }
+        return _multiClickCounter + 1;
+    }
+
+    // Exact match: Ctrl and Ctrl+Shift are different chords, so holding an extra
+    // modifier does not silently fall through to the plainer one.
+    static bool _modifierMatches(const Control::HyperlinkClickModifier modifier,
+                                 const ::Microsoft::Terminal::Core::ControlKeyStates modifiers)
+    {
+        const auto ctrl = modifiers.IsCtrlPressed();
+        const auto alt = modifiers.IsAltPressed();
+        const auto shift = modifiers.IsShiftPressed();
+        const auto win = modifiers.IsWinPressed();
+
+        switch (modifier)
+        {
+        case Control::HyperlinkClickModifier::None:
+            return !ctrl && !alt && !shift && !win;
+        case Control::HyperlinkClickModifier::Ctrl:
+            return ctrl && !alt && !shift && !win;
+        case Control::HyperlinkClickModifier::Alt:
+            return !ctrl && alt && !shift && !win;
+        case Control::HyperlinkClickModifier::Shift:
+            return !ctrl && !alt && shift && !win;
+        case Control::HyperlinkClickModifier::Win:
+            return !ctrl && !alt && !shift && win;
+        case Control::HyperlinkClickModifier::CtrlAlt:
+            return ctrl && alt && !shift && !win;
+        case Control::HyperlinkClickModifier::CtrlShift:
+            return ctrl && !alt && shift && !win;
+        case Control::HyperlinkClickModifier::AltShift:
+            return !ctrl && alt && shift && !win;
+        case Control::HyperlinkClickModifier::CtrlAltShift:
+            return ctrl && alt && shift && !win;
+        default:
+            return false;
+        }
+    }
+
+    static bool _gestureMatches(const Control::HyperlinkClickGesture gesture,
+                                const Control::MouseButtonState buttonState,
+                                const unsigned int clickCount)
+    {
+        switch (gesture)
+        {
+        case Control::HyperlinkClickGesture::LeftClick:
+            return WI_IsFlagSet(buttonState, MouseButtonState::IsLeftButtonDown);
+        case Control::HyperlinkClickGesture::MiddleClick:
+            return WI_IsFlagSet(buttonState, MouseButtonState::IsMiddleButtonDown);
+        case Control::HyperlinkClickGesture::DoubleClick:
+            return WI_IsFlagSet(buttonState, MouseButtonState::IsLeftButtonDown) && clickCount == 2;
+        default:
+            return false;
+        }
+    }
+
+    // A double-click is also a left click, so when both chords fit the same
+    // press the more specific gesture has to win -- otherwise an alternative
+    // bound to a double-click could never be reached past a plain-click primary.
+    static int _gestureRank(const Control::HyperlinkClickGesture gesture)
+    {
+        switch (gesture)
+        {
+        case Control::HyperlinkClickGesture::DoubleClick:
+            return 2;
+        case Control::HyperlinkClickGesture::MiddleClick:
+            return 1;
+        default:
+            return 0;
+        }
+    }
+
+    ControlInteractivity::HyperlinkChord ControlInteractivity::_matchHyperlinkChord(const ::Microsoft::Terminal::Core::ControlKeyStates modifiers,
+                                                                                   const Control::MouseButtonState buttonState,
+                                                                                   const unsigned int clickCount) const
+    {
+        const auto settings = _core->Settings();
+
+        const auto primaryGesture = settings.HyperlinkPrimaryClickGesture();
+        const auto alternativeGesture = settings.HyperlinkAlternativeClickGesture();
+
+        const auto primary = _modifierMatches(settings.HyperlinkPrimaryClickModifier(), modifiers) &&
+                             _gestureMatches(primaryGesture, buttonState, clickCount);
+        const auto alternative = _modifierMatches(settings.HyperlinkAlternativeClickModifier(), modifiers) &&
+                                 _gestureMatches(alternativeGesture, buttonState, clickCount);
+
+        if (primary && alternative)
+        {
+            return _gestureRank(alternativeGesture) > _gestureRank(primaryGesture) ?
+                       HyperlinkChord::Alternative :
+                       HyperlinkChord::Primary;
+        }
+        if (primary)
+        {
+            return HyperlinkChord::Primary;
+        }
+        return alternative ? HyperlinkChord::Alternative : HyperlinkChord::None;
+    }
+
+    Control::HyperlinkClickGesture ControlInteractivity::_hyperlinkChordGesture(const HyperlinkChord chord) const
+    {
+        const auto settings = _core->Settings();
+        return chord == HyperlinkChord::Alternative ? settings.HyperlinkAlternativeClickGesture() :
+                                                      settings.HyperlinkPrimaryClickGesture();
     }
 
     bool ControlInteractivity::_canSendVTMouseInput(const ::Microsoft::Terminal::Core::ControlKeyStates modifiers)

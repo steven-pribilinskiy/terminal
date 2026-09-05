@@ -4,6 +4,7 @@
 #include "pch.h"
 #include "LinkTooltipViewModel.h"
 #include "LinkTooltipViewModel.g.cpp"
+#include "RuleGroupViewModel.g.cpp"
 #include "HyperlinkTooltipRuleViewModel.g.cpp"
 #include "HyperlinkTooltipActionViewModel.g.cpp"
 #include "IntegrationChoiceViewModel.g.cpp"
@@ -87,6 +88,89 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         return winrt::hstring{ id };
     }
 
+    // The link kinds hyperlink.clickableKinds can name, in the order the
+    // checkboxes are drawn.
+    static constexpr std::wstring_view KnownClickableKindIds[]{
+        L"detected",
+        L"rules",
+        L"osc8",
+    };
+
+    static winrt::hstring _clickableKindLabel(const std::wstring_view id)
+    {
+        if (id == L"detected")
+        {
+            return RS_(L"LinkTooltip_ClickableKindDetected");
+        }
+        if (id == L"rules")
+        {
+            return RS_(L"LinkTooltip_ClickableKindRules");
+        }
+        if (id == L"osc8")
+        {
+            return RS_(L"LinkTooltip_ClickableKindOsc8");
+        }
+        return winrt::hstring{ id };
+    }
+
+    // What a click chord can be bound to: the same ids the card's buttons use,
+    // plus "none". `includeInherit` adds a leading "" entry, which only makes
+    // sense on a rule -- the global setting has nothing to inherit from.
+    static std::vector<Editor::IntegrationChoiceViewModel> _buildActionChoices(const bool includeInherit)
+    {
+        std::vector<Editor::IntegrationChoiceViewModel> choices;
+        if (includeInherit)
+        {
+            choices.push_back(winrt::make<IntegrationChoiceViewModel>(winrt::hstring{}, RS_(L"LinkTooltip_ActionInherit")));
+        }
+        choices.push_back(winrt::make<IntegrationChoiceViewModel>(winrt::hstring{ L"none" }, RS_(L"LinkTooltip_ActionNone")));
+        for (const auto& id : KnownButtonIds)
+        {
+            choices.push_back(winrt::make<IntegrationChoiceViewModel>(winrt::hstring{ id }, _buttonLabel(id)));
+        }
+        return choices;
+    }
+
+    // An id already in use that isn't one of the built-ins -- an entry under
+    // "actions", say -- needs an entry of its own, or the picker would show
+    // nothing selected and the first edit would silently rewrite the setting.
+    // Done once while building the list rather than lazily on lookup: the rule's
+    // list is a plain IVector, so a later Append would never reach the ComboBox.
+    static void _ensureActionChoice(const IVector<Editor::IntegrationChoiceViewModel>& choices, const winrt::hstring& id)
+    {
+        if (!choices || id.empty())
+        {
+            return;
+        }
+        for (const auto& choice : choices)
+        {
+            if (choice.Id() == id)
+            {
+                return;
+            }
+        }
+        choices.Append(winrt::make<IntegrationChoiceViewModel>(id, id));
+    }
+
+    // Shared by the four action pickers: pure lookup, since a binding getter is
+    // no place to be mutating the collection the binding reads.
+    static Windows::Foundation::IInspectable _actionChoiceFor(const IVector<Editor::IntegrationChoiceViewModel>& choices,
+                                                              const winrt::hstring& current)
+    {
+        if (!choices)
+        {
+            return nullptr;
+        }
+        for (const auto& choice : choices)
+        {
+            if (choice.Id() == current)
+            {
+                return choice;
+            }
+        }
+        return nullptr;
+    }
+
     static bool _listContains(const IVector<winrt::hstring>& list, const winrt::hstring& id)
     {
         if (!list)
@@ -132,6 +216,29 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 {
                     ordered.push_back(value);
                 }
+            }
+        }
+        return single_threaded_vector<winrt::hstring>(std::move(ordered));
+    }
+
+    // Toggles one id in a list, rewriting it in `known` order. The same shape as
+    // _withButton, but over whichever id table is passed in -- the clickable-kind
+    // checkboxes need this behaviour over a different set of ids, and unlike the
+    // button list they have no unknown ids to preserve.
+    template<typename KnownIds>
+    static IVector<winrt::hstring> _withIdToggled(const IVector<winrt::hstring>& list,
+                                                  const KnownIds& known,
+                                                  const winrt::hstring& id,
+                                                  bool selected)
+    {
+        std::vector<winrt::hstring> ordered;
+        for (const auto& entry : known)
+        {
+            const winrt::hstring knownId{ entry };
+            const auto wanted = knownId == id ? selected : _listContains(list, knownId);
+            if (wanted)
+            {
+                ordered.push_back(knownId);
             }
         }
         return single_threaded_vector<winrt::hstring>(std::move(ordered));
@@ -255,6 +362,14 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
         _ButtonChoices = single_threaded_observable_vector<Editor::ButtonChoiceViewModel>(std::move(buttonVMs));
 
+        // A rule's action pickers carry an extra leading "inherit" entry the
+        // global ones don't have, so this list can't be shared with the page's.
+        // Built here rather than in the delegating constructor, because this is
+        // the one every rule actually goes through.
+        _ActionChoices = single_threaded_vector<Editor::IntegrationChoiceViewModel>(_buildActionChoices(true));
+        _ensureActionChoice(_ActionChoices, _Rule.PrimaryAction());
+        _ensureActionChoice(_ActionChoices, _Rule.AlternativeAction());
+
         std::vector<Editor::HyperlinkTooltipActionViewModel> actionVMs;
         for (const auto& action : _Rule.CustomActions())
         {
@@ -309,6 +424,34 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             }
         }
         _IntegrationChoices = single_threaded_observable_vector<Editor::IntegrationChoiceViewModel>(std::move(choices));
+    }
+
+    Windows::Foundation::IInspectable HyperlinkTooltipRuleViewModel::CurrentPrimaryAction() const
+    {
+        return _actionChoiceFor(_ActionChoices, _Rule.PrimaryAction());
+    }
+
+    void HyperlinkTooltipRuleViewModel::CurrentPrimaryAction(const Windows::Foundation::IInspectable& value)
+    {
+        if (const auto choice = value.try_as<Editor::IntegrationChoiceViewModel>(); choice && _Rule.PrimaryAction() != choice.Id())
+        {
+            _Rule.PrimaryAction(choice.Id());
+            _NotifyChanges(L"CurrentPrimaryAction");
+        }
+    }
+
+    Windows::Foundation::IInspectable HyperlinkTooltipRuleViewModel::CurrentAlternativeAction() const
+    {
+        return _actionChoiceFor(_ActionChoices, _Rule.AlternativeAction());
+    }
+
+    void HyperlinkTooltipRuleViewModel::CurrentAlternativeAction(const Windows::Foundation::IInspectable& value)
+    {
+        if (const auto choice = value.try_as<Editor::IntegrationChoiceViewModel>(); choice && _Rule.AlternativeAction() != choice.Id())
+        {
+            _Rule.AlternativeAction(choice.Id());
+            _NotifyChanges(L"CurrentAlternativeAction");
+        }
     }
 
     void HyperlinkTooltipRuleViewModel::Name(const hstring& value)
@@ -712,20 +855,179 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                        L"ShowInPane");
     }
 
+    RuleGroupViewModel::RuleGroupViewModel(winrt::hstring platformId,
+                                           winrt::hstring platformName,
+                                           winrt::hstring platformIcon,
+                                           std::vector<Editor::HyperlinkTooltipRuleViewModel> rules) :
+        _platformId{ std::move(platformId) },
+        _platformName{ std::move(platformName) },
+        _platformIcon{ std::move(platformIcon) },
+        _rules{ winrt::single_threaded_observable_vector<Editor::HyperlinkTooltipRuleViewModel>(std::move(rules)) }
+    {
+        for (const auto& r : _rules)
+        {
+            winrt::weak_ref<RuleGroupViewModel> weakThis{ get_weak() };
+            r.PropertyChanged([weakThis](auto&&, const Windows::UI::Xaml::Data::PropertyChangedEventArgs& args) {
+                if (auto strong = weakThis.get())
+                {
+                    if (args.PropertyName() == L"Enabled")
+                    {
+                        strong->RefreshState();
+                    }
+                }
+            });
+        }
+    }
+
+    winrt::hstring RuleGroupViewModel::CountBadge() const
+    {
+        if (!_rules)
+        {
+            return winrt::hstring{ L"0/0" };
+        }
+        uint32_t enabled = 0;
+        const auto total = _rules.Size();
+        for (const auto& r : _rules)
+        {
+            if (r.Enabled())
+            {
+                enabled++;
+            }
+        }
+        return winrt::hstring{ fmt::format(L"{}/{}", enabled, total) };
+    }
+
+    bool RuleGroupViewModel::IsEnabled() const
+    {
+        if (!_rules || _rules.Size() == 0)
+        {
+            return false;
+        }
+        for (const auto& r : _rules)
+        {
+            if (r.Enabled())
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void RuleGroupViewModel::IsEnabled(bool value)
+    {
+        if (!_rules)
+        {
+            return;
+        }
+        for (const auto& r : _rules)
+        {
+            r.Enabled(value);
+        }
+        RefreshState();
+    }
+
+    void RuleGroupViewModel::RefreshState()
+    {
+        _NotifyChanges(L"IsEnabled", L"CountBadge");
+    }
+
+    static IVector<Model::HyperlinkTooltipRule> _ensureRules(const Model::WindowSettings& windowSettings)
+    {
+        auto rules = windowSettings.HyperlinkTooltipRules();
+        if (!rules)
+        {
+            rules = winrt::single_threaded_vector<Model::HyperlinkTooltipRule>();
+            windowSettings.HyperlinkTooltipRules(rules);
+        }
+        return rules;
+    }
+
+    static std::wstring _toLower(std::wstring_view s)
+    {
+        std::wstring res{ s };
+        std::transform(res.begin(), res.end(), res.begin(), ::towlower);
+        return res;
+    }
+
+    static winrt::hstring _classifyRulePlatform(const Editor::HyperlinkTooltipRuleViewModel& vm)
+    {
+        const auto name = _toLower(vm.DisplayName());
+        const auto pattern = _toLower(vm.Pattern());
+        const auto integration = _toLower(vm.Integration());
+        const auto schemes = _toLower(vm.Schemes());
+
+        if (integration.find(L"github") != std::wstring::npos ||
+            name.find(L"github") != std::wstring::npos ||
+            pattern.find(L"github") != std::wstring::npos)
+        {
+            return L"github";
+        }
+        if (integration.find(L"jira") != std::wstring::npos ||
+            name.find(L"jira") != std::wstring::npos ||
+            pattern.find(L"jira") != std::wstring::npos ||
+            pattern.find(L"browse/") != std::wstring::npos)
+        {
+            return L"jira";
+        }
+        if (integration.find(L"slack") != std::wstring::npos ||
+            name.find(L"slack") != std::wstring::npos ||
+            pattern.find(L"slack") != std::wstring::npos)
+        {
+            return L"slack";
+        }
+        if (integration.find(L"stith") != std::wstring::npos ||
+            name.find(L"stith") != std::wstring::npos)
+        {
+            return L"stith";
+        }
+        if (name.find(L"git") != std::wstring::npos ||
+            name.find(L"commit") != std::wstring::npos ||
+            pattern.find(L"commit") != std::wstring::npos ||
+            schemes.find(L"git") != std::wstring::npos)
+        {
+            return L"git";
+        }
+        if (schemes.find(L"file") != std::wstring::npos ||
+            name.find(L"file") != std::wstring::npos ||
+            name.find(L"markdown") != std::wstring::npos ||
+            name.find(L"media") != std::wstring::npos ||
+            name.find(L"path") != std::wstring::npos)
+        {
+            return L"files";
+        }
+        return L"custom";
+    }
+
+    // The order _updateRuleGroups draws the groups in, and therefore the order
+    // automatic sorting puts the rules in. "custom" is last, so ungrouped rules
+    // sit below the grouped ones -- and, since order is precedence, lose to them.
+    static constexpr std::wstring_view GroupOrder[]{
+        L"github",
+        L"jira",
+        L"slack",
+        L"stith",
+        L"git",
+        L"files",
+        L"custom",
+    };
+
+    static size_t _groupRank(const winrt::hstring& platform)
+    {
+        for (size_t i = 0; i < std::size(GroupOrder); ++i)
+        {
+            if (GroupOrder[i] == platform)
+            {
+                return i;
+            }
+        }
+        return std::size(GroupOrder);
+    }
+
     LinkTooltipViewModel::LinkTooltipViewModel(Model::GlobalAppSettings globalSettings, Model::WindowSettings windowSettings) :
         _GlobalSettings{ globalSettings },
         _WindowSettings{ windowSettings }
     {
-        auto rules = _WindowSettings.HyperlinkTooltipRules();
-        if (!rules)
-        {
-            rules = winrt::single_threaded_vector<Model::HyperlinkTooltipRule>();
-        }
-        // Assign unconditionally, not just when it's null: an inheritable setting
-        // the user has never set hands back a *freshly constructed* fallback on
-        // every read (see IInheritable.h), so a rule appended to what we just read
-        // would land in a temporary and vanish. Assigning pins it as the user's own.
-        _WindowSettings.HyperlinkTooltipRules(rules);
+        auto rules = _ensureRules(_WindowSettings);
 
         std::vector<Editor::ButtonChoiceViewModel> buttonVMs;
         for (const auto& id : KnownButtonIds)
@@ -745,16 +1047,55 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         INITIALIZE_BINDABLE_ENUM_SETTING(FileTypeGroup, HyperlinkFileTypeGroup, Model::HyperlinkFileTypeGroup, L"LinkTooltip_FileTypeGroup", L"Content");
         INITIALIZE_BINDABLE_ENUM_SETTING(Kind, HyperlinkMatchKind, Model::HyperlinkMatchKind, L"LinkTooltip_MatchKind", L"Content");
-        _IntegrationChoices = single_threaded_observable_vector<Editor::IntegrationChoiceViewModel>(_buildIntegrationChoices(_WindowSettings.HyperlinkTooltipRules()));
+        INITIALIZE_BINDABLE_ENUM_SETTING(IntegrationDisplayMode, HyperlinkIntegrationDisplayMode, Model::HyperlinkIntegrationDisplayMode, L"LinkTooltip_IntegrationDisplayMode", L"Content");
+        INITIALIZE_BINDABLE_ENUM_SETTING(ActionPlacement, HyperlinkActionPlacement, Model::HyperlinkActionPlacement, L"LinkTooltip_ActionPlacement", L"Content");
+        INITIALIZE_BINDABLE_ENUM_SETTING(ClickModifier, HyperlinkClickModifier, Model::HyperlinkClickModifier, L"LinkTooltip_ClickModifier", L"Content");
+        INITIALIZE_BINDABLE_ENUM_SETTING(ClickGesture, HyperlinkClickGesture, Model::HyperlinkClickGesture, L"LinkTooltip_ClickGesture", L"Content");
+        _IntegrationChoices = single_threaded_observable_vector<Editor::IntegrationChoiceViewModel>(_buildIntegrationChoices(rules));
+        _ActionChoices = single_threaded_observable_vector<Editor::IntegrationChoiceViewModel>(_buildActionChoices(false));
+        _ensureActionChoice(_ActionChoices, _WindowSettings.HyperlinkPrimaryAction());
+        _ensureActionChoice(_ActionChoices, _WindowSettings.HyperlinkAlternativeAction());
+
+        std::vector<Editor::ButtonChoiceViewModel> kindVMs;
+        for (const auto& id : KnownClickableKindIds)
+        {
+            const winrt::hstring kindId{ id };
+            kindVMs.push_back(make<ButtonChoiceViewModel>(
+                kindId,
+                _clickableKindLabel(id),
+                [this](const winrt::hstring& which) {
+                    // An unset list is the shipped default -- every kind -- rather
+                    // than "no kinds", matching how the control resolves it.
+                    const auto kinds = _WindowSettings.HyperlinkClickableKinds();
+                    return !kinds ? true : _listContains(kinds, which);
+                },
+                [this](const winrt::hstring& which, bool selected) {
+                    auto kinds = _WindowSettings.HyperlinkClickableKinds();
+                    if (!kinds)
+                    {
+                        kinds = single_threaded_vector<winrt::hstring>();
+                        for (const auto& id : KnownClickableKindIds)
+                        {
+                            kinds.Append(winrt::hstring{ id });
+                        }
+                    }
+                    _WindowSettings.HyperlinkClickableKinds(_withIdToggled(kinds, KnownClickableKindIds, which, selected));
+                }));
+        }
+        _ClickableKindChoices = single_threaded_observable_vector<Editor::ButtonChoiceViewModel>(std::move(kindVMs));
 
         std::vector<Editor::HyperlinkTooltipRuleViewModel> ruleVMs;
-        for (const auto& rule : _WindowSettings.HyperlinkTooltipRules())
+        for (const auto& rule : rules)
         {
             ruleVMs.push_back(make<HyperlinkTooltipRuleViewModel>(rule, _WindowSettings, _KindList, _KindMap, _FileTypeGroupList, _FileTypeGroupMap, _IntegrationChoices));
         }
         _CurrentView = single_threaded_observable_vector<Editor::HyperlinkTooltipRuleViewModel>(std::move(ruleVMs));
+        _RuleGroups = single_threaded_observable_vector<Editor::RuleGroupViewModel>();
+        _updateRuleGroups();
 
         _rulesChangedRevoker = _CurrentView.VectorChanged(winrt::auto_revoke, [this](auto&&, const IVectorChangedEventArgs& args) {
+            auto rules = _ensureRules(_WindowSettings);
+
             switch (args.CollectionChange())
             {
             case CollectionChange::Reset:
@@ -765,25 +1106,247 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                     modelRules.push_back(get_self<HyperlinkTooltipRuleViewModel>(vm)->Rule());
                 }
                 _WindowSettings.HyperlinkTooltipRules(single_threaded_vector<Model::HyperlinkTooltipRule>(std::move(modelRules)));
-                return;
+                break;
             }
             case CollectionChange::ItemInserted:
             {
                 const auto& vm = _CurrentView.GetAt(args.Index());
-                _WindowSettings.HyperlinkTooltipRules().InsertAt(args.Index(), get_self<HyperlinkTooltipRuleViewModel>(vm)->Rule());
-                return;
+                rules.InsertAt(args.Index(), get_self<HyperlinkTooltipRuleViewModel>(vm)->Rule());
+                break;
             }
             case CollectionChange::ItemRemoved:
-                _WindowSettings.HyperlinkTooltipRules().RemoveAt(args.Index());
-                return;
+                if (args.Index() < rules.Size())
+                {
+                    rules.RemoveAt(args.Index());
+                }
+                break;
             case CollectionChange::ItemChanged:
             {
                 const auto& vm = _CurrentView.GetAt(args.Index());
-                _WindowSettings.HyperlinkTooltipRules().SetAt(args.Index(), get_self<HyperlinkTooltipRuleViewModel>(vm)->Rule());
-                return;
+                if (args.Index() < rules.Size())
+                {
+                    rules.SetAt(args.Index(), get_self<HyperlinkTooltipRuleViewModel>(vm)->Rule());
+                }
+                break;
             }
             }
+            _updateRuleGroups();
         });
+
+        // Only now that the write-through above is armed, so the sort reaches
+        // hyperlink.tooltipRules rather than only the list on screen.
+        _applyAutomaticOrder();
+    }
+
+    // With manual ordering off, the list you see IS the precedence order rather
+    // than a display that lies about it: the model is kept sorted by group rank
+    // (Custom Rules last) and then by name. Turning manual ordering on simply
+    // stops this running, freezing the current order as the starting point.
+    void LinkTooltipViewModel::_applyAutomaticOrder()
+    {
+        if (!_CurrentView || _reorderingInProgress || _WindowSettings.HyperlinkManualRuleOrder())
+        {
+            return;
+        }
+
+        std::vector<Editor::HyperlinkTooltipRuleViewModel> sorted{ begin(_CurrentView), end(_CurrentView) };
+        std::stable_sort(sorted.begin(), sorted.end(), [](const auto& lhs, const auto& rhs) {
+            const auto lhsRank = _groupRank(_classifyRulePlatform(lhs));
+            const auto rhsRank = _groupRank(_classifyRulePlatform(rhs));
+            if (lhsRank != rhsRank)
+            {
+                return lhsRank < rhsRank;
+            }
+            return _toLower(lhs.DisplayName()) < _toLower(rhs.DisplayName());
+        });
+
+        // Already in order. Returning without touching the vector is what stops
+        // the VectorChanged handler below from calling back in here forever --
+        // see the stack overflow this page has already had once.
+        if (std::equal(sorted.begin(), sorted.end(), begin(_CurrentView), end(_CurrentView)))
+        {
+            return;
+        }
+
+        _reorderingInProgress = true;
+        _CurrentView.ReplaceAll(sorted);
+        _reorderingInProgress = false;
+    }
+
+    void LinkTooltipViewModel::_updateRuleGroups()
+    {
+        if (!_RuleGroups)
+        {
+            _RuleGroups = winrt::single_threaded_observable_vector<Editor::RuleGroupViewModel>();
+        }
+
+        struct GroupInfo
+        {
+            std::wstring id;
+            std::wstring name;
+            std::wstring icon;
+            std::vector<Editor::HyperlinkTooltipRuleViewModel> rules;
+        };
+
+        std::vector<GroupInfo> groups = {
+            { L"github", L"GitHub", L"\uE82D", {} },
+            { L"jira", L"Jira", L"\uE943", {} },
+            { L"slack", L"Slack", L"\uE8BD", {} },
+            { L"stith", L"Stith", L"\uE774", {} },
+            { L"git", L"Git", L"\uE81D", {} },
+            { L"files", L"Files & Media", L"\uE8A5", {} },
+            { L"custom", L"Custom Rules", L"\uE713", {} }
+        };
+
+        if (_CurrentView)
+        {
+            for (const auto& vm : _CurrentView)
+            {
+                const auto platform = _classifyRulePlatform(vm);
+                bool found = false;
+                for (auto& g : groups)
+                {
+                    if (g.id == platform)
+                    {
+                        g.rules.push_back(vm);
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                {
+                    groups.back().rules.push_back(vm);
+                }
+            }
+        }
+
+        _RuleGroups.Clear();
+        for (auto& g : groups)
+        {
+            if (!g.rules.empty())
+            {
+                _RuleGroups.Append(winrt::make<RuleGroupViewModel>(
+                    winrt::hstring{ g.id },
+                    winrt::hstring{ g.name },
+                    winrt::hstring{ g.icon },
+                    std::move(g.rules)));
+            }
+        }
+        _NotifyChanges(L"RuleGroups");
+    }
+
+    Windows::Foundation::IInspectable LinkTooltipViewModel::CurrentIntegrationDisplayMode() const
+    {
+        return _IntegrationDisplayModeMap.Lookup(_WindowSettings.HyperlinkIntegrationDisplayMode());
+    }
+
+    void LinkTooltipViewModel::CurrentIntegrationDisplayMode(const Windows::Foundation::IInspectable& enumEntry)
+    {
+        if (const auto entry = enumEntry.try_as<Editor::EnumEntry>())
+        {
+            const auto value = winrt::unbox_value<Model::HyperlinkIntegrationDisplayMode>(entry.EnumValue());
+            _WindowSettings.HyperlinkIntegrationDisplayMode(value);
+            _NotifyChanges(L"CurrentIntegrationDisplayMode", L"HyperlinkIntegrationDisplayMode");
+        }
+    }
+
+    Windows::Foundation::IInspectable LinkTooltipViewModel::CurrentActionPlacement() const
+    {
+        return _ActionPlacementMap.Lookup(_WindowSettings.HyperlinkActionPlacement());
+    }
+
+    void LinkTooltipViewModel::CurrentActionPlacement(const Windows::Foundation::IInspectable& enumEntry)
+    {
+        if (const auto entry = enumEntry.try_as<Editor::EnumEntry>())
+        {
+            const auto value = winrt::unbox_value<Model::HyperlinkActionPlacement>(entry.EnumValue());
+            _WindowSettings.HyperlinkActionPlacement(value);
+            _NotifyChanges(L"CurrentActionPlacement", L"HyperlinkActionPlacement");
+        }
+    }
+
+    Windows::Foundation::IInspectable LinkTooltipViewModel::CurrentPrimaryClickModifier() const
+    {
+        return _ClickModifierMap.Lookup(_WindowSettings.HyperlinkPrimaryClickModifier());
+    }
+
+    void LinkTooltipViewModel::CurrentPrimaryClickModifier(const Windows::Foundation::IInspectable& enumEntry)
+    {
+        if (const auto entry = enumEntry.try_as<Editor::EnumEntry>())
+        {
+            _WindowSettings.HyperlinkPrimaryClickModifier(winrt::unbox_value<Model::HyperlinkClickModifier>(entry.EnumValue()));
+            _NotifyChanges(L"CurrentPrimaryClickModifier");
+        }
+    }
+
+    Windows::Foundation::IInspectable LinkTooltipViewModel::CurrentPrimaryClickGesture() const
+    {
+        return _ClickGestureMap.Lookup(_WindowSettings.HyperlinkPrimaryClickGesture());
+    }
+
+    void LinkTooltipViewModel::CurrentPrimaryClickGesture(const Windows::Foundation::IInspectable& enumEntry)
+    {
+        if (const auto entry = enumEntry.try_as<Editor::EnumEntry>())
+        {
+            _WindowSettings.HyperlinkPrimaryClickGesture(winrt::unbox_value<Model::HyperlinkClickGesture>(entry.EnumValue()));
+            _NotifyChanges(L"CurrentPrimaryClickGesture");
+        }
+    }
+
+    Windows::Foundation::IInspectable LinkTooltipViewModel::CurrentAlternativeClickModifier() const
+    {
+        return _ClickModifierMap.Lookup(_WindowSettings.HyperlinkAlternativeClickModifier());
+    }
+
+    void LinkTooltipViewModel::CurrentAlternativeClickModifier(const Windows::Foundation::IInspectable& enumEntry)
+    {
+        if (const auto entry = enumEntry.try_as<Editor::EnumEntry>())
+        {
+            _WindowSettings.HyperlinkAlternativeClickModifier(winrt::unbox_value<Model::HyperlinkClickModifier>(entry.EnumValue()));
+            _NotifyChanges(L"CurrentAlternativeClickModifier");
+        }
+    }
+
+    Windows::Foundation::IInspectable LinkTooltipViewModel::CurrentAlternativeClickGesture() const
+    {
+        return _ClickGestureMap.Lookup(_WindowSettings.HyperlinkAlternativeClickGesture());
+    }
+
+    void LinkTooltipViewModel::CurrentAlternativeClickGesture(const Windows::Foundation::IInspectable& enumEntry)
+    {
+        if (const auto entry = enumEntry.try_as<Editor::EnumEntry>())
+        {
+            _WindowSettings.HyperlinkAlternativeClickGesture(winrt::unbox_value<Model::HyperlinkClickGesture>(entry.EnumValue()));
+            _NotifyChanges(L"CurrentAlternativeClickGesture");
+        }
+    }
+
+    Windows::Foundation::IInspectable LinkTooltipViewModel::CurrentPrimaryAction() const
+    {
+        return _actionChoiceFor(_ActionChoices, _WindowSettings.HyperlinkPrimaryAction());
+    }
+
+    void LinkTooltipViewModel::CurrentPrimaryAction(const Windows::Foundation::IInspectable& value)
+    {
+        if (const auto choice = value.try_as<Editor::IntegrationChoiceViewModel>())
+        {
+            _WindowSettings.HyperlinkPrimaryAction(choice.Id());
+            _NotifyChanges(L"CurrentPrimaryAction");
+        }
+    }
+
+    Windows::Foundation::IInspectable LinkTooltipViewModel::CurrentAlternativeAction() const
+    {
+        return _actionChoiceFor(_ActionChoices, _WindowSettings.HyperlinkAlternativeAction());
+    }
+
+    void LinkTooltipViewModel::CurrentAlternativeAction(const Windows::Foundation::IInspectable& value)
+    {
+        if (const auto choice = value.try_as<Editor::IntegrationChoiceViewModel>())
+        {
+            _WindowSettings.HyperlinkAlternativeAction(choice.Id());
+            _NotifyChanges(L"CurrentAlternativeAction");
+        }
     }
 
     winrt::hstring LinkTooltipViewModel::SafeUriSchemes() const
@@ -816,6 +1379,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     void LinkTooltipViewModel::CurrentRule(const Editor::HyperlinkTooltipRuleViewModel& vm)
     {
         _currentRuleChangedRevoker.revoke();
+        const auto wasEditing = static_cast<bool>(_CurrentRule);
         _CurrentRule = vm;
         if (_CurrentRule)
         {
@@ -826,25 +1390,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 }
             });
         }
-        _NotifyChanges(L"CurrentRule", L"IsEditingRule", L"IsNotEditingRule", L"CurrentRuleName");
-    }
-
-    void LinkTooltipViewModel::RequestReorderRule(const Editor::HyperlinkTooltipRuleViewModel& vm, bool goingUp)
-    {
-        uint32_t idx;
-        if (CurrentView().IndexOf(vm, idx))
+        else if (wasEditing)
         {
-            if (goingUp && idx > 0)
-            {
-                CurrentView().RemoveAt(idx);
-                CurrentView().InsertAt(idx - 1, vm);
-            }
-            else if (!goingUp && idx < CurrentView().Size() - 1)
-            {
-                CurrentView().RemoveAt(idx);
-                CurrentView().InsertAt(idx + 1, vm);
-            }
+            _updateRuleGroups();
         }
+        _NotifyChanges(L"CurrentRule", L"IsEditingRule", L"IsNotEditingRule", L"CurrentRuleName");
     }
 
     void LinkTooltipViewModel::RequestDeleteRule(const Editor::HyperlinkTooltipRuleViewModel& vm)
@@ -862,23 +1412,44 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     Editor::HyperlinkTooltipRuleViewModel LinkTooltipViewModel::RequestAddRule()
     {
+        _ensureRules(_WindowSettings);
         Model::HyperlinkTooltipRule rule{};
         rule.Enabled(true);
         rule.CustomActions(winrt::single_threaded_vector<Model::HyperlinkTooltipAction>());
         const auto vm = make<HyperlinkTooltipRuleViewModel>(rule, _WindowSettings, _KindList, _KindMap, _FileTypeGroupList, _FileTypeGroupMap, _IntegrationChoices);
         CurrentView().Append(vm);
+        // A blank rule classifies as Custom, which sorts last anyway, so this
+        // leaves it at the end -- where the user is about to start editing it.
+        _applyAutomaticOrder();
         return vm;
     }
 
     Editor::HyperlinkTooltipRuleViewModel LinkTooltipViewModel::RequestAddRuleWithPreset(const winrt::hstring& presetId)
     {
+        _ensureRules(_WindowSettings);
         if (const auto preset = FindLinkTooltipPreset(presetId))
         {
             const auto rule = CreateRuleFromPreset(*preset);
             const auto vm = make<HyperlinkTooltipRuleViewModel>(rule, _WindowSettings, _KindList, _KindMap, _FileTypeGroupList, _FileTypeGroupMap, _IntegrationChoices);
             CurrentView().Append(vm);
+            _applyAutomaticOrder();
             return vm;
         }
         return RequestAddRule();
+    }
+
+    // The manual-ordering switch. Turning it off re-sorts at once, so the list
+    // never sits in an order the setting says it does not have. This is written
+    // out rather than left to PERMANENT_OBSERVABLE_PROJECTED_SETTING because of
+    // that side effect.
+    void LinkTooltipViewModel::HyperlinkManualRuleOrder(bool value)
+    {
+        if (_WindowSettings.HyperlinkManualRuleOrder() == value)
+        {
+            return;
+        }
+        _WindowSettings.HyperlinkManualRuleOrder(value);
+        _applyAutomaticOrder();
+        _NotifyChanges(L"HasHyperlinkManualRuleOrder", L"HyperlinkManualRuleOrder", L"IsAutomaticRuleOrder");
     }
 }

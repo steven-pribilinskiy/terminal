@@ -17,7 +17,7 @@
     "matchers": [
         {
             "kind": "link",
-            "pattern": "^https://(?<workspace>[^/.]+)\\.slack\\.com/archives/(?<channel>[A-Z0-9]+)/p(?<ts_s>\\d{10})(?<ts_us>\\d{6})(?:\\?thread_ts=(?<thread>\\d+\\.\\d+))?"
+            "pattern": "^https://(?<workspace>[a-zA-Z0-9_.-]+)\\.slack\\.com/archives/(?<channel>[A-Z0-9]+)/p(?<ts_s>\\d{10})(?<ts_us>\\d{6})(?:\\?thread_ts=(?<thread>\\d+\\.\\d+))?"
         }
     ],
     "fetch": [

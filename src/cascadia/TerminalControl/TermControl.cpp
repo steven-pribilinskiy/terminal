@@ -983,15 +983,15 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             ScrollBar().Visibility(Visibility::Visible);
         }
 
-        // The hyperlink tooltip tells you which gesture opens the link, so it has
-        // to follow the setting that decides it. The XAML's x:Uid seeds the Run
-        // with the localized Ctrl+Click wording; keep a copy of that so turning the
-        // setting back off restores it in the user's language, and not in English.
+        // The hyperlink tooltip tells you which gesture opens the link, so it has to
+        // follow the chord that decides it. The XAML's x:Uid seeds the Run with the
+        // localized Ctrl+Click wording; keep a copy of that so a chord of Ctrl+click
+        // restores it in the user's language, and not in English.
         if (_followLinkHintCtrlClick.empty())
         {
             _followLinkHintCtrlClick = HowToOpenRun().Text();
         }
-        HowToOpenRun().Text(settings.OpenLinksOnSingleClick() ? RS_(L"HowToOpenRunSingleClick") : _followLinkHintCtrlClick);
+        HowToOpenRun().Text(_followLinkHintText(settings));
 
         // Zero or less means "don't wrap at all", which is only sensible on a very wide
         // window but is the honest reading of "no maximum".
@@ -3409,6 +3409,26 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // (like ShellExecute pumping our messaging thread...GH#7994)
         co_await winrt::resume_foreground(Dispatcher());
 
+        // Which action this chord runs for this link. The rule that matched the hovered
+        // run decides; _currentHyperlinkTooltipSettings was computed on hover. A link
+        // that never came from a hover -- mark mode's Ctrl+Enter -- has no rule context,
+        // so the globals are recomputed for it instead of reusing a stale hover.
+        auto effective = _currentHyperlinkTooltipSettings;
+        if (_hoveredUri.empty())
+        {
+            effective = _effectiveHyperlinkTooltipSettings(args.Uri(), false);
+        }
+        const auto actionId = args.IsAlternative() ? effective.alternativeAction : effective.primaryAction;
+
+        // "open" falls through to the resolve-and-raise below, which is the only path
+        // that can turn a text match into a real URI. Everything else is dispatched.
+        if (!actionId.empty() && actionId != L"open")
+        {
+            _invokeHyperlinkActionById(actionId);
+            _hideHyperlinkCard();
+            co_return;
+        }
+
         // A text match arrives here as the plain text it matched -- "CAB-8209", not a URI --
         // because that is what the buffer scanner found and what ControlCore reported. Only
         // an integration knows what it stands for, so give it the chance to say before the
@@ -3646,7 +3666,13 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             .hideDelay = std::max(0, settings.HyperlinkTooltipHideDelay()),
             .maxWidth = settings.HyperlinkTooltipMaxWidth(),
             .preferPane = settings.HyperlinkPreviewInPane(),
-            .showHint = settings.HyperlinkTooltipHint(),
+            // A "click to follow link" line would be a lie when clicking is off,
+            // so the master switch suppresses it regardless of the hint setting.
+            .showHint = settings.HyperlinkTooltipHint() && settings.HyperlinkClickable(),
+            .primaryAction = settings.HyperlinkPrimaryAction(),
+            .alternativeAction = settings.HyperlinkAlternativeAction(),
+            .integrationDisplayMode = settings.HyperlinkIntegrationDisplayMode(),
+            .actionPlacement = settings.HyperlinkActionPlacement(),
         };
 
         // The global choice, which a matching rule may replace wholesale below. An
@@ -3822,6 +3848,18 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 effective.preferPane = showInPane.Value();
             }
 
+            // An empty action id inherits the global chord action; "none" is a
+            // deliberate "this rule has no such click" and is kept as-is so the
+            // dispatcher can tell it apart from inheriting.
+            if (const auto primary = rule.PrimaryAction(); !primary.empty())
+            {
+                effective.primaryAction = primary;
+            }
+            if (const auto alternative = rule.AlternativeAction(); !alternative.empty())
+            {
+                effective.alternativeAction = alternative;
+            }
+
             if (actionsEnabled)
             {
                 if (const auto actions = rule.CustomActions())
@@ -3963,7 +4001,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             }
         }
 
-        HoveredUri().Text(uriText);
+        _formatHighlightedUri(uriText);
 
         // Say where a file:// link will really go when that is not what it says. A POSIX
         // path printed inside WSL opens as \\wsl.localhost\<distro>\..., and seeing that
@@ -3994,6 +4032,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // Show in pane needs somewhere to send the request and something worth
         // sending: a link nobody can preview would open an empty pane.
         HyperlinkShowInPaneButton().Visibility(_currentHyperlinkTooltipSettings.showInPane ? Visibility::Visible : Visibility::Collapsed);
+
+        _applyActionPlacement();
 
         // The hint is about following the link, so it only makes sense when there is
         // a link to follow -- and only when the user has asked to keep it.
@@ -4223,13 +4263,46 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
 
         HyperlinkCardPreviewName().Text(preview.IntegrationName());
-        if (const auto icon = preview.IntegrationIcon(); !icon.empty())
+        auto iconStr = preview.IntegrationIcon();
+        if (iconStr.empty())
         {
-            HyperlinkCardPreviewIcon().Content(winrt::Microsoft::Terminal::UI::IconPathConverter::IconWUX(icon));
+            const auto name = preview.IntegrationName();
+            const auto id = _currentHyperlinkTooltipSettings.integration;
+            auto containsSub = [](std::wstring_view haystack, std::wstring_view needle) {
+                if (needle.empty()) return true;
+                auto it = std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end(), [](wchar_t ch1, wchar_t ch2) {
+                    return ::towlower(ch1) == ::towlower(ch2);
+                });
+                return it != haystack.end();
+            };
+
+            if (containsSub(name, L"github") || containsSub(id, L"github"))
+            {
+                iconStr = L"\uE82D";
+            }
+            else if (containsSub(name, L"jira") || containsSub(id, L"jira"))
+            {
+                iconStr = L"\uE943";
+            }
+            else if (containsSub(name, L"slack") || containsSub(id, L"slack"))
+            {
+                iconStr = L"\uE8BD";
+            }
+            else if (containsSub(name, L"stith") || containsSub(id, L"stith"))
+            {
+                iconStr = L"\uE774";
+            }
+        }
+
+        if (!iconStr.empty())
+        {
+            HyperlinkCardPreviewIcon().Content(winrt::Microsoft::Terminal::UI::IconPathConverter::IconWUX(iconStr));
+            HyperlinkCardLeftIcon().Content(winrt::Microsoft::Terminal::UI::IconPathConverter::IconWUX(iconStr));
         }
         else
         {
             HyperlinkCardPreviewIcon().Content(nullptr);
+            HyperlinkCardLeftIcon().Content(nullptr);
         }
 
         // An integration that could not answer says why, in place of the fields it would
@@ -4246,6 +4319,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
         CATCH_LOG();
         HyperlinkCardPreview().Visibility(Visibility::Visible);
+        _applyIntegrationDisplayMode();
 
         // An integration can send a rendered HTML representation of its own instead of the
         // generic field list. Hosting one needs Feature_HyperlinkPreviewHtml *and* a
@@ -4641,45 +4715,145 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
     }
 
+    // The "<chord> to follow link" line under the card. The two chords that have
+    // always had their own fully localized string keep using it -- a plain click and
+    // Ctrl+click are far and away the common cases, and every locale already carries
+    // both. Anything else composes the modifier and gesture names into a format
+    // string, which only en-US has; other locales fall back to it rather than losing
+    // the two wordings they do have.
+    winrt::hstring TermControl::_followLinkHintText(const IControlSettings& settings) const
+    {
+        const auto modifier = settings.HyperlinkPrimaryClickModifier();
+        const auto gesture = settings.HyperlinkPrimaryClickGesture();
+
+        if (gesture == HyperlinkClickGesture::LeftClick)
+        {
+            if (modifier == HyperlinkClickModifier::None)
+            {
+                return RS_(L"HowToOpenRunSingleClick");
+            }
+            if (modifier == HyperlinkClickModifier::Ctrl)
+            {
+                return _followLinkHintCtrlClick;
+            }
+        }
+
+        const auto modifierName = [&]() -> std::wstring_view {
+            switch (modifier)
+            {
+            case HyperlinkClickModifier::Ctrl:
+                return L"Ctrl+";
+            case HyperlinkClickModifier::Alt:
+                return L"Alt+";
+            case HyperlinkClickModifier::Shift:
+                return L"Shift+";
+            case HyperlinkClickModifier::Win:
+                return L"Win+";
+            case HyperlinkClickModifier::CtrlAlt:
+                return L"Ctrl+Alt+";
+            case HyperlinkClickModifier::CtrlShift:
+                return L"Ctrl+Shift+";
+            case HyperlinkClickModifier::AltShift:
+                return L"Alt+Shift+";
+            case HyperlinkClickModifier::CtrlAltShift:
+                return L"Ctrl+Alt+Shift+";
+            default:
+                return L"";
+            }
+        }();
+
+        const auto gestureName = gesture == HyperlinkClickGesture::MiddleClick ? RS_(L"HowToOpenGestureMiddleClick") :
+                                 gesture == HyperlinkClickGesture::DoubleClick ? RS_(L"HowToOpenGestureDoubleClick") :
+                                                                                 RS_(L"HowToOpenGestureClick");
+
+        return winrt::hstring{ RS_fmt(L"HowToOpenRunFormat", modifierName, std::wstring_view{ gestureName }) };
+    }
+
+    // Runs one of the built-in action ids -- "open", "copyLink", "copyPath",
+    // "reveal", "showInPane" -- or hands anything else to TerminalPage as an entry
+    // under "actions". Both the card's buttons and the two click chords come
+    // through here, so binding a chord to a button's id does exactly what the
+    // button does. "" and "none" are no-ops: the former is an unresolved inherit,
+    // the latter a rule saying this link has no such click.
+    void TermControl::_invokeHyperlinkActionById(const winrt::hstring& actionId)
+    {
+        if (actionId.empty() || actionId == L"none")
+        {
+            return;
+        }
+
+        if (actionId == L"open")
+        {
+            // The link, not the hovered run: for a text match the two differ, and it is
+            // the link the user means. Down the same path a click takes, so the
+            // unsafe-URL prompt and the file:// resolution in TerminalPage still apply.
+            if (const auto target = _hoveredLinkTarget(); !target.empty())
+            {
+                OpenHyperlink.raise(*this, winrt::make<OpenHyperlinkEventArgs>(target));
+            }
+            return;
+        }
+        if (actionId == L"copyLink")
+        {
+            if (const auto target = _hoveredLinkTarget(); !target.empty())
+            {
+                _core.CopyTextToClipboard(target);
+            }
+            return;
+        }
+        if (actionId == L"copyPath")
+        {
+            if (const auto target = _resolvedHyperlinkTarget(); !target.empty())
+            {
+                _core.CopyTextToClipboard(winrt::hstring{ target });
+            }
+            return;
+        }
+        if (actionId == L"reveal")
+        {
+            if (const auto target = _resolvedHyperlinkTarget(); !target.empty())
+            {
+                // /select, so the file itself comes up selected rather than just its folder.
+                const auto args = fmt::format(LR"(/select,"{}")", target);
+                ShellExecuteW(nullptr, nullptr, L"explorer", args.c_str(), nullptr, SW_SHOW);
+            }
+            return;
+        }
+        if (actionId == L"showInPane")
+        {
+            _raiseShowHyperlinkPreviewRequested();
+            return;
+        }
+
+        // An entry under "actions"; the dispatch, including the %u URI
+        // substitution, happens up in TerminalPage.
+        if (!_hoveredUri.empty())
+        {
+            HyperlinkTooltipActionInvoked.raise(*this, winrt::make<HyperlinkTooltipActionInvokedEventArgs>(actionId, _hoveredUri));
+        }
+    }
+
     void TermControl::_HyperlinkOpenClick(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
     {
-        // The link, not the hovered run: for a text match the two differ, and it is the link
-        // the user means by pressing Open.
-        if (const auto target = _hoveredLinkTarget(); !target.empty())
-        {
-            // Down the same path a click takes, so the unsafe-URL prompt and the file://
-            // resolution in TerminalPage still apply. The card gets no rules of its own.
-            OpenHyperlink.raise(*this, winrt::make<OpenHyperlinkEventArgs>(target));
-        }
+        _invokeHyperlinkActionById(L"open");
         _hideHyperlinkCard();
     }
 
     void TermControl::_HyperlinkCopyLinkClick(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
     {
-        if (const auto target = _hoveredLinkTarget(); !target.empty())
-        {
-            _core.CopyTextToClipboard(target);
-        }
+        _invokeHyperlinkActionById(L"copyLink");
         _hideHyperlinkCard();
     }
 
     void TermControl::_HyperlinkCopyPathClick(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
     {
-        if (const auto target = _resolvedHyperlinkTarget(); !target.empty())
-        {
-            _core.CopyTextToClipboard(winrt::hstring{ target });
-        }
+        _invokeHyperlinkActionById(L"copyPath");
         _hideHyperlinkCard();
     }
 
     void TermControl::_HyperlinkRevealClick(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
     {
-        if (const auto target = _resolvedHyperlinkTarget(); !target.empty())
-        {
-            // /select, so the file itself comes up selected rather than just its folder.
-            const auto args = fmt::format(LR"(/select,"{}")", target);
-            ShellExecuteW(nullptr, nullptr, L"explorer", args.c_str(), nullptr, SW_SHOW);
-        }
+        _invokeHyperlinkActionById(L"reveal");
         _hideHyperlinkCard();
     }
 
@@ -4696,6 +4870,170 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             }
         }
         _hideHyperlinkCard();
+    }
+
+    void TermControl::_HyperlinkCommitCopyShaClick(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
+    {
+        if (!_currentCommitFullSha.empty())
+        {
+            _core.CopyTextToClipboard(winrt::hstring{ _currentCommitFullSha });
+        }
+    }
+
+    void TermControl::_formatHighlightedUri(const winrt::hstring& uriText)
+    {
+        const auto inlines = HoveredUri().Inlines();
+        inlines.Clear();
+
+        if (uriText.empty())
+        {
+            return;
+        }
+
+        const std::wstring uriStr{ uriText };
+
+        auto appendRun = [&](std::wstring_view text, bool bold) {
+            if (text.empty())
+            {
+                return;
+            }
+            Windows::UI::Xaml::Documents::Run run;
+            run.Text(winrt::hstring{ text });
+            if (bold)
+            {
+                run.FontWeight(Windows::UI::Text::FontWeights::SemiBold());
+            }
+            inlines.Append(run);
+        };
+
+        // 1. GitHub PR/issue: https://github.com/{owner}/{repo}/(pull|issues)/{number}
+        static const std::wregex ghPrRe{ LR"(^(https?://github\.com/)([^/]+)/([^/]+)/((?:pull|issues)/)(\d+)(.*)$)", std::regex_constants::ECMAScript | std::regex_constants::icase };
+        // 2. GitHub commit: https://github.com/{owner}/{repo}/commit/{sha}
+        static const std::wregex ghCommitRe{ LR"(^(https?://github\.com/)([^/]+)/([^/]+)/(commit/)([0-9a-fA-F]+)(.*)$)", std::regex_constants::ECMAScript | std::regex_constants::icase };
+        // 3. GitHub repo: https://github.com/{owner}/{repo}
+        static const std::wregex ghRepoRe{ LR"(^(https?://github\.com/)([^/]+)/([^/?#]+)(.*)$)", std::regex_constants::ECMAScript | std::regex_constants::icase };
+        // 4. repo#number: {repo}#{number}
+        static const std::wregex repoNumRe{ LR"(^([A-Za-z0-9_.-]+)(#)(\d+)$)", std::regex_constants::ECMAScript };
+        // 5. Jira browse: .../browse/{KEY-123}
+        static const std::wregex jiraRe{ LR"(^(.*?/browse/)([A-Z][A-Z0-9]+-\d+)(.*)$)", std::regex_constants::ECMAScript };
+        // 6. Bare Jira key: {KEY-123}
+        static const std::wregex bareJiraRe{ LR"(^([A-Z][A-Z0-9]+-\d+)$)", std::regex_constants::ECMAScript };
+
+        std::wsmatch match;
+        if (std::regex_match(uriStr, match, ghPrRe))
+        {
+            appendRun(match[1].str(), false);
+            appendRun(match[2].str(), true);
+            appendRun(L"/", false);
+            appendRun(match[3].str(), true);
+            appendRun(L"/" + match[4].str(), false);
+            appendRun(match[5].str(), true);
+            appendRun(match[6].str(), false);
+            return;
+        }
+
+        if (std::regex_match(uriStr, match, ghCommitRe))
+        {
+            appendRun(match[1].str(), false);
+            appendRun(match[2].str(), true);
+            appendRun(L"/", false);
+            appendRun(match[3].str(), true);
+            appendRun(L"/" + match[4].str(), false);
+            appendRun(match[5].str(), true);
+            appendRun(match[6].str(), false);
+            return;
+        }
+
+        if (std::regex_match(uriStr, match, ghRepoRe))
+        {
+            appendRun(match[1].str(), false);
+            appendRun(match[2].str(), true);
+            appendRun(L"/", false);
+            appendRun(match[3].str(), true);
+            appendRun(match[4].str(), false);
+            return;
+        }
+
+        if (std::regex_match(uriStr, match, repoNumRe))
+        {
+            appendRun(match[1].str(), true);
+            appendRun(match[2].str(), false);
+            appendRun(match[3].str(), true);
+            return;
+        }
+
+        if (std::regex_match(uriStr, match, jiraRe))
+        {
+            appendRun(match[1].str(), false);
+            appendRun(match[2].str(), true);
+            appendRun(match[3].str(), false);
+            return;
+        }
+
+        if (std::regex_match(uriStr, match, bareJiraRe))
+        {
+            appendRun(match[1].str(), true);
+            return;
+        }
+
+        appendRun(uriStr, false);
+    }
+
+    void TermControl::_applyActionPlacement()
+    {
+        const auto headerHost = HyperlinkCardHeaderActionsHost();
+        const auto footerHost = HyperlinkCardFooterActionsHost();
+        const auto actions = HyperlinkCardActions();
+        if (!headerHost || !footerHost || !actions)
+        {
+            return;
+        }
+
+        const auto placement = _currentHyperlinkTooltipSettings.actionPlacement;
+        const auto targetHost = (placement == Control::HyperlinkActionPlacement::Header) ? headerHost : footerHost;
+        const auto otherHost = (placement == Control::HyperlinkActionPlacement::Header) ? footerHost : headerHost;
+
+        uint32_t index = 0;
+        if (otherHost.Children().IndexOf(actions, index))
+        {
+            otherHost.Children().RemoveAt(index);
+        }
+        if (!targetHost.Children().IndexOf(actions, index))
+        {
+            targetHost.Children().Append(actions);
+        }
+        headerHost.Visibility(placement == Control::HyperlinkActionPlacement::Header ? Visibility::Visible : Visibility::Collapsed);
+        footerHost.Visibility(placement == Control::HyperlinkActionPlacement::Footer ? Visibility::Visible : Visibility::Collapsed);
+    }
+
+    void TermControl::_applyIntegrationDisplayMode()
+    {
+        const auto mode = _currentHyperlinkTooltipSettings.integrationDisplayMode;
+        const auto leftIcon = HyperlinkCardLeftIcon();
+        const auto previewHeader = HyperlinkCardPreviewHeader();
+        if (!leftIcon || !previewHeader)
+        {
+            return;
+        }
+
+        const auto isPreviewVisible = HyperlinkCardPreview().Visibility() == Visibility::Visible;
+        const auto hasIcon = leftIcon.Content() != nullptr || HyperlinkCardPreviewIcon().Content() != nullptr;
+
+        if (!isPreviewVisible || !hasIcon || mode == Control::HyperlinkIntegrationDisplayMode::None)
+        {
+            leftIcon.Visibility(Visibility::Collapsed);
+            previewHeader.Visibility(Visibility::Collapsed);
+        }
+        else if (mode == Control::HyperlinkIntegrationDisplayMode::Above)
+        {
+            leftIcon.Visibility(Visibility::Collapsed);
+            previewHeader.Visibility(Visibility::Visible);
+        }
+        else if (mode == Control::HyperlinkIntegrationDisplayMode::Left)
+        {
+            leftIcon.Visibility(Visibility::Visible);
+            previewHeader.Visibility(Visibility::Collapsed);
+        }
     }
 
     // Ask the app to put this link's preview in a pane. The card is not the place
@@ -4715,7 +5053,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
     void TermControl::_HyperlinkShowInPaneClick(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
     {
-        _raiseShowHyperlinkPreviewRequested();
+        _invokeHyperlinkActionById(L"showInPane");
         _hideHyperlinkCard();
     }
 
@@ -4743,8 +5081,162 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         const auto fields = preview ? preview.Fields() : nullptr;
         if (!fields)
         {
+            HyperlinkCardCommitPanel().Visibility(Visibility::Collapsed);
+            HyperlinkCardFieldsScroll().Visibility(Visibility::Collapsed);
             return;
         }
+
+        bool isCommit = false;
+        std::wstring commitTitle;
+        std::wstring commitBody;
+        std::wstring commitSha;
+        std::wstring commitParent;
+        int32_t commitAdditions = 0;
+        int32_t commitDeletions = 0;
+        int32_t commitFilesCount = 0;
+
+        for (const auto& f : fields)
+        {
+            if (!f)
+            {
+                continue;
+            }
+            const auto label = f.Label();
+            const auto val = f.Value();
+            if (f.IsTitle() && (label == L"Message" || label.empty()))
+            {
+                const std::wstring text{ val };
+                const auto newline = text.find(L"\n");
+                if (newline != std::wstring::npos)
+                {
+                    commitTitle = text.substr(0, newline);
+                    auto body = text.substr(newline + 1);
+                    while (!body.empty() && (body.front() == L'\r' || body.front() == L'\n'))
+                    {
+                        body.erase(0, 1);
+                    }
+                    commitBody = body;
+                }
+                else
+                {
+                    commitTitle = text;
+                }
+            }
+            else if (label == L"Commit")
+            {
+                isCommit = true;
+                commitSha = val;
+            }
+            else if (label == L"Parent")
+            {
+                isCommit = true;
+                commitParent = val;
+            }
+            else if (label == L"Added")
+            {
+                commitAdditions = _wtoi(val.c_str());
+            }
+            else if (label == L"Removed")
+            {
+                commitDeletions = _wtoi(val.c_str());
+            }
+            else if (label == L"Files changed")
+            {
+                commitFilesCount = _wtoi(val.c_str());
+            }
+        }
+
+        if (!isCommit && !_hoveredUri.empty())
+        {
+            static const std::wregex commitRe{ LR"(/commit/([0-9a-fA-F]{7,40}))", std::regex_constants::ECMAScript | std::regex_constants::icase };
+            std::wsmatch match;
+            std::wstring uriStr{ _hoveredUri };
+            if (std::regex_search(uriStr, match, commitRe))
+            {
+                isCommit = true;
+                if (commitSha.empty())
+                {
+                    commitSha = match[1].str();
+                }
+            }
+        }
+
+        if (isCommit)
+        {
+            HyperlinkCardCommitPanel().Visibility(Visibility::Visible);
+            HyperlinkCardFieldsScroll().Visibility(Visibility::Collapsed);
+
+            HyperlinkCommitTitle().Text(winrt::hstring{ commitTitle.empty() ? commitSha : commitTitle });
+            if (!commitBody.empty())
+            {
+                HyperlinkCommitBody().Text(winrt::hstring{ commitBody });
+                HyperlinkCommitBody().Visibility(Visibility::Visible);
+            }
+            else
+            {
+                HyperlinkCommitBody().Visibility(Visibility::Collapsed);
+            }
+
+            HyperlinkCommitBranch().Text(L"main");
+
+            if (!commitParent.empty())
+            {
+                const auto shortParent = commitParent.size() >= 7 ? commitParent.substr(0, 7) : commitParent;
+                HyperlinkCommitParents().Text(winrt::hstring{ shortParent + L" parent" });
+            }
+            else
+            {
+                HyperlinkCommitParents().Text(L"1 parent");
+            }
+
+            _currentCommitFullSha = commitSha;
+            const auto shortSha = commitSha.size() >= 7 ? commitSha.substr(0, 7) : commitSha;
+            HyperlinkCommitSha().Text(winrt::hstring{ shortSha });
+
+            const auto fileCount = commitFilesCount > 0 ? commitFilesCount : 1;
+            HyperlinkCommitFilesChanged().Text(winrt::hstring{ fmt::format(L"{} changed file{}", fileCount, (fileCount == 1 ? L"" : L"s")) });
+            HyperlinkCommitStatsText().Text(winrt::hstring{ fmt::format(L"+{} -{}", commitAdditions, commitDeletions) });
+
+            const auto squares = HyperlinkCommitDiffSquares();
+            squares.Children().Clear();
+            const auto total = commitAdditions + commitDeletions;
+            int greenCount = 0;
+            int redCount = 0;
+            if (total > 0)
+            {
+                greenCount = std::clamp(static_cast<int>(std::round(5.0 * commitAdditions / total)), 0, 5);
+                redCount = std::clamp(static_cast<int>(std::round(5.0 * commitDeletions / total)), 0, 5 - greenCount);
+            }
+            const int grayCount = 5 - greenCount - redCount;
+
+            auto addSquare = [&](Windows::UI::Color color) {
+                Controls::Border square;
+                square.Width(8);
+                square.Height(8);
+                square.Margin(Thickness{ 1, 0, 1, 0 });
+                square.CornerRadius(Windows::UI::Xaml::CornerRadius{ 1, 1, 1, 1 });
+                square.Background(Media::SolidColorBrush{ color });
+                squares.Children().Append(square);
+            };
+
+            for (int i = 0; i < greenCount; ++i)
+            {
+                addSquare(Windows::UI::ColorHelper::FromArgb(255, 45, 164, 78));
+            }
+            for (int i = 0; i < redCount; ++i)
+            {
+                addSquare(Windows::UI::ColorHelper::FromArgb(255, 207, 34, 46));
+            }
+            for (int i = 0; i < grayCount; ++i)
+            {
+                addSquare(Windows::UI::ColorHelper::FromArgb(255, 208, 215, 222));
+            }
+
+            return;
+        }
+
+        HyperlinkCardCommitPanel().Visibility(Visibility::Collapsed);
+        HyperlinkCardFieldsScroll().Visibility(Visibility::Visible);
 
         auto row = 0;
         for (const auto& field : fields)
@@ -4933,6 +5425,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         const auto tabs = preview ? preview.Tabs() : nullptr;
         if (!tabs || tabs.Size() == 0)
         {
+            HyperlinkCardTabStripBorder().Visibility(Visibility::Collapsed);
             strip.Visibility(Visibility::Collapsed);
             _showHyperlinkTab(-1);
             return;
@@ -4942,9 +5435,11 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             Controls::Primitives::ToggleButton button;
             button.Content(winrt::box_value(label));
             button.Tag(winrt::box_value(index));
-            button.Padding(Thickness{ 8, 2, 8, 2 });
+            button.Padding(Thickness{ 10, 3, 10, 3 });
             button.MinWidth(0);
             button.FontSize(12);
+            button.BorderThickness(Thickness{ 0, 0, 0, 0 });
+            button.CornerRadius(Windows::UI::Xaml::CornerRadius{ 4, 4, 4, 4 });
             button.IsChecked(index == _hyperlinkSelectedTab);
             button.Click({ this, &TermControl::_HyperlinkTabClick });
             strip.Children().Append(button);
@@ -4958,6 +5453,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
 
         strip.Visibility(Visibility::Visible);
+        HyperlinkCardTabStripBorder().Visibility(Visibility::Visible);
         _showHyperlinkTab(-1);
     }
 
@@ -4967,14 +5463,13 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         {
             if (const auto index = button.Tag().try_as<int32_t>())
             {
+                if (*index == _hyperlinkSelectedTab)
+                {
+                    button.IsChecked(true);
+                    return;
+                }
                 _showHyperlinkTab(*index);
             }
-        }
-
-        // The card just swapped one section for another of a different height.
-        if (HyperlinkCard().Visibility() == Visibility::Visible)
-        {
-            _showHyperlinkCard();
         }
     }
 
@@ -5017,6 +5512,21 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         HyperlinkCardBodyScroll().Visibility(showBody ? Visibility::Visible : Visibility::Collapsed);
         HyperlinkCardCommentsScroll().Visibility(showComments ? Visibility::Visible : Visibility::Collapsed);
 
+        Media::Brush activeBrush = nullptr;
+        if (Resources().HasKey(winrt::box_value(L"ApplicationPageBackgroundThemeBrush")))
+        {
+            activeBrush = Resources().Lookup(winrt::box_value(L"ApplicationPageBackgroundThemeBrush")).try_as<Media::Brush>();
+        }
+        if (!activeBrush && Application::Current().Resources().HasKey(winrt::box_value(L"ApplicationPageBackgroundThemeBrush")))
+        {
+            activeBrush = Application::Current().Resources().Lookup(winrt::box_value(L"ApplicationPageBackgroundThemeBrush")).try_as<Media::Brush>();
+        }
+        if (!activeBrush)
+        {
+            activeBrush = Media::SolidColorBrush{ Windows::UI::Colors::Gray() };
+        }
+        const Media::SolidColorBrush transparentBrush{ Windows::UI::ColorHelper::FromArgb(0, 0, 0, 0) };
+
         // Only one of the toggles can be down at a time; there is no ready-made radio
         // behaviour on ToggleButton, so it is enforced here.
         for (const auto& child : HyperlinkCardTabStrip().Children())
@@ -5024,7 +5534,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             if (const auto button = child.try_as<Controls::Primitives::ToggleButton>())
             {
                 const auto buttonIndex = button.Tag().try_as<int32_t>();
-                button.IsChecked(buttonIndex && *buttonIndex == index);
+                const auto isSelected = buttonIndex && *buttonIndex == index;
+                button.IsChecked(isSelected);
+                button.FontWeight(isSelected ? Windows::UI::Text::FontWeights::SemiBold() : Windows::UI::Text::FontWeights::Normal());
+                button.Background(isSelected ? activeBrush : transparentBrush);
             }
         }
     }

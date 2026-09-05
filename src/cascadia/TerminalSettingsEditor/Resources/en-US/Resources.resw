@@ -293,16 +293,60 @@
     <comment>Header for a control to toggle whether selected text should be copied to the clipboard automatically, or not.</comment>
   </data>
   <data name="Globals_DetectURLs.Header" xml:space="preserve">
-    <value>Automatically detect URLs and make them clickable</value>
-    <comment>Header for a control to toggle whether the terminal should automatically detect URLs and make them clickable, or not.</comment>
+    <value>Automatically detect URLs</value>
+    <comment>Header for a control to toggle whether the terminal should find URLs in the output by itself, or not.</comment>
   </data>
-  <data name="Globals_OpenLinksOnSingleClick.Header" xml:space="preserve">
-    <value>Open links with a single click, without holding Ctrl</value>
-    <comment>Header for a control to toggle whether clicking a link opens it without the Ctrl key being held, or not. {Locked="Ctrl"}</comment>
+  <data name="Globals_DetectURLs.Description" xml:space="preserve">
+    <value>Finds bare URLs in the output. Your rules below match either way, so turning this off stops the guessing without disabling them.</value>
+    <comment>Additional text presented near "Globals_DetectURLs.Header".</comment>
   </data>
-  <data name="Globals_OpenLinksOnSingleClick.Description" xml:space="preserve">
-    <value>The link opens when the mouse button is released, and only if the click did not become a selection, so dragging across a URL still selects it. Ctrl+click opens links either way.</value>
-    <comment>{Locked="Ctrl"} Additional text presented near "Globals_OpenLinksOnSingleClick.Header".</comment>
+  <data name="Globals_HyperlinkClickable.Header" xml:space="preserve">
+    <value>Make links clickable</value>
+    <comment>Header for a control to toggle whether clicking a link activates it, or not.</comment>
+  </data>
+  <data name="Globals_HyperlinkClickable.Description" xml:space="preserve">
+    <value>When off, hovering a link still highlights it and still shows its tooltip — you pick what to do from the tooltip instead of clicking.</value>
+    <comment>Additional text presented near "Globals_HyperlinkClickable.Header".</comment>
+  </data>
+  <data name="Globals_HyperlinkClickableKinds.Header" xml:space="preserve">
+    <value>Which links respond to a click</value>
+    <comment>Header for a group of checkboxes choosing which kinds of link a click activates.</comment>
+  </data>
+  <data name="Globals_HyperlinkPrimaryClick.Header" xml:space="preserve">
+    <value>Primary action</value>
+    <comment>Header for the controls choosing the modifier key, mouse gesture and action for the main way of activating a link.</comment>
+  </data>
+  <data name="Globals_HyperlinkPrimaryClick.Description" xml:space="preserve">
+    <value>A left-click chord opens the link on release, and only if the click did not become a selection, so dragging across a URL still selects it.</value>
+    <comment>Additional text presented near "Globals_HyperlinkPrimaryClick.Header".</comment>
+  </data>
+  <data name="Globals_HyperlinkAlternativeClick.Header" xml:space="preserve">
+    <value>Alternative action</value>
+    <comment>Header for the controls choosing the modifier key, mouse gesture and action for a second way of activating a link.</comment>
+  </data>
+  <data name="Globals_HyperlinkAlternativeClick.Description" xml:space="preserve">
+    <value>A second chord, for doing something else with the same link. Alt and Shift also start block and extended selections; on a link the chord wins, everywhere else selection behaves as it always did.</value>
+    <comment>{Locked="Alt"}{Locked="Shift"} Additional text presented near "Globals_HyperlinkAlternativeClick.Header".</comment>
+  </data>
+  <data name="Globals_HyperlinkClickModifierBox.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Modifier key</value>
+    <comment>Name for a control to choose which modifier key must be held for a click to activate a link.</comment>
+  </data>
+  <data name="Globals_HyperlinkClickGestureBox.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Mouse gesture</value>
+    <comment>Name for a control to choose which mouse gesture activates a link.</comment>
+  </data>
+  <data name="Globals_HyperlinkClickActionBox.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Action</value>
+    <comment>Name for a control to choose what happens when a link is activated.</comment>
+  </data>
+  <data name="Globals_HyperlinkManualRuleOrder.Header" xml:space="preserve">
+    <value>Arrange rules by hand</value>
+    <comment>Header for a control to toggle whether the user orders the link tooltip rules themselves by dragging, or not.</comment>
+  </data>
+  <data name="Globals_HyperlinkManualRuleOrder.Description" xml:space="preserve">
+    <value>Off, rules are grouped by platform and sorted by name. On, they become one list you drag into the order you want.</value>
+    <comment>Additional text presented near "Globals_HyperlinkManualRuleOrder.Header".</comment>
   </data>
   <data name="Globals_HyperlinkTooltipMaxWidth.Header" xml:space="preserve">
     <value>Maximum width of the link tooltip</value>
@@ -3208,21 +3252,105 @@
     <value>Show in pane</value>
     <comment>Label for the link tooltip button that opens the link's details in a pane.</comment>
   </data>
-  <data name="LinkTooltip_MoveRuleUpButton.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
-    <value>Move rule up</value>
-    <comment>The name of a button that moves a link tooltip rule earlier in the list.</comment>
-  </data>
-  <data name="LinkTooltip_MoveRuleDownButton.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
-    <value>Move rule down</value>
-    <comment>The name of a button that moves a link tooltip rule later in the list.</comment>
-  </data>
   <data name="LinkTooltip_DeleteRuleButton.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
     <value>Delete rule</value>
     <comment>The name of a button that removes a link tooltip rule.</comment>
   </data>
-  <data name="LinkTooltip_CloseRuleEditorButton.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
-    <value>Close rule</value>
-    <comment>The name of a button that returns from one rule's settings to the list of rules.</comment>
+  <data name="LinkTooltip_RuleNavigator.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Edit rule</value>
+    <comment>The name of the clickable row that opens one link tooltip rule's settings.</comment>
+  </data>
+  <data name="LinkTooltip_RuleOrderHint.Text" xml:space="preserve">
+    <value>Rules higher in the list win: the first enabled rule that matches a link decides its tooltip and its click actions.</value>
+    <comment>Explains that the order of the list below it is the order rules are matched in.</comment>
+  </data>
+  <data name="LinkTooltip_ClickableKindDetected" xml:space="preserve">
+    <value>Automatically detected URLs</value>
+    <comment>Label for the checkbox choosing whether a click activates URLs the terminal found by itself. Fetched in code.</comment>
+  </data>
+  <data name="LinkTooltip_ClickableKindRules" xml:space="preserve">
+    <value>Matches from your rules</value>
+    <comment>Label for the checkbox choosing whether a click activates text matched by one of the user's own rules. Fetched in code.</comment>
+  </data>
+  <data name="LinkTooltip_ClickableKindOsc8" xml:space="preserve">
+    <value>Links the program marked as links</value>
+    <comment>Label for the checkbox choosing whether a click activates hyperlinks a program emitted deliberately. Fetched in code.</comment>
+  </data>
+  <data name="LinkTooltip_ActionInherit" xml:space="preserve">
+    <value>Inherit</value>
+    <comment>The choice that leaves a rule's click action set to whatever the global setting is. Fetched in code.</comment>
+  </data>
+  <data name="LinkTooltip_ActionNone" xml:space="preserve">
+    <value>Do nothing</value>
+    <comment>The choice that makes a click do nothing at all. Fetched in code.</comment>
+  </data>
+  <data name="LinkTooltip_ClickActionsHeader.Text" xml:space="preserve">
+    <value>Click actions</value>
+    <comment>Header for the section choosing what clicking a link this rule matches does.</comment>
+  </data>
+  <data name="LinkTooltip_RulePrimaryAction.Header" xml:space="preserve">
+    <value>Primary action</value>
+    <comment>Header for a control choosing what this rule's primary click does.</comment>
+  </data>
+  <data name="LinkTooltip_RulePrimaryAction.Description" xml:space="preserve">
+    <value>What the primary chord does for links this rule matches. The chord itself stays global.</value>
+    <comment>Additional text presented near "LinkTooltip_RulePrimaryAction.Header".</comment>
+  </data>
+  <data name="LinkTooltip_RuleAlternativeAction.Header" xml:space="preserve">
+    <value>Alternative action</value>
+    <comment>Header for a control choosing what this rule's alternative click does.</comment>
+  </data>
+  <data name="LinkTooltip_RuleAlternativeAction.Description" xml:space="preserve">
+    <value>What the alternative chord does for links this rule matches. The chord itself stays global.</value>
+    <comment>Additional text presented near "LinkTooltip_RuleAlternativeAction.Header".</comment>
+  </data>
+  <data name="LinkTooltip_ClickModifierNone.Content" xml:space="preserve">
+    <value>No modifier</value>
+    <comment>The choice for a click chord that needs no modifier key held.</comment>
+  </data>
+  <data name="LinkTooltip_ClickModifierCtrl.Content" xml:space="preserve">
+    <value>Ctrl</value>
+    <comment>{Locked="Ctrl"} The choice for a click chord that needs the Ctrl key held.</comment>
+  </data>
+  <data name="LinkTooltip_ClickModifierAlt.Content" xml:space="preserve">
+    <value>Alt</value>
+    <comment>{Locked="Alt"} The choice for a click chord that needs the Alt key held.</comment>
+  </data>
+  <data name="LinkTooltip_ClickModifierShift.Content" xml:space="preserve">
+    <value>Shift</value>
+    <comment>{Locked="Shift"} The choice for a click chord that needs the Shift key held.</comment>
+  </data>
+  <data name="LinkTooltip_ClickModifierWin.Content" xml:space="preserve">
+    <value>Win</value>
+    <comment>{Locked="Win"} The choice for a click chord that needs the Windows key held.</comment>
+  </data>
+  <data name="LinkTooltip_ClickModifierCtrlAlt.Content" xml:space="preserve">
+    <value>Ctrl+Alt</value>
+    <comment>{Locked="Ctrl+Alt"} The choice for a click chord that needs both Ctrl and Alt held.</comment>
+  </data>
+  <data name="LinkTooltip_ClickModifierCtrlShift.Content" xml:space="preserve">
+    <value>Ctrl+Shift</value>
+    <comment>{Locked="Ctrl+Shift"} The choice for a click chord that needs both Ctrl and Shift held.</comment>
+  </data>
+  <data name="LinkTooltip_ClickModifierAltShift.Content" xml:space="preserve">
+    <value>Alt+Shift</value>
+    <comment>{Locked="Alt+Shift"} The choice for a click chord that needs both Alt and Shift held.</comment>
+  </data>
+  <data name="LinkTooltip_ClickModifierCtrlAltShift.Content" xml:space="preserve">
+    <value>Ctrl+Alt+Shift</value>
+    <comment>{Locked="Ctrl+Alt+Shift"} The choice for a click chord that needs Ctrl, Alt and Shift held.</comment>
+  </data>
+  <data name="LinkTooltip_ClickGestureLeft.Content" xml:space="preserve">
+    <value>Left click</value>
+    <comment>The choice for a click chord performed with the left mouse button.</comment>
+  </data>
+  <data name="LinkTooltip_ClickGestureMiddle.Content" xml:space="preserve">
+    <value>Middle click</value>
+    <comment>The choice for a click chord performed with the middle mouse button.</comment>
+  </data>
+  <data name="LinkTooltip_ClickGestureDouble.Content" xml:space="preserve">
+    <value>Double click</value>
+    <comment>The choice for a click chord performed by clicking twice quickly.</comment>
   </data>
   <data name="LinkTooltip_DeleteCustomActionButton.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
     <value>Delete action</value>
@@ -3327,6 +3455,33 @@
   <data name="LinkTooltip_IntegrationNone" xml:space="preserve">
     <value>None</value>
     <comment>An option to choose from for a rule's "integration" setting. No integration previews the match.</comment>
+  </data>
+  <data name="LinkTooltip_IntegrationDisplayModeNone.Content" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="LinkTooltip_IntegrationDisplayModeAbove.Content" xml:space="preserve">
+    <value>Above link (header)</value>
+  </data>
+  <data name="LinkTooltip_IntegrationDisplayModeLeft.Content" xml:space="preserve">
+    <value>Left of link (compact)</value>
+  </data>
+  <data name="LinkTooltip_ActionPlacementFooter.Content" xml:space="preserve">
+    <value>Footer (bottom)</value>
+  </data>
+  <data name="LinkTooltip_ActionPlacementHeader.Content" xml:space="preserve">
+    <value>Header (top)</value>
+  </data>
+  <data name="Globals_HyperlinkIntegrationDisplayMode.Header" xml:space="preserve">
+    <value>Integration logo display</value>
+  </data>
+  <data name="Globals_HyperlinkIntegrationDisplayMode.Description" xml:space="preserve">
+    <value>Choose where the integration's logo is shown in the tooltip</value>
+  </data>
+  <data name="Globals_HyperlinkActionPlacement.Header" xml:space="preserve">
+    <value>Action button placement</value>
+  </data>
+  <data name="Globals_HyperlinkActionPlacement.Description" xml:space="preserve">
+    <value>Choose whether action buttons appear at the top or bottom of the tooltip</value>
   </data>
   <data name="Nav_Integrations.Content" xml:space="preserve">
     <value>Integrations</value>

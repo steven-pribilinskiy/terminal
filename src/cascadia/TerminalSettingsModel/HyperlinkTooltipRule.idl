@@ -43,12 +43,49 @@ namespace Microsoft.Terminal.Settings.Model
         Text
     };
 
-    // When a pane shows its own title bar.
     enum PaneTitlebarVisibility
     {
         Never = 0,
         MultiplePanes,
         Always
+    };
+
+    enum HyperlinkIntegrationDisplayMode
+    {
+        None = 0,
+        Above,
+        Left
+    };
+
+    enum HyperlinkActionPlacement
+    {
+        Footer = 0,
+        Header
+    };
+
+    // Which modifier keys must be held for a click to activate a link. None
+    // means the gesture alone activates it. Left/right variants are not
+    // distinguished -- ControlKeyStates folds both onto the left flag.
+    enum HyperlinkClickModifier
+    {
+        None = 0,
+        Ctrl,
+        Alt,
+        Shift,
+        Win,
+        CtrlAlt,
+        CtrlShift,
+        AltShift,
+        CtrlAltShift
+    };
+
+    // Which mouse gesture activates a link. Right click is deliberately absent:
+    // it belongs to the context menu and to paste.
+    enum HyperlinkClickGesture
+    {
+        LeftClick = 0,
+        MiddleClick,
+        DoubleClick
     };
 
     // A rule that customizes the hyperlink tooltip card's behavior for links
@@ -90,6 +127,15 @@ namespace Microsoft.Terminal.Settings.Model
         IVector<String> Buttons;
         // Unset inherits hyperlink.previewInPane.
         Windows.Foundation.IReference<Boolean> ShowInPane;
+
+        // --- what clicking a match does ---
+        // An action id: one of "open", "copyLink", "copyPath", "reveal",
+        // "showInPane", or an entry under "actions" (including this rule's own
+        // CustomActions). "" inherits hyperlink.primaryAction /
+        // hyperlink.alternativeAction; "none" means this rule has no such click.
+        // The chords themselves stay global -- only the action is per-rule.
+        String PrimaryAction;
+        String AlternativeAction;
 
         IVector<HyperlinkTooltipAction> CustomActions;
     }

@@ -34,6 +34,64 @@
                           IsChecked="{x:Bind Selected, Mode=TwoWay}" />
             </DataTemplate>
 
+            <!--
+                One rule's row. Shared by the grouped view and, through the
+                draggable template below, by the flat one - so the two orderings
+                cannot drift apart. The chevron is not markup: SettingsCard draws
+                it itself once IsClickEnabled is set.
+            -->
+            <DataTemplate x:Key="RuleRowTemplate"
+                          x:DataType="local:HyperlinkTooltipRuleViewModel">
+                <local:SettingsCard x:Uid="LinkTooltip_RuleNavigator"
+                                    Margin="0,2,0,0"
+                                    AutomationProperties.Name="{x:Bind DisplayName, Mode=OneWay}"
+                                    Click="EditRule_Click"
+                                    Description="{x:Bind SummaryText, Mode=OneWay}"
+                                    Header="{x:Bind DisplayName, Mode=OneWay}"
+                                    IsClickEnabled="True"
+                                    Tag="{x:Bind}">
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                Spacing="4">
+                        <ToggleSwitch VerticalAlignment="Center"
+                                      IsOn="{x:Bind Enabled, Mode=TwoWay}"
+                                      OffContent=""
+                                      OnContent=""
+                                      Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                        <Button x:Uid="LinkTooltip_DeleteRuleButton"
+                                Click="DeleteRule_Click"
+                                Tag="{x:Bind}">
+                            <FontIcon FontSize="{StaticResource StandardIconSize}"
+                                      Glyph="&#xE74D;" />
+                        </Button>
+                    </StackPanel>
+                </local:SettingsCard>
+            </DataTemplate>
+
+            <!--
+                The same row with a grip in front of it. Only the flat list uses
+                this: in the grouped view the order on screen is derived, so
+                there is nothing to drag.
+            -->
+            <DataTemplate x:Key="DraggableRuleRowTemplate"
+                          x:DataType="local:HyperlinkTooltipRuleViewModel">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Grid.Column="0"
+                              Margin="4,0,8,0"
+                              VerticalAlignment="Center"
+                              FontSize="{StaticResource StandardIconSize}"
+                              Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                              Glyph="&#xE76F;" />
+                    <ContentPresenter Grid.Column="1"
+                                      Content="{x:Bind}"
+                                      ContentTemplate="{StaticResource RuleRowTemplate}" />
+                </Grid>
+            </DataTemplate>
+
             <Style x:Key="RulePatternHintStyle"
                    BasedOn="{StaticResource DisclaimerStyle}"
                    TargetType="TextBlock">
@@ -55,16 +113,149 @@
                 <TextBlock x:Uid="LinkTooltip_DefaultsHeader"
                            Style="{StaticResource TextBlockSubHeaderStyle}" />
 
+                <!-- Live Preview Mockup Card -->
+                <Border Margin="0,4,0,12"
+                        Padding="14"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        MaxWidth="600"
+                        HorizontalAlignment="Left">
+                    <StackPanel Spacing="10">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon FontSize="15" Glyph="&#xE8B9;" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                            <TextBlock Text="Preview Appearance" FontWeight="SemiBold" FontSize="13" />
+                        </StackPanel>
+
+                        <!-- Tooltip Card Mockup -->
+                        <Border Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="12">
+                            <StackPanel Spacing="8">
+                                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                    <FontIcon FontSize="16" Glyph="&#xE82D;" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                    <TextBlock Text="GitHub Pull Request" FontWeight="SemiBold" FontSize="13" />
+                                    <Border Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}"
+                                            CornerRadius="10"
+                                            Padding="6,1,6,1"
+                                            Margin="4,0,0,0">
+                                        <TextBlock Text="Open" FontSize="11" Foreground="{ThemeResource SystemFillColorSuccessBrush}" FontWeight="SemiBold" />
+                                    </Border>
+                                </StackPanel>
+
+                                <RichTextBlock IsTextSelectionEnabled="False">
+                                    <Paragraph FontFamily="Cascadia Code, Consolas" FontSize="12">
+                                        <Run Text="https://github.com/" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <Run Text="microsoft/terminal" FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                        <Run Text="/pull/" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <Run Text="18920" FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                    </Paragraph>
+                                </RichTextBlock>
+
+                                <TextBlock Text="Add hyperlink preview cards and customizable platform rules"
+                                           FontWeight="SemiBold"
+                                           FontSize="12"
+                                           TextWrapping="Wrap" />
+
+                                <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+                                    <Button Padding="8,3,8,3" FontSize="12" AllowFocusOnInteraction="False">
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <FontIcon FontSize="12" Glyph="&#xE8A7;" />
+                                            <TextBlock Text="Open" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Padding="8,3,8,3" FontSize="12" AllowFocusOnInteraction="False">
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <FontIcon FontSize="12" Glyph="&#xE8C8;" />
+                                            <TextBlock Text="Copy link" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
                 <local:SettingsCard x:Name="DetectURLs"
                                     x:Uid="Globals_DetectURLs">
                     <ToggleSwitch IsOn="{x:Bind ViewModel.DetectURLs, Mode=TwoWay}"
                                   Style="{StaticResource ToggleSwitchInExpanderStyle}" />
                 </local:SettingsCard>
 
-                <local:SettingsCard x:Name="OpenLinksOnSingleClick"
-                                    x:Uid="Globals_OpenLinksOnSingleClick">
-                    <ToggleSwitch IsOn="{x:Bind ViewModel.OpenLinksOnSingleClick, Mode=TwoWay}"
+                <!--
+                    Detection and clicking are separate: a link can be detected,
+                    hovered and previewed without a click ever activating it, which
+                    is the point of turning this off - you pick the action from the
+                    tooltip instead. The list under it says which kinds of link a
+                    click reaches, and greys out when clicking is off entirely.
+                -->
+                <local:SettingsCard x:Name="HyperlinkClickable"
+                                    x:Uid="Globals_HyperlinkClickable">
+                    <ToggleSwitch IsOn="{x:Bind ViewModel.HyperlinkClickable, Mode=TwoWay}"
                                   Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                </local:SettingsCard>
+
+                <local:SettingsCard x:Name="HyperlinkClickableKinds"
+                                    x:Uid="Globals_HyperlinkClickableKinds"
+                                    ContentAlignment="Vertical"
+                                    IsEnabled="{x:Bind ViewModel.HyperlinkClickable, Mode=OneWay}">
+                    <ItemsControl ItemTemplate="{StaticResource ButtonChoiceTemplate}"
+                                  ItemsSource="{x:Bind ViewModel.ClickableKindChoices, Mode=OneWay}" />
+                </local:SettingsCard>
+
+                <!--
+                    The two chords. Each is a modifier plus a mouse gesture plus the
+                    action it runs, and the same three ids the card's buttons use are
+                    what an action can be - so binding a chord to "Copy link" does
+                    exactly what the Copy link button does.
+                -->
+                <local:SettingsCard x:Name="HyperlinkPrimaryClick"
+                                    x:Uid="Globals_HyperlinkPrimaryClick"
+                                    IsEnabled="{x:Bind ViewModel.HyperlinkClickable, Mode=OneWay}">
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="8">
+                        <ComboBox x:Uid="Globals_HyperlinkClickModifierBox"
+                                  AutomationProperties.AccessibilityView="Content"
+                                  ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                                  ItemsSource="{x:Bind ViewModel.ClickModifierList, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.CurrentPrimaryClickModifier, Mode=TwoWay}" />
+                        <ComboBox x:Uid="Globals_HyperlinkClickGestureBox"
+                                  AutomationProperties.AccessibilityView="Content"
+                                  ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                                  ItemsSource="{x:Bind ViewModel.ClickGestureList, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.CurrentPrimaryClickGesture, Mode=TwoWay}" />
+                        <ComboBox x:Uid="Globals_HyperlinkClickActionBox"
+                                  AutomationProperties.AccessibilityView="Content"
+                                  ItemTemplate="{StaticResource IntegrationChoiceComboBoxTemplate}"
+                                  ItemsSource="{x:Bind ViewModel.ActionChoices, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.CurrentPrimaryAction, Mode=TwoWay}" />
+                    </StackPanel>
+                </local:SettingsCard>
+
+                <local:SettingsCard x:Name="HyperlinkAlternativeClick"
+                                    x:Uid="Globals_HyperlinkAlternativeClick"
+                                    IsEnabled="{x:Bind ViewModel.HyperlinkClickable, Mode=OneWay}">
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="8">
+                        <ComboBox x:Uid="Globals_HyperlinkClickModifierBox"
+                                  AutomationProperties.AccessibilityView="Content"
+                                  ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                                  ItemsSource="{x:Bind ViewModel.ClickModifierList, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.CurrentAlternativeClickModifier, Mode=TwoWay}" />
+                        <ComboBox x:Uid="Globals_HyperlinkClickGestureBox"
+                                  AutomationProperties.AccessibilityView="Content"
+                                  ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                                  ItemsSource="{x:Bind ViewModel.ClickGestureList, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.CurrentAlternativeClickGesture, Mode=TwoWay}" />
+                        <ComboBox x:Uid="Globals_HyperlinkClickActionBox"
+                                  AutomationProperties.AccessibilityView="Content"
+                                  ItemTemplate="{StaticResource IntegrationChoiceComboBoxTemplate}"
+                                  ItemsSource="{x:Bind ViewModel.ActionChoices, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.CurrentAlternativeAction, Mode=TwoWay}" />
+                    </StackPanel>
                 </local:SettingsCard>
 
                 <local:SettingsCard x:Name="HyperlinkTooltipMaxWidth"
@@ -98,6 +289,24 @@
                                     SmallChange="50"
                                     Style="{StaticResource NumberBoxSettingStyle}"
                                     Value="{x:Bind ViewModel.HyperlinkTooltipHideDelay, Mode=TwoWay}" />
+                </local:SettingsCard>
+
+                <local:SettingsCard x:Name="HyperlinkIntegrationDisplayMode"
+                                    x:Uid="Globals_HyperlinkIntegrationDisplayMode">
+                    <ComboBox AutomationProperties.AccessibilityView="Content"
+                              ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                              ItemsSource="{x:Bind ViewModel.IntegrationDisplayModeList, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.CurrentIntegrationDisplayMode, Mode=TwoWay}"
+                              Style="{StaticResource ComboBoxSettingStyle}" />
+                </local:SettingsCard>
+
+                <local:SettingsCard x:Name="HyperlinkActionPlacement"
+                                    x:Uid="Globals_HyperlinkActionPlacement">
+                    <ComboBox AutomationProperties.AccessibilityView="Content"
+                              ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                              ItemsSource="{x:Bind ViewModel.ActionPlacementList, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.CurrentActionPlacement, Mode=TwoWay}"
+                              Style="{StaticResource ComboBoxSettingStyle}" />
                 </local:SettingsCard>
 
                 <!--
@@ -144,7 +353,7 @@
                 </local:SettingsCard>
             </StackPanel>
 
-            <!--  Rules: read-only rows. Clicking one opens it as a nested view.  -->
+            <!--  Rules: grouped expandable sections by platform.  -->
             <StackPanel Spacing="2"
                         Style="{StaticResource SettingsStackStyle}">
                 <TextBlock x:Uid="LinkTooltip_RulesHeader"
@@ -164,45 +373,91 @@
                     </muxc:SplitButton.Flyout>
                 </muxc:SplitButton>
 
-                <ItemsControl ItemsSource="{x:Bind ViewModel.CurrentView, Mode=OneWay}">
+                <!--
+                    Order is precedence: the first enabled rule that matches a link
+                    wins outright. Off, the list is grouped and sorted so what you
+                    see is that order; on, you arrange it yourself by dragging.
+                -->
+                <local:SettingsCard x:Name="HyperlinkManualRuleOrder"
+                                    x:Uid="Globals_HyperlinkManualRuleOrder">
+                    <ToggleSwitch IsOn="{x:Bind ViewModel.HyperlinkManualRuleOrder, Mode=TwoWay}"
+                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                </local:SettingsCard>
+
+                <!--
+                    Manual order: one flat list, top to bottom = priority.
+                    AllowDrop/CanDragItems/CanReorderItems is the whole gesture -
+                    ListViewBase runs the drag and draws the insertion line itself,
+                    and mutates CurrentView in place. It must be bound to
+                    CurrentView and not to a group's Rules: that one is a snapshot
+                    nothing observes, so a drop into it would be a dead write.
+                -->
+                <StackPanel Visibility="{x:Bind ViewModel.HyperlinkManualRuleOrder, Mode=OneWay}">
+                    <TextBlock x:Uid="LinkTooltip_RuleOrderHint"
+                               Margin="0,4,0,0"
+                               Style="{StaticResource DisclaimerStyle}" />
+                    <ListView AllowDrop="True"
+                              CanDragItems="True"
+                              CanReorderItems="True"
+                              ItemTemplate="{StaticResource DraggableRuleRowTemplate}"
+                              ItemsSource="{x:Bind ViewModel.CurrentView, Mode=OneWay}"
+                              SelectionMode="None">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="0" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                    </ListView>
+                </StackPanel>
+
+                <ItemsControl ItemsSource="{x:Bind ViewModel.RuleGroups, Mode=OneWay}"
+                              Visibility="{x:Bind ViewModel.IsAutomaticRuleOrder, Mode=OneWay}">
                     <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="local:HyperlinkTooltipRuleViewModel">
-                            <local:SettingsCard x:Uid="LinkTooltip_RuleNavigator"
-                                                Margin="0,2,0,0"
-                                                AutomationProperties.Name="{x:Bind DisplayName, Mode=OneWay}"
-                                                Click="EditRule_Click"
-                                                Description="{x:Bind SummaryText, Mode=OneWay}"
-                                                Header="{x:Bind DisplayName, Mode=OneWay}"
-                                                IsClickEnabled="True"
-                                                Tag="{x:Bind}">
-                                <StackPanel Orientation="Horizontal"
-                                            VerticalAlignment="Center"
-                                            Spacing="4">
-                                    <ToggleSwitch VerticalAlignment="Center"
-                                                  IsOn="{x:Bind Enabled, Mode=TwoWay}"
-                                                  OffContent=""
-                                                  OnContent=""
-                                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-                                    <Button x:Uid="LinkTooltip_MoveRuleUpButton"
-                                            Click="MoveRuleUp_Click"
-                                            Tag="{x:Bind}">
-                                        <FontIcon FontSize="{StaticResource StandardIconSize}"
-                                                  Glyph="&#xF0AD;" />
-                                    </Button>
-                                    <Button x:Uid="LinkTooltip_MoveRuleDownButton"
-                                            Click="MoveRuleDown_Click"
-                                            Tag="{x:Bind}">
-                                        <FontIcon FontSize="{StaticResource StandardIconSize}"
-                                                  Glyph="&#xF0AE;" />
-                                    </Button>
-                                    <Button x:Uid="LinkTooltip_DeleteRuleButton"
-                                            Click="DeleteRule_Click"
-                                            Tag="{x:Bind}">
-                                        <FontIcon FontSize="{StaticResource StandardIconSize}"
-                                                  Glyph="&#xE74D;" />
-                                    </Button>
-                                </StackPanel>
-                            </local:SettingsCard>
+                        <DataTemplate x:DataType="local:RuleGroupViewModel">
+                            <muxc:Expander Margin="0,4,0,0"
+                                           HorizontalAlignment="Stretch"
+                                           HorizontalContentAlignment="Stretch"
+                                           IsExpanded="{x:Bind IsExpanded, Mode=TwoWay}">
+                                <muxc:Expander.Header>
+                                    <Grid Margin="0,4,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon Grid.Column="0"
+                                                  Margin="0,0,12,0"
+                                                  FontSize="{StaticResource StandardIconSize}"
+                                                  Glyph="{x:Bind PlatformIcon}" />
+                                        <TextBlock Grid.Column="1"
+                                                   VerticalAlignment="Center"
+                                                   FontWeight="SemiBold"
+                                                   Text="{x:Bind PlatformName}" />
+                                        <Border Grid.Column="2"
+                                                Margin="0,0,12,0"
+                                                Padding="8,2,8,2"
+                                                VerticalAlignment="Center"
+                                                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="10">
+                                            <TextBlock FontSize="12"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                       Text="{x:Bind CountBadge, Mode=OneWay}" />
+                                        </Border>
+                                        <ToggleSwitch Grid.Column="3"
+                                                      VerticalAlignment="Center"
+                                                      IsOn="{x:Bind IsEnabled, Mode=TwoWay}"
+                                                      OffContent=""
+                                                      OnContent=""
+                                                      Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                                    </Grid>
+                                </muxc:Expander.Header>
+                                <ItemsControl ItemTemplate="{StaticResource RuleRowTemplate}"
+                                              ItemsSource="{x:Bind Rules, Mode=OneWay}" />
+                            </muxc:Expander>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
@@ -218,22 +473,27 @@
                     Style="{StaticResource SettingsStackStyle}"
                     Visibility="{x:Bind ViewModel.IsEditingRule, Mode=OneWay}">
 
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock VerticalAlignment="Center"
-                           Style="{StaticResource TextBlockSubHeaderStyle}"
-                           Text="{x:Bind ViewModel.CurrentRuleName, Mode=OneWay}" />
-                <Button x:Uid="LinkTooltip_CloseRuleEditorButton"
-                        Grid.Column="1"
-                        VerticalAlignment="Center"
-                        Click="CloseRuleEditor_Click">
-                    <FontIcon FontSize="{StaticResource StandardIconSize}"
-                              Glyph="&#xE711;" />
-                </Button>
-            </Grid>
+            <TextBlock Style="{StaticResource TextBlockSubHeaderStyle}"
+                       Text="{x:Bind ViewModel.CurrentRuleName, Mode=OneWay}" />
+
+            <!--  Live Preview of Match  -->
+            <Border Margin="0,4,0,8"
+                    Padding="12"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <StackPanel Spacing="6">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon FontSize="14" Glyph="&#xE8B9;" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                        <TextBlock Text="Rule Preview" FontWeight="SemiBold" FontSize="13" />
+                    </StackPanel>
+                    <TextBlock Text="{x:Bind ViewModel.CurrentRule.SummaryText, Mode=OneWay}"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               FontSize="12"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
 
             <!--  Preset  -->
             <local:SettingsCard x:Uid="LinkTooltip_RulePreset">
@@ -397,6 +657,30 @@
                                   ItemTemplate="{StaticResource ButtonChoiceTemplate}"
                                   ItemsSource="{x:Bind ViewModel.CurrentRule.ButtonChoices, Mode=OneWay}" />
                 </StackPanel>
+            </local:SettingsCard>
+
+            <!--
+                What clicking a link this rule matches does. The chords themselves
+                stay global - only which action each one runs is per-rule, so
+                "Inherit" means "whatever the two chords above are set to".
+            -->
+            <TextBlock x:Uid="LinkTooltip_ClickActionsHeader"
+                       Style="{StaticResource TextBlockSubHeaderStyle}" />
+
+            <local:SettingsCard x:Uid="LinkTooltip_RulePrimaryAction">
+                <ComboBox AutomationProperties.AccessibilityView="Content"
+                          ItemTemplate="{StaticResource IntegrationChoiceComboBoxTemplate}"
+                          ItemsSource="{x:Bind ViewModel.CurrentRule.ActionChoices, Mode=OneWay}"
+                          SelectedItem="{x:Bind ViewModel.CurrentRule.CurrentPrimaryAction, Mode=TwoWay}"
+                          Style="{StaticResource ComboBoxSettingStyle}" />
+            </local:SettingsCard>
+
+            <local:SettingsCard x:Uid="LinkTooltip_RuleAlternativeAction">
+                <ComboBox AutomationProperties.AccessibilityView="Content"
+                          ItemTemplate="{StaticResource IntegrationChoiceComboBoxTemplate}"
+                          ItemsSource="{x:Bind ViewModel.CurrentRule.ActionChoices, Mode=OneWay}"
+                          SelectedItem="{x:Bind ViewModel.CurrentRule.CurrentAlternativeAction, Mode=TwoWay}"
+                          Style="{StaticResource ComboBoxSettingStyle}" />
             </local:SettingsCard>
 
             <TextBlock x:Uid="LinkTooltip_CustomActionsHeader"

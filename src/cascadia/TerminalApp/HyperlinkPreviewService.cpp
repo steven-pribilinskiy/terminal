@@ -20,6 +20,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cwchar>
+#include <map>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <utility>
@@ -450,6 +452,10 @@ namespace
             case JsonValueType::Array:
             {
                 const auto array = current.GetArray();
+                if (token == L"length")
+                {
+                    return JsonValue::CreateNumberValue(array.Size());
+                }
                 int64_t index = 0;
                 try
                 {
@@ -1675,6 +1681,14 @@ namespace
         preview.Actions(actions);
     }
 
+    struct RepoOwnerResolution
+    {
+        std::wstring Owner;
+        bool IsPull{ false };
+    };
+    static std::map<std::wstring, RepoOwnerResolution> s_resolvedRepoOwners;
+    static std::mutex s_resolvedRepoOwnersMutex;
+
     // Runs the whole pipeline for one integration and renders the result.
     // Blocking; always called from a background thread.
     Control::HyperlinkPreview RunFetch(const Snapshot::Plugin& plugin, const std::wstring& text, const TemplateValueMap& groups)
@@ -1690,16 +1704,143 @@ namespace
         auto fields = winrt::single_threaded_vector<Control::HyperlinkPreviewField>();
         preview.Fields(fields);
 
+        TemplateValueMap effectiveGroups = groups;
+        WWH::HttpClient plainClient{ nullptr };
+        WWH::HttpClient lenientClient{ nullptr };
+
+        if (plugin.Id == L"github" && effectiveGroups.find(L"owner") == effectiveGroups.end())
+        {
+            const auto repoIt = effectiveGroups.find(L"repo");
+            const auto numberIt = effectiveGroups.find(L"number");
+            if (repoIt != effectiveGroups.end() && numberIt != effectiveGroups.end())
+            {
+                const auto& repo = repoIt->second;
+                const auto& number = numberIt->second;
+
+                RepoOwnerResolution resolution;
+                bool resolved = false;
+                {
+                    std::lock_guard lock{ s_resolvedRepoOwnersMutex };
+                    const auto cached = s_resolvedRepoOwners.find(repo);
+                    if (cached != s_resolvedRepoOwners.end())
+                    {
+                        resolution = cached->second;
+                        resolved = true;
+                    }
+                }
+
+                if (!resolved)
+                {
+                    std::wstring token;
+                    const auto credIt = plugin.Credentials.find(L"token");
+                    if (credIt != plugin.Credentials.end() && !credIt->second.empty())
+                    {
+                        token = credIt->second;
+                    }
+                    else
+                    {
+                        const auto ghOutput = ::TerminalApp::RunProcessCapture(L"pwsh -NoProfile -NonInteractive -Command \"(gh auth token 2>$null | Out-String).Trim()\"", {}, 4000);
+                        token = til::u8u16(ghOutput);
+                        while (!token.empty() && (token.back() == L'\r' || token.back() == L'\n' || token.back() == L' '))
+                        {
+                            token.pop_back();
+                        }
+                    }
+
+                    std::wstring candidates;
+                    const auto settingIt = plugin.Settings.find(L"candidateOwners");
+                    if (settingIt != plugin.Settings.end())
+                    {
+                        candidates = settingIt->second;
+                    }
+
+                    std::vector<std::wstring> candidateList;
+                    std::wstring current;
+                    for (wchar_t ch : candidates)
+                    {
+                        if (ch == L',')
+                        {
+                            auto trimmed = std::wstring{ Trim(current) };
+                            if (!trimmed.empty())
+                            {
+                                candidateList.push_back(std::move(trimmed));
+                            }
+                            current.clear();
+                        }
+                        else
+                        {
+                            current.push_back(ch);
+                        }
+                    }
+                    auto lastTrimmed = std::wstring{ Trim(current) };
+                    if (!lastTrimmed.empty())
+                    {
+                        candidateList.push_back(std::move(lastTrimmed));
+                    }
+
+                    ExpandContext probeContext;
+                    for (const auto& candidate : candidateList)
+                    {
+                        HttpCall probeCall;
+                        probeCall.Url = fmt::format(L"https://api.github.com/repos/{}/{}/issues/{}", candidate, repo, number);
+                        probeCall.Method = L"GET";
+                        std::vector<std::pair<std::wstring, std::wstring>> headers = {
+                            { L"Accept", L"application/vnd.github+json" },
+                            { L"X-GitHub-Api-Version", L"2022-11-28" },
+                            { L"User-Agent", L"WindowsTerminal" }
+                        };
+                        probeCall.Headers = &headers;
+                        if (!token.empty())
+                        {
+                            probeCall.AuthType = L"bearer";
+                            probeCall.AuthPassword = token;
+                        }
+                        probeCall.TimeoutMs = 4000;
+
+                        const auto outcome = RunHttpCall(probeCall, probeContext, plugin.Name, plainClient, lenientClient);
+                        if (outcome.Error.empty() && !outcome.Body.empty())
+                        {
+                            JsonObject parsedObj{ nullptr };
+                            if (JsonObject::TryParse(winrt::hstring{ outcome.Body }, parsedObj))
+                            {
+                                resolution.Owner = candidate;
+                                resolution.IsPull = parsedObj.HasKey(L"pull_request");
+                                resolved = true;
+                                {
+                                    std::lock_guard lock{ s_resolvedRepoOwnersMutex };
+                                    s_resolvedRepoOwners[repo] = resolution;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (resolved)
+                {
+                    effectiveGroups[L"owner"] = resolution.Owner;
+                    if (resolution.IsPull)
+                    {
+                        effectiveGroups[L"ispull"] = L"pull";
+                        preview.ResolvedUri(winrt::hstring{ fmt::format(L"https://github.com/{}/{}/pull/{}", resolution.Owner, repo, number) });
+                    }
+                    else
+                    {
+                        effectiveGroups[L"isissue"] = L"issues";
+                        preview.ResolvedUri(winrt::hstring{ fmt::format(L"https://github.com/{}/{}/issues/{}", resolution.Owner, repo, number) });
+                    }
+                }
+            }
+        }
+
         PipelineOutcome pipeline;
 
         ExpandContext context;
-        context.Groups = &groups;
+        context.Groups = &effectiveGroups;
         context.Settings = &plugin.Settings;
         context.Credentials = &plugin.Credentials;
         context.Results = &pipeline.Results;
 
-        WWH::HttpClient plainClient{ nullptr };
-        WWH::HttpClient lenientClient{ nullptr };
         RunPipeline(plugin, context, pipeline, plainClient, lenientClient);
 
         const ResultReader reader{ &pipeline };
@@ -2544,6 +2685,22 @@ namespace winrt::TerminalApp::implementation
         const auto found = FindMatch(_currentSnapshot(), value, {}, true);
         if (!found || !found->Matcher || found->Matcher->LinkTemplate.empty())
         {
+            if (found && found->Owner && found->Owner->Id == L"github")
+            {
+                const auto repoIt = found->Groups.find(L"repo");
+                const auto numberIt = found->Groups.find(L"number");
+                if (repoIt != found->Groups.end() && numberIt != found->Groups.end())
+                {
+                    std::lock_guard lock{ s_resolvedRepoOwnersMutex };
+                    const auto it = s_resolvedRepoOwners.find(repoIt->second);
+                    if (it != s_resolvedRepoOwners.end())
+                    {
+                        const auto& res = it->second;
+                        return winrt::hstring{ fmt::format(L"https://github.com/{}/{}/{}/{}",
+                            res.Owner, repoIt->second, res.IsPull ? L"pull" : L"issues", numberIt->second) };
+                    }
+                }
+            }
             return {};
         }
 

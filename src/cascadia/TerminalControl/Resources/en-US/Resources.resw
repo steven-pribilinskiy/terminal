@@ -182,6 +182,22 @@
     <value>Click to follow link</value>
     <comment>Replaces HowToOpenRun.Text when links are set to open on a single click.</comment>
   </data>
+  <data name="HowToOpenRunFormat" xml:space="preserve">
+    <value>{0}{1} to follow link</value>
+    <comment>Replaces HowToOpenRun.Text when links open on a chord other than a plain click or Ctrl+click, which have their own strings. {0} is a modifier prefix such as "Alt+" and is not translated; {1} is one of HowToOpenGestureClick, HowToOpenGestureMiddleClick or HowToOpenGestureDoubleClick. {Locked="{0}","{1}"}</comment>
+  </data>
+  <data name="HowToOpenGestureClick" xml:space="preserve">
+    <value>Click</value>
+    <comment>The name of the left mouse click gesture, substituted into HowToOpenRunFormat.</comment>
+  </data>
+  <data name="HowToOpenGestureMiddleClick" xml:space="preserve">
+    <value>Middle click</value>
+    <comment>The name of the middle mouse button click gesture, substituted into HowToOpenRunFormat.</comment>
+  </data>
+  <data name="HowToOpenGestureDoubleClick" xml:space="preserve">
+    <value>Double click</value>
+    <comment>The name of the double click gesture, substituted into HowToOpenRunFormat.</comment>
+  </data>
   <data name="HyperlinkOpenButton.Content" xml:space="preserve">
     <value>Open</value>
     <comment>Label of a button on the link tooltip that opens the hovered link.</comment>

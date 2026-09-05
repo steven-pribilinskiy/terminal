@@ -91,10 +91,28 @@ namespace Microsoft.Terminal.Settings.Editor
         Boolean OverrideShowInPane;
         Boolean ShowInPane;
 
+        // What each click chord does for links this rule matches. The choice list
+        // carries an "inherit" entry ("") and a "none" entry alongside the action
+        // ids, so a rule can defer to the global setting or suppress the click.
+        Windows.Foundation.Collections.IVector<IntegrationChoiceViewModel> ActionChoices { get; };
+        IInspectable CurrentPrimaryAction;
+        IInspectable CurrentAlternativeAction;
+
         Windows.Foundation.Collections.IObservableVector<HyperlinkTooltipActionViewModel> CustomActions { get; };
         HyperlinkTooltipActionViewModel RequestAddCustomAction();
         void RequestDeleteCustomAction(HyperlinkTooltipActionViewModel vm);
         void ApplyPreset(String presetId);
+    }
+
+    [default_interface] runtimeclass RuleGroupViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
+    {
+        String PlatformId { get; };
+        String PlatformName { get; };
+        String PlatformIcon { get; };
+        String CountBadge { get; };
+        Boolean IsEnabled;
+        Boolean IsExpanded;
+        Windows.Foundation.Collections.IObservableVector<HyperlinkTooltipRuleViewModel> Rules { get; };
     }
 
     runtimeclass LinkTooltipViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
@@ -102,13 +120,45 @@ namespace Microsoft.Terminal.Settings.Editor
         LinkTooltipViewModel(Microsoft.Terminal.Settings.Model.GlobalAppSettings globalSettings, Microsoft.Terminal.Settings.Model.WindowSettings windowSettings);
 
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, DetectURLs);
-        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, OpenLinksOnSingleClick);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, HyperlinkClickable);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, HyperlinkManualRuleOrder);
+        // The grouped view's Visibility, since XAML cannot negate a binding.
+        Boolean IsAutomaticRuleOrder { get; };
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, HyperlinkTooltipMaxWidth);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, HyperlinkTooltipShowDelay);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, HyperlinkTooltipHideDelay);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, HyperlinkTooltipActions);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, HyperlinkTooltipHint);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, HyperlinkPreviewInPane);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Microsoft.Terminal.Settings.Model.HyperlinkIntegrationDisplayMode, HyperlinkIntegrationDisplayMode);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Microsoft.Terminal.Settings.Model.HyperlinkActionPlacement, HyperlinkActionPlacement);
+
+        IInspectable CurrentIntegrationDisplayMode;
+        Windows.Foundation.Collections.IObservableVector<EnumEntry> IntegrationDisplayModeList { get; };
+
+        IInspectable CurrentActionPlacement;
+        Windows.Foundation.Collections.IObservableVector<EnumEntry> ActionPlacementList { get; };
+
+        // Which kinds of link a click activates: detected URLs, rule matches,
+        // and links the program marked itself.
+        Windows.Foundation.Collections.IObservableVector<ButtonChoiceViewModel> ClickableKindChoices { get; };
+
+        // The two click chords. Both modifier pickers share one list of entries,
+        // and both gesture pickers share the other -- an EnumEntry is immutable,
+        // so a ComboBox's own SelectedItem is the only per-picker state.
+        Windows.Foundation.Collections.IObservableVector<EnumEntry> ClickModifierList { get; };
+        Windows.Foundation.Collections.IObservableVector<EnumEntry> ClickGestureList { get; };
+        IInspectable CurrentPrimaryClickModifier;
+        IInspectable CurrentPrimaryClickGesture;
+        IInspectable CurrentAlternativeClickModifier;
+        IInspectable CurrentAlternativeClickGesture;
+
+        // What each chord runs. The ids are the card's own button ids plus
+        // "none", so a chord and a button can be bound to the same thing.
+        Windows.Foundation.Collections.IObservableVector<IntegrationChoiceViewModel> ActionChoices { get; };
+        IInspectable CurrentPrimaryAction;
+        IInspectable CurrentAlternativeAction;
+
         String SafeUriSchemes;
 
         // The global button list every rule inherits unless it overrides it.
@@ -119,13 +169,13 @@ namespace Microsoft.Terminal.Settings.Editor
         Windows.Foundation.Collections.IObservableVector<IntegrationChoiceViewModel> IntegrationChoices { get; };
 
         Windows.Foundation.Collections.IObservableVector<HyperlinkTooltipRuleViewModel> CurrentView { get; };
+        Windows.Foundation.Collections.IObservableVector<RuleGroupViewModel> RuleGroups { get; };
         HyperlinkTooltipRuleViewModel CurrentRule;
         Boolean IsEditingRule { get; };
         Boolean IsNotEditingRule { get; };
         // The name of the rule being edited, so the breadcrumb can follow a rename.
         String CurrentRuleName { get; };
 
-        void RequestReorderRule(HyperlinkTooltipRuleViewModel vm, Boolean goingUp);
         void RequestDeleteRule(HyperlinkTooltipRuleViewModel vm);
         HyperlinkTooltipRuleViewModel RequestAddRule();
         HyperlinkTooltipRuleViewModel RequestAddRuleWithPreset(String presetId);

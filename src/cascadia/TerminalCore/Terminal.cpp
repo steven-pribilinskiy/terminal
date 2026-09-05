@@ -573,20 +573,33 @@ static std::wstring uriFromDelimitedLink(const std::wstring& match)
 // - Given a coord, get the URI at that location
 // Arguments:
 // - The position relative to the viewport
-std::wstring Terminal::GetHyperlinkAtViewportPosition(const til::point viewportPos)
+std::wstring Terminal::GetHyperlinkAtViewportPosition(const til::point viewportPos, HyperlinkSource* source)
 {
-    return GetHyperlinkAtBufferPosition(_ConvertToBufferCell(viewportPos, false));
+    return GetHyperlinkAtBufferPosition(_ConvertToBufferCell(viewportPos, false), source);
 }
 
-std::wstring Terminal::GetHyperlinkAtBufferPosition(const til::point bufferPos)
+std::wstring Terminal::GetHyperlinkAtBufferPosition(const til::point bufferPos, HyperlinkSource* source)
 {
     const auto& buffer = _activeBuffer();
+
+    const auto found = [&](HyperlinkSource s, std::wstring uri) {
+        if (source)
+        {
+            *source = s;
+        }
+        return uri;
+    };
+
+    if (source)
+    {
+        *source = HyperlinkSource::None;
+    }
 
     // Case 1: buffer position has a hyperlink stored in the buffer
     const auto attr = buffer.GetCellDataAt(bufferPos)->TextAttr();
     if (attr.IsHyperlink())
     {
-        return buffer.GetHyperlinkUriFromId(attr.GetHyperlinkId());
+        return found(HyperlinkSource::Osc8, buffer.GetHyperlinkUriFromId(attr.GetHyperlinkId()));
     }
 
     // Case 2: buffer position may point to an auto-detected hyperlink
@@ -600,14 +613,14 @@ std::wstring Terminal::GetHyperlinkAtBufferPosition(const til::point bufferPos)
         {
             if (result.value == _delimitedLinkPatternId)
             {
-                return uriFromDelimitedLink(buffer.GetPlainText(result.start, result.stop));
+                return found(HyperlinkSource::Detected, uriFromDelimitedLink(buffer.GetPlainText(result.start, result.stop)));
             }
         }
         for (const auto& result : results)
         {
             if (result.value == _hyperlinkPatternId)
             {
-                return buffer.GetPlainText(result.start, result.stop);
+                return found(HyperlinkSource::Detected, buffer.GetPlainText(result.start, result.stop));
             }
         }
         // A user text pattern: the match itself is the "link" text. Whoever
@@ -616,7 +629,7 @@ std::wstring Terminal::GetHyperlinkAtBufferPosition(const til::point bufferPos)
         {
             if (result.value >= _firstTextPatternId)
             {
-                return buffer.GetPlainText(result.start, result.stop);
+                return found(HyperlinkSource::Rule, buffer.GetPlainText(result.start, result.stop));
             }
         }
     }
@@ -1421,7 +1434,9 @@ TextBuffer& Terminal::_activeBuffer() const noexcept
 
 void Terminal::_updateUrlDetection()
 {
-    if (_detectURLs)
+    // Rules scan even when URL auto-detection is off, so the tree is only
+    // pointless when there is nothing at all left to look for.
+    if (_detectURLs || !_textPatterns.empty())
     {
         UpdatePatternsUnderLock();
     }
@@ -1512,7 +1527,11 @@ PointTree Terminal::_getPatterns(til::CoordType beg, til::CoordType end) const
         LR"(<(?:https?|ftp|file)://[^\s<>|]+(?:\|[^<>\n]{0,256})?>)",
     };
 
-    if (!_detectURLs)
+    // detectURLs governs the two built-in URL regexes above and nothing else.
+    // The text patterns below come from hyperlink.tooltipRules and from
+    // integration manifests -- things the user configured on purpose -- so
+    // turning off URL guessing must not silently disable them too.
+    if (!_detectURLs && _textPatterns.empty())
     {
         return {};
     }
@@ -1541,9 +1560,12 @@ PointTree Terminal::_getPatterns(til::CoordType beg, til::CoordType end) const
         }
     };
 
-    for (size_t i = 0; i < patterns.size(); ++i)
+    if (_detectURLs)
     {
-        scan(patterns.at(i), i);
+        for (size_t i = 0; i < patterns.size(); ++i)
+        {
+            scan(patterns.at(i), i);
+        }
     }
     // User text patterns (see ICoreSettings::TextPatterns) come after the
     // built-ins so their ids never collide with _hyperlinkPatternId & co.

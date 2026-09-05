@@ -143,14 +143,46 @@ preview-related keys:
 | `preview` | boolean, default `true` | Whether to show a preview at all for links/text this rule matches. |
 | `buttons` | array of string | Which buttons the card shows for this rule: `open`, `copyLink`, `copyPath`, `reveal` (Show in Explorer), `showInPane`. An empty or absent list inherits the global `hyperlink.tooltipButtons`. |
 | `showInPane` | boolean, unset = inherit | Open the preview in a pane instead of a tooltip for this rule. Unset inherits the global `hyperlink.previewInPane`. |
+| `primaryAction` | `""` (inherit) \| `"none"` \| an action id | What the primary click chord does for links this rule matches. |
+| `alternativeAction` | `""` (inherit) \| `"none"` \| an action id | The same, for the alternative chord. Chords themselves are global — only the action is per-rule. |
 
-Three global settings back these, in `settings.json` alongside the rules:
+These global settings back them, in `settings.json` alongside the rules:
 
 | JSON key | Default | Meaning |
 |---|---|---|
 | `hyperlink.tooltipButtons` | `["copyLink", "showInPane"]` | The buttons every rule shows unless it overrides them. **Open is off by default** — a card is for looking, and the link is still clickable. |
-| `hyperlink.tooltipHint` | `true` | Whether the card ends with the "Click to follow link" line. |
+| `hyperlink.tooltipHint` | `true` | Whether the card ends with the "Click to follow link" line. Hidden anyway when `hyperlink.clickable` is off. |
 | `hyperlink.previewInPane` | `false` | Hovering opens the preview in a pane rather than a card. |
+| `hyperlink.manualRuleOrder` | `false` | Leave the rules in the order you arranged them (and let the settings UI drag them) rather than grouping and sorting the list. |
+
+## Clicking a link
+
+Detection and clicking are separate. `experimental.detectURLs` governs only the two built-in URL
+regexes — rules keep matching when it is off — and `hyperlink.clickable` governs whether a click
+activates a link at all. With clicking off, links are still detected, highlighted and previewed;
+the card's buttons are how you act on one.
+
+Two chords are configurable, each a modifier plus a mouse gesture plus the action it runs:
+
+| JSON key | Default | Values |
+|---|---|---|
+| `hyperlink.clickable` | `true` | boolean |
+| `hyperlink.clickableKinds` | `["detected", "rules", "osc8"]` | which kinds of link a click reaches |
+| `hyperlink.primaryClickModifier` | `"none"` | `none`, `ctrl`, `alt`, `shift`, `win`, `ctrlAlt`, `ctrlShift`, `altShift`, `ctrlAltShift` |
+| `hyperlink.primaryClickGesture` | `"left"` | `left`, `middle`, `double` |
+| `hyperlink.primaryAction` | `"open"` | a button id, an `actions` entry id, or `none` |
+| `hyperlink.alternativeClickModifier` | `"ctrl"` | as above |
+| `hyperlink.alternativeClickGesture` | `"left"` | as above |
+| `hyperlink.alternativeAction` | `"open"` | as above |
+
+An action id is one of the card's own button ids (`open`, `copyLink`, `copyPath`, `reveal`,
+`showInPane`) or the id of an entry under `actions`, which is invoked with the hovered link
+available as `%u` — so binding a chord to a button's id does exactly what pressing that button
+does. Modifiers are matched exactly, so `ctrl` does not fire while Ctrl+Shift is held. A `left`
+chord resolves on mouse release and only if the click did not become a selection, so dragging
+across a URL still selects it; `middle` and `double` resolve on press. `alt` and `shift` also
+start block and extended selections — on a link the chord wins, and selection is untouched
+everywhere else.
 
 **Show in pane** puts the same preview — header, tabs, field groups, actions — into a real pane
 with room to read it, and offers a "Pane only — hide tooltips" switch that silences hover cards

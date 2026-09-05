@@ -2475,9 +2475,57 @@
           "minimum": 1,
           "type": "integer"
         },
-        "openLinksOnSingleClick": {
+        "hyperlink.clickable": {
           "default": true,
-          "description": "When set to true, clicking a link in the terminal opens it without holding Ctrl. The link opens on mouse release, and only if the click did not become a text selection, so dragging to select a URL still selects it rather than opening it. Ctrl+click continues to work either way.",
+          "description": "When set to false, clicking a link does nothing: links are still detected, highlighted on hover and previewed, and the tooltip's own buttons are how you act on one.",
+          "type": "boolean"
+        },
+        "hyperlink.clickableKinds": {
+          "default": [ "detected", "rules", "osc8" ],
+          "description": "Which kinds of link a click activates. \"detected\" is the built-in URL detection, \"rules\" is a match from hyperlink.tooltipRules, and \"osc8\" is a hyperlink a program emitted deliberately with the OSC 8 escape sequence.",
+          "items": {
+            "enum": [ "detected", "rules", "osc8" ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "hyperlink.primaryClickModifier": {
+          "default": "none",
+          "description": "Which modifier keys must be held for the primary click chord. Matched exactly, so \"ctrl\" does not fire when Ctrl+Shift is held.",
+          "enum": [ "none", "ctrl", "alt", "shift", "win", "ctrlAlt", "ctrlShift", "altShift", "ctrlAltShift" ],
+          "type": "string"
+        },
+        "hyperlink.primaryClickGesture": {
+          "default": "left",
+          "description": "Which mouse gesture performs the primary click chord. A \"left\" chord activates the link on mouse release, and only if the click did not become a text selection, so dragging to select a URL still selects it; \"middle\" and \"double\" act on press.",
+          "enum": [ "left", "middle", "double" ],
+          "type": "string"
+        },
+        "hyperlink.primaryAction": {
+          "default": "open",
+          "description": "What the primary click chord does: one of the tooltip button ids (\"open\", \"copyLink\", \"copyPath\", \"reveal\", \"showInPane\"), the id of an entry under \"actions\", or \"none\". A matching rule's \"primaryAction\" overrides this.",
+          "type": "string"
+        },
+        "hyperlink.alternativeClickModifier": {
+          "default": "ctrl",
+          "description": "Which modifier keys must be held for the alternative click chord. Matched exactly, the same way as hyperlink.primaryClickModifier.",
+          "enum": [ "none", "ctrl", "alt", "shift", "win", "ctrlAlt", "ctrlShift", "altShift", "ctrlAltShift" ],
+          "type": "string"
+        },
+        "hyperlink.alternativeClickGesture": {
+          "default": "left",
+          "description": "Which mouse gesture performs the alternative click chord. When both chords fit the same press, the more specific gesture wins.",
+          "enum": [ "left", "middle", "double" ],
+          "type": "string"
+        },
+        "hyperlink.alternativeAction": {
+          "default": "open",
+          "description": "What the alternative click chord does. Takes the same values as hyperlink.primaryAction, and a matching rule's \"alternativeAction\" overrides it.",
+          "type": "string"
+        },
+        "hyperlink.manualRuleOrder": {
+          "default": false,
+          "description": "When set to true, hyperlink.tooltipRules is left in the order you arranged it and the settings UI lets you drag rules around. When false, the UI keeps the list grouped by platform and sorted by name. Order is precedence either way: the first enabled rule that matches a link wins.",
           "type": "boolean"
         },
         "hyperlink.tooltipMaxWidth": {
@@ -2502,6 +2550,109 @@
           "default": true,
           "description": "When set to true, the link tooltip carries buttons for opening the link, copying it, and — for file:// links — copying the resolved path or revealing it in File Explorer.",
           "type": "boolean"
+        },
+        "hyperlink.tooltipButtons": {
+          "default": [ "copyLink", "showInPane" ],
+          "description": "Which of the built-in buttons the link tooltip carries. A rule's own \"buttons\" list replaces this outright rather than adding to it.",
+          "items": {
+            "enum": [ "open", "copyLink", "copyPath", "reveal", "showInPane" ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "hyperlink.tooltipHint": {
+          "default": true,
+          "description": "When set to true, the link tooltip shows a line naming the gesture that follows the link. It is hidden anyway when hyperlink.clickable is false, since there would be no such gesture.",
+          "type": "boolean"
+        },
+        "hyperlink.previewInPane": {
+          "default": false,
+          "description": "When set to true, hovering a link opens its details in a pane instead of in the tooltip card.",
+          "type": "boolean"
+        },
+        "hyperlink.integrationDisplayMode": {
+          "default": "above",
+          "description": "Where an integration's preview sits relative to the link on the tooltip card.",
+          "enum": [ "none", "above", "left" ],
+          "type": "string"
+        },
+        "hyperlink.actionPlacement": {
+          "default": "footer",
+          "description": "Whether the link tooltip's row of buttons sits under its content or above it.",
+          "enum": [ "footer", "header" ],
+          "type": "string"
+        },
+        "hyperlink.tooltipRules": {
+          "default": [],
+          "description": "Rules that customize the link tooltip for links matching their criteria. All set criteria are ANDed; an unset one is skipped. Order is precedence: the first enabled rule that matches a link wins outright, and overrides are not merged across rules.",
+          "items": {
+            "properties": {
+              "actions": {
+                "description": "Extra buttons for this rule's card. Each names an entry under \"actions\" by id, which is invoked with the hovered link's URI available as %u.",
+                "items": {
+                  "properties": {
+                    "icon": { "type": "string" },
+                    "id": { "type": "string" },
+                    "name": { "type": "string" }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "alternativeAction": {
+                "description": "What the alternative click chord does for links this rule matches. Empty inherits hyperlink.alternativeAction; \"none\" suppresses that click.",
+                "type": "string"
+              },
+              "buttons": {
+                "description": "Which built-in buttons this rule's card carries. An empty list inherits hyperlink.tooltipButtons.",
+                "items": {
+                  "enum": [ "open", "copyLink", "copyPath", "reveal", "showInPane" ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "enabled": { "default": true, "type": "boolean" },
+              "extensions": {
+                "description": "Individual file extensions this rule matches, in addition to fileTypeGroup.",
+                "items": { "type": "string" },
+                "type": "array"
+              },
+              "fileTypeGroup": {
+                "enum": [ "none", "image", "video", "audio", "media", "sourceCode", "document", "archive", "executable" ],
+                "type": "string"
+              },
+              "hideDelay": { "minimum": 0, "type": "integer" },
+              "integration": {
+                "description": "Which integration previews matches: \"\" picks one automatically, \"none\" shows no preview, anything else is an integration id.",
+                "type": "string"
+              },
+              "match": {
+                "default": "link",
+                "description": "\"link\" matches detected and OSC 8 hyperlinks; \"text\" turns plain terminal output matching the pattern into a hoverable match.",
+                "enum": [ "link", "text" ],
+                "type": "string"
+              },
+              "maxWidth": { "minimum": 0, "type": "integer" },
+              "name": { "type": "string" },
+              "pattern": {
+                "description": "For link rules, an ECMAScript regex searched in the link text. For text rules, an ICU regex scanned over the buffer; the whole match becomes the hoverable text.",
+                "type": "string"
+              },
+              "preview": { "default": true, "type": "boolean" },
+              "primaryAction": {
+                "description": "What the primary click chord does for links this rule matches. Empty inherits hyperlink.primaryAction; \"none\" suppresses that click.",
+                "type": "string"
+              },
+              "schemes": {
+                "items": { "type": "string" },
+                "type": "array"
+              },
+              "showDelay": { "minimum": 0, "type": "integer" },
+              "showInPane": { "type": "boolean" }
+            },
+            "type": "object"
+          },
+          "type": "array"
         },
         "focusFollowMouse": {
           "default": false,

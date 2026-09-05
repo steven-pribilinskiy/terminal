@@ -78,6 +78,9 @@ namespace Microsoft.Terminal.Control
     {
         OpenHyperlinkEventArgs(String uri);
         String Uri { get; };
+        // True when the alternative click chord activated this link rather than
+        // the primary one, so the control can pick the matching action.
+        Boolean IsAlternative { get; };
     }
 
     runtimeclass HyperlinkTooltipActionInvokedEventArgs

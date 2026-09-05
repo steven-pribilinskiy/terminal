@@ -450,7 +450,14 @@ namespace winrt::Microsoft::Terminal::Settings
         _CopyFormatting = windowSettings.CopyFormatting();
         _FocusFollowMouse = windowSettings.FocusFollowMouse();
         _ScrollToZoom = windowSettings.ScrollToZoom();
-        _OpenLinksOnSingleClick = windowSettings.OpenLinksOnSingleClick();
+        _HyperlinkClickable = windowSettings.HyperlinkClickable();
+        _HyperlinkClickableKinds = windowSettings.HyperlinkClickableKinds();
+        _HyperlinkPrimaryClickModifier = static_cast<Control::HyperlinkClickModifier>(windowSettings.HyperlinkPrimaryClickModifier());
+        _HyperlinkPrimaryClickGesture = static_cast<Control::HyperlinkClickGesture>(windowSettings.HyperlinkPrimaryClickGesture());
+        _HyperlinkPrimaryAction = windowSettings.HyperlinkPrimaryAction();
+        _HyperlinkAlternativeClickModifier = static_cast<Control::HyperlinkClickModifier>(windowSettings.HyperlinkAlternativeClickModifier());
+        _HyperlinkAlternativeClickGesture = static_cast<Control::HyperlinkClickGesture>(windowSettings.HyperlinkAlternativeClickGesture());
+        _HyperlinkAlternativeAction = windowSettings.HyperlinkAlternativeAction();
         _HyperlinkTooltipMaxWidth = windowSettings.HyperlinkTooltipMaxWidth();
         _HyperlinkTooltipShowDelay = windowSettings.HyperlinkTooltipShowDelay();
         _HyperlinkTooltipHideDelay = windowSettings.HyperlinkTooltipHideDelay();
@@ -458,6 +465,8 @@ namespace winrt::Microsoft::Terminal::Settings
         _HyperlinkTooltipButtons = windowSettings.HyperlinkTooltipButtons();
         _HyperlinkTooltipHint = windowSettings.HyperlinkTooltipHint();
         _HyperlinkPreviewInPane = windowSettings.HyperlinkPreviewInPane();
+        _HyperlinkIntegrationDisplayMode = static_cast<Control::HyperlinkIntegrationDisplayMode>(windowSettings.HyperlinkIntegrationDisplayMode());
+        _HyperlinkActionPlacement = static_cast<Control::HyperlinkActionPlacement>(windowSettings.HyperlinkActionPlacement());
 
         if (const auto modelRules = windowSettings.HyperlinkTooltipRules())
         {
@@ -483,6 +492,11 @@ namespace winrt::Microsoft::Terminal::Settings
                 // control resolves both, so both are mirrored as they are.
                 controlRule.Buttons(modelRule.Buttons());
                 controlRule.ShowInPane(modelRule.ShowInPane());
+                // Empty inherits the window's hyperlink.primaryAction /
+                // hyperlink.alternativeAction; "none" suppresses that click for
+                // this rule. The control resolves both, so both pass through.
+                controlRule.PrimaryAction(modelRule.PrimaryAction());
+                controlRule.AlternativeAction(modelRule.AlternativeAction());
 
                 auto controlActions = winrt::single_threaded_vector<HyperlinkTooltipAction>();
                 if (const auto modelActions = modelRule.CustomActions())

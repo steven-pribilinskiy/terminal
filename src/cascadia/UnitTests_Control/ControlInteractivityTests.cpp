@@ -1073,8 +1073,10 @@ namespace ControlUnitTests
         VERIFY_ARE_EQUAL(0u, expectedOutput.size(), L"Validate we drained all the expected output");
     }
 
-    // openLinksOnSingleClick: a plain click on a URL opens it. The interesting
-    // half is VT mouse mode - tmux and other multiplexers with `mouse on`, and
+    // The click chords: which (modifier, gesture) pair activates a link, and what
+    // hyperlink.clickable / hyperlink.clickableKinds do when they say a link is not
+    // a click target. The interesting half is still VT mouse mode - tmux and other
+    // multiplexers with `mouse on`, and
     // full-screen apps generally. There the press and the release are forwarded
     // to the app, and PointerReleased returns as soon as it has sent the event,
     // so the link has to be handled before that or it never is. It never was:
@@ -1089,13 +1091,23 @@ namespace ControlUnitTests
         _standardInit(core, interactivity);
         auto& term{ *core->_terminal };
 
-        VERIFY_IS_TRUE(settings->OpenLinksOnSingleClick());
+        // Out of the box the primary chord is a plain left click, and the
+        // alternative is Ctrl+click. Both run "open".
+        VERIFY_IS_TRUE(settings->HyperlinkClickable());
+        VERIFY_ARE_EQUAL(Control::HyperlinkClickModifier::None, settings->HyperlinkPrimaryClickModifier());
+        VERIFY_ARE_EQUAL(Control::HyperlinkClickGesture::LeftClick, settings->HyperlinkPrimaryClickGesture());
+        VERIFY_ARE_EQUAL(Control::HyperlinkClickModifier::Ctrl, settings->HyperlinkAlternativeClickModifier());
         VERIFY_IS_TRUE(settings->DetectURLs());
 
         auto opened = 0;
+        auto openedAlternative = 0;
         winrt::hstring lastUri;
         interactivity->OpenHyperlink([&](auto&&, const Control::OpenHyperlinkEventArgs& args) {
             ++opened;
+            if (args.IsAlternative())
+            {
+                ++openedAlternative;
+            }
             lastUri = args.Uri();
         });
 
@@ -1157,11 +1169,49 @@ namespace ControlUnitTests
         interactivity->PointerReleased(0, noButtons, WM_LBUTTONUP, modifiers, onTheLink);
         VERIFY_ARE_EQUAL(3, opened, L"the second click of a double-click opens nothing");
 
-        Log::Comment(L" --- Nothing opens when the setting is off ---");
-        settings->OpenLinksOnSingleClick(false);
+        Log::Comment(L" --- The alternative chord (ctrl+click) opens too, and says which fired ---");
+        // Every left-click chord goes through the same drag guard, so this one
+        // resolves on release as well: ctrl+dragging across a URL should select
+        // it, not launch it.
+        const auto ctrlHeld = ControlKeyStates{ ControlKeyStates::LeftCtrlPressed };
+        interactivity->PointerPressed(0, leftMouseDown, WM_LBUTTONDOWN, 5'000'000, ctrlHeld, onTheLink);
+        VERIFY_ARE_EQUAL(3, opened, L"the press alone opens nothing");
+        interactivity->PointerReleased(0, noButtons, WM_LBUTTONUP, ctrlHeld, onTheLink);
+        VERIFY_ARE_EQUAL(4, opened);
+        VERIFY_ARE_EQUAL(1, openedAlternative, L"the args carry which chord fired");
+
+        Log::Comment(L" --- Ctrl+dragging across the URL selects rather than opening ---");
+        interactivity->PointerPressed(0, leftMouseDown, WM_LBUTTONDOWN, 6'000'000, ctrlHeld, onTheLink);
+        interactivity->PointerReleased(0, noButtons, WM_LBUTTONUP, ctrlHeld, furtherAlong);
+        VERIFY_ARE_EQUAL(4, opened, L"a drag is not a click, whichever chord it is");
+
+        Log::Comment(L" --- A chord with an extra modifier held is a different chord ---");
+        const auto ctrlShiftHeld = ControlKeyStates{ ControlKeyStates::LeftCtrlPressed | ControlKeyStates::ShiftPressed };
+        interactivity->PointerPressed(0, leftMouseDown, WM_LBUTTONDOWN, 7'000'000, ctrlShiftHeld, onTheLink);
+        interactivity->PointerReleased(0, noButtons, WM_LBUTTONUP, ctrlShiftHeld, onTheLink);
+        VERIFY_ARE_EQUAL(4, opened, L"ctrl+shift matches neither configured chord");
+
+        Log::Comment(L" --- A middle-click chord opens on press ---");
+        settings->HyperlinkAlternativeClickGesture(Control::HyperlinkClickGesture::MiddleClick);
+        settings->HyperlinkAlternativeClickModifier(Control::HyperlinkClickModifier::None);
         core->UpdateSettings(*settings, nullptr);
-        interactivity->PointerPressed(0, leftMouseDown, WM_LBUTTONDOWN, 5'000'000, modifiers, onTheLink);
+        interactivity->PointerPressed(0, Control::MouseButtonState::IsMiddleButtonDown, WM_MBUTTONDOWN, 8'000'000, modifiers, onTheLink);
+        VERIFY_ARE_EQUAL(5, opened);
+        VERIFY_ARE_EQUAL(2, openedAlternative);
+
+        Log::Comment(L" --- Nothing opens once clicking is turned off ---");
+        settings->HyperlinkClickable(false);
+        core->UpdateSettings(*settings, nullptr);
+        interactivity->PointerPressed(0, leftMouseDown, WM_LBUTTONDOWN, 9'000'000, modifiers, onTheLink);
         interactivity->PointerReleased(0, noButtons, WM_LBUTTONUP, modifiers, onTheLink);
-        VERIFY_ARE_EQUAL(3, opened);
+        VERIFY_ARE_EQUAL(5, opened);
+
+        Log::Comment(L" --- Nor when this kind of link is excluded ---");
+        settings->HyperlinkClickable(true);
+        settings->HyperlinkClickableKinds(winrt::single_threaded_vector<winrt::hstring>({ winrt::hstring{ L"rules" }, winrt::hstring{ L"osc8" } }));
+        core->UpdateSettings(*settings, nullptr);
+        interactivity->PointerPressed(0, leftMouseDown, WM_LBUTTONDOWN, 10'000'000, modifiers, onTheLink);
+        interactivity->PointerReleased(0, noButtons, WM_LBUTTONUP, modifiers, onTheLink);
+        VERIFY_ARE_EQUAL(5, opened, L"an auto-detected URL is not in clickableKinds");
     }
 }

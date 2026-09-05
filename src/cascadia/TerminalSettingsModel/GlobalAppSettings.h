@@ -45,6 +45,15 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
     {
         return winrt::single_threaded_vector<winrt::hstring>({ winrt::hstring{ L"copyLink" }, winrt::hstring{ L"showInPane" } });
     }
+
+    // Which kinds of link respond to a click when hyperlink.clickable is on:
+    // "detected" = the built-in URL regexes, "rules" = hyperlink.tooltipRules
+    // matches, "osc8" = links a program marked as links itself. All three out
+    // of the box, so the master toggle is the only thing most people touch.
+    inline winrt::Windows::Foundation::Collections::IVector<winrt::hstring> MakeDefaultClickableKinds()
+    {
+        return winrt::single_threaded_vector<winrt::hstring>({ winrt::hstring{ L"detected" }, winrt::hstring{ L"rules" }, winrt::hstring{ L"osc8" } });
+    }
 }
 
 // fwdecl unittest classes

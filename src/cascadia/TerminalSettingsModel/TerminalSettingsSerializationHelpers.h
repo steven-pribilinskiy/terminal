@@ -770,6 +770,51 @@ JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::PaneTitlebarVisi
     };
 };
 
+// Possible HyperlinkIntegrationDisplayMode values
+JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::HyperlinkIntegrationDisplayMode)
+{
+    JSON_MAPPINGS(3) = {
+        pair_type{ "none", ValueType::None },
+        pair_type{ "above", ValueType::Above },
+        pair_type{ "left", ValueType::Left },
+    };
+};
+
+// Possible HyperlinkActionPlacement values
+JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::HyperlinkActionPlacement)
+{
+    JSON_MAPPINGS(2) = {
+        pair_type{ "footer", ValueType::Footer },
+        pair_type{ "header", ValueType::Header },
+    };
+};
+
+// Possible HyperlinkClickModifier values
+JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::HyperlinkClickModifier)
+{
+    JSON_MAPPINGS(9) = {
+        pair_type{ "none", ValueType::None },
+        pair_type{ "ctrl", ValueType::Ctrl },
+        pair_type{ "alt", ValueType::Alt },
+        pair_type{ "shift", ValueType::Shift },
+        pair_type{ "win", ValueType::Win },
+        pair_type{ "ctrlAlt", ValueType::CtrlAlt },
+        pair_type{ "ctrlShift", ValueType::CtrlShift },
+        pair_type{ "altShift", ValueType::AltShift },
+        pair_type{ "ctrlAltShift", ValueType::CtrlAltShift },
+    };
+};
+
+// Possible HyperlinkClickGesture values
+JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::HyperlinkClickGesture)
+{
+    JSON_MAPPINGS(3) = {
+        pair_type{ "left", ValueType::LeftClick },
+        pair_type{ "middle", ValueType::MiddleClick },
+        pair_type{ "double", ValueType::DoubleClick },
+    };
+};
+
 // Possible IntegrationMatcherKind values
 JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::IntegrationMatcherKind)
 {

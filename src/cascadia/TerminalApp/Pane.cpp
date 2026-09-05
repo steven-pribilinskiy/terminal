@@ -1266,10 +1266,7 @@ void Pane::UpdateVisuals()
     _borderFirst.BorderBrush(brush);
     _borderSecond.BorderBrush(brush);
 
-    if (brush)
-    {
-        _paneHeaderBorder.BorderBrush(brush);
-    }
+    _UpdatePaneHeaderBrush();
     _UpdateDividerBrush();
 }
 
@@ -1898,12 +1895,8 @@ void Pane::_CreatePaneHeader()
 
     _paneHeaderBorder.Child(_paneHeaderText);
     _paneHeaderBorder.Visibility(Visibility::Collapsed);
-    // Without a Background the strip beside a short title isn't hit testable, and
-    // only the text itself would be clickable.
-    _paneHeaderBorder.Background(MakeInvisibleHitTestBrush());
-    // A one-DIP rule under the title in the pane's own border colour. Painting a
-    // solid background instead would need a foreground colour to match it, and
-    // there isn't a theme-safe pair to pick here.
+    // Solid theme background ensures buffer text behind the header in multi-pane does not shine through
+    _paneHeaderBorder.Background(_themeResources.headerBackgroundBrush ? _themeResources.headerBackgroundBrush : MakeInvisibleHitTestBrush());
     _paneHeaderBorder.BorderThickness(ThicknessHelper::FromLengths(0, 0, 0, 1));
 
     // Clicking the header focuses *this* pane. Upstream's PR routed this through
@@ -2040,6 +2033,14 @@ void Pane::_UpdatePaneHeaderBrush()
     if (const auto& brush{ _ComputeBorderColor() })
     {
         _paneHeaderBorder.BorderBrush(brush);
+    }
+    if (_themeResources.headerBackgroundBrush)
+    {
+        _paneHeaderBorder.Background(_themeResources.headerBackgroundBrush);
+    }
+    if (_themeResources.headerForegroundBrush)
+    {
+        _paneHeaderText.Foreground(_themeResources.headerForegroundBrush);
     }
 }
 

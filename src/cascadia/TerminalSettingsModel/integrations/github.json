@@ -1,10 +1,19 @@
 {
     "id": "github",
     "name": "GitHub",
-    "icon": "",
+    "icon": "\uE82D",
     "version": 1,
     "cacheSeconds": 300,
-    "settings": [],
+    "settings": [
+        {
+            "key": "candidateOwners",
+            "label": "Candidate owners",
+            "placeholder": "e.g. org1, org2",
+            "default": "",
+            "description": "Comma-separated GitHub accounts or organizations to search when resolving repository references without an explicit owner (e.g. repo#123).",
+            "required": false
+        }
+    ],
     "credentials": [
         {
             "key": "token",
@@ -26,6 +35,12 @@
         {
             "kind": "link",
             "pattern": "^https://github\\.com/(?<owner>[^/]+)/(?<repo>[^/]+)/commit/(?<sha>[0-9a-f]{7,40})"
+        },
+        {
+            "kind": "text",
+            "pattern": "^(?<repo>[A-Za-z0-9_.-]+)#(?<number>\\d+)",
+            "description": "GitHub pull requests and issues (repo#number)",
+            "suggested": true
         }
     ],
     "fetch": [
@@ -189,7 +204,7 @@
         {
             "key": "commit",
             "label": "Commit",
-            "fields": [ "message", "commitAuthor", "committed", "commitAdditions", "commitDeletions" ]
+            "fields": [ "message", "commitAuthor", "committed", "commitSha", "commitParent", "commitAdditions", "commitDeletions", "commitFiles" ]
         }
     ],
     "fields": [
@@ -215,8 +230,11 @@
         { "key": "message", "label": "Message", "path": "commit:/commit/message", "kind": "title", "default": true },
         { "key": "commitAuthor", "label": "Author", "path": "commit:/author/login", "kind": "text", "iconPath": "commit:/author/avatar_url", "default": true },
         { "key": "committed", "label": "Committed", "path": "commit:/commit/author/date", "kind": "text", "format": "relativeTime", "default": true },
+        { "key": "commitSha", "label": "Commit", "path": "commit:/sha", "kind": "text", "default": true },
+        { "key": "commitParent", "label": "Parent", "path": "commit:/parents/0/sha", "kind": "text", "default": true },
         { "key": "commitAdditions", "label": "Added", "path": "commit:/stats/additions", "kind": "text", "default": true },
-        { "key": "commitDeletions", "label": "Removed", "path": "commit:/stats/deletions", "kind": "text", "default": true }
+        { "key": "commitDeletions", "label": "Removed", "path": "commit:/stats/deletions", "kind": "text", "default": true },
+        { "key": "commitFiles", "label": "Files changed", "path": "commit:/files/length", "kind": "text", "default": true }
     ],
     "tabs": [
         {

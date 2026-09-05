@@ -47,6 +47,9 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         WINRT_PROPERTY(winrt::Windows::Foundation::Collections::IVector<winrt::hstring>, Buttons);
         WINRT_PROPERTY(winrt::Windows::Foundation::IReference<bool>, ShowInPane);
 
+        WINRT_PROPERTY(winrt::hstring, PrimaryAction);
+        WINRT_PROPERTY(winrt::hstring, AlternativeAction);
+
         WINRT_PROPERTY(winrt::Windows::Foundation::Collections::IVector<Model::HyperlinkTooltipAction>, CustomActions);
     };
 }

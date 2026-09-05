@@ -51,6 +51,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         WINRT_PROPERTY(Windows::Foundation::Collections::IVector<hstring>, Buttons);
         WINRT_PROPERTY(Windows::Foundation::IReference<bool>, ShowInPane);
 
+        WINRT_PROPERTY(hstring, PrimaryAction);
+        WINRT_PROPERTY(hstring, AlternativeAction);
+
         WINRT_PROPERTY(Windows::Foundation::Collections::IVector<Control::HyperlinkTooltipAction>, CustomActions);
     };
 }

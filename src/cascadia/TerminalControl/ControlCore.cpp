@@ -607,7 +607,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 _updateSelectionUI();
                 return true;
             }
-            else if (vkey == VK_TAB && !mods.IsAltPressed() && !mods.IsCtrlPressed() && _settings.DetectURLs())
+            // detectURLs only governs the built-in URL regexes now, so rule
+            // matches are Tab-navigable whether or not it is on. The pattern
+            // tree is empty when there is nothing to find, so this is safe.
+            else if (vkey == VK_TAB && !mods.IsAltPressed() && !mods.IsCtrlPressed())
             {
                 // [Shift +] Tab --> next/previous hyperlink
                 const auto direction = mods.IsShiftPressed() ? ::Terminal::SearchDirection::Backward : ::Terminal::SearchDirection::Forward;
@@ -900,10 +903,41 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
     }
 
-    winrt::hstring ControlCore::GetHyperlink(const Core::Point pos) const
+    winrt::hstring ControlCore::GetHyperlink(const Core::Point pos, ::Microsoft::Terminal::Core::HyperlinkSource* source) const
     {
         const auto lock = _terminal->LockForReading();
-        return winrt::hstring{ _terminal->GetHyperlinkAtViewportPosition(til::point{ pos }) };
+        return winrt::hstring{ _terminal->GetHyperlinkAtViewportPosition(til::point{ pos }, source) };
+    }
+
+    // Whether a click should activate a link of this kind at all: the master
+    // hyperlink.clickable switch, then the per-kind list under it. An unset
+    // list means "all kinds", matching the settings-model default.
+    bool ControlCore::IsHyperlinkClickable(::Microsoft::Terminal::Core::HyperlinkSource source) const
+    {
+        using ::Microsoft::Terminal::Core::HyperlinkSource;
+
+        if (source == HyperlinkSource::None || !_settings.HyperlinkClickable())
+        {
+            return false;
+        }
+
+        const auto kinds = _settings.HyperlinkClickableKinds();
+        if (!kinds)
+        {
+            return true;
+        }
+
+        const auto wanted = source == HyperlinkSource::Osc8     ? L"osc8" :
+                            source == HyperlinkSource::Detected ? L"detected" :
+                                                                  L"rules";
+        for (const auto& kind : kinds)
+        {
+            if (kind == wanted)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     winrt::hstring ControlCore::HoveredUriText() const

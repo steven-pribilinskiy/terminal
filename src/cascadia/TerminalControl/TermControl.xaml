@@ -1307,30 +1307,48 @@
                                     Visibility of its own and the hint is a setting the user
                                     can turn off.
                                 -->
-                                <TextBlock x:Name="HoveredUri"
-                                           IsTextSelectionEnabled="True"
-                                           TextTrimming="CharacterEllipsis"
-                                           TextWrapping="Wrap">
-                                    <TextBlock.ContextFlyout>
-                                        <mtu:TextMenuFlyout />
-                                    </TextBlock.ContextFlyout>
-                                </TextBlock>
-                                <TextBlock x:Name="HowToOpenRun"
-                                           x:Uid="HowToOpenRun"
-                                           FontStyle="Italic"
-                                           TextWrapping="Wrap" />
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <ContentControl x:Name="HyperlinkCardLeftIcon"
+                                                    VerticalAlignment="Top"
+                                                    Margin="0,2,0,0"
+                                                    IsTabStop="False"
+                                                    Visibility="Collapsed" />
+                                    <StackPanel Grid.Column="1"
+                                                Spacing="2">
+                                        <TextBlock x:Name="HoveredUri"
+                                                   IsTextSelectionEnabled="True"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   TextWrapping="Wrap">
+                                            <TextBlock.ContextFlyout>
+                                                <mtu:TextMenuFlyout />
+                                            </TextBlock.ContextFlyout>
+                                        </TextBlock>
+                                        <TextBlock x:Name="HowToOpenRun"
+                                                   x:Uid="HowToOpenRun"
+                                                   FontStyle="Italic"
+                                                   TextWrapping="Wrap" />
 
-                                <!--
-                                    Where a file:// link actually resolves to, shown only when that
-                                    differs from the URI itself. A POSIX path emitted inside WSL
-                                    opens as \\wsl.localhost\<distro>\..., and being able to see
-                                    that before clicking is the difference between trusting the
-                                    link and finding out afterwards.
-                                -->
-                                <TextBlock x:Name="HyperlinkCardTarget"
-                                           Opacity="0.75"
-                                           TextWrapping="Wrap"
-                                           Visibility="Collapsed" />
+                                        <!--
+                                            Where a file:// link actually resolves to, shown only when that
+                                            differs from the URI itself. A POSIX path emitted inside WSL
+                                            opens as \\wsl.localhost\<distro>\..., and being able to see
+                                            that before clicking is the difference between trusting the
+                                            link and finding out afterwards.
+                                        -->
+                                        <TextBlock x:Name="HyperlinkCardTarget"
+                                                   Opacity="0.75"
+                                                   TextWrapping="Wrap"
+                                                   Visibility="Collapsed" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Host for actions placed in Header position -->
+                                <StackPanel x:Name="HyperlinkCardHeaderActionsHost"
+                                            Visibility="Collapsed" />
 
                                 <!--
                                     What an integration has to say about the hovered link, or about
@@ -1343,7 +1361,8 @@
                                 <StackPanel x:Name="HyperlinkCardPreview"
                                             Spacing="4"
                                             Visibility="Collapsed">
-                                    <StackPanel Orientation="Horizontal"
+                                    <StackPanel x:Name="HyperlinkCardPreviewHeader"
+                                                Orientation="Horizontal"
                                                 Spacing="6">
                                         <ContentControl x:Name="HyperlinkCardPreviewIcon"
                                                         VerticalAlignment="Center"
@@ -1363,20 +1382,109 @@
 
                                     <!--
                                         The tab strip, when the integration declared tabs. Built
-                                        from ToggleButtons by TermControl rather than from a Pivot
-                                        or a TabView: both are far heavier than a row of buttons,
-                                        and neither is used anywhere else in this control.
+                                        from ToggleButtons by TermControl in a segmented pill strip.
                                     -->
-                                    <StackPanel x:Name="HyperlinkCardTabStrip"
-                                                Orientation="Horizontal"
-                                                Spacing="2"
-                                                Visibility="Collapsed" />
+                                    <Border x:Name="HyperlinkCardTabStripBorder"
+                                            Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}"
+                                            CornerRadius="6"
+                                            Padding="2"
+                                            HorizontalAlignment="Left"
+                                            Visibility="Collapsed">
+                                        <StackPanel x:Name="HyperlinkCardTabStrip"
+                                                    Orientation="Horizontal"
+                                                    Spacing="2" />
+                                    </Border>
 
                                     <!--  Why the integration could not answer, in place of the fields it would have produced.  -->
                                     <TextBlock x:Name="HyperlinkCardPreviewError"
                                                Opacity="0.8"
                                                TextWrapping="Wrap"
                                                Visibility="Collapsed" />
+
+                                    <!--
+                                        Dedicated GitHub commit card formatting matching GitHub UI
+                                    -->
+                                    <StackPanel x:Name="HyperlinkCardCommitPanel"
+                                                Spacing="6"
+                                                Visibility="Collapsed">
+                                        <TextBlock x:Name="HyperlinkCommitTitle"
+                                                   FontWeight="SemiBold"
+                                                   TextWrapping="Wrap"
+                                                   MaxLines="3"
+                                                   IsTextSelectionEnabled="True" />
+                                        <TextBlock x:Name="HyperlinkCommitBody"
+                                                   Opacity="0.85"
+                                                   TextWrapping="Wrap"
+                                                   MaxLines="4"
+                                                   IsTextSelectionEnabled="True"
+                                                   Visibility="Collapsed" />
+                                        <Border Height="1" Background="{ThemeResource SubtleFillColorSecondaryBrush}" />
+                                        <Grid ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                <FontIcon FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                          Glyph="&#xE82D;"
+                                                          FontSize="14"
+                                                          VerticalAlignment="Center" />
+                                                <Border Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}"
+                                                        CornerRadius="4"
+                                                        Padding="6,1"
+                                                        VerticalAlignment="Center">
+                                                    <TextBlock x:Name="HyperlinkCommitBranch"
+                                                               Text="main"
+                                                               FontSize="11"
+                                                               FontWeight="SemiBold" />
+                                                </Border>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                                <TextBlock x:Name="HyperlinkCommitParents"
+                                                           Opacity="0.75"
+                                                           FontSize="12"
+                                                           VerticalAlignment="Center" />
+                                                <TextBlock Text="commit"
+                                                           Opacity="0.75"
+                                                           FontSize="12"
+                                                           VerticalAlignment="Center" />
+                                                <TextBlock x:Name="HyperlinkCommitSha"
+                                                           FontFamily="Cascadia Mono, Consolas"
+                                                           FontWeight="SemiBold"
+                                                           FontSize="12"
+                                                           VerticalAlignment="Center" />
+                                                <Button x:Name="HyperlinkCommitCopyShaButton"
+                                                        Click="_HyperlinkCommitCopyShaClick"
+                                                        Padding="4"
+                                                        Margin="2,0,0,0"
+                                                        VerticalAlignment="Center">
+                                                    <FontIcon FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                              Glyph="&#xE8C8;"
+                                                              FontSize="12" />
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+                                        <Border Height="1" Background="{ThemeResource SubtleFillColorSecondaryBrush}" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="HyperlinkCommitFilesChanged"
+                                                       FontWeight="SemiBold"
+                                                       VerticalAlignment="Center" />
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                <TextBlock x:Name="HyperlinkCommitStatsText"
+                                                           FontFamily="Cascadia Mono, Consolas"
+                                                           FontWeight="SemiBold"
+                                                           VerticalAlignment="Center" />
+                                                <StackPanel x:Name="HyperlinkCommitDiffSquares"
+                                                            Orientation="Horizontal"
+                                                            Spacing="2"
+                                                            VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
 
                                     <!--
                                         One row per field the integration returned, populated
@@ -1502,55 +1610,57 @@
                                             Visibility="Collapsed" />
                                 </StackPanel>
 
-                                <StackPanel x:Name="HyperlinkCardActions"
-                                            Orientation="Horizontal"
-                                            Spacing="4">
-                                    <Button x:Name="HyperlinkOpenButton"
-                                            x:Uid="HyperlinkOpenButton"
-                                            AllowFocusOnInteraction="False"
-                                            Click="_HyperlinkOpenClick" />
-                                    <Button x:Name="HyperlinkCopyLinkButton"
-                                            x:Uid="HyperlinkCopyLinkButton"
-                                            AllowFocusOnInteraction="False"
-                                            Click="_HyperlinkCopyLinkClick" />
-                                    <Button x:Name="HyperlinkCopyPathButton"
-                                            x:Uid="HyperlinkCopyPathButton"
-                                            AllowFocusOnInteraction="False"
-                                            Click="_HyperlinkCopyPathClick" />
-                                    <Button x:Name="HyperlinkRevealButton"
-                                            x:Uid="HyperlinkRevealButton"
-                                            AllowFocusOnInteraction="False"
-                                            Click="_HyperlinkRevealClick" />
-                                    <Button x:Name="HyperlinkShowInPaneButton"
-                                            x:Uid="HyperlinkShowInPaneButton"
-                                            AllowFocusOnInteraction="False"
-                                            Click="_HyperlinkShowInPaneClick" />
+                                <StackPanel x:Name="HyperlinkCardFooterActionsHost">
+                                    <StackPanel x:Name="HyperlinkCardActions"
+                                                Orientation="Horizontal"
+                                                Spacing="4">
+                                        <Button x:Name="HyperlinkOpenButton"
+                                                x:Uid="HyperlinkOpenButton"
+                                                AllowFocusOnInteraction="False"
+                                                Click="_HyperlinkOpenClick" />
+                                        <Button x:Name="HyperlinkCopyLinkButton"
+                                                x:Uid="HyperlinkCopyLinkButton"
+                                                AllowFocusOnInteraction="False"
+                                                Click="_HyperlinkCopyLinkClick" />
+                                        <Button x:Name="HyperlinkCopyPathButton"
+                                                x:Uid="HyperlinkCopyPathButton"
+                                                AllowFocusOnInteraction="False"
+                                                Click="_HyperlinkCopyPathClick" />
+                                        <Button x:Name="HyperlinkRevealButton"
+                                                x:Uid="HyperlinkRevealButton"
+                                                AllowFocusOnInteraction="False"
+                                                Click="_HyperlinkRevealClick" />
+                                        <Button x:Name="HyperlinkShowInPaneButton"
+                                                x:Uid="HyperlinkShowInPaneButton"
+                                                AllowFocusOnInteraction="False"
+                                                Click="_HyperlinkShowInPaneClick" />
 
-                                    <!--
-                                        A rule's custom actions (see HyperlinkTooltipRule), populated per-hover
-                                        by TermControl: not a live editable list, just a per-hover snapshot.
-                                    -->
-                                    <ItemsControl x:Name="HyperlinkCardCustomActions">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <StackPanel Orientation="Horizontal"
-                                                            Spacing="4" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="local:HyperlinkTooltipAction">
-                                                <Button AllowFocusOnInteraction="False"
-                                                        Click="_HyperlinkCustomActionClick"
-                                                        Tag="{x:Bind ActionId}">
+                                        <!--
+                                            A rule's custom actions (see HyperlinkTooltipRule), populated per-hover
+                                            by TermControl: not a live editable list, just a per-hover snapshot.
+                                        -->
+                                        <ItemsControl x:Name="HyperlinkCardCustomActions">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
                                                     <StackPanel Orientation="Horizontal"
-                                                                Spacing="4">
-                                                        <ContentControl Content="{x:Bind mtu:IconPathConverter.IconWUX(Icon), Mode=OneWay}" />
-                                                        <TextBlock Text="{x:Bind Name}" />
-                                                    </StackPanel>
-                                                </Button>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
+                                                                Spacing="4" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="local:HyperlinkTooltipAction">
+                                                    <Button AllowFocusOnInteraction="False"
+                                                            Click="_HyperlinkCustomActionClick"
+                                                            Tag="{x:Bind ActionId}">
+                                                        <StackPanel Orientation="Horizontal"
+                                                                    Spacing="4">
+                                                            <ContentControl Content="{x:Bind mtu:IconPathConverter.IconWUX(Icon), Mode=OneWay}" />
+                                                            <TextBlock Text="{x:Bind Name}" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
