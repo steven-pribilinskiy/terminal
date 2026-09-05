@@ -1274,7 +1274,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     Windows::Foundation::IInspectable LinkTooltipViewModel::CurrentIntegrationDisplayMode() const
     {
-        return _IntegrationDisplayModeMap.Lookup(_WindowSettings.HyperlinkIntegrationDisplayMode());
+        return _lookupEnumEntry(_IntegrationDisplayModeMap, _WindowSettings.HyperlinkIntegrationDisplayMode());
     }
 
     void LinkTooltipViewModel::CurrentIntegrationDisplayMode(const Windows::Foundation::IInspectable& enumEntry)
@@ -1289,7 +1289,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     Windows::Foundation::IInspectable LinkTooltipViewModel::CurrentActionPlacement() const
     {
-        return _ActionPlacementMap.Lookup(_WindowSettings.HyperlinkActionPlacement());
+        return _lookupEnumEntry(_ActionPlacementMap, _WindowSettings.HyperlinkActionPlacement());
     }
 
     void LinkTooltipViewModel::CurrentActionPlacement(const Windows::Foundation::IInspectable& enumEntry)
