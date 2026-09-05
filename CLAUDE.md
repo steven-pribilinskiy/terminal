@@ -224,6 +224,14 @@ The headline rule: **after changing a `.idl` or a `.xaml`, do not trust an incre
 Stale generated interfaces across DLLs msbuild thinks are up to date abort inside
 `AppHost::Initialize` before any window appears. Build the whole solution, or verify it starts.
 
+**"A slot stopped opening entirely" is usually a windowless process, not a bad build.** A
+`WindowsTerminal.exe` with no window still owns its package's single-instance identity, so every
+later launch hands off to it and exits silently — nothing opens, and nothing says why. Run
+`tools\Repair-TerminalSlots.ps1` *first*, before suspecting the payload or the settings. Never
+judge this by `MainWindowHandle`: it misses hidden windows and calls a tray-minimised Terminal a
+zombie. Any script that launches a Terminal must confirm it reached a window and clean up if it
+did not — a launch left unverified is how one of these is created.
+
 ## The two slots: `wtt` is yours to break, `wtd` is production
 
 I run two Terminals built from this repo side by side. **They are not two equivalent scratch

@@ -49,6 +49,60 @@ so a build that cannot start can no longer be staged for promotion into the slot
 that hosts live sessions. If it fails, Test stays registered so `wtt` reproduces
 it for you.
 
+## Neither slot opens, and the process is *still running*
+
+What you see: `wtd` and/or `wtt` "launch" and nothing appears — no window, no
+error, no crash dialog, and nothing in the event log. Unlike the case above, the
+process does **not** exit: `Get-Process` shows a healthy `WindowsTerminal.exe`
+that has been up for hours, responding, idling, using no CPU.
+
+Confirm it in one command. The tell is a process that owns no window at all:
+
+```powershell
+tools\Repair-TerminalSlots.ps1          # report
+tools\Repair-TerminalSlots.ps1 -Force   # clear the Test slot
+```
+
+`MainWindowHandle` is **not** a sound check on its own: it only finds a *visible*
+top-level window, so a Terminal minimised to the notification area reads as `0`
+and looks like a zombie when it is perfectly fine. The script counts every
+top-level window the process owns, hidden ones included, which is the
+distinction that actually matters.
+
+### Why one failure becomes a permanent one
+
+The emperor owns the single-instance identity for its package — the window class
+and mutex mix in the package family name (`WindowEmperor::HandleCommandlineArgs`).
+A process sitting there with zero windows therefore still answers for the whole
+app: every later launch finds it, hands its commandline over via `WM_COPYDATA`,
+and exits. One failed window creation swallows *every* subsequent launch, with no
+symptom other than nothing happening, until the process is killed by hand.
+
+`_postQuitMessageIfNeeded()` covers the ordinary routes to zero windows (the last
+window closed; startup deliberately created none). It did not cover a creation
+that *failed* — that exception is swallowed by `safe_void_coroutine` or by
+`_messageHandler`'s catch-all — nor a handoff that produced nothing.
+`WindowEmperor::_armNoWindowWatchdog()` is the backstop for both: after a failed
+creation or a handoff, if there is still no window a few seconds later the
+process quits, so the next launch gets a fresh process instead of talking to a
+broken one.
+
+### Seen on 2026-09-05
+
+Both slots went windowless at 14:42, sixteen seconds apart, and stayed that way
+for nearly seven hours. Neither was launched by hand — a script started them
+while the desktop was busy elsewhere. Each still held a live headless ConPTY and
+a `wsl.exe` child, so the tabs were never torn down: the window never arrived
+(or died) while the session behind it survived. ManicTime put the last active
+Terminal window at 14:21:51, well before the processes started, which is what
+ruled out "the window opened and was closed".
+
+Two things kept it invisible. A caught window-creation failure logs nowhere you
+would think to look, and `Deploy-TerminalSlots.ps1`'s boot check *skipped itself*
+whenever any process was already running under the payload — so once a zombie
+existed, every later deploy quietly stopped verifying. The boot check now clears
+windowless processes first, and only then decides whether something real is up.
+
 ## The Dev slot went *backwards* after pressing promote
 
 What you see: you promote, `wtd` relaunches, and the tab row or About dialog now

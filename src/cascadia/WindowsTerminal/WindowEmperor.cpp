@@ -269,11 +269,26 @@ void WindowEmperor::CreateNewWindow(winrt::TerminalApp::WindowRequestedArgs args
         args.Id(newId + 1);
     }
 
-    auto host = std::make_shared<AppHost>(this, _app.Logic(), std::move(args));
-    host->Initialize();
+    try
+    {
+        auto host = std::make_shared<AppHost>(this, _app.Logic(), std::move(args));
+        host->Initialize();
+        _windowCount += 1;
+        _windows.emplace_back(std::move(host));
+    }
+    catch (...)
+    {
+        // The window we were asked for is not going to appear. Nobody up the
+        // stack treats that as fatal -- a safe_void_coroutine swallows it, and
+        // so does _messageHandler's catch-all -- so without this we would carry
+        // on running with nothing to rule. See _armNoWindowWatchdog().
+        LOG_CAUGHT_EXCEPTION();
+        _armNoWindowWatchdog();
+        throw;
+    }
+
     _handoffTimeoutTimer.Stop();
-    _windowCount += 1;
-    _windows.emplace_back(std::move(host));
+    _noWindowWatchdogTimer.Stop();
 
     if (_windowCount == 1)
     {
@@ -1256,6 +1271,42 @@ void WindowEmperor::_postQuitMessageIfNeeded() const
     }
 }
 
+// A window that never materialises must not leave this process running.
+//
+// The emperor owns the single-instance identity for its package, so a process
+// sitting here with no windows still answers for the whole app: every later
+// `wt` invocation finds it, hands its commandline over via WM_COPYDATA and
+// exits. If we cannot produce a window, that repeats forever -- the terminal
+// silently stops opening, with no window, no error and no crash to point at,
+// until someone finds the process and kills it by hand.
+//
+// _postQuitMessageIfNeeded() already covers the ordinary routes to zero windows
+// (the last one closed, or startup deliberately created none). It does not
+// cover a creation that *failed*, because that exception is swallowed by
+// safe_void_coroutine or by _messageHandler's catch-all, and it does not cover
+// a handoff that produced nothing. This is the backstop for both: give anything
+// still in flight a few seconds to put a window up, then quit if none did, so
+// the next launch gets a fresh process instead of talking to a broken one.
+void WindowEmperor::_armNoWindowWatchdog()
+{
+    _assertIsMainThread();
+
+    // Windows exist, so there is nothing to recover from. This also means an
+    // unrelated failure while other windows are open never risks the session.
+    if (_windowCount > 0)
+    {
+        return;
+    }
+
+    _noWindowWatchdogTimer.Interval(5s);
+    _noWindowWatchdogTimer.Tick([this](auto&&, auto&&) {
+        _noWindowWatchdogTimer.Stop();
+        // Re-checked inside: a window may well have arrived while we waited.
+        _postQuitMessageIfNeeded();
+    });
+    _noWindowWatchdogTimer.Start();
+}
+
 safe_void_coroutine WindowEmperor::_showMessageBox(winrt::hstring message, bool error)
 {
     // Prevent the main loop from exiting until the message box is closed.
@@ -1465,6 +1516,12 @@ LRESULT WindowEmperor::_messageHandler(HWND window, UINT const message, WPARAM c
                 if (argv.size() != 2 || argv[1] != L"--from-toast")
                 {
                     _dispatchCommandlineCommon(argv, handoff.cwd, handoff.env, handoff.show);
+                    // Someone just asked us for a window because we are the
+                    // process holding this package's single-instance identity.
+                    // If we still have none once that settles, we are no use to
+                    // them and must get out of the way. See
+                    // _armNoWindowWatchdog().
+                    _armNoWindowWatchdog();
                 }
             }
             return 0;

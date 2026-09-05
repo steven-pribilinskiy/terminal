@@ -207,6 +207,17 @@ function Test-SlotBoot {
     $mine = @(Get-Process -Name 'WindowsTerminal' -ErrorAction SilentlyContinue |
               Where-Object { $_.Path -like "$PayloadDir\*" })
     if ($mine) {
+        # "A process exists" is not the same as "a window exists". A windowless
+        # process still takes our handoff, so it would make this check opt out --
+        # and keep opting out on every later run, since nothing clears it. That is
+        # precisely how a zombie survives unnoticed for hours. Clear those first,
+        # then decide whether anything real is still up.
+        & "$PSScriptRoot\Repair-TerminalSlots.ps1" -Slot Test -TestPayload $PayloadDir -GraceSeconds 20 -Force | Out-Host
+
+        $mine = @(Get-Process -Name 'WindowsTerminal' -ErrorAction SilentlyContinue |
+                  Where-Object { $_.Path -like "$PayloadDir\*" })
+    }
+    if ($mine) {
         Write-Host '   skipping boot check: a Test slot process is already running' -ForegroundColor DarkYellow
         Write-Host "   (wtt would hand off to pid $($mine[0].Id) instead of starting)" -ForegroundColor DarkYellow
         return $null

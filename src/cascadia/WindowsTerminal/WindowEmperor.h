@@ -78,6 +78,7 @@ private:
     LRESULT _messageHandler(HWND window, UINT message, WPARAM wParam, LPARAM lParam) noexcept;
     void _createMessageWindow(const wchar_t* className);
     void _postQuitMessageIfNeeded() const;
+    void _armNoWindowWatchdog();
     safe_void_coroutine _showMessageBox(winrt::hstring message, bool error);
     void _notificationAreaMenuRequested(WPARAM wParam);
     void _notificationAreaMenuClicked(WPARAM wParam, LPARAM lParam) const;
@@ -109,6 +110,7 @@ private:
     bool _needsPersistenceCleanup = false;
     SafeDispatcherTimer _persistStateTimer;
     SafeDispatcherTimer _handoffTimeoutTimer;
+    SafeDispatcherTimer _noWindowWatchdogTimer;
     std::optional<bool> _currentSystemThemeIsDark;
     int32_t _windowCount = 0;
     int32_t _messageBoxCount = 0;
