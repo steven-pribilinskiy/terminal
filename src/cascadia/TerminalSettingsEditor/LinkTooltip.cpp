@@ -44,6 +44,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         });
     }
 
+    void LinkTooltip::ExpandAllRuleGroups_Click(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
+    {
+        _ViewModel.ExpandAllRuleGroups();
+    }
+
+    void LinkTooltip::CollapseAllRuleGroups_Click(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
+    {
+        _ViewModel.CollapseAllRuleGroups();
+    }
+
     void LinkTooltip::AddRuleFlyout_Opening(const IInspectable& sender, const IInspectable& /*args*/)
     {
         const auto flyout = sender.try_as<Controls::MenuFlyout>();
@@ -141,6 +151,10 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             Controls::MenuFlyoutSubItem subMenu;
             subMenu.Text(winrt::hstring{ cat.name });
 
+            // A category with nothing left to add is disabled at the top level, so
+            // you can see there is no point opening it.
+            auto anyAvailable = false;
+
             for (const auto* preset : cat.presets)
             {
                 Controls::MenuFlyoutItem item;
@@ -151,6 +165,19 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 }
 
                 const winrt::hstring presetId{ preset->id };
+
+                // Adding a preset twice produces two rules matching the same links,
+                // where only the first can ever win. Disable rather than hide, so the
+                // menu keeps a stable shape and can say why.
+                if (_ViewModel.IsPresetInUse(presetId))
+                {
+                    item.IsEnabled(false);
+                    Controls::ToolTipService::SetToolTip(item, box_value(RS_(L"LinkTooltip_AddRuleMenu_AlreadyAdded")));
+                    subMenu.Items().Append(item);
+                    continue;
+                }
+                anyAvailable = true;
+
                 item.Click([this, presetId](const auto&, const auto&) {
                     const auto rule = _ViewModel.RequestAddRuleWithPreset(presetId);
                     Dispatcher().RunAsync(Windows::UI::Core::CoreDispatcherPriority::Normal, [weakThis{ get_weak() }, rule]() {
@@ -162,6 +189,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 });
                 subMenu.Items().Append(item);
             }
+            subMenu.IsEnabled(anyAvailable);
             items.Append(subMenu);
         }
     }

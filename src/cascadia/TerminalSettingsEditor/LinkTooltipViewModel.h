@@ -248,7 +248,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         winrt::hstring _platformId;
         winrt::hstring _platformName;
         winrt::hstring _platformIcon;
-        bool _isExpanded{ true };
+        // Collapsed by default: with every platform expanded the list opens as a
+        // wall of regexes you have to scroll past to reach anything. The group
+        // headers already carry the name, the enabled toggle and the n/n badge,
+        // which is what you actually scan for.
+        bool _isExpanded{ false };
         Windows::Foundation::Collections::IObservableVector<Editor::HyperlinkTooltipRuleViewModel> _rules;
     };
 
@@ -326,6 +330,9 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         void RequestDeleteRule(const Editor::HyperlinkTooltipRuleViewModel& vm);
         Editor::HyperlinkTooltipRuleViewModel RequestAddRule();
         Editor::HyperlinkTooltipRuleViewModel RequestAddRuleWithPreset(const winrt::hstring& presetId);
+        bool IsPresetInUse(const winrt::hstring& presetId) const;
+        void ExpandAllRuleGroups();
+        void CollapseAllRuleGroups();
 
     private:
         Model::GlobalAppSettings _GlobalSettings;

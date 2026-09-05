@@ -152,6 +152,23 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         choices.Append(winrt::make<IntegrationChoiceViewModel>(id, id));
     }
 
+    // IMap::Lookup throws hresult_out_of_bounds when the key is absent, and these
+    // maps are read from x:Bind getters that XAML calls while dispatching
+    // PropertyChanged. An exception there does not surface as a failed binding -- it
+    // escapes the callback and fails the process fast (0xC000041D,
+    // STATUS_FATAL_USER_CALLBACK_EXCEPTION), taking every window with it. A combo box
+    // showing nothing selected is the right failure for a value the list does not
+    // contain.
+    template<typename K>
+    static Windows::Foundation::IInspectable _lookupEnumEntry(const IMap<K, Editor::EnumEntry>& map, const K& key)
+    {
+        if (!map || !map.HasKey(key))
+        {
+            return nullptr;
+        }
+        return map.Lookup(key);
+    }
+
     // Shared by the four action pickers: pure lookup, since a binding getter is
     // no place to be mutating the collection the binding reads.
     static Windows::Foundation::IInspectable _actionChoiceFor(const IVector<Editor::IntegrationChoiceViewModel>& choices,
@@ -337,18 +354,33 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             buttonVMs.push_back(make<ButtonChoiceViewModel>(
                 buttonId,
                 _buttonLabel(id),
-                [this](const winrt::hstring& which) {
-                    const auto own = _Rule.Buttons();
-                    return _listContains(own && own.Size() > 0 ? own : _WindowSettings.HyperlinkTooltipButtons(), which);
+                // Weak, not [this]: these live inside ButtonChoiceViewModels that
+                // XAML holds through its ItemsSource, so they outlive this view
+                // model whenever the page is torn down or rebuilt while a box is
+                // still bound. A raw this would be dangling by then, and the
+                // read happens during teardown.
+                [weakThis = winrt::weak_ref<HyperlinkTooltipRuleViewModel>{ get_weak() }](const winrt::hstring& which) {
+                    const auto self = weakThis.get();
+                    if (!self)
+                    {
+                        return false;
+                    }
+                    const auto own = self->_Rule.Buttons();
+                    return _listContains(own && own.Size() > 0 ? own : self->_WindowSettings.HyperlinkTooltipButtons(), which);
                 },
-                [this](const winrt::hstring& which, bool selected) {
-                    if (!OverrideButtons())
+                [weakThis = winrt::weak_ref<HyperlinkTooltipRuleViewModel>{ get_weak() }](const winrt::hstring& which, bool selected) {
+                    const auto self = weakThis.get();
+                    if (!self)
+                    {
+                        return;
+                    }
+                    if (!self->OverrideButtons())
                     {
                         // The boxes are disabled while the rule inherits; don't
                         // let a stray write turn the override on by accident.
                         return;
                     }
-                    const auto updated = _withButton(_Rule.Buttons(), which, selected);
+                    const auto updated = _withButton(self->_Rule.Buttons(), which, selected);
                     if (updated.Size() == 0)
                     {
                         // An empty list is how a rule says "inherit", so it can't
@@ -357,7 +389,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                         // the checkbox snaps back on its own.
                         return;
                     }
-                    _Rule.Buttons(updated);
+                    self->_Rule.Buttons(updated);
                 }));
         }
         _ButtonChoices = single_threaded_observable_vector<Editor::ButtonChoiceViewModel>(std::move(buttonVMs));
@@ -1036,11 +1068,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             buttonVMs.push_back(make<ButtonChoiceViewModel>(
                 buttonId,
                 _buttonLabel(id),
-                [this](const winrt::hstring& which) {
-                    return _listContains(_WindowSettings.HyperlinkTooltipButtons(), which);
+                // The settings object, not [this]: these outlive the view model
+                // whenever XAML still holds the ButtonChoiceViewModels through its
+                // ItemsSource. _WindowSettings is set once in the constructor and
+                // never reassigned, so a captured copy is the same object -- and it
+                // keeps itself alive.
+                [windowSettings = _WindowSettings](const winrt::hstring& which) {
+                    return _listContains(windowSettings.HyperlinkTooltipButtons(), which);
                 },
-                [this](const winrt::hstring& which, bool selected) {
-                    _WindowSettings.HyperlinkTooltipButtons(_withButton(_WindowSettings.HyperlinkTooltipButtons(), which, selected));
+                [windowSettings = _WindowSettings](const winrt::hstring& which, bool selected) {
+                    windowSettings.HyperlinkTooltipButtons(_withButton(windowSettings.HyperlinkTooltipButtons(), which, selected));
                 }));
         }
         _ButtonChoices = single_threaded_observable_vector<Editor::ButtonChoiceViewModel>(std::move(buttonVMs));
@@ -1063,14 +1100,14 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             kindVMs.push_back(make<ButtonChoiceViewModel>(
                 kindId,
                 _clickableKindLabel(id),
-                [this](const winrt::hstring& which) {
+                [windowSettings = _WindowSettings](const winrt::hstring& which) {
                     // An unset list is the shipped default -- every kind -- rather
                     // than "no kinds", matching how the control resolves it.
-                    const auto kinds = _WindowSettings.HyperlinkClickableKinds();
+                    const auto kinds = windowSettings.HyperlinkClickableKinds();
                     return !kinds ? true : _listContains(kinds, which);
                 },
-                [this](const winrt::hstring& which, bool selected) {
-                    auto kinds = _WindowSettings.HyperlinkClickableKinds();
+                [windowSettings = _WindowSettings](const winrt::hstring& which, bool selected) {
+                    auto kinds = windowSettings.HyperlinkClickableKinds();
                     if (!kinds)
                     {
                         kinds = single_threaded_vector<winrt::hstring>();
@@ -1079,7 +1116,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                             kinds.Append(winrt::hstring{ id });
                         }
                     }
-                    _WindowSettings.HyperlinkClickableKinds(_withIdToggled(kinds, KnownClickableKindIds, which, selected));
+                    windowSettings.HyperlinkClickableKinds(_withIdToggled(kinds, KnownClickableKindIds, which, selected));
                 }));
         }
         _ClickableKindChoices = single_threaded_observable_vector<Editor::ButtonChoiceViewModel>(std::move(kindVMs));
@@ -1267,7 +1304,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     Windows::Foundation::IInspectable LinkTooltipViewModel::CurrentPrimaryClickModifier() const
     {
-        return _ClickModifierMap.Lookup(_WindowSettings.HyperlinkPrimaryClickModifier());
+        return _lookupEnumEntry(_ClickModifierMap, _WindowSettings.HyperlinkPrimaryClickModifier());
     }
 
     void LinkTooltipViewModel::CurrentPrimaryClickModifier(const Windows::Foundation::IInspectable& enumEntry)
@@ -1281,7 +1318,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     Windows::Foundation::IInspectable LinkTooltipViewModel::CurrentPrimaryClickGesture() const
     {
-        return _ClickGestureMap.Lookup(_WindowSettings.HyperlinkPrimaryClickGesture());
+        return _lookupEnumEntry(_ClickGestureMap, _WindowSettings.HyperlinkPrimaryClickGesture());
     }
 
     void LinkTooltipViewModel::CurrentPrimaryClickGesture(const Windows::Foundation::IInspectable& enumEntry)
@@ -1295,7 +1332,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     Windows::Foundation::IInspectable LinkTooltipViewModel::CurrentAlternativeClickModifier() const
     {
-        return _ClickModifierMap.Lookup(_WindowSettings.HyperlinkAlternativeClickModifier());
+        return _lookupEnumEntry(_ClickModifierMap, _WindowSettings.HyperlinkAlternativeClickModifier());
     }
 
     void LinkTooltipViewModel::CurrentAlternativeClickModifier(const Windows::Foundation::IInspectable& enumEntry)
@@ -1309,7 +1346,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     Windows::Foundation::IInspectable LinkTooltipViewModel::CurrentAlternativeClickGesture() const
     {
-        return _ClickGestureMap.Lookup(_WindowSettings.HyperlinkAlternativeClickGesture());
+        return _lookupEnumEntry(_ClickGestureMap, _WindowSettings.HyperlinkAlternativeClickGesture());
     }
 
     void LinkTooltipViewModel::CurrentAlternativeClickGesture(const Windows::Foundation::IInspectable& enumEntry)
@@ -1422,6 +1459,83 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         // leaves it at the end -- where the user is about to start editing it.
         _applyAutomaticOrder();
         return vm;
+    }
+
+    // Whether the rules list already contains this preset, so the Add rule menu can
+    // grey it out instead of silently making a duplicate that matches the same links
+    // twice. Rules do not record the preset they came from, so this compares what a
+    // preset actually writes: the name, and the pattern where there is one. A preset
+    // whose pattern is empty (the file-type ones) is identified by name and file-type
+    // group, which is the only thing that distinguishes those from each other.
+    bool LinkTooltipViewModel::IsPresetInUse(const winrt::hstring& presetId) const
+    {
+        const auto preset = FindLinkTooltipPreset(presetId);
+        if (!preset)
+        {
+            return false;
+        }
+
+        const auto rules = _WindowSettings.HyperlinkTooltipRules();
+        if (!rules)
+        {
+            return false;
+        }
+
+        const std::wstring_view presetName{ preset->name };
+        const std::wstring_view presetPattern{ preset->pattern };
+
+        for (const auto& rule : rules)
+        {
+            if (!rule)
+            {
+                continue;
+            }
+
+            if (!presetPattern.empty())
+            {
+                if (std::wstring_view{ rule.Pattern() } == presetPattern)
+                {
+                    return true;
+                }
+                continue;
+            }
+
+            if (std::wstring_view{ rule.Name() } == presetName && rule.FileTypeGroup() == preset->fileTypeGroup)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void LinkTooltipViewModel::ExpandAllRuleGroups()
+    {
+        if (!_RuleGroups)
+        {
+            return;
+        }
+        for (const auto& group : _RuleGroups)
+        {
+            if (group)
+            {
+                group.IsExpanded(true);
+            }
+        }
+    }
+
+    void LinkTooltipViewModel::CollapseAllRuleGroups()
+    {
+        if (!_RuleGroups)
+        {
+            return;
+        }
+        for (const auto& group : _RuleGroups)
+        {
+            if (group)
+            {
+                group.IsExpanded(false);
+            }
+        }
     }
 
     Editor::HyperlinkTooltipRuleViewModel LinkTooltipViewModel::RequestAddRuleWithPreset(const winrt::hstring& presetId)

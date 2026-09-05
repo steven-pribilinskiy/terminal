@@ -238,6 +238,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _extensionsVM.UpdateSettings(_settingsClone, _colorSchemesPageVM);
         _profileDefaultsVM = nullptr; // Lazy-loaded upon navigation
 
+        // Same deal, and load-bearing rather than tidiness: both of these hold the
+        // WindowSettings clone they were built with. Discard replaces that clone, so
+        // a surviving view model would keep reading and writing the object we just
+        // threw away -- every edit landing somewhere nothing will ever save. Dropping
+        // them also makes _Navigate take its "build a fresh one" path below instead
+        // of the "already here, just close the sub-page" one, which would otherwise
+        // reuse the stale VM.
+        _linkTooltipVM = nullptr;
+        _integrationsVM = nullptr;
+
         if (const auto& profileTag{ destination.try_as<Editor::ProfileViewModel>() })
         {
             // Find the new profile VM by guid
@@ -630,7 +640,20 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             {
                 if (_linkTooltipVM && _linkTooltipVM.CurrentRule())
                 {
+                    // Coming back from a rule to the list. The page is already up, so
+                    // this only closes the rule -- but _PreNavigateHelper has just
+                    // cleared the breadcrumbs and revoked our listener, and neither
+                    // comes back on its own down this path. Re-add the crumb and
+                    // re-register, in that order, so the change above doesn't
+                    // re-enter the handler.
+                    //
+                    // Without this the page heading simply disappears, and the empty
+                    // crumb trail is also what UpdateSettings() reads to decide where
+                    // to return to -- so Discard changes would land on the first page
+                    // in the list rather than back here.
                     _linkTooltipVM.CurrentRule(nullptr);
+                    _breadcrumbs.Append(winrt::make<Breadcrumb>(vm, RS_(L"Nav_LinkTooltip/Content"), BreadcrumbSubPage::None));
+                    _SetupLinkTooltipEventHandling();
                 }
                 else
                 {
@@ -648,7 +671,12 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             {
                 if (_integrationsVM && _integrationsVM.CurrentIntegration())
                 {
+                    // Same as the Link Tooltip case above: restore the crumb and the
+                    // listener that _PreNavigateHelper cleared, since this path never
+                    // re-navigates the frame.
                     _integrationsVM.CurrentIntegration(nullptr);
+                    _breadcrumbs.Append(winrt::make<Breadcrumb>(vm, RS_(L"Nav_Integrations/Content"), BreadcrumbSubPage::None));
+                    _SetupIntegrationsEventHandling();
                 }
                 else
                 {

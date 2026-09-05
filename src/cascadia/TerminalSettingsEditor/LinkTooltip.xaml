@@ -198,9 +198,18 @@
                                   Style="{StaticResource ToggleSwitchInExpanderStyle}" />
                 </local:SettingsCard>
 
+                <!--
+                    HorizontalContentAlignment="Left" is required, not decorative:
+                    ContentAlignment="Vertical" only stretches the presenter across
+                    the row, and SettingsCard then propagates the card's own
+                    HorizontalContentAlignment to it - which the style defaults to
+                    Right. Without this the checkboxes sit against the right edge,
+                    a column away from the header they belong to.
+                -->
                 <local:SettingsCard x:Name="HyperlinkClickableKinds"
                                     x:Uid="Globals_HyperlinkClickableKinds"
                                     ContentAlignment="Vertical"
+                                    HorizontalContentAlignment="Left"
                                     IsEnabled="{x:Bind ViewModel.HyperlinkClickable, Mode=OneWay}">
                     <ItemsControl ItemTemplate="{StaticResource ButtonChoiceTemplate}"
                                   ItemsSource="{x:Bind ViewModel.ClickableKindChoices, Mode=OneWay}" />
@@ -323,6 +332,7 @@
                 <local:SettingsCard x:Name="HyperlinkTooltipButtons"
                                     x:Uid="Globals_HyperlinkTooltipButtons"
                                     ContentAlignment="Vertical"
+                                    HorizontalContentAlignment="Left"
                                     IsEnabled="{x:Bind ViewModel.HyperlinkTooltipActions, Mode=OneWay}">
                     <ItemsControl ItemTemplate="{StaticResource ButtonChoiceTemplate}"
                                   ItemsSource="{x:Bind ViewModel.ButtonChoices, Mode=OneWay}" />
@@ -359,19 +369,35 @@
                 <TextBlock x:Uid="LinkTooltip_RulesHeader"
                            Style="{StaticResource TextBlockSubHeaderStyle}" />
 
-                <muxc:SplitButton x:Name="AddRuleButton"
-                                  Click="AddRuleButton_Click">
-                    <StackPanel Orientation="Horizontal"
-                                Spacing="8">
-                        <FontIcon FontSize="{StaticResource StandardIconSize}"
-                                  Glyph="&#xE710;" />
-                        <TextBlock x:Uid="LinkTooltip_AddRuleButtonText" />
-                    </StackPanel>
-                    <muxc:SplitButton.Flyout>
-                        <MenuFlyout Opening="AddRuleFlyout_Opening"
-                                    Placement="BottomEdgeAlignedLeft" />
-                    </muxc:SplitButton.Flyout>
-                </muxc:SplitButton>
+                <!--
+                    Expand/collapse all sit beside Add rule rather than in the list,
+                    so they are reachable without first scrolling through the groups
+                    they collapse. They are grouped-view only: the manual-order view
+                    is one flat list with nothing to expand.
+                -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="8">
+                    <muxc:SplitButton x:Name="AddRuleButton"
+                                      Click="AddRuleButton_Click">
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="8">
+                            <FontIcon FontSize="{StaticResource StandardIconSize}"
+                                      Glyph="&#xE710;" />
+                            <TextBlock x:Uid="LinkTooltip_AddRuleButtonText" />
+                        </StackPanel>
+                        <muxc:SplitButton.Flyout>
+                            <MenuFlyout Opening="AddRuleFlyout_Opening"
+                                        Placement="BottomEdgeAlignedLeft" />
+                        </muxc:SplitButton.Flyout>
+                    </muxc:SplitButton>
+
+                    <Button x:Uid="LinkTooltip_ExpandAllRuleGroups"
+                            Click="ExpandAllRuleGroups_Click"
+                            Visibility="{x:Bind ViewModel.IsAutomaticRuleOrder, Mode=OneWay}" />
+                    <Button x:Uid="LinkTooltip_CollapseAllRuleGroups"
+                            Click="CollapseAllRuleGroups_Click"
+                            Visibility="{x:Bind ViewModel.IsAutomaticRuleOrder, Mode=OneWay}" />
+                </StackPanel>
 
                 <!--
                     Order is precedence: the first enabled rule that matches a link
@@ -648,7 +674,8 @@
                        Style="{StaticResource TextBlockSubHeaderStyle}" />
 
             <local:SettingsCard x:Uid="LinkTooltip_RuleButtons"
-                                ContentAlignment="Vertical">
+                                ContentAlignment="Vertical"
+                                HorizontalContentAlignment="Left">
                 <StackPanel Spacing="4">
                     <CheckBox x:Uid="LinkTooltip_RuleOverrideButtons"
                               IsChecked="{x:Bind ViewModel.CurrentRule.OverrideButtons, Mode=TwoWay}" />

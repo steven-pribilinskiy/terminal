@@ -9,6 +9,7 @@
 #include <sddl.h>
 
 #include <regex>
+#include <til/regex.h>
 
 #include "TermControlAutomationPeer.h"
 #include "../../renderer/atlas/AtlasEngine.h"
@@ -3656,6 +3657,46 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
     }
 
+    // Matches one user-authored rule pattern against `text`.
+    //
+    // This uses ICU, not std::wregex, and that is the whole point. Rule patterns are
+    // written against ICU's syntax because that is what compiles them everywhere else
+    // that matters: Terminal::_getPatterns() scans the buffer with ICU, and
+    // HyperlinkPreviewService reads their named captures back with
+    // uregex_groupNumberFromName(). std::regex only implements the ECMAScript grammar
+    // from ECMA-262 3rd edition, which has no named groups at all -- so `(?<key>...)`
+    // threw std::regex_error here and the catch below quietly turned it into "no
+    // match". Every shipped preset (Jira, GitHub, Slack, Stith) uses named groups, so
+    // all of them were detected and highlighted by the scanner and then silently
+    // refused by this function: no card, no preview, no per-rule action.
+    static bool _ruleTextMatches(const std::wstring_view pattern, const std::wstring_view text, const bool requireFullMatch) noexcept
+    {
+        if (pattern.empty() || text.empty())
+        {
+            return false;
+        }
+
+        UErrorCode status = U_ZERO_ERROR;
+        const auto re = til::ICU::CreateRegex(pattern, UREGEX_CASE_INSENSITIVE, &status);
+        if (U_FAILURE(status) || !re)
+        {
+            // An uncompilable pattern never matches, rather than crashing or matching
+            // everything. CreateRegex also caps the match time and stack, so a
+            // pathological pattern cannot hang the hover either.
+            return false;
+        }
+
+#pragma warning(suppress : 26490) // Don't use reinterpret_cast (type.1).
+        uregex_setText(re.get(), reinterpret_cast<const UChar*>(text.data()), gsl::narrow_cast<int32_t>(text.size()), &status);
+        if (U_FAILURE(status))
+        {
+            return false;
+        }
+
+        const auto matched = requireFullMatch ? uregex_matches(re.get(), 0, &status) : uregex_find(re.get(), 0, &status);
+        return U_SUCCESS(status) && matched;
+    }
+
     // Walks HyperlinkTooltipRules in order and returns the show/hide delay, max width,
     // built-in button visibility and custom action list that should actually be used for
     // the given hovered link -- the global settings, overridden by the first enabled rule
@@ -3755,17 +3796,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                     continue;
                 }
 
-                auto matched = false;
-                try
-                {
-                    const std::wregex re{ pattern.c_str(), std::regex_constants::ECMAScript | std::regex_constants::icase };
-                    matched = std::regex_match(uri.begin(), uri.end(), re);
-                }
-                catch (...)
-                {
-                    // An invalid regex never matches, rather than crashing or matching everything.
-                }
-                if (!matched)
+                if (!_ruleTextMatches(pattern, uri, true))
                 {
                     continue;
                 }
@@ -3787,17 +3818,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
             if (const auto pattern = rule.Pattern(); !isTextRule && !pattern.empty())
             {
-                bool matched = false;
-                try
-                {
-                    const std::wregex re{ pattern.c_str(), std::regex_constants::ECMAScript | std::regex_constants::icase };
-                    matched = std::regex_search(uri.begin(), uri.end(), re);
-                }
-                catch (...)
-                {
-                    // An invalid regex never matches, rather than crashing or matching everything.
-                }
-                if (!matched)
+                if (!_ruleTextMatches(pattern, uri, false))
                 {
                     continue;
                 }

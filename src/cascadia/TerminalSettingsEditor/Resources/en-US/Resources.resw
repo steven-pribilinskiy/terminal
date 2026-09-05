@@ -3137,6 +3137,18 @@
     <value>New blank rule</value>
     <comment>Text for the flyout menu item that creates an empty link tooltip rule.</comment>
   </data>
+  <data name="LinkTooltip_AddRuleMenu_AlreadyAdded" xml:space="preserve">
+    <value>Already added</value>
+    <comment>Tooltip on a greyed-out preset in the Add rule menu, meaning this rule is already in the list.</comment>
+  </data>
+  <data name="LinkTooltip_ExpandAllRuleGroups.Text" xml:space="preserve">
+    <value>Expand all</value>
+    <comment>Button that expands every rule group in the list.</comment>
+  </data>
+  <data name="LinkTooltip_CollapseAllRuleGroups.Text" xml:space="preserve">
+    <value>Collapse all</value>
+    <comment>Button that collapses every rule group in the list.</comment>
+  </data>
   <data name="LinkTooltip_RulePreset.Header" xml:space="preserve">
     <value>Preset</value>
     <comment>Header for a control to apply a preset to the current link tooltip rule.</comment>
