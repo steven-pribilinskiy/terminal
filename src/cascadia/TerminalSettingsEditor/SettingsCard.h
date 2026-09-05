@@ -43,6 +43,10 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         DEPENDENCY_PROPERTY(Editor::SettingsCardContentAlignment, ContentAlignment);
         DEPENDENCY_PROPERTY(bool, IsForkFeature);
 
+        // DEPENDENCY_PROPERTY ends in `private:` (it declares the backing static
+        // there), so anything following it needs to say `public:` again or it is
+        // unreachable from the pages that call it.
+    public:
         // Whether fork-only rows draw their mark, for the whole settings window.
         //
         // App-wide state rather than another dependency property, because the
@@ -65,12 +69,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         void _UpdateForkImprint();
 
-        // Every card built so far, weakly. Weak because XAML owns their lifetime and
-        // a settings window opens and closes many times in a session; dead entries
-        // are dropped on the next walk rather than needing an unregister step.
+        // Whether this card has been added to the imprint registry yet. The registry
+        // itself, and the app-wide flag, live at file scope in SettingsCard.cpp:
+        // holding weak references to SettingsCard inside SettingsCard's own
+        // definition would name a type that is not complete yet.
         bool _registeredForImprint{ false };
-        static inline bool _imprintEnabled{ false };
-        static inline std::vector<winrt::weak_ref<Editor::SettingsCard>> _liveCards;
 
         void _EnableButtonInteraction();
         void _DisableButtonInteraction();

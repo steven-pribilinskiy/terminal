@@ -53,6 +53,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     static constexpr std::wstring_view RootGridPart{ L"PART_RootGrid" };
     static constexpr std::wstring_view AylithImprintPart{ L"PART_AylithImprint" };
 
+    // Whether fork-only rows draw their mark, and every card built so far.
+    //
+    // At file scope rather than as class members: a weak_ref to SettingsCard inside
+    // SettingsCard's own definition names an incomplete type. Weak because XAML owns
+    // the cards' lifetime and a settings window opens and closes many times in a
+    // session; dead entries are dropped on the next walk rather than needing an
+    // unregister step that nothing would reliably call.
+    static bool g_imprintEnabled{ false };
+    static std::vector<winrt::weak_ref<SettingsCard>> g_liveCards;
+
     static constexpr double SettingsCardVerticalHeaderContentSpacing{ 8.0 };
 
     // Returns true if the given object is null, or is a string that is empty.
@@ -77,31 +87,31 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     bool SettingsCard::ImprintEnabled() noexcept
     {
-        return _imprintEnabled;
+        return g_imprintEnabled;
     }
 
     void SettingsCard::ImprintEnabled(bool value)
     {
-        if (_imprintEnabled == value)
+        if (g_imprintEnabled == value)
         {
             return;
         }
-        _imprintEnabled = value;
+        g_imprintEnabled = value;
 
         // Refresh what is on screen, dropping cards XAML has since released. The
         // compaction rides along with the walk because there is no teardown hook
         // that would reliably fire for every card.
-        std::vector<winrt::weak_ref<Editor::SettingsCard>> alive;
-        alive.reserve(_liveCards.size());
-        for (const auto& weak : _liveCards)
+        std::vector<winrt::weak_ref<SettingsCard>> alive;
+        alive.reserve(g_liveCards.size());
+        for (const auto& weak : g_liveCards)
         {
             if (const auto card = weak.get())
             {
-                get_self<SettingsCard>(card)->_UpdateForkImprint();
+                card->_UpdateForkImprint();
                 alive.emplace_back(weak);
             }
         }
-        _liveCards = std::move(alive);
+        g_liveCards = std::move(alive);
     }
 
     // The mark is drawn only where both halves agree: this row is one of ours, and
@@ -112,7 +122,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         {
             if (const auto imprint{ child.try_as<Windows::UI::Xaml::UIElement>() })
             {
-                imprint.Visibility(IsForkFeature() && _imprintEnabled ? Visibility::Visible : Visibility::Collapsed);
+                imprint.Visibility(IsForkFeature() && g_imprintEnabled ? Visibility::Visible : Visibility::Collapsed);
             }
         }
     }
@@ -264,7 +274,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         if (!_registeredForImprint)
         {
             _registeredForImprint = true;
-            _liveCards.emplace_back(get_weak());
+            g_liveCards.emplace_back(get_weak());
         }
         _UpdateForkImprint();
         // Initial visual states.
