@@ -2407,11 +2407,6 @@
           "description": "When set to `true`, the terminal remembers the position, size and maximized state of each window when it closes, and reopens the window there. Geometry is remembered per window name, so named windows each keep their own. This takes precedence over \"initialPosition\", \"centerOnLaunch\" and \"launchMode\", but command line arguments such as \"--pos\" and \"--maximized\" still win.",
           "type": "boolean"
         },
-        "warning.inputService": {
-          "default": true,
-          "description": "Warning if 'Touch Keyboard and Handwriting Panel Service' is disabled.",
-          "type": "boolean"
-        },
         "controlPipe": {
           "default": true,
           "description": "When set to true, the Terminal serves a local named pipe, \\\\.\\pipe\\wt-control-<pid>, that lets another process running as you enumerate this Terminal's panes, read what is on a pane's screen, and write text into a pane. Only your own user account can open it, and it can neither run commands nor change settings. Set to false to turn it off.",

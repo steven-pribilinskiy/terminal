@@ -86,6 +86,7 @@ backstory
 Bazz
 bbccb
 bbwe
+bcde
 bcount
 bcx
 bcz
@@ -252,6 +253,7 @@ conterm
 contsf
 contypes
 conwinuserrefs
+cooldown
 COPYCOLOR
 COPYDATA
 COPYDATASTRUCT
