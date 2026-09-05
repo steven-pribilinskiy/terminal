@@ -26,6 +26,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     DependencyProperty SettingsCard::_IsClickEnabledProperty{ nullptr };
     DependencyProperty SettingsCard::_IsActionIconVisibleProperty{ nullptr };
     DependencyProperty SettingsCard::_ContentAlignmentProperty{ nullptr };
+    DependencyProperty SettingsCard::_IsForkFeatureProperty{ nullptr };
 
     static constexpr std::wstring_view NormalState{ L"Normal" };
     static constexpr std::wstring_view PointerOverState{ L"PointerOver" };
@@ -50,6 +51,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     static constexpr std::wstring_view HeaderIconPresenterHolder{ L"PART_HeaderIconPresenterHolder" };
     static constexpr std::wstring_view ContentPresenterPart{ L"PART_ContentPresenter" };
     static constexpr std::wstring_view RootGridPart{ L"PART_RootGrid" };
+    static constexpr std::wstring_view AylithImprintPart{ L"PART_AylithImprint" };
 
     static constexpr double SettingsCardVerticalHeaderContentSpacing{ 8.0 };
 
@@ -71,6 +73,52 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     SettingsCard::SettingsCard()
     {
         _InitializeProperties();
+
+        // Registered here rather than on first use, so a card built while the mark
+        // is already on still gets refreshed when it is later switched off.
+        _liveCards.emplace_back(get_weak());
+    }
+
+    bool SettingsCard::ImprintEnabled() noexcept
+    {
+        return _imprintEnabled;
+    }
+
+    void SettingsCard::ImprintEnabled(bool value)
+    {
+        if (_imprintEnabled == value)
+        {
+            return;
+        }
+        _imprintEnabled = value;
+
+        // Refresh what is on screen, dropping cards XAML has since released. The
+        // compaction rides along with the walk because there is no teardown hook
+        // that would reliably fire for every card.
+        std::vector<winrt::weak_ref<Editor::SettingsCard>> alive;
+        alive.reserve(_liveCards.size());
+        for (const auto& weak : _liveCards)
+        {
+            if (const auto card = weak.get())
+            {
+                get_self<SettingsCard>(card)->_UpdateForkImprint();
+                alive.emplace_back(weak);
+            }
+        }
+        _liveCards = std::move(alive);
+    }
+
+    // The mark is drawn only where both halves agree: this row is one of ours, and
+    // the switch in Appearance is on.
+    void SettingsCard::_UpdateForkImprint()
+    {
+        if (const auto child{ GetTemplateChild(hstring{ AylithImprintPart }) })
+        {
+            if (const auto imprint{ child.try_as<Windows::UI::Xaml::UIElement>() })
+            {
+                imprint.Visibility(IsForkFeature() && _imprintEnabled ? Visibility::Visible : Visibility::Collapsed);
+            }
+        }
     }
 
     void SettingsCard::_InitializeProperties()
@@ -142,6 +190,14 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 xaml_typename<Editor::SettingsCard>(),
                 PropertyMetadata{ box_value(Editor::SettingsCardContentAlignment::Right), PropertyChangedCallback{ &SettingsCard::_OnContentAlignmentChanged } });
         }
+        if (!_IsForkFeatureProperty)
+        {
+            _IsForkFeatureProperty = DependencyProperty::Register(
+                L"IsForkFeature",
+                xaml_typename<bool>(),
+                xaml_typename<Editor::SettingsCard>(),
+                PropertyMetadata{ box_value(false), PropertyChangedCallback{ &SettingsCard::_OnIsForkFeatureChanged } });
+        }
     }
 
     AutomationPeer SettingsCard::OnCreateAutomationPeer()
@@ -203,6 +259,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _UpdateDescriptionVisibility();
         _UpdateHeaderIconVisibility();
         _UpdateContentVisibility();
+        _UpdateForkImprint();
         // Initial visual states.
         _CheckInitialVisualState();
         _CheckHeaderIconState();
@@ -638,6 +695,12 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     {
         const auto obj{ d.try_as<Editor::SettingsCard>() };
         get_self<SettingsCard>(obj)->_UpdateContentAlignmentState();
+    }
+
+    void SettingsCard::_OnIsForkFeatureChanged(const DependencyObject& d, const DependencyPropertyChangedEventArgs& /*e*/)
+    {
+        const auto obj{ d.try_as<Editor::SettingsCard>() };
+        get_self<SettingsCard>(obj)->_UpdateForkImprint();
     }
 
     SettingsCardAutomationPeer::SettingsCardAutomationPeer(const Editor::SettingsCard& owner) :

@@ -45,7 +45,8 @@ Author(s):
     X(bool, PersistBufferPeriodically, "persistBufferPeriodically", true)                                                          \
     X(int32_t, BufferPersistIntervalMinutes, "bufferPersistIntervalMinutes", 5)                                                    \
     X(Model::ResumeSessionNotification, ResumeSessionNotification, "resumeSessionNotification", Model::ResumeSessionNotification::Toast) \
-    X(IntegrationSettingsMap, Integrations, "integrations", MakeIntegrationSettingsMap())
+    X(IntegrationSettingsMap, Integrations, "integrations", MakeIntegrationSettingsMap())                                          \
+    X(bool, AylithImprint, "aylith.imprint", false)
 
 // Settings that are per-window (may vary by window name in the future)
 #define MTSM_WINDOW_SETTINGS(X)                                                                                                                                                                       \

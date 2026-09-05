@@ -41,6 +41,17 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         DEPENDENCY_PROPERTY(bool, IsClickEnabled);
         DEPENDENCY_PROPERTY(bool, IsActionIconVisible);
         DEPENDENCY_PROPERTY(Editor::SettingsCardContentAlignment, ContentAlignment);
+        DEPENDENCY_PROPERTY(bool, IsForkFeature);
+
+        // Whether fork-only rows draw their mark, for the whole settings window.
+        //
+        // App-wide state rather than another dependency property, because the
+        // alternative is threading one binding through every page's view model to
+        // reach cards that otherwise have nothing to do with it. Setting it walks
+        // the cards already on screen so the switch takes effect where you flipped
+        // it, not on the next navigation.
+        static bool ImprintEnabled() noexcept;
+        static void ImprintEnabled(bool value);
 
     private:
         static void _InitializeProperties();
@@ -50,6 +61,15 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         static void _OnIsClickEnabledChanged(const Windows::UI::Xaml::DependencyObject& d, const Windows::UI::Xaml::DependencyPropertyChangedEventArgs& e);
         static void _OnIsActionIconVisibleChanged(const Windows::UI::Xaml::DependencyObject& d, const Windows::UI::Xaml::DependencyPropertyChangedEventArgs& e);
         static void _OnContentAlignmentChanged(const Windows::UI::Xaml::DependencyObject& d, const Windows::UI::Xaml::DependencyPropertyChangedEventArgs& e);
+        static void _OnIsForkFeatureChanged(const Windows::UI::Xaml::DependencyObject& d, const Windows::UI::Xaml::DependencyPropertyChangedEventArgs& e);
+
+        void _UpdateForkImprint();
+
+        // Every card built so far, weakly. Weak because XAML owns their lifetime and
+        // a settings window opens and closes many times in a session; dead entries
+        // are dropped on the next walk rather than needing an unregister step.
+        static inline bool _imprintEnabled{ false };
+        static inline std::vector<winrt::weak_ref<Editor::SettingsCard>> _liveCards;
 
         void _EnableButtonInteraction();
         void _DisableButtonInteraction();

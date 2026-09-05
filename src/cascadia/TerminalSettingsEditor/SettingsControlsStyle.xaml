@@ -248,11 +248,28 @@
                                     Margin="0,0,24,0"
                                     VerticalAlignment="Center"
                                     Orientation="Vertical">
-                            <ContentPresenter x:Name="PART_HeaderPresenter"
-                                              HorizontalAlignment="Left"
-                                              Content="{TemplateBinding Header}"
-                                              HighContrastAdjustment="None"
-                                              TextWrapping="Wrap" />
+                            <!--
+                                The header and, beside it, the provenance mark a
+                                fork-only row carries. Kept in the header line rather
+                                than out at the edge so it reads as part of the name
+                                of the setting, and collapsed unless the row is ours
+                                AND the mark is switched on in Appearance.
+                            -->
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="6">
+                                <ContentPresenter x:Name="PART_HeaderPresenter"
+                                                  HorizontalAlignment="Left"
+                                                  Content="{TemplateBinding Header}"
+                                                  HighContrastAdjustment="None"
+                                                  TextWrapping="Wrap" />
+                                <TextBlock x:Name="PART_AylithImprint"
+                                           VerticalAlignment="Center"
+                                           AutomationProperties.AccessibilityView="Raw"
+                                           FontSize="10"
+                                           Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                           Text="&#x25C6;"
+                                           Visibility="Collapsed" />
+                            </StackPanel>
 
                             <ContentPresenter x:Name="PART_DescriptionPresenter"
                                               Content="{TemplateBinding Description}"

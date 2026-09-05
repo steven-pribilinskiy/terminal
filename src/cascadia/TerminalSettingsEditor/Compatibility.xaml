@@ -63,7 +63,8 @@
 
         <!--  CI Poll Interval  -->
         <local:SettingsCard x:Name="CiPollIntervalMinutes"
-                            x:Uid="Globals_CiPollIntervalMinutes">
+                            x:Uid="Globals_CiPollIntervalMinutes"
+                            IsForkFeature="True">
             <muxc:NumberBox x:Uid="Globals_CiPollIntervalMinutesBox"
                             Maximum="1440"
                             Minimum="0"

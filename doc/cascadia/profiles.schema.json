@@ -2407,6 +2407,11 @@
           "description": "When set to `true`, the terminal remembers the position, size and maximized state of each window when it closes, and reopens the window there. Geometry is remembered per window name, so named windows each keep their own. This takes precedence over \"initialPosition\", \"centerOnLaunch\" and \"launchMode\", but command line arguments such as \"--pos\" and \"--maximized\" still win.",
           "type": "boolean"
         },
+        "aylith.imprint": {
+          "default": false,
+          "description": "When set to true, the settings window draws a small diamond beside every setting this fork added on top of upstream Windows Terminal, so it is clear which behaviour is not upstream's.",
+          "type": "boolean"
+        },
         "controlPipe": {
           "default": true,
           "description": "When set to true, the Terminal serves a local named pipe, \\\\.\\pipe\\wt-control-<pid>, that lets another process running as you enumerate this Terminal's panes, read what is on a pane's screen, and write text into a pane. Only your own user account can open it, and it can neither run commands nor change settings. Set to false to turn it off.",

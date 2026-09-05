@@ -5,6 +5,7 @@
 #include "GlobalAppearanceViewModel.h"
 #include "GlobalAppearanceViewModel.g.cpp"
 #include "EnumEntry.h"
+#include "SettingsCard.h"
 
 using namespace winrt;
 using namespace winrt::Windows::UI::Xaml;
@@ -120,5 +121,14 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         {
             AlwaysShowTabs(true);
         }
+    }
+
+    // The setting lives on the settings clone and is only written on Save, but the
+    // mark is a property of the editor's own chrome -- it should follow the switch
+    // immediately, on every page, including this one. So the value is pushed
+    // straight to SettingsCard rather than waiting to be reloaded.
+    void GlobalAppearanceViewModel::AylithImprintToggled(const winrt::Windows::Foundation::IInspectable& /* sender */, const RoutedEventArgs& /* args */)
+    {
+        SettingsCard::ImprintEnabled(AylithImprint());
     }
 }

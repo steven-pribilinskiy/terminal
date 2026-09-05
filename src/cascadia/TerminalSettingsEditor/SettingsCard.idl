@@ -37,5 +37,11 @@ namespace Microsoft.Terminal.Settings.Editor
 
         SettingsCardContentAlignment ContentAlignment;
         static Windows.UI.Xaml.DependencyProperty ContentAlignmentProperty { get; };
+
+        // True on a row this fork added that upstream does not have. Set in markup,
+        // per row; whether the mark is actually drawn is the app-wide switch in
+        // Appearance, not this.
+        Boolean IsForkFeature;
+        static Windows.UI.Xaml.DependencyProperty IsForkFeatureProperty { get; };
     };
 }

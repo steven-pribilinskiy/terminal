@@ -3,6 +3,7 @@
 
 #include "pch.h"
 #include "MainPage.h"
+#include "SettingsCard.h"
 #include "MainPage.g.cpp"
 #include "Launch.h"
 #include "Interaction.h"
@@ -217,6 +218,12 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _windowSettingsClone = _settingsClone.WindowSettingsDefaults();
 
         _UpdateBackgroundForMica();
+
+        // Seed the provenance mark before anything navigates, so the first page drawn
+        // already agrees with the saved setting rather than picking it up only once
+        // Appearance has been visited.
+        SettingsCard::ImprintEnabled(_settingsClone.GlobalSettings().AylithImprint());
+        _UpdateForkNavItems();
 
         // Capture data about where we are right now, so we can re-navigate to the same
         // place after we rebuild all the settings.
@@ -621,6 +628,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     {
         _PreNavigateHelper();
 
+        // Cheap, and it is the moment the marks can have gone stale: the Appearance
+        // toggle refreshes the cards itself, but the nav entries live above every
+        // page and belong to no view model.
+        _UpdateForkNavItems();
+
         hstring selectedNavTag;
 
         if (const auto clickedItemTag = vm.try_as<hstring>())
@@ -967,6 +979,60 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         if (!_settingsClone.WriteSettingsToDisk())
         {
             ShowLoadWarningsDialog.raise(*this, _settingsClone.Warnings());
+        }
+    }
+
+    // Link Tooltip and Integrations are whole pages this fork added, not settings
+    // scattered among upstream's. Marking every row on them would be noise, so the
+    // mark goes on the nav entry instead and says it once.
+    //
+    // The glyph is appended to the localized label rather than drawn as a separate
+    // element, because a NavigationViewItem's Content is the label and giving it a
+    // panel would cost the item its automation name.
+    void MainPage::_UpdateForkNavItems()
+    {
+        // From resources rather than a literal here: the glyph then lives in a file
+        // that is unambiguously UTF-8, instead of depending on this translation
+        // unit's source charset, and a translator can drop it for a locale where a
+        // trailing diamond reads badly. Held in a named hstring, not viewed straight
+        // off the RS_ temporary, which would be dangling by the next statement.
+        const auto imprintText = RS_(L"Nav_ForkImprintSuffix");
+        const std::wstring_view imprint{ imprintText };
+        if (imprint.empty())
+        {
+            return;
+        }
+
+        const auto enabled = SettingsCard::ImprintEnabled();
+
+        for (const auto& item : { LinkTooltipNavItem(), IntegrationsNavItem() })
+        {
+            if (!item)
+            {
+                continue;
+            }
+            const auto content = item.Content().try_as<hstring>();
+            if (!content)
+            {
+                continue;
+            }
+
+            std::wstring label{ *content };
+            const auto marked = label.size() > imprint.size() &&
+                                label.compare(label.size() - imprint.size(), imprint.size(), imprint) == 0;
+            if (enabled && !marked)
+            {
+                label.append(imprint);
+            }
+            else if (!enabled && marked)
+            {
+                label.resize(label.size() - imprint.size());
+            }
+            else
+            {
+                continue;
+            }
+            item.Content(box_value(hstring{ label }));
         }
     }
 

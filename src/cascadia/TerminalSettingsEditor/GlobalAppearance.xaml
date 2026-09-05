@@ -109,7 +109,8 @@
 
         <!--  Pane Title Bars  -->
         <local:SettingsCard x:Name="PaneTitlebarVisibility"
-                            x:Uid="Globals_PaneTitlebarVisibility">
+                            x:Uid="Globals_PaneTitlebarVisibility"
+                            IsForkFeature="True">
             <ComboBox AutomationProperties.AccessibilityView="Content"
                       ItemTemplate="{StaticResource EnumComboBoxTemplate}"
                       ItemsSource="{x:Bind ViewModel.PaneTitlebarVisibilityList, Mode=OneWay}"
@@ -158,6 +159,19 @@
                             x:Uid="Globals_EnableUnfocusedAcrylic">
             <ToggleSwitch IsOn="{x:Bind ViewModel.EnableUnfocusedAcrylic, Mode=TwoWay}"
                           Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+        </local:SettingsCard>
+
+        <!--
+            The provenance mark. This row is itself one of ours, so it carries the
+            mark it controls - which doubles as the preview of what turning it on
+            does.
+        -->
+        <local:SettingsCard x:Name="AylithImprint"
+                            x:Uid="Globals_AylithImprint"
+                            IsForkFeature="True">
+            <ToggleSwitch IsOn="{x:Bind ViewModel.AylithImprint, Mode=TwoWay}"
+                          Style="{StaticResource ToggleSwitchInExpanderStyle}"
+                          Toggled="{x:Bind ViewModel.AylithImprintToggled}" />
         </local:SettingsCard>
     </StackPanel>
 </Page>

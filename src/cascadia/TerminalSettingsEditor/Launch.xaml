@@ -187,14 +187,16 @@
 
             <!--  Resume Agents  -->
             <local:SettingsCard x:Name="ResumeAgents"
-                                x:Uid="Globals_ResumeAgents">
+                                x:Uid="Globals_ResumeAgents"
+                                IsForkFeature="True">
                 <ToggleSwitch IsOn="{x:Bind ViewModel.ResumeAgents, Mode=TwoWay}"
                               Style="{StaticResource ToggleSwitchInExpanderStyle}" />
             </local:SettingsCard>
 
             <!--  Resume Multiplexers  -->
             <local:SettingsCard x:Name="ResumeMultiplexers"
-                                x:Uid="Globals_ResumeMultiplexers">
+                                x:Uid="Globals_ResumeMultiplexers"
+                                IsForkFeature="True">
                 <ToggleSwitch IsOn="{x:Bind ViewModel.ResumeMultiplexers, Mode=TwoWay}"
                               Style="{StaticResource ToggleSwitchInExpanderStyle}" />
             </local:SettingsCard>
@@ -216,6 +218,7 @@
             <!--  Resume Session Notification  -->
             <local:SettingsCard x:Name="ResumeSessionNotification"
                                 x:Uid="Globals_ResumeSessionNotification"
+                                IsForkFeature="True"
                                 IsEnabled="{x:Bind ViewModel.AnyResumeEnabled, Mode=OneWay}">
                 <ComboBox AutomationProperties.AccessibilityView="Content"
                           ItemTemplate="{StaticResource EnumComboBoxTemplate}"
@@ -226,7 +229,8 @@
 
             <!--  Persist Buffer Periodically  -->
             <local:SettingsCard x:Name="PersistBufferPeriodically"
-                                x:Uid="Globals_PersistBufferPeriodically">
+                                x:Uid="Globals_PersistBufferPeriodically"
+                                IsForkFeature="True">
                 <ToggleSwitch IsOn="{x:Bind ViewModel.PersistBufferPeriodically, Mode=TwoWay}"
                               Style="{StaticResource ToggleSwitchInExpanderStyle}" />
             </local:SettingsCard>
@@ -234,6 +238,7 @@
             <!--  Buffer Persist Interval  -->
             <local:SettingsCard x:Name="BufferPersistIntervalMinutes"
                                 x:Uid="Globals_BufferPersistIntervalMinutes"
+                                IsForkFeature="True"
                                 IsEnabled="{x:Bind ViewModel.PersistBufferPeriodically, Mode=OneWay}">
                 <muxc:NumberBox x:Uid="Globals_BufferPersistIntervalMinutesBox"
                                 Maximum="240"
@@ -344,7 +349,8 @@
                                       Style="{StaticResource ToggleSwitchInExpanderStyle}" />
                     </local:SettingsCard>
                     <local:SettingsCard x:Name="RememberWindowGeometryCard"
-                                        x:Uid="Globals_RememberWindowGeometry">
+                                        x:Uid="Globals_RememberWindowGeometry"
+                                        IsForkFeature="True">
                         <ToggleSwitch x:Name="RememberWindowGeometryToggle"
                                       IsOn="{x:Bind ViewModel.RememberWindowGeometry, Mode=TwoWay}"
                                       Style="{StaticResource ToggleSwitchInExpanderStyle}" />

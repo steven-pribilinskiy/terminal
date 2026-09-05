@@ -3137,6 +3137,18 @@
     <value>New blank rule</value>
     <comment>Text for the flyout menu item that creates an empty link tooltip rule.</comment>
   </data>
+  <data name="Nav_ForkImprintSuffix" xml:space="preserve">
+    <value> ◆</value>
+    <comment>Appended to a navigation item's label to mark a settings page this fork added. Leading space is intentional; the diamond is the mark.</comment>
+  </data>
+  <data name="Globals_AylithImprint.Header" xml:space="preserve">
+    <value>Mark features added by this fork</value>
+    <comment>Header for a setting that shows a small diamond beside every setting this fork added on top of upstream Windows Terminal.</comment>
+  </data>
+  <data name="Globals_AylithImprint.Description" xml:space="preserve">
+    <value>Shows a ◆ beside any setting that exists here but not in upstream Windows Terminal.</value>
+    <comment>Description for the setting that marks fork-only settings. The ◆ is the mark itself.</comment>
+  </data>
   <data name="LinkTooltip_AddRuleMenu_AlreadyAdded" xml:space="preserve">
     <value>Already added</value>
     <comment>Tooltip on a greyed-out preset in the Add rule menu, meaning this rule is already in the list.</comment>
