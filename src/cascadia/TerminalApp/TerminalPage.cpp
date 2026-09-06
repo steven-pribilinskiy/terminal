@@ -438,6 +438,15 @@ namespace winrt::TerminalApp::implementation
         // So a failure here degrades to the top strip instead of taking the
         // window with it. The user gets tabs in the wrong place and a log entry
         // rather than a Terminal they cannot open.
+        //
+        // Note what this does NOT cover, because it was written believing it
+        // did: a tree that XAML accepts and then fails to *render*. That throw
+        // happens on a later tick, inside CCoreServices::NWDrawTree, with none
+        // of our frames on the stack - so nothing here can catch it, and the
+        // process still dies. The bug that prompted this guard was of exactly
+        // that kind, and the guard did not stop it. Building a valid tree is
+        // the only defence against that class; this only helps for a throw
+        // raised inline, while the layout is being assembled.
         if (_tabPosition != TabPosition::Top)
         {
             try
