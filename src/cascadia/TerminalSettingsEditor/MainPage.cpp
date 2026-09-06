@@ -114,6 +114,29 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         InitializeComponent();
         _UpdateBackgroundForMica();
 
+        // TEMPORARY DIAGNOSTIC -- remove once the Link Tooltip crash is fixed.
+        //
+        // An exception escaping a XAML callback fails the process fast (0xC000041D)
+        // with nothing in the event log naming it, and there is no debugger on this
+        // machine. XAML raises Application.UnhandledException first, so this is the
+        // one place the message can be captured. It only writes the message; it does
+        // not set Handled, so behaviour is unchanged and the process still dies --
+        // this exists to name the throw, not to hide it.
+        if (const auto app = Windows::UI::Xaml::Application::Current())
+        {
+            app.UnhandledException([](auto&&, const Windows::UI::Xaml::UnhandledExceptionEventArgs& e) {
+                try
+                {
+                    std::filesystem::path log{ wil::ExpandEnvironmentStringsW<std::wstring>(L"%TEMP%") };
+                    log /= L"wt-settings-unhandled.log";
+                    std::wofstream out{ log, std::ios::app };
+                    out << L"0x" << std::hex << static_cast<uint32_t>(e.Exception()) << std::dec
+                        << L" | " << std::wstring_view{ e.Message() } << L"\n";
+                }
+                CATCH_LOG();
+            });
+        }
+
         _newTabMenuPageVM = winrt::make<NewTabMenuViewModel>(_settingsClone);
         _ntmViewModelChangedRevoker = _newTabMenuPageVM.PropertyChanged(winrt::auto_revoke, [this](auto&&, const PropertyChangedEventArgs& args) {
             const auto settingName{ args.PropertyName() };
@@ -628,9 +651,12 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     {
         _PreNavigateHelper();
 
-        // Cheap, and it is the moment the marks can have gone stale: the Appearance
-        // toggle refreshes the cards itself, but the nav entries live above every
-        // page and belong to no view model.
+        // Re-sync from the settings clone on every navigation, so the flag is right
+        // even if the Appearance toggle's own handler did not run, and so a page
+        // built after the switch was flipped agrees with it. The clone is the
+        // authority; the toggle handler is only there to make the change visible
+        // without leaving the page.
+        SettingsCard::ImprintEnabled(_settingsClone.GlobalSettings().AylithImprint());
         _UpdateForkNavItems();
 
         hstring selectedNavTag;

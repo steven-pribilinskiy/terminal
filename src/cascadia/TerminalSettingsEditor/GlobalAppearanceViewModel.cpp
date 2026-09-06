@@ -127,8 +127,15 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     // mark is a property of the editor's own chrome -- it should follow the switch
     // immediately, on every page, including this one. So the value is pushed
     // straight to SettingsCard rather than waiting to be reloaded.
-    void GlobalAppearanceViewModel::AylithImprintToggled(const winrt::Windows::Foundation::IInspectable& /* sender */, const RoutedEventArgs& /* args */)
+    void GlobalAppearanceViewModel::AylithImprintToggled(const winrt::Windows::Foundation::IInspectable& sender, const RoutedEventArgs& /* args */)
     {
-        SettingsCard::ImprintEnabled(AylithImprint());
+        // Read the switch, not AylithImprint(). Toggled and the TwoWay binding's
+        // write-back are not ordered against each other, so the projected property
+        // can still be reporting the old value here -- which meant this pushed
+        // "false" on the way on, and the mark never appeared anywhere.
+        if (const auto toggle = sender.try_as<winrt::Windows::UI::Xaml::Controls::ToggleSwitch>())
+        {
+            SettingsCard::ImprintEnabled(toggle.IsOn());
+        }
     }
 }
