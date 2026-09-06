@@ -91,7 +91,7 @@
 
                     <local:SettingsCard x:Name="ResumeSessionNotification"
                                         x:Uid="Globals_ResumeSessionNotification"
-                                        IsEnabled="{x:Bind ViewModel.AnyResumeEnabled, Mode=OneWay}">
+                                        IsEnabled="{x:Bind ViewModel.ResumeNotificationEnabled, Mode=OneWay}">
                         <ComboBox AutomationProperties.AccessibilityView="Content"
                                   ItemTemplate="{StaticResource EnumComboBoxTemplate}"
                                   ItemsSource="{x:Bind ViewModel.ResumeSessionNotificationList}"
@@ -122,7 +122,7 @@
 
                     <local:SettingsCard x:Name="BufferPersistIntervalMinutes"
                                         x:Uid="Globals_BufferPersistIntervalMinutes"
-                                        IsEnabled="{x:Bind ViewModel.PersistBufferPeriodically, Mode=OneWay}">
+                                        IsEnabled="{x:Bind ViewModel.PersistIntervalEnabled, Mode=OneWay}">
                         <muxc:NumberBox x:Uid="Globals_BufferPersistIntervalMinutesBox"
                                         Maximum="240"
                                         Minimum="1"
@@ -137,7 +137,8 @@
                         off, and is often exactly why you did.
                     -->
                     <local:SettingsCard x:Name="PersistCost"
-                                        x:Uid="Globals_PersistCost">
+                                        x:Uid="Globals_PersistCost"
+                                        IsEnabled="{x:Bind ViewModel.ContentEnabled, Mode=OneWay}">
                         <StackPanel Orientation="Horizontal"
                                     Spacing="12">
                             <TextBlock VerticalAlignment="Center"

@@ -21,6 +21,11 @@ namespace Microsoft.Terminal.Settings.Editor
         Boolean RestoreEnabled { get; };
         // True only when window *content* is restored too. Gates the saving settings.
         Boolean ContentEnabled { get; };
+        // The two rows whose own condition is not the whole story: each is live
+        // only when the cascade above it is live too. x:Bind has no boolean
+        // operators, and IsEnabled on the expander would grey out its header.
+        Boolean ResumeNotificationEnabled { get; };
+        Boolean PersistIntervalEnabled { get; };
 
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, ResumeAgents);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, ResumeMultiplexers);

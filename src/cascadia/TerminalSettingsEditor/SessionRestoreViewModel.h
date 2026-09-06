@@ -27,6 +27,8 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         void CurrentFirstWindowPreference(const Windows::Foundation::IInspectable& enumEntry);
         bool RestoreEnabled() const;
         bool ContentEnabled() const;
+        bool ResumeNotificationEnabled();
+        bool PersistIntervalEnabled() const;
 
         GETSET_BINDABLE_ENUM_SETTING(ResumeSessionNotification, Model::ResumeSessionNotification, _Settings.GlobalSettings().ResumeSessionNotification);
 

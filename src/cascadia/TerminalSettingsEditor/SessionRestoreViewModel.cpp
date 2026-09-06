@@ -29,7 +29,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             {
                 // The notification setting is only reachable while something
                 // is eligible to be resumed at all.
-                _NotifyChanges(L"AnyResumeEnabled");
+                _NotifyChanges(L"AnyResumeEnabled", L"ResumeNotificationEnabled");
+            }
+            else if (viewModelProperty == L"PersistBufferPeriodically")
+            {
+                _NotifyChanges(L"PersistIntervalEnabled");
             }
         });
     }
@@ -66,7 +70,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             return;
         }
         _Settings.GlobalSettings().FirstWindowPreference(setting);
-        _NotifyChanges(L"RestoreEnabled", L"ContentEnabled");
+        _NotifyChanges(L"RestoreEnabled", L"ContentEnabled", L"ResumeNotificationEnabled", L"PersistIntervalEnabled");
     }
 
     // The same test the app makes: GlobalAppSettings::ShouldUsePersistedLayout is
@@ -84,6 +88,25 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     bool SessionRestoreViewModel::ContentEnabled() const
     {
         return _Settings.GlobalSettings().FirstWindowPreference() == Model::FirstWindowPreference::PersistedLayoutAndContent;
+    }
+
+    // A nested row is live only when its own condition AND the cascade above it
+    // hold. Both halves have to be spelled out here rather than in the markup:
+    // IsEnabled cannot go on the expander (it would grey out the header, taking
+    // the control you are gating on with it), and x:Bind has no boolean
+    // operators, so the conjunction has to be a property.
+    //
+    // Binding a nested row to its inner condition alone is the bug this fixes --
+    // "When resuming sessions" and "Save pane contents every" stayed live under
+    // "Open a tab with the default profile", advertising settings that do nothing.
+    bool SessionRestoreViewModel::ResumeNotificationEnabled()
+    {
+        return RestoreEnabled() && AnyResumeEnabled();
+    }
+
+    bool SessionRestoreViewModel::PersistIntervalEnabled() const
+    {
+        return ContentEnabled() && _Settings.GlobalSettings().PersistBufferPeriodically();
     }
 
     static winrt::hstring _joinPrograms(const Windows::Foundation::Collections::IVector<winrt::hstring>& list)
@@ -136,7 +159,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             return;
         }
         _Settings.GlobalSettings().ResumeExtraPrograms(_splitPrograms(value));
-        _NotifyChanges(L"ResumeExtraProgramsText", L"AnyResumeEnabled");
+        _NotifyChanges(L"ResumeExtraProgramsText", L"AnyResumeEnabled", L"ResumeNotificationEnabled");
     }
 
     winrt::hstring SessionRestoreViewModel::ResumeExcludedProgramsText()
