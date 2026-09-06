@@ -212,6 +212,7 @@ void AppHost::Initialize()
     _window->SetAlwaysOnTop(_windowLogic.GetInitialAlwaysOnTop());
     _window->SetAutoHideWindow(_windowLogic.AutoHideWindow());
     _window->SetShowTabsFullscreen(_windowLogic.GetInitialShowTabsFullscreen());
+    _updateDock();
 
     // MORE EVENT HANDLERS HERE!
     // MAKE SURE THEY ARE ALL:
@@ -1223,7 +1224,39 @@ void AppHost::_HandleSettingsChanged(const winrt::Windows::Foundation::IInspecta
     _window->SetMinimizeToNotificationAreaBehavior(_windowLogic.GetMinimizeToNotificationArea());
     _window->SetAutoHideWindow(_windowLogic.AutoHideWindow());
     _window->SetShowTabsFullscreen(_windowLogic.ShowTabsFullscreen());
+    _updateDock();
     _updateTheme();
+}
+
+// Method Description:
+// - Translates the dockWindow / dockSize settings into the window layer's own
+//   vocabulary. IslandWindow.h includes nothing but BaseWindow.h on purpose, so
+//   the settings enum stops here.
+void AppHost::_updateDock()
+{
+    using namespace winrt::Microsoft::Terminal::Settings::Model;
+
+    auto edge = WindowDockEdge::None;
+    switch (_windowLogic.DockWindow())
+    {
+    case WindowDock::Top:
+        edge = WindowDockEdge::Top;
+        break;
+    case WindowDock::Bottom:
+        edge = WindowDockEdge::Bottom;
+        break;
+    case WindowDock::Left:
+        edge = WindowDockEdge::Left;
+        break;
+    case WindowDock::Right:
+        edge = WindowDockEdge::Right;
+        break;
+    case WindowDock::Off:
+    default:
+        break;
+    }
+
+    _window->SetDock(edge, _windowLogic.DockSize());
 }
 
 void AppHost::_IsQuakeWindowChanged(const winrt::Windows::Foundation::IInspectable&,

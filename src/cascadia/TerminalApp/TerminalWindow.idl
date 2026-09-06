@@ -77,6 +77,8 @@ namespace TerminalApp
         void Maximized(Boolean newMaximized);
         Boolean AlwaysOnTop { get; };
         Boolean AutoHideWindow { get; };
+        Microsoft.Terminal.Settings.Model.WindowDock DockWindow { get; };
+        UInt32 DockSize { get; };
         Boolean ShowTabsFullscreen { get; };
 
         void IdentifyWindow();

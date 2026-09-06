@@ -96,6 +96,8 @@ namespace winrt::TerminalApp::implementation
         bool AlwaysOnTop() const;
         bool ShowTabsFullscreen() const;
         bool AutoHideWindow();
+        Microsoft::Terminal::Settings::Model::WindowDock DockWindow();
+        uint32_t DockSize();
         void IdentifyWindow();
         bool FocusTab(const winrt::TerminalApp::Tab& tab);
 

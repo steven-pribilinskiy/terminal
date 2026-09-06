@@ -1265,6 +1265,16 @@ namespace winrt::TerminalApp::implementation
         return _currentWindowSettings().AutoHideWindow();
     }
 
+    Microsoft::Terminal::Settings::Model::WindowDock TerminalWindow::DockWindow()
+    {
+        return _currentWindowSettings().DockWindow();
+    }
+
+    uint32_t TerminalWindow::DockSize()
+    {
+        return _currentWindowSettings().DockSize();
+    }
+
     void TerminalWindow::UpdateSettingsHandler(const winrt::IInspectable& /*sender*/,
                                                const winrt::TerminalApp::SettingsLoadEventArgs& args)
     {

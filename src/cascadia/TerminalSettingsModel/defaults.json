@@ -31,6 +31,8 @@
     "theme": "system",
     "snapToGridOnResize": true,
     "paneResizeStep": 5,
+    "dockWindow": "off",
+    "dockSize": 50,
     "disableAnimations": false,
     "startupActions": "",
     "focusFollowMouse": false,

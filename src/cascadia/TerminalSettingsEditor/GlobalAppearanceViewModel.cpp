@@ -31,6 +31,9 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         INITIALIZE_BINDABLE_ENUM_SETTING(NewTabPosition, NewTabPosition, NewTabPosition, L"Globals_NewTabPosition", L"Content");
         INITIALIZE_BINDABLE_ENUM_SETTING(TabWidthMode, TabViewWidthMode, winrt::Microsoft::UI::Xaml::Controls::TabViewWidthMode, L"Globals_TabWidthMode", L"Content");
         INITIALIZE_BINDABLE_ENUM_SETTING(TabPosition, TabPosition, Model::TabPosition, L"Globals_TabPosition", L"Content");
+        INITIALIZE_BINDABLE_ENUM_SETTING(TabIconStyle, IconStyle, Model::IconStyle, L"Globals_TabIconStyle", L"Content");
+        INITIALIZE_BINDABLE_ENUM_SETTING(TabCloseButton, TabCloseButtonVisibility, Model::TabCloseButtonVisibility, L"Globals_TabCloseButton", L"Content");
+        INITIALIZE_BINDABLE_ENUM_SETTING(DockWindow, WindowDock, Model::WindowDock, L"Globals_DockWindow", L"Content");
         INITIALIZE_BINDABLE_ENUM_SETTING(PaneTitlebarVisibility, PaneTitlebarVisibility, Model::PaneTitlebarVisibility, L"Globals_PaneTitlebarVisibility", L"Content");
         _UpdateThemeList();
     }

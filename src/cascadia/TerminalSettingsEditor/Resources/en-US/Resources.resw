@@ -865,6 +865,86 @@
     <value>Shows a ◇ beside any setting that upstream Windows Terminal has, but only exposes in settings.json.</value>
     <comment>A description for what the "mark settings upstream hides in JSON" setting does. The ◇ character is a hollow diamond and should be kept as-is; it matches the mark drawn in the interface.</comment>
   </data>
+  <data name="Globals_DockWindow.Header" xml:space="preserve">
+    <value>Dock the window</value>
+    <comment>Header for a control that pins the window to one edge of the screen.</comment>
+  </data>
+  <data name="Globals_DockWindow.Description" xml:space="preserve">
+    <value>Snaps the window to a side of the screen and keeps it there. A docked window cannot be moved, and can only be resized by its inner edge.</value>
+    <comment>A description for what the "dock the window" setting does.</comment>
+  </data>
+  <data name="Globals_DockWindowOff.Content" xml:space="preserve">
+    <value>Off</value>
+    <comment>An option for the "dock the window" setting. The window behaves normally and can be moved anywhere.</comment>
+  </data>
+  <data name="Globals_DockWindowTop.Content" xml:space="preserve">
+    <value>Top</value>
+    <comment>An option for the "dock the window" setting. The window fills the width of the screen along its top edge.</comment>
+  </data>
+  <data name="Globals_DockWindowBottom.Content" xml:space="preserve">
+    <value>Bottom</value>
+    <comment>An option for the "dock the window" setting. The window fills the width of the screen along its bottom edge.</comment>
+  </data>
+  <data name="Globals_DockWindowLeft.Content" xml:space="preserve">
+    <value>Left</value>
+    <comment>An option for the "dock the window" setting. The window fills the height of the screen down its left edge.</comment>
+  </data>
+  <data name="Globals_DockWindowRight.Content" xml:space="preserve">
+    <value>Right</value>
+    <comment>An option for the "dock the window" setting. The window fills the height of the screen down its right edge.</comment>
+  </data>
+  <data name="Globals_DockSize.Header" xml:space="preserve">
+    <value>Docked size</value>
+    <comment>Header for a slider choosing how much of the screen a docked window takes up. The value is a percentage.</comment>
+  </data>
+  <data name="Globals_DockSize.Description" xml:space="preserve">
+    <value>How much of the screen the docked window covers, as a percentage. Has no effect when docking is off.</value>
+    <comment>A description for what the "docked size" setting does. Presented near "Globals_DockSize.Header".</comment>
+  </data>
+  <data name="Globals_TabIconStyle.Header" xml:space="preserve">
+    <value>Profile icon on tabs</value>
+    <comment>Header for a control choosing how the profile's icon is drawn on each tab.</comment>
+  </data>
+  <data name="Globals_TabIconStyle.Description" xml:space="preserve">
+    <value>Overrides the icon style set by the active theme.</value>
+    <comment>A description for what the "profile icon on tabs" setting does. "Theme" here means a colour and chrome theme chosen further up this page.</comment>
+  </data>
+  <data name="Globals_TabIconStyleDefault.Content" xml:space="preserve">
+    <value>Show in colour</value>
+    <comment>An option for the "profile icon on tabs" setting. The icon is drawn as the profile defines it, in full colour.</comment>
+  </data>
+  <data name="Globals_TabIconStyleHidden.Content" xml:space="preserve">
+    <value>Hide</value>
+    <comment>An option for the "profile icon on tabs" setting. No icon is drawn.</comment>
+  </data>
+  <data name="Globals_TabIconStyleMonochrome.Content" xml:space="preserve">
+    <value>Show in one colour</value>
+    <comment>An option for the "profile icon on tabs" setting. The icon is drawn in a single flat colour instead of its own colours.</comment>
+  </data>
+  <data name="Globals_TabCloseButton.Header" xml:space="preserve">
+    <value>Close button on tabs</value>
+    <comment>Header for a control choosing when each tab shows its close button.</comment>
+  </data>
+  <data name="Globals_TabCloseButton.Description" xml:space="preserve">
+    <value>Overrides the active theme. Middle-clicking a tab closes it whichever setting you choose.</value>
+    <comment>A description for what the "close button on tabs" setting does. Middle-clicking means clicking with the mouse wheel.</comment>
+  </data>
+  <data name="Globals_TabCloseButtonAlways.Content" xml:space="preserve">
+    <value>Always</value>
+    <comment>An option for the "close button on tabs" setting. Every tab shows its close button at all times.</comment>
+  </data>
+  <data name="Globals_TabCloseButtonHover.Content" xml:space="preserve">
+    <value>On hover</value>
+    <comment>An option for the "close button on tabs" setting. A tab shows its close button only while the mouse is over it.</comment>
+  </data>
+  <data name="Globals_TabCloseButtonActiveOnly.Content" xml:space="preserve">
+    <value>Active tab only</value>
+    <comment>An option for the "close button on tabs" setting. Only the tab currently in use shows a close button.</comment>
+  </data>
+  <data name="Globals_TabCloseButtonNever.Content" xml:space="preserve">
+    <value>Never</value>
+    <comment>An option for the "close button on tabs" setting. No tab shows a close button.</comment>
+  </data>
   <data name="Globals_ShowTabIndex.Header" xml:space="preserve">
     <value>Show tab numbers</value>
     <comment>Header for a control to toggle whether each tab shows its position in the row.</comment>

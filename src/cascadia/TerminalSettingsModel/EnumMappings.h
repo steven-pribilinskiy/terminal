@@ -50,6 +50,9 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, HyperlinkClickGesture> HyperlinkClickGesture();
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, ConfirmOnClose> ConfirmOnClose();
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, TabPosition> TabPosition();
+        static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, IconStyle> IconStyle();
+        static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, TabCloseButtonVisibility> TabCloseButtonVisibility();
+        static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, WindowDock> WindowDock();
 
         // Profile Settings
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, CloseOnExitMode> CloseOnExitMode();

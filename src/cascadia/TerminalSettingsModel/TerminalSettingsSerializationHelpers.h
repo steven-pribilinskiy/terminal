@@ -712,6 +712,17 @@ JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::TabPosition)
     };
 };
 
+JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::WindowDock)
+{
+    JSON_MAPPINGS(5) = {
+        pair_type{ "off", ValueType::Off },
+        pair_type{ "top", ValueType::Top },
+        pair_type{ "bottom", ValueType::Bottom },
+        pair_type{ "left", ValueType::Left },
+        pair_type{ "right", ValueType::Right },
+    };
+};
+
 // Possible ScrollToMarkDirection values
 JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Control::ScrollToMarkDirection)
 {

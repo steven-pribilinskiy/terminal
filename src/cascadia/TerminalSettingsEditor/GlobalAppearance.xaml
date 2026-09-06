@@ -76,6 +76,33 @@
                           Style="{StaticResource ToggleSwitchInExpanderStyle}" />
         </local:SettingsCard>
 
+        <!--
+            Tab icon and close button. Both exist upstream as theme.tab.iconStyle
+            and theme.tab.showCloseButton and are settable there only by hand, so
+            these carry the hollow mark rather than the filled one. They are
+            overrides: until one is touched, whatever the active theme says still
+            wins. See doc/json-only-settings.md.
+        -->
+        <local:SettingsCard x:Name="TabIconStyle"
+                            x:Uid="Globals_TabIconStyle"
+                            IsJsonOnlyUpstream="True">
+            <ComboBox AutomationProperties.AccessibilityView="Content"
+                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                      ItemsSource="{x:Bind ViewModel.TabIconStyleList, Mode=OneWay}"
+                      SelectedItem="{x:Bind ViewModel.CurrentTabIconStyle, Mode=TwoWay}"
+                      Style="{StaticResource ComboBoxSettingStyle}" />
+        </local:SettingsCard>
+
+        <local:SettingsCard x:Name="TabCloseButton"
+                            x:Uid="Globals_TabCloseButton"
+                            IsJsonOnlyUpstream="True">
+            <ComboBox AutomationProperties.AccessibilityView="Content"
+                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                      ItemsSource="{x:Bind ViewModel.TabCloseButtonList, Mode=OneWay}"
+                      SelectedItem="{x:Bind ViewModel.CurrentTabCloseButton, Mode=TwoWay}"
+                      Style="{StaticResource ComboBoxSettingStyle}" />
+        </local:SettingsCard>
+
         <!--  Show tab index  -->
         <local:SettingsCard x:Name="ShowTabIndex"
                             x:Uid="Globals_ShowTabIndex"
@@ -111,6 +138,40 @@
                             x:Uid="Globals_AlwaysOnTop">
             <ToggleSwitch IsOn="{x:Bind ViewModel.AlwaysOnTop, Mode=TwoWay}"
                           Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+        </local:SettingsCard>
+
+        <!--
+            Docking. Pins the window to a screen edge at a fixed fraction of the
+            screen, and stops it being moved or resized off that edge. Quake mode
+            is the same mechanism fixed at top / 50%, and still wins over this.
+        -->
+        <local:SettingsCard x:Name="DockWindow"
+                            x:Uid="Globals_DockWindow"
+                            IsForkFeature="True">
+            <ComboBox AutomationProperties.AccessibilityView="Content"
+                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                      ItemsSource="{x:Bind ViewModel.DockWindowList, Mode=OneWay}"
+                      SelectedItem="{x:Bind ViewModel.CurrentDockWindow, Mode=TwoWay}"
+                      Style="{StaticResource ComboBoxSettingStyle}" />
+        </local:SettingsCard>
+
+        <local:SettingsCard x:Name="DockSize"
+                            x:Uid="Globals_DockSize"
+                            IsForkFeature="True">
+            <Grid MinWidth="200">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Slider x:Name="DockSizeSlider"
+                        Grid.Column="0"
+                        Maximum="90"
+                        Minimum="10"
+                        Value="{x:Bind ViewModel.DockSize, Mode=TwoWay}" />
+                <TextBlock Grid.Column="1"
+                           Style="{StaticResource SliderValueLabelStyle}"
+                           Text="{Binding ElementName=DockSizeSlider, Path=Value, Mode=OneWay}" />
+            </Grid>
         </local:SettingsCard>
 
         <!--  Tab Position  -->

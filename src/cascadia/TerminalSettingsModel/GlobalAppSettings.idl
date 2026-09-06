@@ -52,6 +52,18 @@ namespace Microsoft.Terminal.Settings.Model
         AfterCurrentTab,
     };
 
+    // Which screen edge the window is pinned to, filling that edge and taking
+    // dockSize percent of the screen in the perpendicular direction. Quake mode
+    // is this same mechanism fixed at Top and 50%, and still overrides it.
+    enum WindowDock
+    {
+        Off,
+        Top,
+        Bottom,
+        Left,
+        Right,
+    };
+
     // Which edge of the window the tab strip sits on. Top is the shipped
     // behavior; Left and Right turn the strip into a vertical sidebar.
     //
@@ -150,6 +162,17 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(UInt32, PaneResizeStep);
         INHERITABLE_SETTING(Boolean, CloseWindowOnLastTab);
         INHERITABLE_SETTING(Boolean, ShowTabIndex);
+
+        // Overrides for theme.tab.iconStyle and theme.tab.showCloseButton.
+        // Deliberately absent from defaults.json: HasTabIconStyle() is then
+        // false until the user actually sets one, which is what lets the theme
+        // keep its say. See doc/json-only-settings.md for why the Settings UI
+        // cannot write the theme values directly.
+        INHERITABLE_SETTING(IconStyle, TabIconStyle);
+        INHERITABLE_SETTING(TabCloseButtonVisibility, TabCloseButton);
+
+        INHERITABLE_SETTING(WindowDock, DockWindow);
+        INHERITABLE_SETTING(UInt32, DockSize);
         INHERITABLE_SETTING(Boolean, UseAcrylicInTabRow);
         INHERITABLE_SETTING(Boolean, ShowTabsInTitlebar);
         INHERITABLE_SETTING(String, WordDelimiters);

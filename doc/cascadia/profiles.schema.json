@@ -2938,6 +2938,44 @@
           "description": "When set to true, the window will snap to the nearest character boundary on resize. When false, the window will resize smoothly",
           "type": "boolean"
         },
+        "dockWindow": {
+          "default": "off",
+          "description": "Pins the window to an edge of the screen. A docked window fills that edge, takes dockSize percent of the screen in the other direction, cannot be moved, and can only be resized by its inner edge. Quake mode is this same mechanism fixed at \"top\" and 50 percent, and overrides this setting for the _quake window.",
+          "enum": [
+            "off",
+            "top",
+            "bottom",
+            "left",
+            "right"
+          ],
+          "type": "string"
+        },
+        "dockSize": {
+          "default": 50,
+          "description": "How much of the screen a docked window covers, as a percentage. Clamped to between 10 and 90. Ignored when dockWindow is \"off\".",
+          "maximum": 90,
+          "minimum": 10,
+          "type": "integer"
+        },
+        "tabIconStyle": {
+          "description": "Overrides theme.tab.iconStyle. Omit it to let the active theme decide. Exists because the Settings UI cannot write theme values: built-in themes are skipped when user settings are serialized.",
+          "enum": [
+            "default",
+            "hidden",
+            "monochrome"
+          ],
+          "type": "string"
+        },
+        "tabCloseButton": {
+          "description": "Overrides theme.tab.showCloseButton. Omit it to let the active theme decide. Middle-clicking a tab closes it regardless of this setting.",
+          "enum": [
+            "always",
+            "hover",
+            "never",
+            "activeOnly"
+          ],
+          "type": "string"
+        },
         "showTabIndex": {
           "default": false,
           "description": "When set to true, each tab shows its position in the row ahead of its title, numbered from 1. Only the first nine positions have default switchToTab key bindings; the number is shown for every tab regardless.",

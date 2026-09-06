@@ -21,6 +21,9 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         GETSET_BINDABLE_ENUM_SETTING(NewTabPosition, Model::NewTabPosition, _WindowSettings.NewTabPosition);
         GETSET_BINDABLE_ENUM_SETTING(TabWidthMode, winrt::Microsoft::UI::Xaml::Controls::TabViewWidthMode, _WindowSettings.TabWidthMode);
         GETSET_BINDABLE_ENUM_SETTING(TabPosition, Model::TabPosition, _WindowSettings.TabPosition);
+        GETSET_BINDABLE_ENUM_SETTING(TabIconStyle, Model::IconStyle, _WindowSettings.TabIconStyle);
+        GETSET_BINDABLE_ENUM_SETTING(TabCloseButton, Model::TabCloseButtonVisibility, _WindowSettings.TabCloseButton);
+        GETSET_BINDABLE_ENUM_SETTING(DockWindow, Model::WindowDock, _WindowSettings.DockWindow);
         GETSET_BINDABLE_ENUM_SETTING(PaneTitlebarVisibility, Model::PaneTitlebarVisibility, _WindowSettings.PaneTitlebarVisibility);
 
     public:
@@ -44,6 +47,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, ShowTabsFullscreen);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, ShowTabIndex);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, CloseWindowOnLastTab);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, DockSize);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, ShowTabsInTitlebar);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, UseAcrylicInTabRow);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, ShowTitleInTitlebar);

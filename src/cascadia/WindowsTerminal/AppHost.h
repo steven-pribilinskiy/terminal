@@ -123,6 +123,7 @@ private:
                             const winrt::Microsoft::Terminal::Control::WindowSizeChangedEventArgs& args);
 
     void _updateTheme();
+    void _updateDock();
 
     void _PropertyChangedHandler(const winrt::Windows::Foundation::IInspectable& sender,
                                  const winrt::Windows::UI::Xaml::Data::PropertyChangedEventArgs& args);

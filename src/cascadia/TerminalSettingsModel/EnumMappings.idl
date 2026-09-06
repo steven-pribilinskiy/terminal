@@ -33,6 +33,9 @@ namespace Microsoft.Terminal.Settings.Model
         static Windows.Foundation.Collections.IMap<String, Microsoft.Terminal.Settings.Model.HyperlinkClickGesture> HyperlinkClickGesture { get; };
         static Windows.Foundation.Collections.IMap<String, Microsoft.Terminal.Settings.Model.ConfirmOnClose> ConfirmOnClose { get; };
         static Windows.Foundation.Collections.IMap<String, Microsoft.Terminal.Settings.Model.TabPosition> TabPosition { get; };
+        static Windows.Foundation.Collections.IMap<String, Microsoft.Terminal.Settings.Model.IconStyle> IconStyle { get; };
+        static Windows.Foundation.Collections.IMap<String, Microsoft.Terminal.Settings.Model.TabCloseButtonVisibility> TabCloseButtonVisibility { get; };
+        static Windows.Foundation.Collections.IMap<String, Microsoft.Terminal.Settings.Model.WindowDock> WindowDock { get; };
 
         // Profile Settings
         static Windows.Foundation.Collections.IMap<String, Microsoft.Terminal.Settings.Model.CloseOnExitMode> CloseOnExitMode { get; };

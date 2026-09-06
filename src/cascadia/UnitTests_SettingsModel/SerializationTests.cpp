@@ -127,6 +127,8 @@ namespace SettingsModelUnitTests
                 "showTabIndex": false,
                 "closeWindowOnLastTab": true,
                 "paneResizeStep": 5,
+                "dockWindow": "off",
+                "dockSize": 50,
                 "tabSwitcherMode": "mru",
 
                 "theme": "system",

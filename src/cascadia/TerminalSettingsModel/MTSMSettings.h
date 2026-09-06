@@ -98,6 +98,10 @@ Author(s):
     X(uint32_t, PaneResizeStep, "paneResizeStep", 5)                                                                                                                                                  \
     X(bool, CloseWindowOnLastTab, "closeWindowOnLastTab", true)                                                                                                                                       \
     X(bool, ShowTabIndex, "showTabIndex", false)                                                                                                                                                      \
+    X(Model::IconStyle, TabIconStyle, "tabIconStyle", Model::IconStyle::Default)                                                                                                                      \
+    X(Model::TabCloseButtonVisibility, TabCloseButton, "tabCloseButton", Model::TabCloseButtonVisibility::Always)                                                                                     \
+    X(Model::WindowDock, DockWindow, "dockWindow", Model::WindowDock::Off)                                                                                                                            \
+    X(uint32_t, DockSize, "dockSize", 50)                                                                                                                                                             \
     X(bool, UseAcrylicInTabRow, "useAcrylicInTabRow", false)                                                                                                                                          \
     X(bool, ShowTabsInTitlebar, "showTabsInTitlebar", true)                                                                                                                                           \
     X(winrt::Microsoft::Terminal::Control::CopyFormat, CopyFormatting, "copyFormatting", 0)                                                                                                           \

@@ -10,6 +10,20 @@ struct SystemMenuItemInfo
     winrt::delegate<void()> callback;
 };
 
+// Which screen edge the window is pinned to, if any.
+//
+// Declared here rather than reusing Settings::Model::WindowDock because
+// IslandWindow.h deliberately includes nothing but BaseWindow.h - the window
+// layer knows about pixels and monitors, not about settings. AppHost translates.
+enum class WindowDockEdge
+{
+    None = 0,
+    Top,
+    Bottom,
+    Left,
+    Right
+};
+
 class IslandWindow :
     public BaseWindow<IslandWindow>
 {
@@ -61,6 +75,7 @@ public:
 
     bool IsQuakeWindow() const noexcept;
     void IsQuakeWindow(bool isQuakeWindow) noexcept;
+    void SetDock(WindowDockEdge edge, uint32_t percent) noexcept;
     void SetAutoHideWindow(bool autoHideWindow) noexcept;
 
     void HideWindow();
@@ -144,10 +159,24 @@ protected:
     void _moveToMonitor(const MONITORINFO activeMonitor);
 
     bool _isQuakeWindow{ false };
+    WindowDockEdge _dockEdge{ WindowDockEdge::None };
+    uint32_t _dockPercent{ 50 };
     bool _autoHideWindow{ false };
 
+    // A quake window is a top dock with a fixed half height, and that keeps
+    // winning over the setting: summoning the quake window is a different
+    // gesture from docking, and it should land where it always has.
+    WindowDockEdge _effectiveDockEdge() const noexcept;
+    uint32_t _effectiveDockPercent() const noexcept;
+    bool _isDocked() const noexcept;
+    // Which single WMSZ_* edge a docked window may be dragged by: the one facing
+    // away from the edge it is pinned to.
+    UINT _resizableDockEdge() const noexcept;
+
     void _enterQuakeMode();
+    void _applyDock();
     til::rect _getQuakeModeSize(HMONITOR hmon);
+    til::rect _getDockedSize(HMONITOR hmon, WindowDockEdge edge, uint32_t percent);
 
     bool _minimizeToNotificationArea{ false };
 

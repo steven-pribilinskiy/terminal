@@ -253,9 +253,11 @@ LRESULT IslandWindow::_OnSizing(const WPARAM wParam, const LPARAM lParam)
 
     auto winRect = reinterpret_cast<LPRECT>(lParam);
 
-    // If we're the quake window, prevent resizing on all sides except the
-    // bottom. This also applies to resizing with the Alt+Space menu
-    if (IsQuakeWindow() && wParam != WMSZ_BOTTOM)
+    // If we're docked to an edge, prevent resizing on every side except the one
+    // facing away from it - a top dock is draggable from the bottom, a left dock
+    // from the right, and so on. This also applies to resizing with the
+    // Alt+Space menu. Quake mode is a top dock, so it keeps its old behaviour.
+    if (_isDocked() && wParam != _resizableDockEdge())
     {
         // Stuff our current window size into the lParam, and return true. This
         // will tell User32 to use our current dimensions to resize to.
@@ -353,9 +355,10 @@ LRESULT IslandWindow::_OnMoving(const WPARAM /*wParam*/, const LPARAM lParam)
 {
     auto winRect = reinterpret_cast<LPRECT>(lParam);
 
-    // If we're the quake window, prevent moving the window. If we don't do
-    // this, then Alt+Space...Move will still be able to move the window.
-    if (IsQuakeWindow())
+    // If we're docked, prevent moving the window - the whole point of a dock is
+    // that it stays put. If we don't do this, then Alt+Space...Move will still
+    // be able to move the window off its edge.
+    if (_isDocked())
     {
         // Stuff our current window into the lParam, and return true. This
         // will tell User32 to use our current position to move to.
@@ -641,9 +644,9 @@ void IslandWindow::_OnGetMinMaxInfo(const WPARAM /*wParam*/, const LPARAM lParam
         return 0;
     case WM_WINDOWPOSCHANGING:
     {
-        // GH#10274 - if the quake window gets moved to another monitor via aero
+        // GH#10274 - if a docked window gets moved to another monitor via aero
         // snap (win+shift+arrows), then re-adjust the size for the new monitor.
-        if (IsQuakeWindow())
+        if (_isDocked())
         {
             // Retrieve the suggested dimensions and make a rect and size.
             auto lpwpos = (LPWINDOWPOS)lparam;
@@ -679,10 +682,10 @@ void IslandWindow::_OnGetMinMaxInfo(const WPARAM /*wParam*/, const LPARAM lParam
             if (til::rect{ proposedInfo.rcMonitor } !=
                 til::rect{ currentInfo.rcMonitor })
             {
-                const auto newWindowRect{ _getQuakeModeSize(proposed) };
+                const auto newWindowRect{ _getDockedSize(proposed, _effectiveDockEdge(), _effectiveDockPercent()) };
 
                 // Inform User32 that we want to be placed at the position
-                // and dimensions that _getQuakeModeSize returned. When we
+                // and dimensions that _getDockedSize returned. When we
                 // snap across monitor boundaries, this will re-evaluate our
                 // size for the new monitor.
                 lpwpos->x = newWindowRect.left;
@@ -1698,7 +1701,91 @@ void IslandWindow::_enterQuakeMode()
 // - <none>
 // Return Value:
 // - <none>
+WindowDockEdge IslandWindow::_effectiveDockEdge() const noexcept
+{
+    return _isQuakeWindow ? WindowDockEdge::Top : _dockEdge;
+}
+
+uint32_t IslandWindow::_effectiveDockPercent() const noexcept
+{
+    return _isQuakeWindow ? 50 : _dockPercent;
+}
+
+bool IslandWindow::_isDocked() const noexcept
+{
+    return _effectiveDockEdge() != WindowDockEdge::None;
+}
+
+UINT IslandWindow::_resizableDockEdge() const noexcept
+{
+    switch (_effectiveDockEdge())
+    {
+    case WindowDockEdge::Top:
+        return WMSZ_BOTTOM;
+    case WindowDockEdge::Bottom:
+        return WMSZ_TOP;
+    case WindowDockEdge::Left:
+        return WMSZ_RIGHT;
+    case WindowDockEdge::Right:
+        return WMSZ_LEFT;
+    default:
+        return 0;
+    }
+}
+
+void IslandWindow::SetDock(WindowDockEdge edge, uint32_t percent) noexcept
+{
+    // Clamped for the same reason the pane resize step is: a 0% dock is an
+    // invisible window and a 100% one is an awkward way to spell "maximized".
+    percent = std::clamp<uint32_t>(percent, 10, 90);
+
+    if (_dockEdge == edge && _dockPercent == percent)
+    {
+        return;
+    }
+
+    _dockEdge = edge;
+    _dockPercent = percent;
+
+    if (_window)
+    {
+        _applyDock();
+    }
+}
+
+// Method Description:
+// - Moves and sizes the window to its docked position, if it has one. Shared by
+//   quake mode and the dockWindow setting; the only difference between them is
+//   which edge and fraction _effectiveDock* report.
+void IslandWindow::_applyDock()
+{
+    if (!_isDocked())
+    {
+        return;
+    }
+
+    const auto hmon = MonitorFromWindow(_window.get(), MONITOR_DEFAULTTONEAREST);
+    if (!hmon)
+    {
+        return;
+    }
+
+    const auto newRect{ _getDockedSize(hmon, _effectiveDockEdge(), _effectiveDockPercent()) };
+    SetWindowPos(GetHandle(),
+                 HWND_TOP,
+                 newRect.left,
+                 newRect.top,
+                 newRect.width(),
+                 newRect.height(),
+                 SWP_SHOWWINDOW | SWP_FRAMECHANGED | SWP_NOACTIVATE);
+}
+
 til::rect IslandWindow::_getQuakeModeSize(HMONITOR hmon)
+{
+    return _getDockedSize(hmon, WindowDockEdge::Top, 50);
+}
+
+til::rect IslandWindow::_getDockedSize(HMONITOR hmon, WindowDockEdge edge, uint32_t percent)
 {
     MONITORINFO nearestMonitorInfo;
 
@@ -1722,16 +1809,30 @@ til::rect IslandWindow::_getQuakeModeSize(HMONITOR hmon)
     // GH#10201 - The borders are still visible in quake mode, so make us 1px
     // smaller on either side to account for that, so they don't hang onto
     // adjacent monitors.
-    const til::point origin{
-        ::base::ClampSub(nearestMonitorInfo.rcWork.left, (ncSize.width / 2)) + 1,
-        (nearestMonitorInfo.rcWork.top)
-    };
-    const til::size dimensions{
-        availableSpace.width - 2,
-        availableSpace.height / 2
-    };
+    const auto left = ::base::ClampSub(nearestMonitorInfo.rcWork.left, (ncSize.width / 2)) + 1;
+    const auto top = nearestMonitorInfo.rcWork.top;
+    const auto fullWidth = availableSpace.width - 2;
+    const auto fullHeight = availableSpace.height;
 
-    return { origin, dimensions };
+    // Integer arithmetic, and the multiply comes first so a 33% dock of a 1080px
+    // monitor is 356px rather than 324px.
+    const auto partWidth = static_cast<til::CoordType>((static_cast<int64_t>(fullWidth) * percent) / 100);
+    const auto partHeight = static_cast<til::CoordType>((static_cast<int64_t>(fullHeight) * percent) / 100);
+
+    switch (edge)
+    {
+    case WindowDockEdge::Bottom:
+        // rcWork.top is where the usable area starts, so the bottom edge is that
+        // plus the full height - the window's own height.
+        return { til::point{ left, top + (fullHeight - partHeight) }, til::size{ fullWidth, partHeight } };
+    case WindowDockEdge::Left:
+        return { til::point{ left, top }, til::size{ partWidth, fullHeight } };
+    case WindowDockEdge::Right:
+        return { til::point{ left + (fullWidth - partWidth), top }, til::size{ partWidth, fullHeight } };
+    case WindowDockEdge::Top:
+    default:
+        return { til::point{ left, top }, til::size{ fullWidth, partHeight } };
+    }
 }
 
 void IslandWindow::HideWindow()
