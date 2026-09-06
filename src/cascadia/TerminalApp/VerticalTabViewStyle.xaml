@@ -33,6 +33,56 @@
                     mc:Ignorable="d">
 
     <!--
+        The tab list itself. This is the line that actually turns the strip on
+        its side: ItemsStackPanel from Horizontal to Vertical, and the scroll
+        viewer's two axes swapped to match.
+
+        An explicit Style replaces the implicit one rather than layering on top
+        of it, so the ItemContainerTransitions setter from App.xaml has to be
+        repeated here or the entrance and add/delete animations this app
+        deliberately turned off would come back for side tabs only.
+    -->
+    <Style x:Key="VerticalTabViewListViewStyle"
+           TargetType="primitives:TabViewListView">
+        <Setter Property="VerticalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="TabNavigation" Value="Once" />
+        <Setter Property="IsSwipeEnabled" Value="False" />
+        <Setter Property="SingleSelectionFollowsFocus" Value="False" />
+
+        <!--  Swapped from the stock style, which disables vertical scrolling outright.  -->
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+        <Setter Property="ScrollViewer.HorizontalScrollMode" Value="Disabled" />
+        <Setter Property="ScrollViewer.IsHorizontalRailEnabled" Value="False" />
+        <Setter Property="ScrollViewer.VerticalScrollMode" Value="Enabled" />
+        <Setter Property="ScrollViewer.IsVerticalRailEnabled" Value="False" />
+        <Setter Property="ScrollViewer.ZoomMode" Value="Disabled" />
+        <Setter Property="ScrollViewer.IsDeferredScrollingEnabled" Value="False" />
+        <Setter Property="ScrollViewer.BringIntoViewOnFocusChange" Value="True" />
+
+        <!--  Matches the App.xaml override; see the comment above.  -->
+        <Setter Property="ItemContainerTransitions">
+            <Setter.Value>
+                <TransitionCollection>
+                    <ContentThemeTransition />
+                    <ReorderThemeTransition />
+                </TransitionCollection>
+            </Setter.Value>
+        </Setter>
+
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <ItemsStackPanel Orientation="Vertical" />
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
         The TabView itself. The stock template lays TabContainerGrid out as four
         columns - header, tabs, add button, footer - so this is the same four
         slots turned into rows.
@@ -109,47 +159,16 @@
                                               Content="{TemplateBinding TabStripHeader}"
                                               ContentTemplate="{TemplateBinding TabStripHeaderTemplate}" />
 
-                            <!--
-                                Deliberately NOT given a Style. An explicit Style
-                                replaces the implicit one outright rather than
-                                layering on it, and the implicit
-                                primitives:TabViewListView style is where the
-                                control's Template lives - a ScrollViewer around
-                                an ItemsPresenter. A style that set the items
-                                panel but no Template left this list with no
-                                visual tree at all, which XAML accepted and then
-                                failed to render: E_FAIL out of
-                                CCoreServices::NWDrawTree, on the tick *after*
-                                the layout was built, so it presented as an
-                                unexplained fail-fast rather than as a bad style.
-
-                                Setting the panel as a local value on the element
-                                keeps the implicit style, its Template and
-                                App.xaml's ItemContainerTransitions override, and
-                                changes only the one thing that has to change.
-                            -->
                             <primitives:TabViewListView x:Name="TabListView"
                                                         Grid.Row="1"
                                                         Padding="{TemplateBinding Padding}"
-                                                        HorizontalAlignment="Stretch"
-                                                        VerticalAlignment="Stretch"
-                                                        HorizontalContentAlignment="Stretch"
                                                         AllowDrop="{TemplateBinding AllowDropTabs}"
                                                         CanDragItems="{TemplateBinding CanDragTabs}"
                                                         CanReorderItems="{TemplateBinding CanReorderTabs}"
                                                         ItemTemplate="{TemplateBinding TabItemTemplate}"
                                                         ItemTemplateSelector="{TemplateBinding TabItemTemplateSelector}"
                                                         ItemsSource="{TemplateBinding TabItemsSource}"
-                                                        ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                                        ScrollViewer.HorizontalScrollMode="Disabled"
-                                                        ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                                        ScrollViewer.VerticalScrollMode="Enabled">
-                                <primitives:TabViewListView.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <ItemsStackPanel Orientation="Vertical" />
-                                    </ItemsPanelTemplate>
-                                </primitives:TabViewListView.ItemsPanel>
-                            </primitives:TabViewListView>
+                                                        Style="{StaticResource VerticalTabViewListViewStyle}" />
 
                             <Border Grid.Row="2"
                                     Padding="{ThemeResource TabViewItemAddButtonContainerPadding}"
