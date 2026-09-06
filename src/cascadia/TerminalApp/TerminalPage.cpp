@@ -446,7 +446,23 @@ namespace winrt::TerminalApp::implementation
                 _UpdateTabWidthMode();
                 return;
             }
-            CATCH_LOG();
+            catch (...)
+            {
+                const auto hr = winrt::to_hresult();
+                LOG_CAUGHT_EXCEPTION();
+
+                // The HRESULT is the whole point of catching here rather than
+                // letting it fail fast: a stowed exception in a minidump does
+                // not carry the inner error, so the crash that prompted this
+                // guard could not be identified from its dumps at all. Emitted
+                // where a debugger or DebugView can see it, alongside WIL's own
+                // ETW record. Diagnostic scaffolding for an unidentified fault -
+                // it can go once the throw is understood.
+                OutputDebugStringW(fmt::format(FMT_COMPILE(L"[TerminalApp] tabPosition {} failed to apply, hr=0x{:08x}; falling back to top\n"),
+                                               static_cast<int32_t>(_tabPosition),
+                                               static_cast<uint32_t>(hr))
+                                       .c_str());
+            }
 
             _tabPosition = TabPosition::Top;
         }
