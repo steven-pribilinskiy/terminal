@@ -4930,10 +4930,17 @@ namespace winrt::TerminalApp::implementation
         // our TabView, to match the tab.showCloseButton property in the theme.
         //
         // Also update every tab's individual IsClosable to match the same property.
-        const auto theme = _settings.GlobalSettings().CurrentTheme(_currentWindowSettings());
-        const auto visibility = (theme && theme.Tab()) ?
-                                    theme.Tab().ShowCloseButton() :
-                                    Settings::Model::TabCloseButtonVisibility::Always;
+        // As with tabIconStyle: the tabCloseButton setting wins once the user
+        // has set one, and until then the theme keeps its say. The Settings UI
+        // has no way to write a theme, so this override is how the control on
+        // the Appearance page reaches the behaviour at all.
+        const auto windowSettings = _currentWindowSettings();
+        const auto theme = _settings.GlobalSettings().CurrentTheme(windowSettings);
+        const auto visibility = windowSettings.HasTabCloseButton() ?
+                                    windowSettings.TabCloseButton() :
+                                    ((theme && theme.Tab()) ?
+                                         theme.Tab().ShowCloseButton() :
+                                         Settings::Model::TabCloseButtonVisibility::Always);
 
         _tabItemMiddleClickHookEnabled = visibility == Settings::Model::TabCloseButtonVisibility::Never;
 

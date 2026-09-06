@@ -239,8 +239,17 @@ namespace winrt::TerminalApp::implementation
         if (const auto content{ tab.GetActiveContent() })
         {
             const auto& icon{ content.Icon() };
-            const auto theme = _settings.GlobalSettings().CurrentTheme(_currentWindowSettings());
-            const auto iconStyle = (theme && theme.Tab()) ? theme.Tab().IconStyle() : IconStyle::Default;
+            const auto windowSettings = _currentWindowSettings();
+
+            // The tabIconStyle setting overrides the theme when the user has
+            // actually set one. Has* is false until they do, so a theme that
+            // specifies an icon style keeps it until the Settings UI control is
+            // touched - the Settings UI cannot write theme values at all, which
+            // is why this override exists. See doc/json-only-settings.md.
+            const auto theme = _settings.GlobalSettings().CurrentTheme(windowSettings);
+            const auto iconStyle = windowSettings.HasTabIconStyle() ?
+                                       windowSettings.TabIconStyle() :
+                                       ((theme && theme.Tab()) ? theme.Tab().IconStyle() : IconStyle::Default);
 
             tab.UpdateIcon(icon, iconStyle);
         }

@@ -49,6 +49,19 @@ No `.xaml` file under `TerminalSettingsEditor` so much as mentions `Themes`. The
 profile icon on tab" and "hide tab close button". Upstream implemented both
 (microsoft/terminal#8157, #3335) and then exposed neither.
 
+**Both are now exposed**, by option 1 below: the window settings `tabIconStyle` and
+`tabCloseButton` override the theme when set, and defer to it when not. They are deliberately
+absent from `defaults.json`, because that is what keeps `HasTabIconStyle()` false until the
+user actually chooses something — `INHERITABLE_SETTING` generates a `Has` accessor for exactly
+this, and it is projected, so `TerminalPage` can ask.
+
+One rough edge, worth knowing and not worth fixing: the dropdown shows the *override's* value,
+not the resolved one. The macro defaults match what the built-in themes give
+(`IconStyle::Default`, `TabCloseButtonVisibility::Always`), so for anyone on a built-in theme
+the control reads correctly. A custom theme that sets these will show its own value in the
+terminal but the default in the dropdown, until the control is touched — at which point the
+override takes over and the two agree again.
+
 ### The trap that shapes how these get exposed
 
 **A theme is not a viable home for a setting the Settings UI writes.**
