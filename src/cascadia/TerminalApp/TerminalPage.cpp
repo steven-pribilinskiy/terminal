@@ -425,6 +425,42 @@ namespace winrt::TerminalApp::implementation
         const auto windowSettings = _currentWindowSettings();
         _tabPosition = windowSettings.TabPosition();
 
+        // Anything but Top rebuilds the root grid, and a throw in here is not
+        // survivable by default: this runs on the dispatcher, so an escaping
+        // exception reaches DirectUI::ErrorHelper::ReportUnhandledError and
+        // fail-fasts the process (0xc000027b, a stowed exception). Worse, the
+        // position is a persisted setting, so the next launch reads it and dies
+        // the same way - the app cannot start, and cannot be used to fix the
+        // setting that is killing it. That is exactly what happened on
+        // 2026-09-06 with tabPosition "left", and it took hand-editing
+        // settings.json from outside to recover.
+        //
+        // So a failure here degrades to the top strip instead of taking the
+        // window with it. The user gets tabs in the wrong place and a log entry
+        // rather than a Terminal they cannot open.
+        if (_tabPosition != TabPosition::Top)
+        {
+            try
+            {
+                _ApplyTabPositionCore(windowSettings);
+                _UpdateTabWidthMode();
+                return;
+            }
+            CATCH_LOG();
+
+            _tabPosition = TabPosition::Top;
+        }
+
+        _ApplyTabPositionCore(windowSettings);
+        _UpdateTabWidthMode();
+    }
+
+    // Method Description:
+    // - The layout work itself. Split out so _ApplyTabPosition can run it under
+    //   a catch for the positions that rebuild the grid, and then run it again
+    //   for Top as the fallback.
+    void TerminalPage::_ApplyTabPositionCore(const Microsoft::Terminal::Settings::Model::WindowSettings& windowSettings)
+    {
         _ResetRootGridLayout();
 
         const auto root = this->Root();
@@ -620,25 +656,34 @@ namespace winrt::TerminalApp::implementation
             _tabRow.VerticalAlignment(VerticalAlignment::Stretch);
             _tabView.VerticalAlignment(VerticalAlignment::Stretch);
 
-            if (const auto& res{ Application::Current().Resources() })
+            // Lookup, not HasKey-then-Lookup. ResourceDictionary::HasKey only
+            // inspects the dictionary it is called on and does NOT walk
+            // MergedDictionaries, while Lookup does - and VerticalTabViewStyle
+            // arrives through App.xaml's merged dictionaries. Guarding with
+            // HasKey therefore answered "no" for a key that is perfectly
+            // resolvable, and silently skipped the re-template: a vertical strip
+            // would come up with the horizontal template squeezed into a 200px
+            // column. Lookup throws when the key really is absent, hence the
+            // try/catch rather than a guard.
+            try
             {
-                const auto key = box_value(winrt::hstring{ L"VerticalTabViewStyle" });
-                if (res.HasKey(key))
+                if (const auto& res{ Application::Current().Resources() })
                 {
-                    if (const auto& style{ res.Lookup(key).try_as<Windows::UI::Xaml::Style>() })
+                    if (const auto& style{ res.Lookup(box_value(winrt::hstring{ L"VerticalTabViewStyle" })).try_as<Windows::UI::Xaml::Style>() })
                     {
                         _tabView.Style(style);
                     }
                 }
             }
+            CATCH_LOG();
             break;
         }
         }
 
         // TabWidthMode is width arithmetic that MUX performs against the strip's
-        // available width, so in a vertical strip Equal and Compact fight the
-        // layout. _UpdateTabWidthMode knows to pin SizeToContent there.
-        _UpdateTabWidthMode();
+        // TabWidthMode is applied by the caller, once the position has actually
+        // settled - including when a failure here has knocked it back to Top,
+        // where the user's real tabWidthMode has to come back.
     }
 
     // Method Description:

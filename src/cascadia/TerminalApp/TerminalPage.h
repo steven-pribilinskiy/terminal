@@ -504,6 +504,7 @@ namespace winrt::TerminalApp::implementation
         // it resets the root grid to its XAML shape first, which is what lets
         // the setting and the toggle action take effect without a new window.
         void _ApplyTabPosition();
+        void _ApplyTabPositionCore(const Microsoft::Terminal::Settings::Model::WindowSettings& windowSettings);
         void _ResetRootGridLayout();
         void _BuildTabStripSplitter();
         bool _TabStripIsVertical() const noexcept;
