@@ -495,17 +495,18 @@ Green means it compiles, packages and passes two unit suites. It says nothing
 about whether a page draws, an icon resolves, or a setting takes effect — see
 `doc/troubleshooting.md`, "A settings page comes up half filled in".
 
-### Two agents on one branch will starve each other of CI
+### Sharing the tree with another session
 
-`.github/workflows/build.yml` sets `concurrency: cancel-in-progress`, which is
-right for one person pushing repeatedly and harmful for two sharing `main`: each
-push cancels the run in flight, and a Terminal build takes longer than the gap
-between two people's commits. On 2026-09-06 that produced six runs and one
-verdict, on the oldest commit of the stack.
+The CI half of this is under "Getting a build" above. The working-tree half:
+stage commits by **explicit path**, never `git add -A` or `git commit -a`, so a
+shared tree cannot sweep up half of someone else's change.
 
-If someone else is working the tree: agree who holds, let one run cover both
-stacks, and stage commits by explicit path — never `git add -A` or `git commit -a`
-— so a shared working tree never sweeps up half of someone else's change.
+That is necessary and not sufficient. Explicit paths only choose *files*; if two
+sessions have edited the same file, staging it by name still takes both sets of
+edits. It happened to this very file on 2026-09-06 — two sessions independently
+wrote up the CI-starvation problem, and whoever committed first carried the
+other's paragraphs. Before staging a file someone else might be in, check
+`git diff -- <path>` and confirm every hunk is yours.
 
 ## Settings UI: cards, expanders, and search
 
