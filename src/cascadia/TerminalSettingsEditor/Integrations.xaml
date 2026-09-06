@@ -108,8 +108,16 @@
                                                Height="32"
                                                Margin="0,0,12,0"
                                                IconSource="{x:Bind mtu:IconPathConverter.IconSourceWUX(ViewModel.CurrentIntegration.Icon), Mode=OneWay}" />
+                            <!--
+                                BodyStrong, not TextBlockSubHeaderStyle. That style is
+                                for a heading standing above a section, and carries a
+                                32px top margin to separate it from whatever came
+                                before - which inside this header row pushed the name
+                                down past the icon beside it and left a band of empty
+                                space across the top of the card.
+                            -->
                             <TextBlock VerticalAlignment="Center"
-                                       Style="{StaticResource TextBlockSubHeaderStyle}"
+                                       Style="{StaticResource BodyStrongTextBlockStyle}"
                                        Text="{x:Bind ViewModel.CurrentIntegration.Name, Mode=OneWay}" />
                         </StackPanel>
 
