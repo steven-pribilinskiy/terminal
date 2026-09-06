@@ -41,6 +41,12 @@ namespace Microsoft.Terminal.Settings.Editor
         Windows.UI.Xaml.Controls.StyleSelector ItemContainerStyleSelector;
         static Windows.UI.Xaml.DependencyProperty ItemContainerStyleSelectorProperty { get; };
 
+        // Marks the whole group as something this fork added, the same way
+        // SettingsCard.IsForkFeature marks one setting. The template forwards it to
+        // the card that draws the expander's header, which is what renders the mark.
+        Boolean IsForkFeature;
+        static Windows.UI.Xaml.DependencyProperty IsForkFeatureProperty { get; };
+
         event Windows.Foundation.TypedEventHandler<SettingsExpander, Object> Expanded;
         event Windows.Foundation.TypedEventHandler<SettingsExpander, Object> Collapsed;
     };

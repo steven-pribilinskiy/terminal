@@ -45,6 +45,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         DEPENDENCY_PROPERTY(Windows::Foundation::IInspectable, ItemsSource);
         DEPENDENCY_PROPERTY(Windows::Foundation::IInspectable, ItemTemplate);
         DEPENDENCY_PROPERTY(Windows::UI::Xaml::Controls::StyleSelector, ItemContainerStyleSelector);
+        // Same mark as SettingsCard's, and drawn by the very same control: the
+        // template's header IS a SettingsCard, so this only has to reach it. Without
+        // it, grouping fork-added settings under an expander silently loses the
+        // diamond that says they are ours.
+        DEPENDENCY_PROPERTY(bool, IsForkFeature);
 
     private:
         static void _InitializeProperties();

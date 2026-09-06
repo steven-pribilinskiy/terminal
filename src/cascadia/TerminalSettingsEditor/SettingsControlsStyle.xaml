@@ -532,7 +532,8 @@
                                                 FontFamily="{TemplateBinding FontFamily}"
                                                 Header="{TemplateBinding Header}"
                                                 HeaderIcon="{TemplateBinding HeaderIcon}"
-                                                IsClickEnabled="False" />
+                                                IsClickEnabled="False"
+                                                IsForkFeature="{TemplateBinding IsForkFeature}" />
                         </muxc:Expander.Header>
                         <muxc:Expander.Content>
                             <!--  CornerRadius is filtered to bottom-only so the items panel visually stitches to the rounded bottom of the expander (matches WCT).  -->

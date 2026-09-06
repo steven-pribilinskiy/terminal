@@ -438,6 +438,44 @@ Scheduled Task action, and `TerminalPage::_armPromotionHelper` /
 this repo adds should follow the same pattern rather than reintroducing a bare `-WindowStyle
 Hidden`/`SW_HIDE` call.
 
+## Settings UI: cards, expanders, and search
+
+**A group of related settings is an accordion, not a run of loose cards.** Profiles →
+Appearance is the reference (`Appearances.xaml:600` background image, `:197` colour scheme),
+and every new or reworked group follows it.
+
+- **`local:SettingsCard` = one setting.** **`local:SettingsExpander` = a group** whose members
+  only make sense together, or a master setting plus what it gates.
+- Three slots, three jobs:
+  - **`Content`** — live controls that belong *in the collapsed header row* (the path box and
+    Browse button, a current-value summary).
+  - **`Items`** — a list of `SettingsCard` rows, one setting each. They are styled
+    automatically by `SettingsExpanderItemStyleSelector`, so **never set `Style` or `Padding`**
+    on them; a local `Style` suppresses the selector outright
+    (`SettingsExpander.cpp::_ApplyItemContainerStyles`).
+  - **`ItemsHeader`** — body content that is not a row of cards (a colour picker, a grid,
+    nested expanders). Wrap it in `<ContentPresenter Padding="16,12,16,16">`; that exact
+    padding is the established value.
+- **Never put `IsEnabled` on the expander itself.** It disables the header too, so the master
+  control you are gating on becomes unclickable. Repeat the binding on each nested card, which
+  is what the background-image group does.
+- **Every card and expander needs both `x:Uid` and `x:Name`.** The uid supplies
+  `<uid>.Header`/`.Description` *and* is what `tools/GenerateSettingsIndex.ps1` keys the search
+  entry on; a missing `x:Name` leaves that entry's `ElementName` empty, so a search result
+  navigates to the page but never scrolls to or expands the setting.
+- Nesting costs search nothing. The generator's XPath is a descendant axis, so cards inside
+  `Items` and `ItemsHeader` get their own flat entries, and `Utils.cpp`'s
+  `ExpandAncestorsAndBringIntoView` walks the logical tree, expands every ancestor expander,
+  then waits out the 333 ms expand animation before scrolling. Exclude a uid only when search
+  genuinely cannot reach it — see the Link Tooltip rule-editor block in `$ProhibitedUids`.
+- **`IsForkFeature` works on both.** `SettingsExpander` forwards it to the `SettingsCard` that
+  draws its header, so a group this fork added still gets the ◆ under `aylith.imprint`. Mark
+  the expander, not every child.
+
+One deliberate exception: `LinkTooltip.xaml`'s per-platform rule groups use a raw
+`muxc:Expander`. That is a data-templated list with its own header controls, not a settings
+group, and it stays as it is.
+
 ## Driving the UI
 
 Automating the Settings UI means taking my keyboard and focus — see the idle rules in my global

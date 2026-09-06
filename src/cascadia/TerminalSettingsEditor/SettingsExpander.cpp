@@ -27,6 +27,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     DependencyProperty SettingsExpander::_ItemsSourceProperty{ nullptr };
     DependencyProperty SettingsExpander::_ItemTemplateProperty{ nullptr };
     DependencyProperty SettingsExpander::_ItemContainerStyleSelectorProperty{ nullptr };
+    DependencyProperty SettingsExpander::_IsForkFeatureProperty{ nullptr };
 
     SettingsExpander::SettingsExpander()
     {
@@ -129,6 +130,17 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 xaml_typename<StyleSelector>(),
                 xaml_typename<Editor::SettingsExpander>(),
                 PropertyMetadata{ nullptr });
+        }
+        if (!_IsForkFeatureProperty)
+        {
+            // No property-changed callback, unlike SettingsCard's: nothing here
+            // draws the mark. The template hands this straight to the SettingsCard
+            // that is the expander's header, and that card redraws itself.
+            _IsForkFeatureProperty = DependencyProperty::Register(
+                L"IsForkFeature",
+                xaml_typename<bool>(),
+                xaml_typename<Editor::SettingsExpander>(),
+                PropertyMetadata{ box_value(false) });
         }
     }
 
