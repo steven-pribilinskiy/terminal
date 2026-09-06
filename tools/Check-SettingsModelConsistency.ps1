@@ -131,7 +131,54 @@ foreach ($s in $settings) {
     }
 }
 
-Write-Host ("Checked {0} settings, {1} EnumMappings entries." -f $settings.Count, $declaredMaps.Count)
+# ---- 5. Every action argument has a localized name ----
+#
+# ActionArgsMagic.h builds this key by pasting the argument's own name:
+# LOCALIZED_NAME(Amount) becomes L"AmountActionArgumentLocalized". Nothing forces
+# the string to exist, and a missing one does not degrade to a blank label --
+# ResourceMap::GetValue hands back a null ResourceCandidate and RS_ calls
+# ValueAsString() on it unguarded, so the process takes an access violation
+# inside the Settings Model the moment anything asks an action for its name. The
+# Settings UI asks for every action's name as it opens, which is why one missing
+# string here reads as "opening Settings crashes the Terminal".
+$actionArgs = Read-SourceFile 'ActionArgs.h'
+$resw = Read-SourceFile 'Resources\en-US\Resources.resw'
+
+$localizedArgNames = [regex]::Matches($resw, '<data name="(\w+)ActionArgumentLocalized"') |
+    ForEach-Object { $_.Groups[1].Value }
+
+$argNames = [regex]::Matches($actionArgs, '(?m)^\s*X\(\s*[^,]+?\s*,\s*(\w+)\s*,') |
+    ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique
+
+foreach ($arg in $argNames) {
+    if ($localizedArgNames -notcontains $arg) {
+        $problems.Add("action argument '$arg' has no '${arg}ActionArgumentLocalized' string in Resources.resw -- naming any action that carries it crashes the Settings Model")
+    }
+}
+
+# ---- 6. Every resource key named in the source exists in the resw ----
+#
+# The same crash reached the ordinary way. RS_, RS_fmt, RS_switchable_ and
+# USES_RESOURCE all bottom out in that one unguarded ValueAsString().
+$definedStrings = [regex]::Matches($resw, '<data name="([^"]+)"') |
+    ForEach-Object { $_.Groups[1].Value }
+
+$keyPattern = 'USES_RESOURCE\(L"([^"]+)"|RS_(?:fmt)?\(L"([^"]+)"|RS_switchable_(?:fmt)?\(L"([^"]+)"'
+$referencedKeys = Get-ChildItem $SourceDir -Recurse -Include *.cpp, *.h -File |
+    Where-Object { $_.FullName -notmatch '\\Generated Files\\' } |
+    ForEach-Object {
+        [regex]::Matches((Get-Content -Raw -LiteralPath $_.FullName), $keyPattern) | ForEach-Object {
+            @($_.Groups[1].Value, $_.Groups[2].Value, $_.Groups[3].Value) | Where-Object { $_ }
+        }
+    } | Sort-Object -Unique
+
+foreach ($key in $referencedKeys) {
+    if ($definedStrings -notcontains $key) {
+        $problems.Add("resource key '$key' is used in the Settings Model but has no entry in Resources.resw -- looking it up crashes the Settings Model")
+    }
+}
+
+Write-Host ("Checked {0} settings, {1} EnumMappings entries, {2} action arguments, {3} resource keys." -f $settings.Count, $declaredMaps.Count, $argNames.Count, $referencedKeys.Count)
 
 if ($problems.Count -gt 0) {
     Write-Host ''

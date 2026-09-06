@@ -39,6 +39,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # A second's worth of textual checks, so they run before the forty-minute
+      # build rather than after it. This is the only gate that catches a missing
+      # resource string: that compiles clean, packages clean, passes both test
+      # suites, and then takes an access violation in the field the first time
+      # the Settings UI asks an action for its name.
+      - name: Settings model consistency
+        shell: pwsh
+        run: .\tools\Check-SettingsModelConsistency.ps1
+
       # The checked-in dep\nuget\nuget.exe is 4.1.0 (2017) and predates .slnx:
       # restoring with it fails with "Invalid input 'OpenConsole.slnx'. The file
       # type was not recognized." Upstream installs a current nuget for the same

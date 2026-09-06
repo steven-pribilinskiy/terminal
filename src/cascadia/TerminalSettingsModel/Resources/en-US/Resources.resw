@@ -854,6 +854,9 @@
   <data name="ResizeDirectionActionArgumentLocalized" xml:space="preserve">
     <value>Resize direction</value>
   </data>
+  <data name="AmountActionArgumentLocalized" xml:space="preserve">
+    <value>Amount</value>
+  </data>
   <data name="FocusDirectionActionArgumentLocalized" xml:space="preserve">
     <value>Focus direction</value>
   </data>
