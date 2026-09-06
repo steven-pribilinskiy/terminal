@@ -1,7 +1,7 @@
 {
     "id": "slack",
     "name": "Slack",
-    "icon": "",
+    "icon": "\uE8BD",
     "version": 1,
     "cacheSeconds": 300,
     "settings": [],

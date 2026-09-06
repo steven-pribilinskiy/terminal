@@ -1,7 +1,7 @@
 {
     "id": "jira",
     "name": "Jira",
-    "icon": "",
+    "icon": "ms-appx:///IntegrationIcons/jira.png",
     "version": 2,
     "cacheSeconds": 300,
     "settings": [

@@ -1,7 +1,7 @@
 {
     "id": "stith",
     "name": "Stith",
-    "icon": "",
+    "icon": "ms-appx:///IntegrationIcons/aylith.png",
     "version": 1,
     "cacheSeconds": 30,
     "settings": [

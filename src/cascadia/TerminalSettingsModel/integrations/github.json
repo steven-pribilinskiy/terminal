@@ -1,7 +1,7 @@
 {
     "id": "github",
     "name": "GitHub",
-    "icon": "\uE82D",
+    "icon": "ms-appx:///IntegrationIcons/github.png",
     "version": 1,
     "cacheSeconds": 300,
     "settings": [
