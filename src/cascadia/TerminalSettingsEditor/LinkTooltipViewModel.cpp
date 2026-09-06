@@ -1491,6 +1491,18 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 continue;
             }
 
+            // Name first. It is what identifies the preset in the menu, and a rule
+            // whose pattern has since been edited -- or which was added before the
+            // preset's own pattern changed -- is still that preset to the person
+            // reading the list. Observed live: the shipped repo#number preset now
+            // matches \b(?<repo>[A-Za-z0-9_.-]+)#\d+\b while a rule added earlier
+            // still stores (?<repo>[a-z-]+)#\d+, so a pattern-only test offered it
+            // again as though it were missing.
+            if (std::wstring_view{ rule.Name() } == presetName)
+            {
+                return true;
+            }
+
             if (!presetPattern.empty())
             {
                 if (std::wstring_view{ rule.Pattern() } == presetPattern)
@@ -1500,7 +1512,9 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 continue;
             }
 
-            if (std::wstring_view{ rule.Name() } == presetName && rule.FileTypeGroup() == preset->fileTypeGroup)
+            // A preset with no pattern of its own (the file-type ones) is only
+            // distinguishable by its file-type group once the name has not matched.
+            if (rule.FileTypeGroup() == preset->fileTypeGroup)
             {
                 return true;
             }
