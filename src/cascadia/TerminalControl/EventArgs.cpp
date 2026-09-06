@@ -11,6 +11,7 @@
 #include "OpenHyperlinkEventArgs.g.cpp"
 #include "HyperlinkTooltipActionInvokedEventArgs.g.cpp"
 #include "ShowHyperlinkPreviewRequestedEventArgs.g.cpp"
+#include "EditHyperlinkRuleRequestedEventArgs.g.cpp"
 #include "NoticeEventArgs.g.cpp"
 #include "ScrollPositionChangedArgs.g.cpp"
 #include "RendererWarningArgs.g.cpp"
