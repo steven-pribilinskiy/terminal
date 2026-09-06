@@ -1,7 +1,7 @@
 {
     "id": "slack",
     "name": "Slack",
-    "icon": "\uE8BD",
+    "icon": "ms-appx:///IntegrationIcons/slack.png",
     "version": 1,
     "cacheSeconds": 300,
     "settings": [],
