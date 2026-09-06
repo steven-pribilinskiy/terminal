@@ -328,10 +328,6 @@ namespace winrt::TerminalApp::implementation
         Microsoft::Terminal::Settings::Model::TabPosition _tabPosition{ Microsoft::Terminal::Settings::Model::TabPosition::Top };
         Windows::UI::Xaml::Controls::Border _tabStripSplitter{ nullptr };
 
-        // For Left/Right only: the wrapper that stacks the info bars above the
-        // terminal inside the content column, since the root grid's rows are
-        // spent on the strip in that layout.
-        Windows::UI::Xaml::Controls::Grid _tabContentWrapper{ nullptr };
 
         // Set while the tab row is parented to the titlebar, so the reset knows
         // to ask for it back. _currentWindowSettings().ShowTabsInTitlebar() is

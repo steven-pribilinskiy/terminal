@@ -346,17 +346,11 @@ namespace winrt::TerminalApp::implementation
             }
         };
 
-        // The info bars and the content live in the wrapper in the Left/Right
-        // layouts and directly in the root otherwise, so try both.
-        detach(_tabContentWrapper, infoBars);
-        detach(_tabContentWrapper, _tabContent);
-        detach(root, _tabContentWrapper);
         detach(root, _tabStripSplitter);
         detach(root, _tabRow);
         detach(root, infoBars);
         detach(root, _tabContent);
 
-        _tabContentWrapper = nullptr;
         _tabStripSplitter = nullptr;
 
         root.ColumnDefinitions().Clear();
@@ -368,12 +362,22 @@ namespace winrt::TerminalApp::implementation
             root.RowDefinitions().Append(row);
         }
 
+        // Spans as well as positions: the Left/Right layout gives the strip and
+        // the splitter a RowSpan of 2, and leaving that behind would make them
+        // straddle two of the three rows we have just put back.
+        for (const auto& e : { _tabRow.try_as<FrameworkElement>(), infoBars.try_as<FrameworkElement>(), _tabContent.try_as<FrameworkElement>() })
+        {
+            if (e)
+            {
+                Grid::SetRowSpan(e, 1);
+                Grid::SetColumnSpan(e, 1);
+                Grid::SetColumn(e, 0);
+            }
+        }
+
         Grid::SetRow(_tabRow, 0);
-        Grid::SetColumn(_tabRow, 0);
         Grid::SetRow(infoBars, 1);
-        Grid::SetColumn(infoBars, 0);
         Grid::SetRow(_tabContent, 2);
-        Grid::SetColumn(_tabContent, 0);
 
         // Insert at the front rather than append: everything else in the root is
         // an overlay declared after these in XAML, and equal-z siblings draw in
@@ -389,6 +393,7 @@ namespace winrt::TerminalApp::implementation
             if (const auto& fwe{ root.Children().GetAt(i).try_as<FrameworkElement>() })
             {
                 Grid::SetRow(fwe, 2);
+                Grid::SetRowSpan(fwe, 1);
                 Grid::SetColumn(fwe, 0);
             }
         }
@@ -594,11 +599,24 @@ namespace winrt::TerminalApp::implementation
                 root.Children().RemoveAt(idx);
             }
 
-            // One row; the strip owns a column now, not a row.
+            // Keep the two content rows the top layout uses - info bars above
+            // the terminal - and add columns alongside. The strip and the
+            // splitter span both rows.
+            //
+            // The obvious alternative, one row plus an inner Grid holding the
+            // info bars and the terminal, is what this did first and it is why
+            // the vertical strip crashed: _tabContent hosts the panes, and the
+            // panes host SwapChainPanels. Re-parenting a live swap chain breaks
+            // the render tree, and XAML does not complain when you do it - it
+            // fails later, in CCoreServices::NWDrawTree, as an E_FAIL with none
+            // of our frames on the stack. Note that Bottom never hit this: it
+            // only ever changes Grid.Row on _tabContent and leaves it a child of
+            // the root, which is exactly what this now does too.
             root.RowDefinitions().Clear();
+            for (const auto& type : { GridUnitType::Auto, GridUnitType::Star })
             {
                 RowDefinition row;
-                row.Height(GridLengthHelper::FromValueAndType(1, GridUnitType::Star));
+                row.Height(GridLengthHelper::FromValueAndType(1, type));
                 root.RowDefinitions().Append(row);
             }
 
@@ -627,47 +645,40 @@ namespace winrt::TerminalApp::implementation
                 root.ColumnDefinitions().Append(stripCol);
             }
 
-            // The root's rows are spent, so the info bars need their own stack
-            // above the terminal inside the content column.
-            _tabContentWrapper = Grid();
-            {
-                RowDefinition infoRow;
-                infoRow.Height(GridLengthHelper::FromValueAndType(1, GridUnitType::Auto));
-                RowDefinition mainRow;
-                mainRow.Height(GridLengthHelper::FromValueAndType(1, GridUnitType::Star));
-                _tabContentWrapper.RowDefinitions().Append(infoRow);
-                _tabContentWrapper.RowDefinitions().Append(mainRow);
-            }
-            Grid::SetRow(infoBars, 0);
-            Grid::SetRow(_tabContent, 1);
-            _tabContentWrapper.Children().Append(infoBars);
-            _tabContentWrapper.Children().Append(_tabContent);
-
             _BuildTabStripSplitter();
 
             const auto stripColIdx = stripFirst ? 0 : 2;
             const auto contentColIdx = stripFirst ? 2 : 0;
 
+            // The strip and its grab handle run the full height beside the
+            // content; the info bars and the terminal keep their own two rows.
             Grid::SetRow(_tabRow, 0);
+            Grid::SetRowSpan(_tabRow, 2);
             Grid::SetColumn(_tabRow, stripColIdx);
             Grid::SetRow(_tabStripSplitter, 0);
+            Grid::SetRowSpan(_tabStripSplitter, 2);
             Grid::SetColumn(_tabStripSplitter, 1);
-            Grid::SetRow(_tabContentWrapper, 0);
-            Grid::SetColumn(_tabContentWrapper, contentColIdx);
+            Grid::SetRow(infoBars, 0);
+            Grid::SetColumn(infoBars, contentColIdx);
+            Grid::SetRow(_tabContent, 1);
+            Grid::SetColumn(_tabContent, contentColIdx);
 
             root.Children().InsertAt(0, _tabRow);
             root.Children().InsertAt(1, _tabStripSplitter);
-            root.Children().InsertAt(2, _tabContentWrapper);
+            root.Children().InsertAt(2, infoBars);
+            root.Children().InsertAt(3, _tabContent);
 
             // Overlays span the whole window. Their Grid.ColumnSpan="3" is
             // declared in TerminalPage.xaml so the x:Load="False" ones are
             // right whenever they finally materialize; here we only have to
-            // undo the reset's row and column.
-            for (uint32_t i = 3; i < root.Children().Size(); ++i)
+            // undo the reset's row and column. Index 4 because the four layout
+            // elements above occupy 0-3.
+            for (uint32_t i = 4; i < root.Children().Size(); ++i)
             {
                 if (const auto& fwe{ root.Children().GetAt(i).try_as<FrameworkElement>() })
                 {
                     Grid::SetRow(fwe, 0);
+                    Grid::SetRowSpan(fwe, 2);
                     Grid::SetColumn(fwe, 0);
                     Grid::SetColumnSpan(fwe, 3);
                 }
