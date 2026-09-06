@@ -102,6 +102,8 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         void _PreNavigateHelper();
         void _UpdateForkNavItems();
+        // TEMPORARY DIAGNOSTIC -- see the comment on the definition.
+        static LONG __stdcall _DiagnosticVectoredHandler(EXCEPTION_POINTERS* info) noexcept;
         void _Navigate(const IInspectable& vm, BreadcrumbSubPage subPage = BreadcrumbSubPage::None, hstring elementToFocus = {});
         void _NavigateToProfileHandler(const IInspectable& sender, winrt::guid profileGuid);
         void _NavigateToColorSchemeHandler(const IInspectable& sender, const IInspectable& args);
