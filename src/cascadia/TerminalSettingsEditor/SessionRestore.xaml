@@ -1,0 +1,155 @@
+<!--
+    Copyright (c) Microsoft Corporation. All rights reserved. Licensed under
+    the MIT License. See LICENSE in the project root for license information.
+-->
+<Page x:Class="Microsoft.Terminal.Settings.Editor.SessionRestore"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:local="using:Microsoft.Terminal.Settings.Editor"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
+      mc:Ignorable="d">
+
+    <Page.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="CommonResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <DataTemplate x:Key="EnumComboBoxTemplate"
+                          x:DataType="local:EnumEntry">
+                <TextBlock Text="{x:Bind EnumName, Mode=OneWay}" />
+            </DataTemplate>
+        </ResourceDictionary>
+    </Page.Resources>
+
+    <StackPanel>
+        <StackPanel Spacing="2"
+                    Style="{StaticResource SettingsStackStyle}">
+            <TextBlock x:Uid="SessionRestore_PageDescription"
+                       IsTextSelectionEnabled="True"
+                       Style="{StaticResource DisclaimerStyle}" />
+
+            <!--
+                The same setting the Startup page shows, and the master switch for
+                this whole page. Mirrored rather than moved: "what happens when
+                Terminal starts" is a question you go to Startup to answer, and it
+                is also the thing everything here hangs off.
+
+                Two pages binding one setting needs no synchronisation. Only one
+                page lives in the content frame at a time, each is handed a fresh
+                view model built from the same settings clone on every navigation,
+                and the enum getter re-reads the model rather than caching - so the
+                second page to be shown is constructed after the first one's write.
+            -->
+            <local:SettingsCard x:Name="FirstWindowPreference"
+                                x:Uid="Globals_FirstWindowPreference">
+                <ComboBox AutomationProperties.AccessibilityView="Content"
+                          ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                          ItemsSource="{x:Bind ViewModel.FirstWindowPreferenceList}"
+                          SelectedItem="{x:Bind ViewModel.CurrentFirstWindowPreference, Mode=TwoWay}"
+                          Style="{StaticResource ComboBoxSettingStyle}" />
+            </local:SettingsCard>
+
+            <!--
+                What gets put back into the panes. Everything in here needs a
+                restored layout to be put back into, so it greys out entirely
+                under "Open a tab with the default profile".
+            -->
+            <local:SettingsExpander x:Name="ResumePrograms"
+                                    x:Uid="SessionRestore_ResumePrograms"
+                                    IsForkFeature="True">
+                <local:SettingsExpander.Items>
+                    <local:SettingsCard x:Name="ResumeAgents"
+                                        x:Uid="Globals_ResumeAgents"
+                                        IsEnabled="{x:Bind ViewModel.RestoreEnabled, Mode=OneWay}">
+                        <ToggleSwitch IsOn="{x:Bind ViewModel.ResumeAgents, Mode=TwoWay}"
+                                      Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                    </local:SettingsCard>
+
+                    <local:SettingsCard x:Name="ResumeMultiplexers"
+                                        x:Uid="Globals_ResumeMultiplexers"
+                                        IsEnabled="{x:Bind ViewModel.RestoreEnabled, Mode=OneWay}">
+                        <ToggleSwitch IsOn="{x:Bind ViewModel.ResumeMultiplexers, Mode=TwoWay}"
+                                      Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                    </local:SettingsCard>
+
+                    <local:SettingsCard x:Name="ResumeExtraPrograms"
+                                        x:Uid="Globals_ResumeExtraPrograms"
+                                        IsEnabled="{x:Bind ViewModel.RestoreEnabled, Mode=OneWay}">
+                        <TextBox Style="{StaticResource TextBoxSettingStyle}"
+                                 Text="{x:Bind ViewModel.ResumeExtraProgramsText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </local:SettingsCard>
+
+                    <local:SettingsCard x:Name="ResumeExcludedPrograms"
+                                        x:Uid="Globals_ResumeExcludedPrograms"
+                                        IsEnabled="{x:Bind ViewModel.RestoreEnabled, Mode=OneWay}">
+                        <TextBox Style="{StaticResource TextBoxSettingStyle}"
+                                 Text="{x:Bind ViewModel.ResumeExcludedProgramsText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </local:SettingsCard>
+
+                    <local:SettingsCard x:Name="ResumeSessionNotification"
+                                        x:Uid="Globals_ResumeSessionNotification"
+                                        IsEnabled="{x:Bind ViewModel.AnyResumeEnabled, Mode=OneWay}">
+                        <ComboBox AutomationProperties.AccessibilityView="Content"
+                                  ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                                  ItemsSource="{x:Bind ViewModel.ResumeSessionNotificationList}"
+                                  SelectedItem="{x:Bind ViewModel.CurrentResumeSessionNotification, Mode=TwoWay}"
+                                  Style="{StaticResource ComboBoxSettingStyle}" />
+                    </local:SettingsCard>
+                </local:SettingsExpander.Items>
+            </local:SettingsExpander>
+
+            <!--
+                Writing the scrollback out. Stricter than the group above: the
+                buffer is only ever written under "Restore window layout and
+                content", so these grey out under plain "Restore window layout"
+                as well. That dependency used to live in one description string
+                and nowhere in the code, which is how the switch above shipped
+                defaulting to On while doing nothing at all.
+            -->
+            <local:SettingsExpander x:Name="SavePaneContents"
+                                    x:Uid="SessionRestore_SavePaneContents"
+                                    IsForkFeature="True">
+                <local:SettingsExpander.Items>
+                    <local:SettingsCard x:Name="PersistBufferPeriodically"
+                                        x:Uid="Globals_PersistBufferPeriodically"
+                                        IsEnabled="{x:Bind ViewModel.ContentEnabled, Mode=OneWay}">
+                        <ToggleSwitch IsOn="{x:Bind ViewModel.PersistBufferPeriodically, Mode=TwoWay}"
+                                      Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                    </local:SettingsCard>
+
+                    <local:SettingsCard x:Name="BufferPersistIntervalMinutes"
+                                        x:Uid="Globals_BufferPersistIntervalMinutes"
+                                        IsEnabled="{x:Bind ViewModel.PersistBufferPeriodically, Mode=OneWay}">
+                        <muxc:NumberBox x:Uid="Globals_BufferPersistIntervalMinutesBox"
+                                        Maximum="240"
+                                        Minimum="1"
+                                        SpinButtonPlacementMode="Compact"
+                                        Style="{StaticResource NumberBoxSettingStyle}"
+                                        Value="{x:Bind ViewModel.BufferPersistIntervalMinutes, Mode=TwoWay}" />
+                    </local:SettingsCard>
+
+                    <!--
+                        Not greyed with the rest: a record of what saving has
+                        already cost stays worth reading after you turn saving
+                        off, and is often exactly why you did.
+                    -->
+                    <local:SettingsCard x:Name="PersistCost"
+                                        x:Uid="Globals_PersistCost">
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="12">
+                            <TextBlock VerticalAlignment="Center"
+                                       FontFamily="Cascadia Mono, Consolas, monospace"
+                                       FontSize="16"
+                                       Text="{x:Bind ViewModel.PersistCostSparkline, Mode=OneWay}" />
+                            <TextBlock VerticalAlignment="Center"
+                                       Text="{x:Bind ViewModel.PersistCostSummary, Mode=OneWay}" />
+                        </StackPanel>
+                    </local:SettingsCard>
+                </local:SettingsExpander.Items>
+            </local:SettingsExpander>
+        </StackPanel>
+    </StackPanel>
+</Page>

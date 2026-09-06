@@ -20,7 +20,7 @@ window.FEATURE_DETAILS = {
     how:
       "Shortly before the layout is written out, every pane is asked what it is running right now. Windows panes are read from the process tree, taking the first thing the shell launched — not the deepest, because an agent spawns a child per MCP server and the deepest descendant is one of those. WSL panes cannot be read that way at all, since none of their processes are Windows processes; instead one probe runs inside each distro and matches panes by the WT_SESSION identifier the terminal already puts into every pane's environment. The answer is stored in the same persisted layout the panes are restored from, so it travels with the profile, the working directory and the split geometry. On the next start it is typed into the pane rather than launched as its command line — launching it would make the agent the pane's root process, so the pane would close the moment it exited, instead of leaving you the shell it was actually running in.",
     steps: [
-      "Turn on <code>Restore window layout and content</code> under Settings → Startup. Resume rides on the persisted layout, so without it there is nothing to attach a command to.",
+      "Turn on <code>Restore window layout and content</code> under Settings → Session Restore. Resume rides on the persisted layout, so without it there is nothing to attach a command to.",
       "Leave <code>Resume coding agents</code> and <code>Resume session multiplexers</code> on. Anything else you want back — a dev server, a watcher — goes in <code>Also resume these programs</code> by name.",
       "Open a pane and start something: a coding agent, or <code>tmux new-session -s demo</code>.",
       "Close the terminal, or kill it outright. Contents are saved on a timer, so an ungraceful end costs you the process but not the history.",
@@ -38,7 +38,7 @@ window.FEATURE_DETAILS = {
     media: [
       { kind: "video", base: "resume-restore", caption: "A tmux session running, the terminal killed outright, and the pane coming back attached to it. Recorded in one take across the restart." },
       { base: "resume-toast", caption: "After the restart: the notice names what was resumed, and it is the attach form — not the command the session was first created with." },
-      { base: "resume-settings", caption: "The settings, under Startup. Agents and multiplexers are separate switches, with lists for anything else." },
+      { base: "resume-settings", caption: "The settings, under Session Restore. Agents and multiplexers are separate switches, with lists for anything else." },
       { base: "resume-restored-buffer", caption: "A pane that resumed nothing keeps its scrollback instead, marked with when it was saved." },
     ],
     notes: [

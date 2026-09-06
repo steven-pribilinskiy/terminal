@@ -11,6 +11,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 {
     inline constexpr std::wstring_view openJsonTag{ L"OpenJson_Nav" };
     inline constexpr std::wstring_view launchTag{ L"Launch_Nav" };
+    inline constexpr std::wstring_view sessionRestoreTag{ L"SessionRestore_Nav" };
     inline constexpr std::wstring_view interactionTag{ L"Interaction_Nav" };
     inline constexpr std::wstring_view linkTooltipTag{ L"LinkTooltip_Nav" };
     inline constexpr std::wstring_view integrationsTag{ L"Integrations_Nav" };
@@ -27,6 +28,10 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     // Map from navigation tags to Segoe MDL2 Assets icon glyphs
     inline constexpr til::static_map NavTagIconMap{
         std::pair{ launchTag, L"\xE7B5" }, /* Set Lock Screen */
+        // Mandatory, not decorative: MainPage's nav-item loop looks every tag up
+        // in this map without guarding the lookup, so a tag missing from here
+        // fails at construction rather than merely rendering no icon.
+        std::pair{ sessionRestoreTag, L"\xE777" }, /* Update Restore */
         std::pair{ interactionTag, L"\xE7C9" }, /* Touch Pointer */
         std::pair{ linkTooltipTag, L"\xE71B" }, /* Link */
         std::pair{ integrationsTag, L"\xE774" }, /* Globe */

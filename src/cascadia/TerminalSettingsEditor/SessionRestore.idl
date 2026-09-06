@@ -1,0 +1,13 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
+import "SessionRestoreViewModel.idl";
+
+namespace Microsoft.Terminal.Settings.Editor
+{
+    [default_interface] runtimeclass SessionRestore : Windows.UI.Xaml.Controls.Page
+    {
+        SessionRestore();
+        SessionRestoreViewModel ViewModel { get; };
+    }
+}

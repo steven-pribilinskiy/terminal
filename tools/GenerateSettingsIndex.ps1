@@ -81,6 +81,11 @@ $ClassMap = @{
         NavigationParam = "Launch_Nav"
         SubPage         = "BreadcrumbSubPage::None"
     }
+    "Microsoft::Terminal::Settings::Editor::SessionRestore" = @{
+        ResourceName    = "Nav_SessionRestore/Content"
+        NavigationParam = "SessionRestore_Nav"
+        SubPage         = "BreadcrumbSubPage::None"
+    }
     "Microsoft::Terminal::Settings::Editor::Interaction" = @{
         ResourceName    = "Nav_Interaction/Content"
         NavigationParam = "Interaction_Nav"

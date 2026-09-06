@@ -6,6 +6,7 @@
 #include "SettingsCard.h"
 #include "MainPage.g.cpp"
 #include "Launch.h"
+#include "SessionRestore.h"
 #include "Interaction.h"
 #include "LinkTooltip.h"
 #include "Integrations.h"
@@ -24,6 +25,7 @@
 #include "LinkTooltipViewModel.h"
 #include "IntegrationsViewModel.h"
 #include "LaunchViewModel.h"
+#include "SessionRestoreViewModel.h"
 #include "NewTabMenuViewModel.h"
 #include "NewTabMenu.h"
 #include "NavConstants.h"
@@ -646,6 +648,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 contentFrame().Navigate(xaml_typename<Editor::Launch>(), winrt::make<NavigateToPageArgs>(winrt::make<LaunchViewModel>(_settingsClone), *this, elementToFocus));
                 _breadcrumbs.Append(winrt::make<Breadcrumb>(vm, RS_(L"Nav_Launch/Content"), BreadcrumbSubPage::None));
             }
+            else if (*clickedItemTag == sessionRestoreTag)
+            {
+                // A fresh view model every time, like Launch and Interaction above
+                // and below. That is also what keeps this page and Startup agreeing
+                // about "When Terminal starts", which they both show: whichever is
+                // navigated to second is built after the other one's write, and
+                // reads the value back off the same settings clone.
+                contentFrame().Navigate(xaml_typename<Editor::SessionRestore>(), winrt::make<NavigateToPageArgs>(winrt::make<SessionRestoreViewModel>(_settingsClone), *this, elementToFocus));
+                _breadcrumbs.Append(winrt::make<Breadcrumb>(vm, RS_(L"Nav_SessionRestore/Content"), BreadcrumbSubPage::None));
+            }
             else if (*clickedItemTag == interactionTag)
             {
                 contentFrame().Navigate(xaml_typename<Editor::Interaction>(), winrt::make<NavigateToPageArgs>(winrt::make<InteractionViewModel>(_settingsClone.GlobalSettings(), _windowSettingsClone), *this, elementToFocus));
@@ -1008,7 +1020,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         const auto enabled = SettingsCard::ImprintEnabled();
 
-        for (const auto& item : { LinkTooltipNavItem(), IntegrationsNavItem() })
+        for (const auto& item : { SessionRestoreNavItem(), LinkTooltipNavItem(), IntegrationsNavItem() })
         {
             if (!item)
             {

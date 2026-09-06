@@ -39,20 +39,6 @@ namespace Microsoft.Terminal.Settings.Editor
         IInspectable CurrentWindowingBehavior;
         IObservableVector<Microsoft.Terminal.Settings.Editor.EnumEntry> WindowingBehaviorList { get; };
 
-        IInspectable CurrentResumeSessionNotification;
-        IObservableVector<Microsoft.Terminal.Settings.Editor.EnumEntry> ResumeSessionNotificationList { get; };
-
-        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, ResumeAgents);
-        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, ResumeMultiplexers);
-        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, PersistBufferPeriodically);
-        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, BufferPersistIntervalMinutes);
-
-        String ResumeExtraProgramsText;
-        String ResumeExcludedProgramsText;
-        Boolean AnyResumeEnabled { get; };
-        String PersistCostSparkline { get; };
-        String PersistCostSummary { get; };
-
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, CenterOnLaunch);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, RememberWindowGeometry);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, InitialRows);

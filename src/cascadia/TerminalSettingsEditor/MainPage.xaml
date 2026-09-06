@@ -156,6 +156,10 @@
                                      x:Uid="Nav_Launch"
                                      Tag="Launch_Nav" />
 
+            <muxc:NavigationViewItem x:Name="SessionRestoreNavItem"
+                                     x:Uid="Nav_SessionRestore"
+                                     Tag="SessionRestore_Nav" />
+
             <muxc:NavigationViewItem x:Name="InteractionNavItem"
                                      x:Uid="Nav_Interaction"
                                      Tag="Interaction_Nav" />

@@ -641,7 +641,27 @@
     <comment>Header for a control to toggle saving each pane's scrollback on a timer, instead of only when Terminal is closed normally.</comment>
   </data>
   <data name="Globals_PersistBufferPeriodically.Description" xml:space="preserve">
-    <value>Without this, scrollback is only written when Terminal closes normally, so a crash or an End Task loses it. Requires "Restore window layout and content".</value>
+    <value>Without this, scrollback is only written when Terminal closes normally, so a crash or an End Task loses it.</value>
+  </data>
+  <data name="SessionRestore_PageDescription" xml:space="preserve">
+    <value>What comes back when Terminal starts: which windows and panes, what was on screen in them, and which of the programs that were running are started again. "When Terminal starts" decides how much of that happens, and everything below follows from it.</value>
+    <comment>Introductory text at the top of the Session Restore settings page.</comment>
+  </data>
+  <data name="SessionRestore_ResumePrograms.Header" xml:space="preserve">
+    <value>Resume programs</value>
+    <comment>Header for a collapsible group of settings about restarting or reattaching to the programs that were running in a restored pane.</comment>
+  </data>
+  <data name="SessionRestore_ResumePrograms.Description" xml:space="preserve">
+    <value>Which programs are started again in the panes they were in. Needs a layout to put them back into, so this is off entirely under "Open a tab with the default profile".</value>
+    <comment>Additional text presented near "SessionRestore_ResumePrograms.Header".</comment>
+  </data>
+  <data name="SessionRestore_SavePaneContents.Header" xml:space="preserve">
+    <value>Saving pane contents</value>
+    <comment>Header for a collapsible group of settings about writing each pane's scrollback to disk so it can be restored.</comment>
+  </data>
+  <data name="SessionRestore_SavePaneContents.Description" xml:space="preserve">
+    <value>Writing each pane's scrollback to disk so it can come back. Only applies under "Restore window layout and content".</value>
+    <comment>Additional text presented near "SessionRestore_SavePaneContents.Header".</comment>
   </data>
   <data name="Globals_BufferPersistIntervalMinutes.Header" xml:space="preserve">
     <value>Save pane contents every</value>
@@ -912,6 +932,10 @@
   <data name="Nav_Launch.Content" xml:space="preserve">
     <value>Startup</value>
     <comment>Header for the "startup" menu item. This navigates to a page that lets you see and modify settings related to the app's launch experience (i.e. screen position, mode, etc.)</comment>
+  </data>
+  <data name="Nav_SessionRestore.Content" xml:space="preserve">
+    <value>Session Restore</value>
+    <comment>Header for the "session restore" menu item. This navigates to a page that lets you see and modify settings about putting a previous session's windows, panes, scrollback and running programs back.</comment>
   </data>
   <data name="Nav_PaneOpenedAnnouncement" xml:space="preserve">
     <value>Navigation pane opened</value>

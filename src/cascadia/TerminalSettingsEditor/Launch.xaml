@@ -175,7 +175,11 @@
                               Style="{StaticResource ToggleSwitchInExpanderStyle}" />
             </local:SettingsCard>
 
-            <!--  First Window Behavior  -->
+            <!--
+                First Window Behavior. Also shown on the Session Restore page,
+                which is where everything downstream of it now lives - this is
+                both the first-run question and that page's master switch.
+            -->
             <local:SettingsCard x:Name="FirstWindowPreference"
                                 x:Uid="Globals_FirstWindowPreference">
                 <ComboBox AutomationProperties.AccessibilityView="Content"
@@ -183,83 +187,6 @@
                           ItemsSource="{x:Bind ViewModel.FirstWindowPreferenceList}"
                           SelectedItem="{x:Bind ViewModel.CurrentFirstWindowPreference, Mode=TwoWay}"
                           Style="{StaticResource ComboBoxSettingStyle}" />
-            </local:SettingsCard>
-
-            <!--  Resume Agents  -->
-            <local:SettingsCard x:Name="ResumeAgents"
-                                x:Uid="Globals_ResumeAgents"
-                                IsForkFeature="True">
-                <ToggleSwitch IsOn="{x:Bind ViewModel.ResumeAgents, Mode=TwoWay}"
-                              Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-            </local:SettingsCard>
-
-            <!--  Resume Multiplexers  -->
-            <local:SettingsCard x:Name="ResumeMultiplexers"
-                                x:Uid="Globals_ResumeMultiplexers"
-                                IsForkFeature="True">
-                <ToggleSwitch IsOn="{x:Bind ViewModel.ResumeMultiplexers, Mode=TwoWay}"
-                              Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-            </local:SettingsCard>
-
-            <!--  Extra Programs To Resume  -->
-            <local:SettingsCard x:Name="ResumeExtraPrograms"
-                                x:Uid="Globals_ResumeExtraPrograms">
-                <TextBox Style="{StaticResource TextBoxSettingStyle}"
-                         Text="{x:Bind ViewModel.ResumeExtraProgramsText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-            </local:SettingsCard>
-
-            <!--  Programs To Never Resume  -->
-            <local:SettingsCard x:Name="ResumeExcludedPrograms"
-                                x:Uid="Globals_ResumeExcludedPrograms">
-                <TextBox Style="{StaticResource TextBoxSettingStyle}"
-                         Text="{x:Bind ViewModel.ResumeExcludedProgramsText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-            </local:SettingsCard>
-
-            <!--  Resume Session Notification  -->
-            <local:SettingsCard x:Name="ResumeSessionNotification"
-                                x:Uid="Globals_ResumeSessionNotification"
-                                IsForkFeature="True"
-                                IsEnabled="{x:Bind ViewModel.AnyResumeEnabled, Mode=OneWay}">
-                <ComboBox AutomationProperties.AccessibilityView="Content"
-                          ItemTemplate="{StaticResource EnumComboBoxTemplate}"
-                          ItemsSource="{x:Bind ViewModel.ResumeSessionNotificationList}"
-                          SelectedItem="{x:Bind ViewModel.CurrentResumeSessionNotification, Mode=TwoWay}"
-                          Style="{StaticResource ComboBoxSettingStyle}" />
-            </local:SettingsCard>
-
-            <!--  Persist Buffer Periodically  -->
-            <local:SettingsCard x:Name="PersistBufferPeriodically"
-                                x:Uid="Globals_PersistBufferPeriodically"
-                                IsForkFeature="True">
-                <ToggleSwitch IsOn="{x:Bind ViewModel.PersistBufferPeriodically, Mode=TwoWay}"
-                              Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-            </local:SettingsCard>
-
-            <!--  Buffer Persist Interval  -->
-            <local:SettingsCard x:Name="BufferPersistIntervalMinutes"
-                                x:Uid="Globals_BufferPersistIntervalMinutes"
-                                IsForkFeature="True"
-                                IsEnabled="{x:Bind ViewModel.PersistBufferPeriodically, Mode=OneWay}">
-                <muxc:NumberBox x:Uid="Globals_BufferPersistIntervalMinutesBox"
-                                Maximum="240"
-                                Minimum="1"
-                                SpinButtonPlacementMode="Compact"
-                                Style="{StaticResource NumberBoxSettingStyle}"
-                                Value="{x:Bind ViewModel.BufferPersistIntervalMinutes, Mode=TwoWay}" />
-            </local:SettingsCard>
-
-            <!--  What Persistence Has Been Costing  -->
-            <local:SettingsCard x:Name="PersistCost"
-                                x:Uid="Globals_PersistCost">
-                <StackPanel Orientation="Horizontal"
-                            Spacing="12">
-                    <TextBlock FontFamily="Cascadia Mono, Consolas, monospace"
-                               FontSize="16"
-                               Text="{x:Bind ViewModel.PersistCostSparkline, Mode=OneWay}"
-                               VerticalAlignment="Center" />
-                    <TextBlock Text="{x:Bind ViewModel.PersistCostSummary, Mode=OneWay}"
-                               VerticalAlignment="Center" />
-                </StackPanel>
             </local:SettingsCard>
 
             <!--  Windowing Behavior  -->
