@@ -29,6 +29,23 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     DependencyProperty SettingsExpander::_ItemContainerStyleSelectorProperty{ nullptr };
     DependencyProperty SettingsExpander::_IsForkFeatureProperty{ nullptr };
 
+    // Which groups the user has opened, for as long as the process lives.
+    //
+    // Expansion is view state rather than a setting, so it does not belong in
+    // settings.json -- but it does have to outlive the page, because the page is
+    // rebuilt far more often than it looks. Saving or discarding runs
+    // MainPage::UpdateSettings, which re-navigates to the current crumb
+    // (MainPage.cpp), and navigating away and back does the same: either way a
+    // brand-new SettingsExpander is constructed and takes its markup default. So
+    // every group snapped shut the moment you pressed Save.
+    //
+    // Keyed on x:Name, which is unique across the editor's XAML -- the search
+    // index already depends on that (GenerateSettingsIndex.ps1 emits it as
+    // ElementName). Expanders without a name are simply not remembered, which is
+    // the safe default for one inside a DataTemplate, where the name would be
+    // shared by every instantiation.
+    static std::unordered_map<std::wstring, bool> g_expansionState;
+
     SettingsExpander::SettingsExpander()
     {
         _InitializeProperties();
@@ -159,6 +176,8 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         StyleExtensions::EnsureImplicitStylesMergedInto(*this);
 
         _SetAccessibleName();
+        // After the parser has applied the markup default, so a remembered state wins.
+        _RestoreExpansionState();
         _UpdateFullDescription();
 
         // Drop the prior template's host before locating the new one.
@@ -284,6 +303,24 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
     }
 
+    // Re-apply what this group was left at, if we have seen it before. Setting the
+    // property re-enters _OnIsExpandedChanged, which writes the same value back to
+    // the map and stops -- the callback never touches IsExpanded itself, so there
+    // is no second lap.
+    void SettingsExpander::_RestoreExpansionState()
+    {
+        const auto name = Name();
+        if (name.empty())
+        {
+            return;
+        }
+
+        if (const auto found = g_expansionState.find(std::wstring{ name }); found != g_expansionState.end())
+        {
+            IsExpanded(found->second);
+        }
+    }
+
     void SettingsExpander::_OnIsExpandedChanged(const DependencyObject& d, const DependencyPropertyChangedEventArgs& e)
     {
         const auto obj{ d.try_as<Editor::SettingsExpander>() };
@@ -293,6 +330,14 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
         const auto self = get_self<SettingsExpander>(obj);
         const auto newValue = unbox_value_or<bool>(e.NewValue(), false);
+
+        // Record every change, including the one _RestoreExpansionState makes:
+        // writing back the value we just read is harmless, and it keeps this the
+        // single place that has to know about the map.
+        if (const auto name = self->Name(); !name.empty())
+        {
+            g_expansionState.insert_or_assign(std::wstring{ name }, newValue);
+        }
 
         // Notify the automation peer so screen readers see the expand/collapse state change.
         if (const auto peer{ FrameworkElementAutomationPeer::FromElement(obj) })

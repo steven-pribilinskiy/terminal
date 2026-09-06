@@ -58,6 +58,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         static void _OnItemsConnectedPropertyChanged(const Windows::UI::Xaml::DependencyObject& d, const Windows::UI::Xaml::DependencyPropertyChangedEventArgs& e);
 
         void _SetAccessibleName();
+        void _RestoreExpansionState();
         void _UpdateFullDescription();
         void _UpdateItemsSource();
         void _SubscribeToItemsVectorChanged();
