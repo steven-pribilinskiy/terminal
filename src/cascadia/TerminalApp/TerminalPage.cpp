@@ -3428,12 +3428,14 @@ namespace winrt::TerminalApp::implementation
     // - direction: The direction to move the separator in.
     // Return Value:
     // - whether a pane was resized
-    bool TerminalPage::_ResizePane(const ResizeDirection& direction)
+    bool TerminalPage::_ResizePane(const ResizeDirection& direction, const uint32_t percent)
     {
         if (const auto tabImpl{ _GetFocusedTabImpl() })
         {
             _UnZoomIfNeeded();
-            return tabImpl->ResizePane(direction);
+            // 0 is what an action with no "amount" deserializes to, and means
+            // "whatever the setting says".
+            return tabImpl->ResizePane(direction, percent != 0 ? percent : _currentWindowSettings().PaneResizeStep());
         }
         return false;
     }

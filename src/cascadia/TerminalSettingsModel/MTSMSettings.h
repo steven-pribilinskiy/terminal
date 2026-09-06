@@ -94,6 +94,9 @@ Author(s):
     X(Model::ThemePair, Theme, "theme")                                                                                                                                                               \
     X(winrt::Microsoft::UI::Xaml::Controls::TabViewWidthMode, TabWidthMode, "tabWidthMode", winrt::Microsoft::UI::Xaml::Controls::TabViewWidthMode::Equal)                                            \
     X(Model::TabPosition, TabPosition, "tabPosition", Model::TabPosition::Top)                                                                                                                        \
+    X(uint32_t, PaneResizeStep, "paneResizeStep", 5)                                                                                                                                                  \
+    X(bool, CloseWindowOnLastTab, "closeWindowOnLastTab", true)                                                                                                                                       \
+    X(bool, ShowTabIndex, "showTabIndex", false)                                                                                                                                                      \
     X(bool, UseAcrylicInTabRow, "useAcrylicInTabRow", false)                                                                                                                                          \
     X(bool, ShowTabsInTitlebar, "showTabsInTitlebar", true)                                                                                                                                           \
     X(winrt::Microsoft::Terminal::Control::CopyFormat, CopyFormatting, "copyFormatting", 0)                                                                                                           \

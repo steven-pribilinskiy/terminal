@@ -24,6 +24,11 @@ namespace winrt::TerminalApp::implementation
 
         til::property_changed_event PropertyChanged;
         WINRT_OBSERVABLE_PROPERTY(winrt::hstring, Title, PropertyChanged.raise);
+        // The tab's 1-based position, shown ahead of the title when
+        // showTabIndex is on. Kept as a preformatted string so the control does
+        // no arithmetic and the empty case costs nothing to render.
+        WINRT_OBSERVABLE_PROPERTY(winrt::hstring, IndexLabel, PropertyChanged.raise);
+        WINRT_OBSERVABLE_PROPERTY(bool, ShowIndex, PropertyChanged.raise, false);
         WINRT_OBSERVABLE_PROPERTY(double, RenamerMaxWidth, PropertyChanged.raise);
         WINRT_OBSERVABLE_PROPERTY(winrt::TerminalApp::TerminalTabStatus, TabStatus, PropertyChanged.raise);
 

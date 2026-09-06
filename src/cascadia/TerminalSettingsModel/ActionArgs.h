@@ -122,8 +122,9 @@ protected:                                                                  \
     X(uint32_t, TabIndex, "index", false, ArgTypeHint::None, 0)
 
 ////////////////////////////////////////////////////////////////////////////////
-#define RESIZE_PANE_ARGS(X) \
-    X(Model::ResizeDirection, ResizeDirection, "direction", args->ResizeDirection() == ResizeDirection::None, ArgTypeHint::None, Model::ResizeDirection::None)
+#define RESIZE_PANE_ARGS(X)                                                                                                                                    \
+    X(Model::ResizeDirection, ResizeDirection, "direction", args->ResizeDirection() == ResizeDirection::None, ArgTypeHint::None, Model::ResizeDirection::None) \
+    X(uint32_t, Amount, "amount", false, ArgTypeHint::None, 0)
 
 ////////////////////////////////////////////////////////////////////////////////
 #define MOVE_FOCUS_ARGS(X) \

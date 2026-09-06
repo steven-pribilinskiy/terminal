@@ -857,6 +857,30 @@
     <value>This allows actions such as Global Summon and Quake Mode actions to work even when no windows are open.</value>
     <comment>Additional description for what the "allow headless" setting does. Presented near "Globals_AllowHeadless.Header".</comment>
   </data>
+  <data name="Globals_ShowTabIndex.Header" xml:space="preserve">
+    <value>Show tab numbers</value>
+    <comment>Header for a control to toggle whether each tab shows its position in the row.</comment>
+  </data>
+  <data name="Globals_ShowTabIndex.Description" xml:space="preserve">
+    <value>Numbers each tab by its position, starting at 1.</value>
+    <comment>A description for what the "show tab numbers" setting does. Presented near "Globals_ShowTabIndex.Header".</comment>
+  </data>
+  <data name="Globals_CloseWindowOnLastTab.Header" xml:space="preserve">
+    <value>Close the window after closing the last tab</value>
+    <comment>Header for a control to toggle whether the window closes once its final tab is closed.</comment>
+  </data>
+  <data name="Globals_CloseWindowOnLastTab.Description" xml:space="preserve">
+    <value>When off, the window stays open and a new tab takes the place of the last one.</value>
+    <comment>A description for what the "close the window after closing the last tab" setting does. Presented near "Globals_CloseWindowOnLastTab.Header".</comment>
+  </data>
+  <data name="Globals_PaneResizeStep.Header" xml:space="preserve">
+    <value>Pane resize step</value>
+    <comment>Header for a slider choosing how far a keyboard shortcut moves the divider between two panes. The value is a percentage.</comment>
+  </data>
+  <data name="Globals_PaneResizeStep.Description" xml:space="preserve">
+    <value>How far, as a percentage of the pane, the resize pane shortcuts move the divider.</value>
+    <comment>A description for what the "pane resize step" setting does. Presented near "Globals_PaneResizeStep.Header".</comment>
+  </data>
   <data name="Globals_TabPosition.Header" xml:space="preserve">
     <value>Tab position</value>
     <comment>Header for a control to choose which edge of the window the row of tabs sits on.</comment>

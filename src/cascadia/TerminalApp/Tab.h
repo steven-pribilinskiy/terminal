@@ -53,7 +53,7 @@ namespace winrt::TerminalApp::implementation
                                                                                                         const float splitSize,
                                                                                                         winrt::Windows::Foundation::Size availableSpace) const;
 
-        bool ResizePane(const winrt::Microsoft::Terminal::Settings::Model::ResizeDirection& direction);
+        bool ResizePane(const winrt::Microsoft::Terminal::Settings::Model::ResizeDirection& direction, const uint32_t percent);
         bool NavigateFocus(const winrt::Microsoft::Terminal::Settings::Model::FocusDirection& direction);
         bool SwapPane(const winrt::Microsoft::Terminal::Settings::Model::FocusDirection& direction);
         bool FocusPane(const uint32_t id);
@@ -170,6 +170,11 @@ namespace winrt::TerminalApp::implementation
             winrt::Microsoft::Terminal::Settings::Model::PaneTitlebarVisibility::MultiplePanes
         };
 
+        // Cached for the same reason: UpdateTabViewIndex has to redraw the
+        // number every time the row is reshuffled, and it is not handed the
+        // window settings.
+        bool _showTabIndex{ false };
+
         std::shared_ptr<Pane> _rootPane{ nullptr };
         std::shared_ptr<Pane> _activePane{ nullptr };
         std::shared_ptr<Pane> _zoomedPane{ nullptr };
@@ -234,6 +239,7 @@ namespace winrt::TerminalApp::implementation
 
         void _UpdateActivePane(std::shared_ptr<Pane> pane);
         void _UpdatePaneTitlebarVisibility();
+        void _UpdateIndexLabel();
         void _UpdateMenuItemStates();
 
         winrt::hstring _GetActiveTitle() const;

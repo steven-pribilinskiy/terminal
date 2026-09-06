@@ -124,6 +124,9 @@ namespace SettingsModelUnitTests
                 "showTerminalTitleInTitlebar": true,
                 "tabWidthMode": "equal",
                 "tabPosition": "top",
+                "showTabIndex": false,
+                "closeWindowOnLastTab": true,
+                "paneResizeStep": 5,
                 "tabSwitcherMode": "mru",
 
                 "theme": "system",

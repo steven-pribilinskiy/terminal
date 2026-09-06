@@ -146,6 +146,9 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(Boolean, ShowTitleInTitlebar);
         INHERITABLE_SETTING(Microsoft.UI.Xaml.Controls.TabViewWidthMode, TabWidthMode);
         INHERITABLE_SETTING(TabPosition, TabPosition);
+        INHERITABLE_SETTING(UInt32, PaneResizeStep);
+        INHERITABLE_SETTING(Boolean, CloseWindowOnLastTab);
+        INHERITABLE_SETTING(Boolean, ShowTabIndex);
         INHERITABLE_SETTING(Boolean, UseAcrylicInTabRow);
         INHERITABLE_SETTING(Boolean, ShowTabsInTitlebar);
         INHERITABLE_SETTING(String, WordDelimiters);

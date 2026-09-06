@@ -90,6 +90,26 @@
                               Style="{StaticResource ToggleSwitchInExpanderStyle}" />
             </local:SettingsCard>
 
+            <!--  Pane Resize Step  -->
+            <local:SettingsCard x:Name="PaneResizeStep"
+                                x:Uid="Globals_PaneResizeStep"
+                                IsForkFeature="True">
+                <Grid MinWidth="200">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Slider x:Name="PaneResizeStepSlider"
+                            Grid.Column="0"
+                            Maximum="50"
+                            Minimum="1"
+                            Value="{x:Bind ViewModel.PaneResizeStep, Mode=TwoWay}" />
+                    <TextBlock Grid.Column="1"
+                               Style="{StaticResource SliderValueLabelStyle}"
+                               Text="{Binding ElementName=PaneResizeStepSlider, Path=Value, Mode=OneWay}" />
+                </Grid>
+            </local:SettingsCard>
+
             <!--  Enable Font Size Changes with Scrolling  -->
             <local:SettingsCard x:Name="ScrollToZoom"
                                 x:Uid="Globals_ScrollToZoom">

@@ -42,6 +42,8 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, AlwaysShowTabs);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, ShowTabsFullscreen);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, ShowTabIndex);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, CloseWindowOnLastTab);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, ShowTabsInTitlebar);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, UseAcrylicInTabRow);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, ShowTitleInTitlebar);

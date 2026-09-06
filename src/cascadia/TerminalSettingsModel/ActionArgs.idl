@@ -234,6 +234,10 @@ namespace Microsoft.Terminal.Settings.Model
     [default_interface] runtimeclass ResizePaneArgs : IActionArgs, IActionArgsDescriptorAccess
     {
         ResizeDirection ResizeDirection { get; };
+
+        // Percent of the pane to move the separator by. 0 means "unset", and
+        // falls back to the paneResizeStep setting.
+        UInt32 Amount { get; };
     };
 
     [default_interface] runtimeclass MoveFocusArgs : IActionArgs, IActionArgsDescriptorAccess

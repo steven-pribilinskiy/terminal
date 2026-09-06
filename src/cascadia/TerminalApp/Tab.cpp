@@ -419,6 +419,9 @@ namespace winrt::TerminalApp::implementation
         _paneTitlebarVisibility = windowSettings.PaneTitlebarVisibility();
         _UpdatePaneTitlebarVisibility();
 
+        _showTabIndex = windowSettings.ShowTabIndex();
+        _UpdateIndexLabel();
+
         // Update the settings on all our panes.
         _rootPane->WalkTree([&](const auto& pane) {
             pane->UpdateSettings(settings, windowSettings);
@@ -909,16 +912,21 @@ namespace winrt::TerminalApp::implementation
     // - direction: The direction to move the separator in.
     // Return Value:
     // - whether a pane was resized
-    bool Tab::ResizePane(const ResizeDirection& direction)
+    bool Tab::ResizePane(const ResizeDirection& direction, const uint32_t percent)
     {
         ASSERT_UI_THREAD();
 
         // NOTE: This _must_ be called on the root pane, so that it can propagate
         // throughout the entire tree.
-        // The keyboard resize actions move the separator by 5% of the pane; a mouse
-        // drag on the divider drives Pane::_Resize with whatever the pointer says.
-        static constexpr auto keyboardResizeAmount = .05f;
-        return _rootPane->ResizePane(direction, keyboardResizeAmount);
+        // The keyboard resize actions move the separator by a percentage of the
+        // pane - paneResizeStep, or whatever the binding overrode it with; a
+        // mouse drag on the divider drives Pane::_Resize with whatever the
+        // pointer says.
+        //
+        // Clamped because a 0% step is a keybinding that silently does nothing,
+        // and anything past half the pane overshoots the far edge on one press.
+        const auto clamped = std::clamp<uint32_t>(percent, 1, 50);
+        return _rootPane->ResizePane(direction, clamped / 100.0f);
     }
 
     // Method Description:
@@ -1925,6 +1933,27 @@ namespace winrt::TerminalApp::implementation
         TabViewNumTabs(numTabs);
         _EnableMenuItems();
         _UpdateSwitchToTabKeyChord();
+        _UpdateIndexLabel();
+    }
+
+    // Method Description:
+    // - Refreshes the number drawn at the head of the tab. Displayed 1-based,
+    //   because that is how people count tabs and how the switchToTab bindings
+    //   read once you account for the modifier. Not capped at the 9 tabs that
+    //   have default key chords - the number is a label, not a promise that
+    //   pressing it will work.
+    void Tab::_UpdateIndexLabel()
+    {
+        if (!_headerControl)
+        {
+            return;
+        }
+
+        _headerControl.ShowIndex(_showTabIndex);
+        if (_showTabIndex)
+        {
+            _headerControl.IndexLabel(winrt::to_hstring(TabViewIndex() + 1));
+        }
     }
 
     // Method Description:

@@ -499,7 +499,7 @@ namespace winrt::TerminalApp::implementation
             }
             else
             {
-                const auto resizeSucceeded = _ResizePane(realArgs.ResizeDirection());
+                const auto resizeSucceeded = _ResizePane(realArgs.ResizeDirection(), realArgs.Amount());
                 args.Handled(resizeSucceeded);
             }
         }

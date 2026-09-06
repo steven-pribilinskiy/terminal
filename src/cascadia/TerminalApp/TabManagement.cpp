@@ -195,7 +195,7 @@ namespace winrt::TerminalApp::implementation
 
             if (page && tab)
             {
-                page->_RemoveTab(*tab);
+                page->_RemoveTab(*tab, /*allowReplacementTab*/ true);
             }
         });
 
@@ -525,7 +525,13 @@ namespace winrt::TerminalApp::implementation
 
     // Removes the tab (both TerminalControl and XAML).
     // NOTE: Don't call this directly, but rather `tab.Close()`.
-    void TerminalPage::_RemoveTab(const winrt::TerminalApp::Tab& tab)
+    // Arguments:
+    // - allowReplacementTab: true when this is the user closing a tab, in which
+    //   case closeWindowOnLastTab gets a say in what happens once the last one
+    //   is gone. False for the paths that remove a tab because it moved to
+    //   another window - tearing the only tab out of a window should still
+    //   leave that window closed, not replace what you just took.
+    void TerminalPage::_RemoveTab(const winrt::TerminalApp::Tab& tab, const bool allowReplacementTab)
     {
         uint32_t tabIndex{};
         if (!_tabs.IndexOf(tab, tabIndex))
@@ -575,11 +581,22 @@ namespace winrt::TerminalApp::implementation
         // To close the window here, we need to close the hosting window.
         if (_tabs.Size() == 0)
         {
-            // If we are supposed to save state, make sure we clear it out
-            // if the user manually closed all tabs.
-            // Do this only if we are the last window; the monarch will notice
-            // we are missing and remove us that way otherwise.
-            CloseWindowRequested.raise(*this, nullptr);
+            if (allowReplacementTab && !_currentWindowSettings().CloseWindowOnLastTab())
+            {
+                // Keep the window and start it over with a fresh tab. Leaving an
+                // empty window would be worse than either alternative: there is
+                // no UI for a tabless Terminal, so it would sit there as a blank
+                // rectangle with no way back other than the command palette.
+                LOG_IF_FAILED(_OpenNewTab(nullptr));
+            }
+            else
+            {
+                // If we are supposed to save state, make sure we clear it out
+                // if the user manually closed all tabs.
+                // Do this only if we are the last window; the monarch will notice
+                // we are missing and remove us that way otherwise.
+                CloseWindowRequested.raise(*this, nullptr);
+            }
         }
         else if (focusedTabIndex.has_value() && focusedTabIndex.value() == gsl::narrow_cast<uint32_t>(tabIndex))
         {

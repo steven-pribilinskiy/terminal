@@ -16,6 +16,19 @@
 
     <StackPanel x:Name="HeaderStackPanel"
                 Orientation="Horizontal">
+        <!--
+            The tab's position in the row. Leads the status glyphs so the
+            numbers line up down a vertical strip, where they are most useful,
+            instead of jittering left and right as bells and progress rings come
+            and go.
+        -->
+        <TextBlock x:Name="HeaderIndexTextBlock"
+                   Margin="0,0,6,0"
+                   VerticalAlignment="Center"
+                   AutomationProperties.AccessibilityView="Raw"
+                   Opacity="0.6"
+                   Text="{x:Bind IndexLabel, Mode=OneWay}"
+                   Visibility="{x:Bind ShowIndex, Mode=OneWay}" />
         <mux:ProgressRing x:Name="HeaderProgressRing"
                           Width="15"
                           Height="15"

@@ -21,6 +21,8 @@
     "showTerminalTitleInTitlebar": true,
     "tabWidthMode": "equal",
     "tabPosition": "top",
+    "showTabIndex": false,
+    "closeWindowOnLastTab": true,
     "tabSwitcherMode": "inOrder",
     "showAdminShield": true,
 
@@ -28,6 +30,7 @@
     "warning.confirmOnClose": "automatic",
     "theme": "system",
     "snapToGridOnResize": true,
+    "paneResizeStep": 5,
     "disableAnimations": false,
     "startupActions": "",
     "focusFollowMouse": false,

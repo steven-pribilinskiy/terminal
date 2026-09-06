@@ -1062,6 +1062,12 @@
               "$ref": "#/$defs/ResizeDirection",
               "default": "left",
               "description": "The direction to move the pane separator in."
+            },
+            "amount": {
+              "description": "The percentage of the pane to move the separator by, overriding the paneResizeStep setting for this binding. Clamped to between 1 and 50. Omit it to use the setting.",
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
             }
           }
         }
@@ -2931,6 +2937,23 @@
           "default": false,
           "description": "When set to true, the window will snap to the nearest character boundary on resize. When false, the window will resize smoothly",
           "type": "boolean"
+        },
+        "showTabIndex": {
+          "default": false,
+          "description": "When set to true, each tab shows its position in the row ahead of its title, numbered from 1. Only the first nine positions have default switchToTab key bindings; the number is shown for every tab regardless.",
+          "type": "boolean"
+        },
+        "closeWindowOnLastTab": {
+          "default": true,
+          "description": "When set to true, closing the last tab closes the window. When set to false, the window stays open and a new tab with the default profile takes its place. Tearing the last tab out into another window still closes the window it left.",
+          "type": "boolean"
+        },
+        "paneResizeStep": {
+          "default": 5,
+          "description": "The percentage of the pane that the resizePane key bindings move the separator by. Clamped to between 1 and 50. A resizePane binding with its own \"amount\" overrides this.",
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer"
         },
         "tabPosition": {
           "default": "top",

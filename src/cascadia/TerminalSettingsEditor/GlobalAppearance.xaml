@@ -76,6 +76,22 @@
                           Style="{StaticResource ToggleSwitchInExpanderStyle}" />
         </local:SettingsCard>
 
+        <!--  Show tab index  -->
+        <local:SettingsCard x:Name="ShowTabIndex"
+                            x:Uid="Globals_ShowTabIndex"
+                            IsForkFeature="True">
+            <ToggleSwitch IsOn="{x:Bind ViewModel.ShowTabIndex, Mode=TwoWay}"
+                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+        </local:SettingsCard>
+
+        <!--  Close the window after closing the last tab  -->
+        <local:SettingsCard x:Name="CloseWindowOnLastTab"
+                            x:Uid="Globals_CloseWindowOnLastTab"
+                            IsForkFeature="True">
+            <ToggleSwitch IsOn="{x:Bind ViewModel.CloseWindowOnLastTab, Mode=TwoWay}"
+                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+        </local:SettingsCard>
+
         <!--  Show Acrylic in Tab Row  -->
         <local:SettingsCard x:Name="AcrylicTabRow"
                             x:Uid="Globals_AcrylicTabRow">
