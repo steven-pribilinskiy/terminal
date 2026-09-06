@@ -130,8 +130,13 @@ jobs:
         run: |
           $te = Get-ChildItem .\packages\Microsoft.Taef.*\build\Binaries\x64\te.exe -ErrorAction SilentlyContinue |
                   Sort-Object FullName -Descending | Select-Object -First 1
-          $suite = '.\bin\x64\Release\SettingsModel.Unit.Tests.dll'
-          if (-not (Test-Path $suite)) { Write-Host "not built: $suite"; exit 0 }
+          # Note the project subdirectory. TargetName is SettingsModel.Unit.Tests
+          # but ProjectName is UnitTests_SettingsModel, and the output lands under
+          # the latter -- exactly as Control.Unit.Tests does above. Naming the file
+          # without it silently found nothing and exited 0, so run 34049885670
+          # reported this suite as fine while never loading it.
+          $suite = '.\bin\x64\Release\UnitTests_SettingsModel\SettingsModel.Unit.Tests.dll'
+          if (-not (Test-Path $suite)) { throw "not built: $suite" }
           # /rebootStateFile keeps te.exe from stopping at the first host death, so
           # one run reports every case rather than only the cases before the crash.
           & $te.FullName $suite /consoleLevel:0x02 2>&1 | Tee-Object -Variable output | Out-Host
