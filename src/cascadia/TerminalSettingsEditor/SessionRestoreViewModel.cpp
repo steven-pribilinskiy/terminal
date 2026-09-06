@@ -34,7 +34,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         });
     }
 
-    IInspectable SessionRestoreViewModel::CurrentFirstWindowPreference()
+    // Qualified: a bare IInspectable here is ambiguous between the projected type
+    // and the ABI struct of the same name that the Windows headers declare at
+    // global scope, which `using namespace winrt::Windows::Foundation` above pulls
+    // into contention.
+    Windows::Foundation::IInspectable SessionRestoreViewModel::CurrentFirstWindowPreference()
     {
         const auto key = _Settings.GlobalSettings().FirstWindowPreference();
         if (!_FirstWindowPreferenceMap || !_FirstWindowPreferenceMap.HasKey(key))
@@ -49,7 +53,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     // deliberately does NOT announce CurrentFirstWindowPreference -- the binding
     // called us because the selection already changed, and telling it otherwise
     // is how this page's neighbours have twice recursed until the stack was gone.
-    void SessionRestoreViewModel::CurrentFirstWindowPreference(const IInspectable& enumEntry)
+    void SessionRestoreViewModel::CurrentFirstWindowPreference(const Windows::Foundation::IInspectable& enumEntry)
     {
         const auto ee = enumEntry.try_as<Editor::EnumEntry>();
         if (!ee)
