@@ -398,7 +398,9 @@ namespace winrt::TerminalApp::implementation
         // tab across the window. The per-item style rides along inside that
         // template as the tab list's ItemContainerStyle, so this one call is
         // enough to undo both halves.
-        _tabView.ClearValue(winrt::Windows::UI::Xaml::Controls::Control::StyleProperty());
+        // FrameworkElement, not Control: Control inherits the Style property but
+        // the static dependency-property accessor is declared on FrameworkElement.
+        _tabView.ClearValue(winrt::Windows::UI::Xaml::FrameworkElement::StyleProperty());
 
         // TabRowControl.xaml sets VerticalAlignment="Bottom" directly on the
         // TabView. That is a local value, and a local value outranks a Style
@@ -689,7 +691,7 @@ namespace winrt::TerminalApp::implementation
             }
         });
 
-        _tabStripSplitter.PointerPressed([weakThis{ get_weak() }](const auto& sender, const Input::PointerRoutedEventArgs& args) {
+        _tabStripSplitter.PointerPressed([weakThis{ get_weak() }](const auto& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& args) {
             if (const auto page{ weakThis.get() })
             {
                 const auto border = sender.template as<Border>();
@@ -701,7 +703,7 @@ namespace winrt::TerminalApp::implementation
             }
         });
 
-        _tabStripSplitter.PointerMoved([weakThis{ get_weak() }](const auto&, const Input::PointerRoutedEventArgs& args) {
+        _tabStripSplitter.PointerMoved([weakThis{ get_weak() }](const auto&, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& args) {
             const auto page{ weakThis.get() };
             if (!page || !page->_splitterDragging)
             {
@@ -728,7 +730,7 @@ namespace winrt::TerminalApp::implementation
             args.Handled(true);
         });
 
-        _tabStripSplitter.PointerReleased([weakThis{ get_weak() }](const auto& sender, const Input::PointerRoutedEventArgs& args) {
+        _tabStripSplitter.PointerReleased([weakThis{ get_weak() }](const auto& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& args) {
             if (const auto page{ weakThis.get() })
             {
                 const auto border = sender.template as<Border>();
