@@ -104,70 +104,6 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
     }
 
-    // TEMPORARY DIAGNOSTIC -- remove once the Link Tooltip crash is fixed.
-    //
-    // Application.UnhandledException does NOT see that crash: it was tried and the
-    // handler never ran. 0xC000041D is a fail-fast raised at the COM callback
-    // boundary and never reaches XAML's managed-exception path.
-    //
-    // A vectored handler does see it, first-chance, before anything unwinds -- and
-    // it sees the stack at the throw, which is the one thing repeated bisection
-    // could not produce. Logs module+offset per frame and returns CONTINUE_SEARCH,
-    // so behaviour is unchanged and the process still dies exactly as before.
-    //
-    // Capped hard: 0xE06D7363 is every C++ throw in the process, and this tree
-    // throws freely on ordinary paths, so an uncapped handler would both flood the
-    // log and slow the app enough to change the timing being investigated.
-    LONG __stdcall MainPage::_DiagnosticVectoredHandler(EXCEPTION_POINTERS* info) noexcept
-    {
-        static std::atomic<int> budget{ 60 };
-
-        const auto code = info->ExceptionRecord->ExceptionCode;
-        if (code != 0xC000041DU && code != 0xE06D7363U)
-        {
-            return EXCEPTION_CONTINUE_SEARCH;
-        }
-        if (budget.fetch_sub(1) <= 0)
-        {
-            return EXCEPTION_CONTINUE_SEARCH;
-        }
-
-        try
-        {
-            void* frames[24]{};
-            const auto captured = RtlCaptureStackBackTrace(0, ARRAYSIZE(frames), frames, nullptr);
-
-            std::filesystem::path log{ wil::ExpandEnvironmentStringsW<std::wstring>(L"%TEMP%") };
-            log /= L"wt-veh.log";
-            std::wofstream out{ log, std::ios::app };
-            out << L"--- code=0x" << std::hex << code << std::dec << L"\n";
-            for (USHORT i = 0; i < captured; ++i)
-            {
-                const auto addr = reinterpret_cast<uintptr_t>(frames[i]);
-                HMODULE mod{};
-                std::wstring name{ L"?" };
-                uintptr_t base{};
-                if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                                       reinterpret_cast<LPCWSTR>(addr),
-                                       &mod) &&
-                    mod)
-                {
-                    wchar_t path[MAX_PATH]{};
-                    if (GetModuleFileNameW(mod, path, ARRAYSIZE(path)))
-                    {
-                        name = std::filesystem::path{ path }.filename().wstring();
-                    }
-                    base = reinterpret_cast<uintptr_t>(mod);
-                }
-                out << L"   " << name << L"+0x" << std::hex << (addr - base) << std::dec << L"\n";
-            }
-        }
-        catch (...)
-        {
-        }
-        return EXCEPTION_CONTINUE_SEARCH;
-    }
-
     MainPage::MainPage(const CascadiaSettings& settings, const Model::WindowSettings& windowSettings) :
         _settingsSource{ settings },
         _settingsClone{ settings.Copy() },
@@ -177,23 +113,6 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     {
         InitializeComponent();
         _UpdateBackgroundForMica();
-
-        // TEMPORARY DIAGNOSTIC -- remove once the Link Tooltip crash is fixed.
-        //
-        // Application.UnhandledException does NOT see this crash: it was tried, the
-        // handler never ran. 0xC000041D is a fail-fast raised at the COM callback
-        // boundary and never reaches XAML's managed-exception path.
-        //
-        // A vectored handler does see it, first-chance, before anything unwinds --
-        // and critically it sees the *stack at the throw*, which is the one thing
-        // four rounds of bisection could not produce. It logs the module and offset
-        // of each frame and returns CONTINUE_SEARCH, so behaviour is unchanged and
-        // the process still dies exactly as before.
-        static const auto vehInstalled = []() {
-            AddVectoredExceptionHandler(1, &MainPage::_DiagnosticVectoredHandler);
-            return true;
-        }();
-        (void)vehInstalled;
 
         _newTabMenuPageVM = winrt::make<NewTabMenuViewModel>(_settingsClone);
         _ntmViewModelChangedRevoker = _newTabMenuPageVM.PropertyChanged(winrt::auto_revoke, [this](auto&&, const PropertyChangedEventArgs& args) {

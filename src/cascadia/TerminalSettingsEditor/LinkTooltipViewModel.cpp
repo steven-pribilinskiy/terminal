@@ -468,7 +468,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         if (const auto choice = value.try_as<Editor::IntegrationChoiceViewModel>(); choice && _Rule.PrimaryAction() != choice.Id())
         {
             _Rule.PrimaryAction(choice.Id());
-            _NotifyChanges(L"CurrentPrimaryAction");
+
         }
     }
 
@@ -482,7 +482,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         if (const auto choice = value.try_as<Editor::IntegrationChoiceViewModel>(); choice && _Rule.AlternativeAction() != choice.Id())
         {
             _Rule.AlternativeAction(choice.Id());
-            _NotifyChanges(L"CurrentAlternativeAction");
+
         }
     }
 
@@ -1272,6 +1272,24 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _NotifyChanges(L"RuleGroups");
     }
 
+    // A Current* setter behind a ComboBox must NOT announce its own property.
+    //
+    // These are the write half of SelectedItem="{x:Bind ..., Mode=TwoWay}". The
+    // binding calls the setter because the selection already changed; telling it
+    // "this property changed" makes it re-read the getter and assign SelectedItem
+    // again, the ComboBox raises its change, the binding calls the setter again --
+    // and round it goes until the stack is gone. It is not a hang and not an
+    // exception: the process simply dies about five seconds later with
+    // STATUS_FATAL_USER_CALLBACK_EXCEPTION, one interaction after the click that
+    // started it, which is why it reads as "any dropdown crashes at random".
+    //
+    // Caught with a debugger: the captured stack is CItemsControl::SetValue ->
+    // NotifyPropertyChanged -> our callback -> SetValueByKnownIndex -> repeat.
+    // GETSET_BINDABLE_ENUM_SETTING omits the notification for exactly this reason,
+    // which is why every page using the macro is unaffected and only this page,
+    // whose setters are hand-written, crashes.
+    //
+    // Announcing a *different* property is fine and is what the remaining calls do.
     Windows::Foundation::IInspectable LinkTooltipViewModel::CurrentIntegrationDisplayMode() const
     {
         return _lookupEnumEntry(_IntegrationDisplayModeMap, _WindowSettings.HyperlinkIntegrationDisplayMode());
@@ -1283,7 +1301,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         {
             const auto value = winrt::unbox_value<Model::HyperlinkIntegrationDisplayMode>(entry.EnumValue());
             _WindowSettings.HyperlinkIntegrationDisplayMode(value);
-            _NotifyChanges(L"CurrentIntegrationDisplayMode", L"HyperlinkIntegrationDisplayMode");
+            _NotifyChanges(L"HyperlinkIntegrationDisplayMode");
         }
     }
 
@@ -1298,7 +1316,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         {
             const auto value = winrt::unbox_value<Model::HyperlinkActionPlacement>(entry.EnumValue());
             _WindowSettings.HyperlinkActionPlacement(value);
-            _NotifyChanges(L"CurrentActionPlacement", L"HyperlinkActionPlacement");
+            _NotifyChanges(L"HyperlinkActionPlacement");
         }
     }
 
@@ -1312,7 +1330,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         if (const auto entry = enumEntry.try_as<Editor::EnumEntry>())
         {
             _WindowSettings.HyperlinkPrimaryClickModifier(winrt::unbox_value<Model::HyperlinkClickModifier>(entry.EnumValue()));
-            _NotifyChanges(L"CurrentPrimaryClickModifier");
+
         }
     }
 
@@ -1326,7 +1344,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         if (const auto entry = enumEntry.try_as<Editor::EnumEntry>())
         {
             _WindowSettings.HyperlinkPrimaryClickGesture(winrt::unbox_value<Model::HyperlinkClickGesture>(entry.EnumValue()));
-            _NotifyChanges(L"CurrentPrimaryClickGesture");
+
         }
     }
 
@@ -1340,7 +1358,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         if (const auto entry = enumEntry.try_as<Editor::EnumEntry>())
         {
             _WindowSettings.HyperlinkAlternativeClickModifier(winrt::unbox_value<Model::HyperlinkClickModifier>(entry.EnumValue()));
-            _NotifyChanges(L"CurrentAlternativeClickModifier");
+
         }
     }
 
@@ -1354,7 +1372,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         if (const auto entry = enumEntry.try_as<Editor::EnumEntry>())
         {
             _WindowSettings.HyperlinkAlternativeClickGesture(winrt::unbox_value<Model::HyperlinkClickGesture>(entry.EnumValue()));
-            _NotifyChanges(L"CurrentAlternativeClickGesture");
+
         }
     }
 
@@ -1368,7 +1386,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         if (const auto choice = value.try_as<Editor::IntegrationChoiceViewModel>())
         {
             _WindowSettings.HyperlinkPrimaryAction(choice.Id());
-            _NotifyChanges(L"CurrentPrimaryAction");
+
         }
     }
 
@@ -1382,7 +1400,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         if (const auto choice = value.try_as<Editor::IntegrationChoiceViewModel>())
         {
             _WindowSettings.HyperlinkAlternativeAction(choice.Id());
-            _NotifyChanges(L"CurrentAlternativeAction");
+
         }
     }
 
