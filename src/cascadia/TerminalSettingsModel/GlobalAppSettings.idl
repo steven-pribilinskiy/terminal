@@ -102,6 +102,7 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(Boolean, AllowHeadless);
         INHERITABLE_SETTING(Boolean, ControlPipeEnabled);
         INHERITABLE_SETTING(Boolean, AylithImprint);
+        INHERITABLE_SETTING(Boolean, AylithImprintJsonOnly);
         INHERITABLE_SETTING(Boolean, EnableColorSelection);
         INHERITABLE_SETTING(Int32, CiPollIntervalMinutes);
         INHERITABLE_SETTING(Boolean, ResumeAgents);

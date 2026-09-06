@@ -38,6 +38,7 @@ namespace Microsoft.Terminal.Settings.Editor
         // Pushes the new value to SettingsCard's app-wide flag, so rows already on
         // screen pick the mark up without waiting to be rebuilt.
         void AylithImprintToggled(IInspectable sender, Windows.UI.Xaml.RoutedEventArgs args);
+        void AylithImprintJsonOnlyToggled(IInspectable sender, Windows.UI.Xaml.RoutedEventArgs args);
 
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, AlwaysShowTabs);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, ShowTabsFullscreen);
@@ -53,5 +54,6 @@ namespace Microsoft.Terminal.Settings.Editor
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, ShowAdminShield);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, EnableUnfocusedAcrylic);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, AylithImprint);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, AylithImprintJsonOnly);
     }
 }

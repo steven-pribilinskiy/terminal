@@ -43,5 +43,11 @@ namespace Microsoft.Terminal.Settings.Editor
         // Appearance, not this.
         Boolean IsForkFeature;
         static Windows.UI.Xaml.DependencyProperty IsForkFeatureProperty { get; };
+
+        // True on a row upstream has but only lets you set by hand in
+        // settings.json, where the control beside it is ours. Mutually exclusive
+        // with IsForkFeature: a setting either exists upstream or it does not.
+        Boolean IsJsonOnlyUpstream;
+        static Windows.UI.Xaml.DependencyProperty IsJsonOnlyUpstreamProperty { get; };
     };
 }

@@ -42,6 +42,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         DEPENDENCY_PROPERTY(bool, IsActionIconVisible);
         DEPENDENCY_PROPERTY(Editor::SettingsCardContentAlignment, ContentAlignment);
         DEPENDENCY_PROPERTY(bool, IsForkFeature);
+        DEPENDENCY_PROPERTY(bool, IsJsonOnlyUpstream);
 
         // DEPENDENCY_PROPERTY ends in `private:` (it declares the backing static
         // there), so anything following it needs to say `public:` again or it is
@@ -57,6 +58,12 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         static bool ImprintEnabled() noexcept;
         static void ImprintEnabled(bool value);
 
+        // The same, for rows that upstream has but only lets you set in
+        // settings.json. Orthogonal to the fork mark: a row is one or the
+        // other, never both, so the two switches never fight over a card.
+        static bool JsonOnlyImprintEnabled() noexcept;
+        static void JsonOnlyImprintEnabled(bool value);
+
     private:
         static void _InitializeProperties();
         static void _OnHeaderChanged(const Windows::UI::Xaml::DependencyObject& d, const Windows::UI::Xaml::DependencyPropertyChangedEventArgs& e);
@@ -66,8 +73,13 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         static void _OnIsActionIconVisibleChanged(const Windows::UI::Xaml::DependencyObject& d, const Windows::UI::Xaml::DependencyPropertyChangedEventArgs& e);
         static void _OnContentAlignmentChanged(const Windows::UI::Xaml::DependencyObject& d, const Windows::UI::Xaml::DependencyPropertyChangedEventArgs& e);
         static void _OnIsForkFeatureChanged(const Windows::UI::Xaml::DependencyObject& d, const Windows::UI::Xaml::DependencyPropertyChangedEventArgs& e);
+        static void _OnIsJsonOnlyUpstreamChanged(const Windows::UI::Xaml::DependencyObject& d, const Windows::UI::Xaml::DependencyPropertyChangedEventArgs& e);
 
         void _UpdateForkImprint();
+
+        // Redraws the marks on every card still alive, and compacts the registry
+        // while it is walking it.
+        static void _RefreshLiveCards();
 
         // Whether this card has been added to the imprint registry yet. The registry
         // itself, and the app-wide flag, live at file scope in SettingsCard.cpp:

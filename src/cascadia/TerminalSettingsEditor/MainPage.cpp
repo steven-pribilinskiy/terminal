@@ -225,6 +225,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         // already agrees with the saved setting rather than picking it up only once
         // Appearance has been visited.
         SettingsCard::ImprintEnabled(_settingsClone.GlobalSettings().AylithImprint());
+        SettingsCard::JsonOnlyImprintEnabled(_settingsClone.GlobalSettings().AylithImprintJsonOnly());
         _UpdateForkNavItems();
 
         // Capture data about where we are right now, so we can re-navigate to the same
@@ -636,6 +637,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         // authority; the toggle handler is only there to make the change visible
         // without leaving the page.
         SettingsCard::ImprintEnabled(_settingsClone.GlobalSettings().AylithImprint());
+        SettingsCard::JsonOnlyImprintEnabled(_settingsClone.GlobalSettings().AylithImprintJsonOnly());
         _UpdateForkNavItems();
 
         hstring selectedNavTag;

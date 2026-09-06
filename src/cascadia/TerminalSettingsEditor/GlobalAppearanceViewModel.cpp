@@ -154,4 +154,15 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             SettingsCard::ImprintEnabled(toggle.IsOn());
         }
     }
+
+    // Same reasoning as AylithImprintToggled, including reading the switch rather
+    // than the projected property: Toggled and the TwoWay binding's write-back are
+    // not ordered against each other.
+    void GlobalAppearanceViewModel::AylithImprintJsonOnlyToggled(const winrt::Windows::Foundation::IInspectable& sender, const RoutedEventArgs& /* args */)
+    {
+        if (const auto toggle = sender.try_as<winrt::Windows::UI::Xaml::Controls::ToggleSwitch>())
+        {
+            SettingsCard::JsonOnlyImprintEnabled(toggle.IsOn());
+        }
+    }
 }

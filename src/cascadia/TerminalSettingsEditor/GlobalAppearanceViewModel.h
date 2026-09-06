@@ -54,8 +54,10 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, ShowAdminShield);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, EnableUnfocusedAcrylic);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, AylithImprint);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, AylithImprintJsonOnly);
 
         void AylithImprintToggled(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::RoutedEventArgs& args);
+        void AylithImprintJsonOnlyToggled(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::RoutedEventArgs& args);
 
     private:
         Model::GlobalAppSettings _GlobalSettings;

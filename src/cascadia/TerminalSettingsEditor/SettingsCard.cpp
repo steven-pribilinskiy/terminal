@@ -27,6 +27,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     DependencyProperty SettingsCard::_IsActionIconVisibleProperty{ nullptr };
     DependencyProperty SettingsCard::_ContentAlignmentProperty{ nullptr };
     DependencyProperty SettingsCard::_IsForkFeatureProperty{ nullptr };
+    DependencyProperty SettingsCard::_IsJsonOnlyUpstreamProperty{ nullptr };
 
     static constexpr std::wstring_view NormalState{ L"Normal" };
     static constexpr std::wstring_view PointerOverState{ L"PointerOver" };
@@ -52,6 +53,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     static constexpr std::wstring_view ContentPresenterPart{ L"PART_ContentPresenter" };
     static constexpr std::wstring_view RootGridPart{ L"PART_RootGrid" };
     static constexpr std::wstring_view AylithImprintPart{ L"PART_AylithImprint" };
+    static constexpr std::wstring_view JsonOnlyImprintPart{ L"PART_JsonOnlyImprint" };
 
     // Whether fork-only rows draw their mark, and every card built so far.
     //
@@ -61,6 +63,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     // session; dead entries are dropped on the next walk rather than needing an
     // unregister step that nothing would reliably call.
     static bool g_imprintEnabled{ false };
+    static bool g_jsonOnlyImprintEnabled{ false };
     static std::vector<winrt::weak_ref<SettingsCard>> g_liveCards;
 
     static constexpr double SettingsCardVerticalHeaderContentSpacing{ 8.0 };
@@ -90,17 +93,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         return g_imprintEnabled;
     }
 
-    void SettingsCard::ImprintEnabled(bool value)
+    // Refresh what is on screen, dropping cards XAML has since released. The
+    // compaction rides along with the walk because there is no teardown hook
+    // that would reliably fire for every card.
+    void SettingsCard::_RefreshLiveCards()
     {
-        if (g_imprintEnabled == value)
-        {
-            return;
-        }
-        g_imprintEnabled = value;
-
-        // Refresh what is on screen, dropping cards XAML has since released. The
-        // compaction rides along with the walk because there is no teardown hook
-        // that would reliably fire for every card.
         std::vector<winrt::weak_ref<SettingsCard>> alive;
         alive.reserve(g_liveCards.size());
         for (const auto& weak : g_liveCards)
@@ -114,17 +111,49 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         g_liveCards = std::move(alive);
     }
 
-    // The mark is drawn only where both halves agree: this row is one of ours, and
-    // the switch in Appearance is on.
+    void SettingsCard::ImprintEnabled(bool value)
+    {
+        if (g_imprintEnabled == value)
+        {
+            return;
+        }
+        g_imprintEnabled = value;
+        _RefreshLiveCards();
+    }
+
+    bool SettingsCard::JsonOnlyImprintEnabled() noexcept
+    {
+        return g_jsonOnlyImprintEnabled;
+    }
+
+    void SettingsCard::JsonOnlyImprintEnabled(bool value)
+    {
+        if (g_jsonOnlyImprintEnabled == value)
+        {
+            return;
+        }
+        g_jsonOnlyImprintEnabled = value;
+        _RefreshLiveCards();
+    }
+
+    // A mark is drawn only where both halves agree: this row carries the flag,
+    // and the matching switch in Appearance is on. The two are mutually
+    // exclusive by construction -- a setting either exists upstream or it does
+    // not -- so nothing has to arbitrate between them here.
     void SettingsCard::_UpdateForkImprint()
     {
-        if (const auto child{ GetTemplateChild(hstring{ AylithImprintPart }) })
-        {
-            if (const auto imprint{ child.try_as<Windows::UI::Xaml::UIElement>() })
+        const auto apply = [this](const std::wstring_view part, const bool visible) {
+            if (const auto child{ GetTemplateChild(hstring{ part }) })
             {
-                imprint.Visibility(IsForkFeature() && g_imprintEnabled ? Visibility::Visible : Visibility::Collapsed);
+                if (const auto imprint{ child.try_as<Windows::UI::Xaml::UIElement>() })
+                {
+                    imprint.Visibility(visible ? Visibility::Visible : Visibility::Collapsed);
+                }
             }
-        }
+        };
+
+        apply(AylithImprintPart, IsForkFeature() && g_imprintEnabled);
+        apply(JsonOnlyImprintPart, IsJsonOnlyUpstream() && g_jsonOnlyImprintEnabled);
     }
 
     void SettingsCard::_InitializeProperties()
@@ -203,6 +232,14 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 xaml_typename<bool>(),
                 xaml_typename<Editor::SettingsCard>(),
                 PropertyMetadata{ box_value(false), PropertyChangedCallback{ &SettingsCard::_OnIsForkFeatureChanged } });
+        }
+        if (!_IsJsonOnlyUpstreamProperty)
+        {
+            _IsJsonOnlyUpstreamProperty = DependencyProperty::Register(
+                L"IsJsonOnlyUpstream",
+                xaml_typename<bool>(),
+                xaml_typename<Editor::SettingsCard>(),
+                PropertyMetadata{ box_value(false), PropertyChangedCallback{ &SettingsCard::_OnIsJsonOnlyUpstreamChanged } });
         }
     }
 
@@ -715,6 +752,12 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     }
 
     void SettingsCard::_OnIsForkFeatureChanged(const DependencyObject& d, const DependencyPropertyChangedEventArgs& /*e*/)
+    {
+        const auto obj{ d.try_as<Editor::SettingsCard>() };
+        get_self<SettingsCard>(obj)->_UpdateForkImprint();
+    }
+
+    void SettingsCard::_OnIsJsonOnlyUpstreamChanged(const DependencyObject& d, const DependencyPropertyChangedEventArgs& /*e*/)
     {
         const auto obj{ d.try_as<Editor::SettingsCard>() };
         get_self<SettingsCard>(obj)->_UpdateForkImprint();

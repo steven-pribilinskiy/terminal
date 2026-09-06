@@ -208,5 +208,18 @@
                           Style="{StaticResource ToggleSwitchInExpanderStyle}"
                           Toggled="{x:Bind ViewModel.AylithImprintToggled}" />
         </local:SettingsCard>
+
+        <!--
+            The companion mark, for settings upstream has but hides in
+            settings.json. This row is itself a fork addition, so it carries the
+            filled mark rather than the hollow one it controls.
+        -->
+        <local:SettingsCard x:Name="AylithImprintJsonOnly"
+                            x:Uid="Globals_AylithImprintJsonOnly"
+                            IsForkFeature="True">
+            <ToggleSwitch IsOn="{x:Bind ViewModel.AylithImprintJsonOnly, Mode=TwoWay}"
+                          Style="{StaticResource ToggleSwitchInExpanderStyle}"
+                          Toggled="{x:Bind ViewModel.AylithImprintJsonOnlyToggled}" />
+        </local:SettingsCard>
     </StackPanel>
 </Page>

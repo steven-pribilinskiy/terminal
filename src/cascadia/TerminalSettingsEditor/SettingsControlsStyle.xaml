@@ -269,6 +269,22 @@
                                            Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
                                            Text="&#x25C6;"
                                            Visibility="Collapsed" />
+                                <!--
+                                    The same mark hollowed out, for a setting upstream
+                                    has but only lets you set in settings.json. Same
+                                    shape and size so the two read as one family at a
+                                    glance; filled means "ours", hollow means "theirs,
+                                    but the control is ours". Secondary rather than
+                                    accent for the same reason - it is the quieter of
+                                    the two claims.
+                                -->
+                                <TextBlock x:Name="PART_JsonOnlyImprint"
+                                           VerticalAlignment="Center"
+                                           AutomationProperties.AccessibilityView="Raw"
+                                           FontSize="10"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                           Text="&#x25C7;"
+                                           Visibility="Collapsed" />
                             </StackPanel>
 
                             <ContentPresenter x:Name="PART_DescriptionPresenter"
