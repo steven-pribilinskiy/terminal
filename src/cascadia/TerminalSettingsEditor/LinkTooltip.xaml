@@ -192,113 +192,169 @@
                     tooltip instead. The list under it says which kinds of link a
                     click reaches, and greys out when clicking is off entirely.
                 -->
-                <local:SettingsCard x:Name="HyperlinkClickable"
-                                    x:Uid="Globals_HyperlinkClickable">
+                <!--
+                    The whole of clicking, as one group: the master switch is the
+                    expander's own header, and everything it gates is inside. The
+                    IsEnabled bindings stay on the rows rather than moving up to the
+                    expander, because disabling a SettingsExpander disables its
+                    header too - which would make the master switch unclickable and
+                    the group impossible to turn back on.
+                -->
+                <local:SettingsExpander x:Name="HyperlinkClickable"
+                                        x:Uid="Globals_HyperlinkClickable"
+                                        IsForkFeature="True">
                     <ToggleSwitch IsOn="{x:Bind ViewModel.HyperlinkClickable, Mode=TwoWay}"
                                   Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-                </local:SettingsCard>
+                    <local:SettingsExpander.Items>
+
+                        <!--
+                            HorizontalContentAlignment="Left" is required, not decorative:
+                            ContentAlignment="Vertical" only stretches the presenter across
+                            the row, and SettingsCard then propagates the card's own
+                            HorizontalContentAlignment to it - which the style defaults to
+                            Right. Without this the checkboxes sit against the right edge,
+                            a column away from the header they belong to.
+                        -->
+                        <local:SettingsCard x:Name="HyperlinkClickableKinds"
+                                            x:Uid="Globals_HyperlinkClickableKinds"
+                                            ContentAlignment="Vertical"
+                                            HorizontalContentAlignment="Left"
+                                            IsEnabled="{x:Bind ViewModel.HyperlinkClickable, Mode=OneWay}">
+                            <ItemsControl ItemTemplate="{StaticResource ButtonChoiceTemplate}"
+                                          ItemsSource="{x:Bind ViewModel.ClickableKindChoices, Mode=OneWay}" />
+                        </local:SettingsCard>
+
+                        <!--
+                            The two chords. Each is a modifier plus a mouse gesture plus the
+                            action it runs, and the same three ids the card's buttons use are
+                            what an action can be - so binding a chord to "Copy link" does
+                            exactly what the Copy link button does.
+                        -->
+                        <local:SettingsCard x:Name="HyperlinkPrimaryClick"
+                                            x:Uid="Globals_HyperlinkPrimaryClick"
+                                            IsEnabled="{x:Bind ViewModel.HyperlinkClickable, Mode=OneWay}">
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="8">
+                                <ComboBox x:Uid="Globals_HyperlinkClickModifierBox"
+                                          AutomationProperties.AccessibilityView="Content"
+                                          ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                                          ItemsSource="{x:Bind ViewModel.ClickModifierList, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.CurrentPrimaryClickModifier, Mode=TwoWay}" />
+                                <ComboBox x:Uid="Globals_HyperlinkClickGestureBox"
+                                          AutomationProperties.AccessibilityView="Content"
+                                          ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                                          ItemsSource="{x:Bind ViewModel.ClickGestureList, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.CurrentPrimaryClickGesture, Mode=TwoWay}" />
+                                <ComboBox x:Uid="Globals_HyperlinkClickActionBox"
+                                          AutomationProperties.AccessibilityView="Content"
+                                          ItemTemplate="{StaticResource IntegrationChoiceComboBoxTemplate}"
+                                          ItemsSource="{x:Bind ViewModel.ActionChoices, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.CurrentPrimaryAction, Mode=TwoWay}" />
+                            </StackPanel>
+                        </local:SettingsCard>
+
+                        <local:SettingsCard x:Name="HyperlinkAlternativeClick"
+                                            x:Uid="Globals_HyperlinkAlternativeClick"
+                                            IsEnabled="{x:Bind ViewModel.HyperlinkClickable, Mode=OneWay}">
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="8">
+                                <ComboBox x:Uid="Globals_HyperlinkClickModifierBox"
+                                          AutomationProperties.AccessibilityView="Content"
+                                          ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                                          ItemsSource="{x:Bind ViewModel.ClickModifierList, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.CurrentAlternativeClickModifier, Mode=TwoWay}" />
+                                <ComboBox x:Uid="Globals_HyperlinkClickGestureBox"
+                                          AutomationProperties.AccessibilityView="Content"
+                                          ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                                          ItemsSource="{x:Bind ViewModel.ClickGestureList, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.CurrentAlternativeClickGesture, Mode=TwoWay}" />
+                                <ComboBox x:Uid="Globals_HyperlinkClickActionBox"
+                                          AutomationProperties.AccessibilityView="Content"
+                                          ItemTemplate="{StaticResource IntegrationChoiceComboBoxTemplate}"
+                                          ItemsSource="{x:Bind ViewModel.ActionChoices, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.CurrentAlternativeAction, Mode=TwoWay}" />
+                            </StackPanel>
+                        </local:SettingsCard>
+                    </local:SettingsExpander.Items>
+                </local:SettingsExpander>
 
                 <!--
-                    HorizontalContentAlignment="Left" is required, not decorative:
-                    ContentAlignment="Vertical" only stretches the presenter across
-                    the row, and SettingsCard then propagates the card's own
-                    HorizontalContentAlignment to it - which the style defaults to
-                    Right. Without this the checkboxes sit against the right edge,
-                    a column away from the header they belong to.
+                    How the tooltip is shaped: the two delays and the width it may
+                    grow to. No master switch - these are three numbers that are
+                    only ever tuned together, which is the other reason to group.
                 -->
-                <local:SettingsCard x:Name="HyperlinkClickableKinds"
-                                    x:Uid="Globals_HyperlinkClickableKinds"
-                                    ContentAlignment="Vertical"
-                                    HorizontalContentAlignment="Left"
-                                    IsEnabled="{x:Bind ViewModel.HyperlinkClickable, Mode=OneWay}">
-                    <ItemsControl ItemTemplate="{StaticResource ButtonChoiceTemplate}"
-                                  ItemsSource="{x:Bind ViewModel.ClickableKindChoices, Mode=OneWay}" />
-                </local:SettingsCard>
+                <local:SettingsExpander x:Name="HyperlinkTooltipSizing"
+                                        x:Uid="Globals_HyperlinkTooltipSizing"
+                                        IsForkFeature="True">
+                    <local:SettingsExpander.Items>
+                        <local:SettingsCard x:Name="HyperlinkTooltipShowDelay"
+                                            x:Uid="Globals_HyperlinkTooltipShowDelay">
+                            <muxc:NumberBox x:Uid="Globals_HyperlinkTooltipShowDelayBox"
+                                            LargeChange="100"
+                                            Maximum="5000"
+                                            Minimum="0"
+                                            SmallChange="50"
+                                            Style="{StaticResource NumberBoxSettingStyle}"
+                                            Value="{x:Bind ViewModel.HyperlinkTooltipShowDelay, Mode=TwoWay}" />
+                        </local:SettingsCard>
+
+                        <local:SettingsCard x:Name="HyperlinkTooltipHideDelay"
+                                            x:Uid="Globals_HyperlinkTooltipHideDelay">
+                            <muxc:NumberBox x:Uid="Globals_HyperlinkTooltipHideDelayBox"
+                                            LargeChange="100"
+                                            Maximum="5000"
+                                            Minimum="0"
+                                            SmallChange="50"
+                                            Style="{StaticResource NumberBoxSettingStyle}"
+                                            Value="{x:Bind ViewModel.HyperlinkTooltipHideDelay, Mode=TwoWay}" />
+                        </local:SettingsCard>
+
+                        <local:SettingsCard x:Name="HyperlinkTooltipMaxWidth"
+                                            x:Uid="Globals_HyperlinkTooltipMaxWidth">
+                            <muxc:NumberBox x:Uid="Globals_HyperlinkTooltipMaxWidthBox"
+                                            LargeChange="100"
+                                            Maximum="4000"
+                                            Minimum="0"
+                                            SmallChange="20"
+                                            Style="{StaticResource NumberBoxSettingStyle}"
+                                            Value="{x:Bind ViewModel.HyperlinkTooltipMaxWidth, Mode=TwoWay}" />
+                        </local:SettingsCard>
+                    </local:SettingsExpander.Items>
+                </local:SettingsExpander>
 
                 <!--
-                    The two chords. Each is a modifier plus a mouse gesture plus the
-                    action it runs, and the same three ids the card's buttons use are
-                    what an action can be - so binding a chord to "Copy link" does
-                    exactly what the Copy link button does.
+                    The button row: the switch is the group's header, and what the
+                    row carries and which end of the card it sits on are inside.
+                    The integration logo is deliberately NOT in here - it is drawn
+                    whether or not there are buttons, so gating it on this switch
+                    would grey out a setting that still applies.
                 -->
-                <local:SettingsCard x:Name="HyperlinkPrimaryClick"
-                                    x:Uid="Globals_HyperlinkPrimaryClick"
-                                    IsEnabled="{x:Bind ViewModel.HyperlinkClickable, Mode=OneWay}">
-                    <StackPanel Orientation="Horizontal"
-                                Spacing="8">
-                        <ComboBox x:Uid="Globals_HyperlinkClickModifierBox"
-                                  AutomationProperties.AccessibilityView="Content"
-                                  ItemTemplate="{StaticResource EnumComboBoxTemplate}"
-                                  ItemsSource="{x:Bind ViewModel.ClickModifierList, Mode=OneWay}"
-                                  SelectedItem="{x:Bind ViewModel.CurrentPrimaryClickModifier, Mode=TwoWay}" />
-                        <ComboBox x:Uid="Globals_HyperlinkClickGestureBox"
-                                  AutomationProperties.AccessibilityView="Content"
-                                  ItemTemplate="{StaticResource EnumComboBoxTemplate}"
-                                  ItemsSource="{x:Bind ViewModel.ClickGestureList, Mode=OneWay}"
-                                  SelectedItem="{x:Bind ViewModel.CurrentPrimaryClickGesture, Mode=TwoWay}" />
-                        <ComboBox x:Uid="Globals_HyperlinkClickActionBox"
-                                  AutomationProperties.AccessibilityView="Content"
-                                  ItemTemplate="{StaticResource IntegrationChoiceComboBoxTemplate}"
-                                  ItemsSource="{x:Bind ViewModel.ActionChoices, Mode=OneWay}"
-                                  SelectedItem="{x:Bind ViewModel.CurrentPrimaryAction, Mode=TwoWay}" />
-                    </StackPanel>
-                </local:SettingsCard>
+                <local:SettingsExpander x:Name="HyperlinkTooltipActions"
+                                        x:Uid="Globals_HyperlinkTooltipActions"
+                                        IsForkFeature="True">
+                    <ToggleSwitch IsOn="{x:Bind ViewModel.HyperlinkTooltipActions, Mode=TwoWay}"
+                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                    <local:SettingsExpander.Items>
+                        <local:SettingsCard x:Name="HyperlinkTooltipButtons"
+                                            x:Uid="Globals_HyperlinkTooltipButtons"
+                                            ContentAlignment="Vertical"
+                                            HorizontalContentAlignment="Left"
+                                            IsEnabled="{x:Bind ViewModel.HyperlinkTooltipActions, Mode=OneWay}">
+                            <ItemsControl ItemTemplate="{StaticResource ButtonChoiceTemplate}"
+                                          ItemsSource="{x:Bind ViewModel.ButtonChoices, Mode=OneWay}" />
+                        </local:SettingsCard>
 
-                <local:SettingsCard x:Name="HyperlinkAlternativeClick"
-                                    x:Uid="Globals_HyperlinkAlternativeClick"
-                                    IsEnabled="{x:Bind ViewModel.HyperlinkClickable, Mode=OneWay}">
-                    <StackPanel Orientation="Horizontal"
-                                Spacing="8">
-                        <ComboBox x:Uid="Globals_HyperlinkClickModifierBox"
-                                  AutomationProperties.AccessibilityView="Content"
-                                  ItemTemplate="{StaticResource EnumComboBoxTemplate}"
-                                  ItemsSource="{x:Bind ViewModel.ClickModifierList, Mode=OneWay}"
-                                  SelectedItem="{x:Bind ViewModel.CurrentAlternativeClickModifier, Mode=TwoWay}" />
-                        <ComboBox x:Uid="Globals_HyperlinkClickGestureBox"
-                                  AutomationProperties.AccessibilityView="Content"
-                                  ItemTemplate="{StaticResource EnumComboBoxTemplate}"
-                                  ItemsSource="{x:Bind ViewModel.ClickGestureList, Mode=OneWay}"
-                                  SelectedItem="{x:Bind ViewModel.CurrentAlternativeClickGesture, Mode=TwoWay}" />
-                        <ComboBox x:Uid="Globals_HyperlinkClickActionBox"
-                                  AutomationProperties.AccessibilityView="Content"
-                                  ItemTemplate="{StaticResource IntegrationChoiceComboBoxTemplate}"
-                                  ItemsSource="{x:Bind ViewModel.ActionChoices, Mode=OneWay}"
-                                  SelectedItem="{x:Bind ViewModel.CurrentAlternativeAction, Mode=TwoWay}" />
-                    </StackPanel>
-                </local:SettingsCard>
-
-                <local:SettingsCard x:Name="HyperlinkTooltipMaxWidth"
-                                    x:Uid="Globals_HyperlinkTooltipMaxWidth">
-                    <muxc:NumberBox x:Uid="Globals_HyperlinkTooltipMaxWidthBox"
-                                    LargeChange="100"
-                                    Maximum="4000"
-                                    Minimum="0"
-                                    SmallChange="20"
-                                    Style="{StaticResource NumberBoxSettingStyle}"
-                                    Value="{x:Bind ViewModel.HyperlinkTooltipMaxWidth, Mode=TwoWay}" />
-                </local:SettingsCard>
-
-                <local:SettingsCard x:Name="HyperlinkTooltipShowDelay"
-                                    x:Uid="Globals_HyperlinkTooltipShowDelay">
-                    <muxc:NumberBox x:Uid="Globals_HyperlinkTooltipShowDelayBox"
-                                    LargeChange="100"
-                                    Maximum="5000"
-                                    Minimum="0"
-                                    SmallChange="50"
-                                    Style="{StaticResource NumberBoxSettingStyle}"
-                                    Value="{x:Bind ViewModel.HyperlinkTooltipShowDelay, Mode=TwoWay}" />
-                </local:SettingsCard>
-
-                <local:SettingsCard x:Name="HyperlinkTooltipHideDelay"
-                                    x:Uid="Globals_HyperlinkTooltipHideDelay">
-                    <muxc:NumberBox x:Uid="Globals_HyperlinkTooltipHideDelayBox"
-                                    LargeChange="100"
-                                    Maximum="5000"
-                                    Minimum="0"
-                                    SmallChange="50"
-                                    Style="{StaticResource NumberBoxSettingStyle}"
-                                    Value="{x:Bind ViewModel.HyperlinkTooltipHideDelay, Mode=TwoWay}" />
-                </local:SettingsCard>
+                        <local:SettingsCard x:Name="HyperlinkActionPlacement"
+                                            x:Uid="Globals_HyperlinkActionPlacement"
+                                            IsEnabled="{x:Bind ViewModel.HyperlinkTooltipActions, Mode=OneWay}">
+                            <ComboBox AutomationProperties.AccessibilityView="Content"
+                                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                                      ItemsSource="{x:Bind ViewModel.ActionPlacementList, Mode=OneWay}"
+                                      SelectedItem="{x:Bind ViewModel.CurrentActionPlacement, Mode=TwoWay}"
+                                      Style="{StaticResource ComboBoxSettingStyle}" />
+                        </local:SettingsCard>
+                    </local:SettingsExpander.Items>
+                </local:SettingsExpander>
 
                 <local:SettingsCard x:Name="HyperlinkIntegrationDisplayMode"
                                     x:Uid="Globals_HyperlinkIntegrationDisplayMode">
@@ -307,35 +363,6 @@
                               ItemsSource="{x:Bind ViewModel.IntegrationDisplayModeList, Mode=OneWay}"
                               SelectedItem="{x:Bind ViewModel.CurrentIntegrationDisplayMode, Mode=TwoWay}"
                               Style="{StaticResource ComboBoxSettingStyle}" />
-                </local:SettingsCard>
-
-                <local:SettingsCard x:Name="HyperlinkActionPlacement"
-                                    x:Uid="Globals_HyperlinkActionPlacement">
-                    <ComboBox AutomationProperties.AccessibilityView="Content"
-                              ItemTemplate="{StaticResource EnumComboBoxTemplate}"
-                              ItemsSource="{x:Bind ViewModel.ActionPlacementList, Mode=OneWay}"
-                              SelectedItem="{x:Bind ViewModel.CurrentActionPlacement, Mode=TwoWay}"
-                              Style="{StaticResource ComboBoxSettingStyle}" />
-                </local:SettingsCard>
-
-                <!--
-                    Two settings about the buttons, kept adjacent because their
-                    names are close: this one is the whole row's on/off switch,
-                    the list under it chooses which buttons the row carries.
-                -->
-                <local:SettingsCard x:Name="HyperlinkTooltipActions"
-                                    x:Uid="Globals_HyperlinkTooltipActions">
-                    <ToggleSwitch IsOn="{x:Bind ViewModel.HyperlinkTooltipActions, Mode=TwoWay}"
-                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-                </local:SettingsCard>
-
-                <local:SettingsCard x:Name="HyperlinkTooltipButtons"
-                                    x:Uid="Globals_HyperlinkTooltipButtons"
-                                    ContentAlignment="Vertical"
-                                    HorizontalContentAlignment="Left"
-                                    IsEnabled="{x:Bind ViewModel.HyperlinkTooltipActions, Mode=OneWay}">
-                    <ItemsControl ItemTemplate="{StaticResource ButtonChoiceTemplate}"
-                                  ItemsSource="{x:Bind ViewModel.ButtonChoices, Mode=OneWay}" />
                 </local:SettingsCard>
 
                 <local:SettingsCard x:Name="HyperlinkTooltipHint"
@@ -672,65 +699,78 @@
                               Style="{StaticResource ToggleSwitchInExpanderStyle}" />
             </local:SettingsCard>
 
-            <TextBlock x:Uid="LinkTooltip_OverridesHeader"
-                       Style="{StaticResource TextBlockSubHeaderStyle}" />
-
-            <local:SettingsCard x:Uid="LinkTooltip_OverrideShowDelay">
-                <StackPanel Orientation="Horizontal"
-                            Spacing="8">
-                    <CheckBox IsChecked="{x:Bind ViewModel.CurrentRule.OverrideShowDelay, Mode=TwoWay}" />
-                    <muxc:NumberBox LargeChange="100"
-                                    Maximum="5000"
-                                    Minimum="0"
-                                    SmallChange="50"
-                                    IsEnabled="{x:Bind ViewModel.CurrentRule.OverrideShowDelay, Mode=OneWay}"
-                                    Style="{StaticResource NumberBoxSettingStyle}"
-                                    Value="{x:Bind ViewModel.CurrentRule.ShowDelay, Mode=TwoWay}" />
-                </StackPanel>
-            </local:SettingsCard>
-
-            <local:SettingsCard x:Uid="LinkTooltip_OverrideHideDelay">
-                <StackPanel Orientation="Horizontal"
-                            Spacing="8">
-                    <CheckBox IsChecked="{x:Bind ViewModel.CurrentRule.OverrideHideDelay, Mode=TwoWay}" />
-                    <muxc:NumberBox LargeChange="100"
-                                    Maximum="5000"
-                                    Minimum="0"
-                                    SmallChange="50"
-                                    IsEnabled="{x:Bind ViewModel.CurrentRule.OverrideHideDelay, Mode=OneWay}"
-                                    Style="{StaticResource NumberBoxSettingStyle}"
-                                    Value="{x:Bind ViewModel.CurrentRule.HideDelay, Mode=TwoWay}" />
-                </StackPanel>
-            </local:SettingsCard>
-
-            <local:SettingsCard x:Uid="LinkTooltip_OverrideMaxWidth">
-                <StackPanel Orientation="Horizontal"
-                            Spacing="8">
-                    <CheckBox IsChecked="{x:Bind ViewModel.CurrentRule.OverrideMaxWidth, Mode=TwoWay}" />
-                    <muxc:NumberBox LargeChange="100"
-                                    Maximum="4000"
-                                    Minimum="0"
-                                    SmallChange="20"
-                                    IsEnabled="{x:Bind ViewModel.CurrentRule.OverrideMaxWidth, Mode=OneWay}"
-                                    Style="{StaticResource NumberBoxSettingStyle}"
-                                    Value="{x:Bind ViewModel.CurrentRule.MaxWidth, Mode=TwoWay}" />
-                </StackPanel>
-            </local:SettingsCard>
-
             <!--
-                Which surface a hover uses for links this rule matches. Nothing
-                to do with the "Show in pane" button below, which this rule can
-                also add or remove; the two are independent.
+                Four settings a rule can take off the defaults, collapsed by
+                default because most rules override none of them - the checkbox
+                in each row is the override, so a closed group reads as "this
+                rule inherits everything".
             -->
-            <local:SettingsCard x:Uid="LinkTooltip_RuleShowInPane">
-                <StackPanel Orientation="Horizontal"
-                            Spacing="8">
-                    <CheckBox IsChecked="{x:Bind ViewModel.CurrentRule.OverrideShowInPane, Mode=TwoWay}" />
-                    <ToggleSwitch IsEnabled="{x:Bind ViewModel.CurrentRule.OverrideShowInPane, Mode=OneWay}"
-                                  IsOn="{x:Bind ViewModel.CurrentRule.ShowInPane, Mode=TwoWay}"
-                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-                </StackPanel>
-            </local:SettingsCard>
+            <local:SettingsExpander x:Name="RuleOverrides"
+                                    x:Uid="LinkTooltip_RuleOverrides"
+                                    IsForkFeature="True">
+                <local:SettingsExpander.Items>
+                    <local:SettingsCard x:Name="RuleOverrideShowDelay"
+                                        x:Uid="LinkTooltip_OverrideShowDelay">
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="8">
+                            <CheckBox IsChecked="{x:Bind ViewModel.CurrentRule.OverrideShowDelay, Mode=TwoWay}" />
+                            <muxc:NumberBox LargeChange="100"
+                                            Maximum="5000"
+                                            Minimum="0"
+                                            SmallChange="50"
+                                            IsEnabled="{x:Bind ViewModel.CurrentRule.OverrideShowDelay, Mode=OneWay}"
+                                            Style="{StaticResource NumberBoxSettingStyle}"
+                                            Value="{x:Bind ViewModel.CurrentRule.ShowDelay, Mode=TwoWay}" />
+                        </StackPanel>
+                    </local:SettingsCard>
+
+                    <local:SettingsCard x:Name="RuleOverrideHideDelay"
+                                        x:Uid="LinkTooltip_OverrideHideDelay">
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="8">
+                            <CheckBox IsChecked="{x:Bind ViewModel.CurrentRule.OverrideHideDelay, Mode=TwoWay}" />
+                            <muxc:NumberBox LargeChange="100"
+                                            Maximum="5000"
+                                            Minimum="0"
+                                            SmallChange="50"
+                                            IsEnabled="{x:Bind ViewModel.CurrentRule.OverrideHideDelay, Mode=OneWay}"
+                                            Style="{StaticResource NumberBoxSettingStyle}"
+                                            Value="{x:Bind ViewModel.CurrentRule.HideDelay, Mode=TwoWay}" />
+                        </StackPanel>
+                    </local:SettingsCard>
+
+                    <local:SettingsCard x:Name="RuleOverrideMaxWidth"
+                                        x:Uid="LinkTooltip_OverrideMaxWidth">
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="8">
+                            <CheckBox IsChecked="{x:Bind ViewModel.CurrentRule.OverrideMaxWidth, Mode=TwoWay}" />
+                            <muxc:NumberBox LargeChange="100"
+                                            Maximum="4000"
+                                            Minimum="0"
+                                            SmallChange="20"
+                                            IsEnabled="{x:Bind ViewModel.CurrentRule.OverrideMaxWidth, Mode=OneWay}"
+                                            Style="{StaticResource NumberBoxSettingStyle}"
+                                            Value="{x:Bind ViewModel.CurrentRule.MaxWidth, Mode=TwoWay}" />
+                        </StackPanel>
+                    </local:SettingsCard>
+
+                    <!--
+                        Which surface a hover uses for links this rule matches. Nothing
+                        to do with the "Show in pane" button below, which this rule can
+                        also add or remove; the two are independent.
+                    -->
+                    <local:SettingsCard x:Name="RuleShowInPane"
+                                        x:Uid="LinkTooltip_RuleShowInPane">
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="8">
+                            <CheckBox IsChecked="{x:Bind ViewModel.CurrentRule.OverrideShowInPane, Mode=TwoWay}" />
+                            <ToggleSwitch IsEnabled="{x:Bind ViewModel.CurrentRule.OverrideShowInPane, Mode=OneWay}"
+                                          IsOn="{x:Bind ViewModel.CurrentRule.ShowInPane, Mode=TwoWay}"
+                                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                        </StackPanel>
+                    </local:SettingsCard>
+                </local:SettingsExpander.Items>
+            </local:SettingsExpander>
 
             <TextBlock x:Uid="LinkTooltip_BuiltInButtonsHeader"
                        Style="{StaticResource TextBlockSubHeaderStyle}" />

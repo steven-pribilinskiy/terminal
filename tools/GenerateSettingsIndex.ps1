@@ -48,6 +48,7 @@ $ProhibitedUids = @(
     "LinkTooltip_RuleName",
     "LinkTooltip_RuleAlternativeAction",
     "LinkTooltip_RuleNavigator",
+    "LinkTooltip_RuleOverrides",
     "LinkTooltip_RulePattern",
     "LinkTooltip_RulePreset",
     "LinkTooltip_RulePrimaryAction",

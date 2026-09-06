@@ -380,6 +380,14 @@
     <value>In milliseconds. This is the time you have to move the pointer onto the tooltip to use its buttons, so 0 puts them out of reach of the mouse.</value>
     <comment>Additional text presented near "Globals_HyperlinkTooltipHideDelay.Header".</comment>
   </data>
+  <data name="Globals_HyperlinkTooltipSizing.Header" xml:space="preserve">
+    <value>Timing and size</value>
+    <comment>Header for a collapsible group of settings controlling how long the link tooltip waits before appearing and disappearing, and how wide it may grow.</comment>
+  </data>
+  <data name="Globals_HyperlinkTooltipSizing.Description" xml:space="preserve">
+    <value>How long the tooltip waits before it appears and disappears, and how far it may spread.</value>
+    <comment>Additional text presented near "Globals_HyperlinkTooltipSizing.Header".</comment>
+  </data>
   <data name="Globals_HyperlinkTooltipHideDelayBox.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
     <value>Delay before the link tooltip disappears</value>
     <comment>Name for a control to choose how long the link tooltip stays on screen after the pointer leaves the link.</comment>
@@ -413,7 +421,7 @@
     <comment>Header for a control to toggle whether the link tooltip carries action buttons.</comment>
   </data>
   <data name="Globals_HyperlinkTooltipActions.Description" xml:space="preserve">
-    <value>Turns the whole row of buttons off. Which buttons the row carries is chosen below.</value>
+    <value>Turns the whole row of buttons off. Which buttons the row carries, and where it sits, are chosen inside.</value>
     <comment>Additional text presented near "Globals_HyperlinkTooltipActions.Header".</comment>
   </data>
   <data name="Globals_SafeUriSchemes.Header" xml:space="preserve">
@@ -3225,9 +3233,13 @@
     <value>Separate extensions with commas, for example: log, ini. Merged with the file type group above.</value>
     <comment>{Locked="log"}{Locked="ini"} Additional text presented near "LinkTooltip_RuleCustomExtensions.Header".</comment>
   </data>
-  <data name="LinkTooltip_OverridesHeader.Text" xml:space="preserve">
+  <data name="LinkTooltip_RuleOverrides.Header" xml:space="preserve">
     <value>Overrides</value>
-    <comment>Header for a group of settings that let a link tooltip rule override the default show delay, hide delay, and maximum width.</comment>
+    <comment>Header for a collapsible group of settings that let a link tooltip rule override the default show delay, hide delay, maximum width, and preview surface.</comment>
+  </data>
+  <data name="LinkTooltip_RuleOverrides.Description" xml:space="preserve">
+    <value>Settings this rule takes off the defaults. Tick one to override it; leave it clear to inherit.</value>
+    <comment>Additional text presented near "LinkTooltip_RuleOverrides.Header".</comment>
   </data>
   <data name="LinkTooltip_OverrideShowDelay.Header" xml:space="preserve">
     <value>Show delay</value>
