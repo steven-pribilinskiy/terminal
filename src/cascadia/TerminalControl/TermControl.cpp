@@ -3719,6 +3719,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             .alternativeAction = settings.HyperlinkAlternativeAction(),
             .integrationDisplayMode = settings.HyperlinkIntegrationDisplayMode(),
             .actionPlacement = settings.HyperlinkActionPlacement(),
+            .showRule = settings.HyperlinkTooltipShowRule(),
         };
 
         // The global choice, which a matching rule may replace wholesale below. An
@@ -3775,8 +3776,14 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             }
         }
 
+        // Counted rather than taken from the iterator, because the index is how the
+        // settings page is later told which rule this was: the list here is a faithful
+        // 1:1 mirror of hyperlink.tooltipRules, and a rule has nothing else to identify
+        // it by -- no id, and a name that is user-editable, optional and not unique.
+        int32_t ruleIndex = -1;
         for (const auto& rule : rules)
         {
+            ++ruleIndex;
             if (!rule || !rule.Enabled())
             {
                 continue;
@@ -3901,6 +3908,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             effective.isTextMatch = isTextRule;
             effective.integration = rule.Integration();
             effective.showPreview = rule.ShowPreview();
+            effective.ruleIndex = ruleIndex;
+            effective.ruleName = rule.Name();
 
             break;
         }
@@ -4059,6 +4068,11 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // sending: a link nobody can preview would open an empty pane.
         HyperlinkShowInPaneButton().Visibility(_currentHyperlinkTooltipSettings.showInPane ? Visibility::Visible : Visibility::Collapsed);
 
+        // Before _applyActionPlacement, which decides whether either host has anything
+        // in it worth showing and so needs the rule line's visibility settled first.
+        // Placement runs a second time from _showHyperlinkCard once the card has been
+        // positioned, because only then is it known which edge is nearest the link.
+        _applyRuleInfo();
         _applyActionPlacement();
 
         // The hint is about following the link, so it only makes sense when there is
@@ -4596,9 +4610,21 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         // Under the line by default, flipped above it when there is no room below.
         auto top = cellTop + fontSize.Height;
+        auto aboveLine = false;
         if (top + desiredHeight > viewportHeight)
         {
             top = cellTop - desiredHeight;
+            aboveLine = true;
+        }
+
+        // Which edge is nearest the link is only known now, so the button row may
+        // have to change ends. Safe to do after the card was measured: swapping the
+        // row between the two hosts moves the same content from one end to the other
+        // and cannot change the height the flip decision above was made from.
+        if (aboveLine != _hyperlinkCardAboveLine)
+        {
+            _hyperlinkCardAboveLine = aboveLine;
+            _applyActionPlacement();
         }
 
         // Right of the cursor by default, flipped to grow left of it instead when
@@ -5005,31 +5031,100 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         appendRun(uriStr, false);
     }
 
+    // Moves the button row, and the matched-rule line, into whichever of the card's
+    // two hosts the settings ask for.
+    //
+    // The setting names an edge relative to the *link*, not to the card, because the
+    // card is not always the same way up: _showHyperlinkCard puts it under the line
+    // and flips it above when there is no room below. Under the line, the card's top
+    // is the edge next to the link; above the line, its bottom is. So the host to use
+    // is the exclusive-or of "the user asked for near" and "the card is above the
+    // line" -- which is the whole reason this cannot be decided once from the setting
+    // alone, and why _showHyperlinkCard calls this again after it has placed the card.
+    //
+    // The rule line is always on the far edge, right-aligned, so it never sits between
+    // the pointer and the buttons. When the buttons are on the far edge too they share
+    // that row, which is what the two-column hosts are for.
     void TermControl::_applyActionPlacement()
     {
         const auto headerHost = HyperlinkCardHeaderActionsHost();
         const auto footerHost = HyperlinkCardFooterActionsHost();
         const auto actions = HyperlinkCardActions();
+        const auto ruleInfo = HyperlinkCardRuleInfo();
         if (!headerHost || !footerHost || !actions)
         {
             return;
         }
 
-        const auto placement = _currentHyperlinkTooltipSettings.actionPlacement;
-        const auto targetHost = (placement == Control::HyperlinkActionPlacement::Header) ? headerHost : footerHost;
-        const auto otherHost = (placement == Control::HyperlinkActionPlacement::Header) ? footerHost : headerHost;
+        const auto wantNearLink = _currentHyperlinkTooltipSettings.actionPlacement == Control::HyperlinkActionPlacement::NearLink;
+        const auto actionsInHeader = wantNearLink != _hyperlinkCardAboveLine;
+        // The far edge is the top when the card sits above the link, the bottom when
+        // it sits below it -- i.e. exactly the header when the card is above.
+        const auto ruleInHeader = _hyperlinkCardAboveLine;
 
-        uint32_t index = 0;
-        if (otherHost.Children().IndexOf(actions, index))
+        const auto reparent = [](const Controls::Grid& target, const Controls::Grid& other, const UIElement& child) {
+            if (!child)
+            {
+                return;
+            }
+            uint32_t index = 0;
+            if (other.Children().IndexOf(child, index))
+            {
+                other.Children().RemoveAt(index);
+            }
+            if (!target.Children().IndexOf(child, index))
+            {
+                target.Children().Append(child);
+            }
+        };
+
+        reparent(actionsInHeader ? headerHost : footerHost, actionsInHeader ? footerHost : headerHost, actions);
+        reparent(ruleInHeader ? headerHost : footerHost, ruleInHeader ? footerHost : headerHost, ruleInfo);
+
+        // A host earns its space by holding something that is actually on screen.
+        // The button row can be switched off wholesale and the rule line is off by
+        // default, so either host may end up empty.
+        const auto actionsShown = actions.Visibility() == Visibility::Visible;
+        const auto ruleShown = ruleInfo && ruleInfo.Visibility() == Visibility::Visible;
+        const auto headerUsed = (actionsInHeader && actionsShown) || (ruleInHeader && ruleShown);
+        const auto footerUsed = (!actionsInHeader && actionsShown) || (!ruleInHeader && ruleShown);
+        headerHost.Visibility(headerUsed ? Visibility::Visible : Visibility::Collapsed);
+        footerHost.Visibility(footerUsed ? Visibility::Visible : Visibility::Collapsed);
+    }
+
+    // Names the rule that decided how this card looks, and -- just as usefully --
+    // says when no rule did. A link that is detected but matches nothing gets the
+    // global defaults, and "why is this not previewing the way I set it up" is
+    // answered by seeing that stated rather than by guessing.
+    void TermControl::_applyRuleInfo()
+    {
+        const auto ruleInfo = HyperlinkCardRuleInfo();
+        const auto ruleText = HyperlinkCardRuleInfoText();
+        if (!ruleInfo || !ruleText)
         {
-            otherHost.Children().RemoveAt(index);
+            return;
         }
-        if (!targetHost.Children().IndexOf(actions, index))
+
+        if (!_currentHyperlinkTooltipSettings.showRule)
         {
-            targetHost.Children().Append(actions);
+            ruleInfo.Visibility(Visibility::Collapsed);
+            return;
         }
-        headerHost.Visibility(placement == Control::HyperlinkActionPlacement::Header ? Visibility::Visible : Visibility::Collapsed);
-        footerHost.Visibility(placement == Control::HyperlinkActionPlacement::Footer ? Visibility::Visible : Visibility::Collapsed);
+
+        const auto matched = _currentHyperlinkTooltipSettings.ruleIndex >= 0;
+        if (matched)
+        {
+            const auto& name = _currentHyperlinkTooltipSettings.ruleName;
+            const auto displayName = name.empty() ? RS_(L"HyperlinkRuleUnnamed") : name;
+            ruleText.Text(winrt::hstring{ fmt::format(FMT_COMPILE(L"{} {}"),
+                                                      std::wstring_view{ RS_(L"HyperlinkRuleMatchedPrefix") },
+                                                      std::wstring_view{ displayName }) });
+        }
+        else
+        {
+            ruleText.Text(RS_(L"HyperlinkRuleNoMatch"));
+        }
+        ruleInfo.Visibility(Visibility::Visible);
     }
 
     void TermControl::_applyIntegrationDisplayMode()
@@ -5081,6 +5176,18 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     {
         _invokeHyperlinkActionById(L"showInPane");
         _hideHyperlinkCard();
+    }
+
+    // The rule line, clicked. Hand the app the rule to open; it owns the settings
+    // UI and we do not. The card goes away first: the settings are about to take
+    // the foreground, and a tooltip left hanging over them looks like a bug.
+    // Read before hiding, since _hideHyperlinkCard is free to reset the hover state.
+    void TermControl::_HyperlinkRuleInfoClick(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
+    {
+        const auto ruleIndex = _currentHyperlinkTooltipSettings.ruleIndex;
+        const auto ruleName = _currentHyperlinkTooltipSettings.ruleName;
+        _hideHyperlinkCard();
+        EditHyperlinkRuleRequested.raise(*this, winrt::make<EditHyperlinkRuleRequestedEventArgs>(ruleIndex, ruleName));
     }
 
     // The pane's "pane only" switch. Nothing is torn down: the card simply stops

@@ -2036,6 +2036,49 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         return false;
     }
 
+    // Index first, name as the check. The index is what the tooltip actually had
+    // and is exact -- the control's rule list is a 1:1 mirror of this one, in the
+    // same order. But the settings are editable while a tooltip is on screen, so
+    // by the time the click arrives the rule at that index may be a different one,
+    // or gone. The name catches that: if it disagrees, fall back to searching by
+    // name, and if nothing answers to either, say so and let the caller leave the
+    // user on the rules list rather than opening some unrelated rule for editing.
+    //
+    // A rule has nothing better to be found by. There is no id, and the name is
+    // user-editable, optional and not required to be unique -- so name alone would
+    // be a guess, and index alone would be a stale one.
+    bool LinkTooltipViewModel::SelectRule(int32_t ruleIndex, const winrt::hstring& ruleName)
+    {
+        if (!_CurrentView)
+        {
+            return false;
+        }
+
+        if (ruleIndex >= 0 && static_cast<uint32_t>(ruleIndex) < _CurrentView.Size())
+        {
+            const auto candidate = _CurrentView.GetAt(static_cast<uint32_t>(ruleIndex));
+            if (candidate && (ruleName.empty() || candidate.Name() == ruleName))
+            {
+                CurrentRule(candidate);
+                return true;
+            }
+        }
+
+        if (!ruleName.empty())
+        {
+            for (const auto& vm : _CurrentView)
+            {
+                if (vm && vm.Name() == ruleName)
+                {
+                    CurrentRule(vm);
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     void LinkTooltipViewModel::ExpandAllRuleGroups()
     {
         if (!_RuleGroups)

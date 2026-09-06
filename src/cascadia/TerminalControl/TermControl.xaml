@@ -1346,9 +1346,23 @@
                                     </StackPanel>
                                 </Grid>
 
-                                <!-- Host for actions placed in Header position -->
-                                <StackPanel x:Name="HyperlinkCardHeaderActionsHost"
-                                            Visibility="Collapsed" />
+                                <!--
+                                    The card's top edge, as a place to put things. Which of the two
+                                    hosts is the one "near the link" depends on where the card landed:
+                                    it opens below the link and flips above it when there is no room,
+                                    so _applyActionPlacement decides at hover time which host the
+                                    button row goes into. Two columns, because the row of buttons and
+                                    the matched-rule line can end up sharing an edge - buttons left,
+                                    rule right.
+                                -->
+                                <Grid x:Name="HyperlinkCardHeaderActionsHost"
+                                      ColumnSpacing="8"
+                                      Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                </Grid>
 
                                 <!--
                                     What an integration has to say about the hovered link, or about
@@ -1610,8 +1624,35 @@
                                             Visibility="Collapsed" />
                                 </StackPanel>
 
-                                <StackPanel x:Name="HyperlinkCardFooterActionsHost">
+                                <Grid x:Name="HyperlinkCardFooterActionsHost"
+                                      ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!--
+                                        Which rule decided how this card looks, and a way into that
+                                        rule's settings. Always on the edge furthest from the link,
+                                        right-aligned, so it never sits between the pointer and the
+                                        buttons. Reparented alongside the button row by
+                                        _applyActionPlacement; the Grid.Column travels with it.
+                                    -->
+                                    <HyperlinkButton x:Name="HyperlinkCardRuleInfo"
+                                                     Grid.Column="1"
+                                                     Padding="4,0,4,0"
+                                                     HorizontalAlignment="Right"
+                                                     VerticalAlignment="Center"
+                                                     AllowFocusOnInteraction="False"
+                                                     Click="_HyperlinkRuleInfoClick"
+                                                     Visibility="Collapsed">
+                                        <TextBlock x:Name="HyperlinkCardRuleInfoText"
+                                                   FontSize="12"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </HyperlinkButton>
+
                                     <StackPanel x:Name="HyperlinkCardActions"
+                                                Grid.Column="0"
                                                 Orientation="Horizontal"
                                                 Spacing="4">
                                         <Button x:Name="HyperlinkOpenButton"
@@ -1661,7 +1702,7 @@
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
                                     </StackPanel>
-                                </StackPanel>
+                                </Grid>
                             </StackPanel>
                         </Border>
 

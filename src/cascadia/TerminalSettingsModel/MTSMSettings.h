@@ -70,10 +70,11 @@ Author(s):
     X(bool, HyperlinkTooltipActions, "hyperlink.tooltipActions", true)                                                                                                                                \
     X(winrt::Windows::Foundation::Collections::IVector<winrt::hstring>, HyperlinkTooltipButtons, "hyperlink.tooltipButtons", MakeDefaultTooltipButtons())                                            \
     X(bool, HyperlinkTooltipHint, "hyperlink.tooltipHint", true)                                                                                                                                      \
+    X(bool, HyperlinkTooltipShowRule, "hyperlink.tooltipShowRule", false)                                                                                                                             \
     X(bool, HyperlinkPreviewInPane, "hyperlink.previewInPane", false)                                                                                                                                 \
     X(Model::PaneTitlebarVisibility, PaneTitlebarVisibility, "paneTitlebarVisibility", Model::PaneTitlebarVisibility::MultiplePanes)                                                                   \
     X(Model::HyperlinkIntegrationDisplayMode, HyperlinkIntegrationDisplayMode, "hyperlink.integrationDisplayMode", Model::HyperlinkIntegrationDisplayMode::Above)                                    \
-    X(Model::HyperlinkActionPlacement, HyperlinkActionPlacement, "hyperlink.actionPlacement", Model::HyperlinkActionPlacement::Footer)                                                               \
+    X(Model::HyperlinkActionPlacement, HyperlinkActionPlacement, "hyperlink.actionPlacement", Model::HyperlinkActionPlacement::FarFromLink)                                                               \
     X(winrt::Windows::Foundation::Collections::IVector<Model::HyperlinkTooltipRule>, HyperlinkTooltipRules, "hyperlink.tooltipRules", winrt::single_threaded_vector<Model::HyperlinkTooltipRule>())   \
     X(bool, HyperlinkManualRuleOrder, "hyperlink.manualRuleOrder", false)                                                                                                                             \
     X(bool, ScrollToChangeOpacity, "experimental.scrollToChangeOpacity", false)                                                                                                                       \

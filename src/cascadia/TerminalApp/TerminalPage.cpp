@@ -2060,6 +2060,7 @@ namespace winrt::TerminalApp::implementation
         term.OpenHyperlink({ this, &TerminalPage::_OpenHyperlinkHandler });
         term.HyperlinkTooltipActionInvoked({ this, &TerminalPage::_HyperlinkTooltipActionInvokedHandler });
         term.ShowHyperlinkPreviewRequested({ this, &TerminalPage::_ShowHyperlinkPreviewRequestedHandler });
+        term.EditHyperlinkRuleRequested({ this, &TerminalPage::_EditHyperlinkRuleRequestedHandler });
 
         // A pane may already be silencing hover cards. A control created after that
         // switch was flipped has to be told, or it is the one terminal in the window
@@ -3490,6 +3491,31 @@ namespace winrt::TerminalApp::implementation
         // Built directly rather than through INewContentArgs, which today can only
         // carry a type string and so has nowhere to put the link.
         _SplitPane(focusedTab, SplitDirection::Automatic, 0.5f, std::make_shared<Pane>(*previewContent));
+    }
+
+    // "Matched by <rule>" on a link tooltip, clicked. Put the settings up and open
+    // that rule.
+    //
+    // OpenSettingsUI creates the tab or focuses the existing one, and either way
+    // _settingsUI is a live page afterwards -- the create path sets it on the way
+    // through _makeSettingsContent, and an already-open tab set it when it was made.
+    void TerminalPage::_EditHyperlinkRuleRequestedHandler(const IInspectable& /*sender*/,
+                                                          const Microsoft::Terminal::Control::EditHyperlinkRuleRequestedEventArgs& eventArgs)
+    {
+        if (!eventArgs)
+        {
+            return;
+        }
+
+        const auto ruleIndex = eventArgs.RuleIndex();
+        const auto ruleName = eventArgs.RuleName();
+
+        OpenSettingsUI();
+
+        if (const auto sui = _settingsUI.get())
+        {
+            sui.NavigateToLinkTooltipRule(ruleIndex, ruleName);
+        }
     }
 
     // The preview pane's "Pane only" switch, and the same event raised with the
@@ -4928,6 +4954,11 @@ namespace winrt::TerminalApp::implementation
         // Create the SUI pane content
         auto settingsContent{ winrt::make_self<SettingsPaneContent>(_settings, _currentWindowSettings()) };
         auto sui = settingsContent->SettingsUI();
+
+        // Remembered so a deep link can steer the page after the fact. Whichever
+        // settings surface was made last wins, which is right for the tab that
+        // OpenSettingsUI puts up and close enough for the rarely-used settings pane.
+        _settingsUI = sui;
 
         if (_hostingHwnd)
         {

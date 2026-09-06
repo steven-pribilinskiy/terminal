@@ -63,6 +63,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         void BreadcrumbBar_ItemClicked(const Microsoft::UI::Xaml::Controls::BreadcrumbBar& sender, const Microsoft::UI::Xaml::Controls::BreadcrumbBarItemClickedEventArgs& args);
 
         void SetHostingWindow(uint64_t hostingWindow) noexcept;
+        void NavigateToLinkTooltipRule(int32_t ruleIndex, const winrt::hstring& ruleName);
         bool TryPropagateHostingWindow(IInspectable object) noexcept;
         uint64_t GetHostingWindow() const noexcept;
 

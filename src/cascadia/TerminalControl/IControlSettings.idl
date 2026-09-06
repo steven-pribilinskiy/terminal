@@ -75,10 +75,11 @@ namespace Microsoft.Terminal.Control
         Left
     };
 
+    // Mirrors Microsoft.Terminal.Settings.Model.HyperlinkActionPlacement.
     enum HyperlinkActionPlacement
     {
-        Footer = 0,
-        Header
+        FarFromLink = 0,
+        NearLink
     };
 
     // Mirrors Microsoft.Terminal.Settings.Model.HyperlinkClickModifier.
@@ -183,6 +184,7 @@ namespace Microsoft.Terminal.Control
         Windows.Foundation.Collections.IVector<String> HyperlinkTooltipButtons { get; };
         // The "Ctrl+Click to follow link" line under the URI.
         Boolean HyperlinkTooltipHint { get; };
+        Boolean HyperlinkTooltipShowRule { get; };
         // Hovering opens the detail pane instead of the card.
         Boolean HyperlinkPreviewInPane { get; };
         HyperlinkIntegrationDisplayMode HyperlinkIntegrationDisplayMode { get; };

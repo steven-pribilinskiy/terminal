@@ -464,6 +464,7 @@ namespace winrt::Microsoft::Terminal::Settings
         _HyperlinkTooltipActions = windowSettings.HyperlinkTooltipActions();
         _HyperlinkTooltipButtons = windowSettings.HyperlinkTooltipButtons();
         _HyperlinkTooltipHint = windowSettings.HyperlinkTooltipHint();
+        _HyperlinkTooltipShowRule = windowSettings.HyperlinkTooltipShowRule();
         _HyperlinkPreviewInPane = windowSettings.HyperlinkPreviewInPane();
         _HyperlinkIntegrationDisplayMode = static_cast<Control::HyperlinkIntegrationDisplayMode>(windowSettings.HyperlinkIntegrationDisplayMode());
         _HyperlinkActionPlacement = static_cast<Control::HyperlinkActionPlacement>(windowSettings.HyperlinkActionPlacement());

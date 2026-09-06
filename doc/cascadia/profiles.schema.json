@@ -2565,6 +2565,11 @@
           "description": "When set to true, the link tooltip shows a line naming the gesture that follows the link. It is hidden anyway when hyperlink.clickable is false, since there would be no such gesture.",
           "type": "boolean"
         },
+        "hyperlink.tooltipShowRule": {
+          "default": false,
+          "description": "When set to true, the link tooltip names the rule under hyperlink.tooltipRules that produced it, on the edge furthest from the link, and says so when no rule matched. The name is a link into that rule's settings.",
+          "type": "boolean"
+        },
         "hyperlink.previewInPane": {
           "default": false,
           "description": "When set to true, hovering a link opens its details in a pane instead of in the tooltip card.",
@@ -2577,9 +2582,9 @@
           "type": "string"
         },
         "hyperlink.actionPlacement": {
-          "default": "footer",
-          "description": "Whether the link tooltip's row of buttons sits under its content or above it.",
-          "enum": [ "footer", "header" ],
+          "default": "farFromLink",
+          "description": "Which edge of the link tooltip its row of buttons sits on, relative to the link being pointed at. The tooltip opens below the link and flips above it when there is no room, so an edge is not reliably \"top\" or \"bottom\". \"footer\" and \"header\" are the previous spellings and are still accepted.",
+          "enum": [ "farFromLink", "nearLink", "footer", "header" ],
           "type": "string"
         },
         "hyperlink.tooltipRules": {

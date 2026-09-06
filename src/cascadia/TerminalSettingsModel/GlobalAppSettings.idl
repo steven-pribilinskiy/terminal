@@ -169,6 +169,7 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(Boolean, HyperlinkTooltipActions);
         INHERITABLE_SETTING(IVector<String>, HyperlinkTooltipButtons);
         INHERITABLE_SETTING(Boolean, HyperlinkTooltipHint);
+        INHERITABLE_SETTING(Boolean, HyperlinkTooltipShowRule);
         INHERITABLE_SETTING(Boolean, HyperlinkPreviewInPane);
         INHERITABLE_SETTING(PaneTitlebarVisibility, PaneTitlebarVisibility);
         INHERITABLE_SETTING(HyperlinkIntegrationDisplayMode, HyperlinkIntegrationDisplayMode);

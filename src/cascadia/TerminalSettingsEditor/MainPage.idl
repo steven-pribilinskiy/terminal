@@ -59,6 +59,13 @@ namespace Microsoft.Terminal.Settings.Editor
         // Let's just smuggle the HWND in as a UInt64 :|
         void SetHostingWindow(UInt64 window);
 
+        // Opens the Link Tooltip page on one rule. The only way in from outside the
+        // settings editor -- the link tooltip's "Matched by <rule>" line uses it --
+        // and the only deep link of its kind, so it names the destination rather
+        // than taking a page and an item. Pass -1 to land on the rules list, which
+        // is also what happens when the rule can no longer be found.
+        void NavigateToLinkTooltipRule(Int32 ruleIndex, String ruleName);
+
         Windows.Foundation.Collections.IObservableVector<IInspectable> Breadcrumbs { get; };
         ExtensionsViewModel ExtensionsVM { get; };
         ActionsViewModel ActionsVM { get; };

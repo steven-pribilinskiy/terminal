@@ -783,9 +783,17 @@ JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::HyperlinkIntegra
 // Possible HyperlinkActionPlacement values
 JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::HyperlinkActionPlacement)
 {
-    JSON_MAPPINGS(2) = {
-        pair_type{ "footer", ValueType::Footer },
-        pair_type{ "header", ValueType::Header },
+    JSON_MAPPINGS(4) = {
+        pair_type{ "farFromLink", ValueType::FarFromLink },
+        pair_type{ "nearLink", ValueType::NearLink },
+
+        // Keep deprecated keys last, so when they get serialized again they aren't written out.
+        // These named an edge of the card; the card flips above the link when there is no room
+        // below it, so which edge that was depended on where the card happened to land. A
+        // settings file written before the rename keeps working and is rewritten to the new
+        // spelling on the next save.
+        pair_type{ "footer", ValueType::FarFromLink },
+        pair_type{ "header", ValueType::NearLink },
     };
 };
 

@@ -345,6 +345,10 @@ namespace winrt::TerminalApp::implementation
         void _UpdateTabIndices();
 
         TerminalApp::Tab _settingsTab{ nullptr };
+        // The settings page behind _settingsTab, so a deep link (the link tooltip's
+        // "Matched by <rule>" line) can steer it after OpenSettingsUI has put it up.
+        // Weak: the page belongs to its pane content, and the tab can be closed.
+        winrt::weak_ref<winrt::Microsoft::Terminal::Settings::Editor::MainPage> _settingsUI{ nullptr };
 
         bool _isInFocusMode{ false };
         bool _isFullscreen{ false };
@@ -550,6 +554,7 @@ namespace winrt::TerminalApp::implementation
         safe_void_coroutine _OpenHyperlinkHandler(const IInspectable sender, const Microsoft::Terminal::Control::OpenHyperlinkEventArgs eventArgs);
         void _HyperlinkTooltipActionInvokedHandler(const IInspectable& sender, const Microsoft::Terminal::Control::HyperlinkTooltipActionInvokedEventArgs& eventArgs);
         void _ShowHyperlinkPreviewRequestedHandler(const IInspectable& sender, const Microsoft::Terminal::Control::ShowHyperlinkPreviewRequestedEventArgs& eventArgs);
+        void _EditHyperlinkRuleRequestedHandler(const IInspectable& sender, const Microsoft::Terminal::Control::EditHyperlinkRuleRequestedEventArgs& eventArgs);
         void _LinkPreviewHideTooltipsChanged(const IInspectable& sender, const IInspectable& args);
         void _setHyperlinkTooltipsSuppressed(bool suppressed);
         static bool _IsUriSupported(const winrt::Windows::Foundation::Uri& parsedUri);

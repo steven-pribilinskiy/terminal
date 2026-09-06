@@ -75,6 +75,7 @@ namespace Microsoft.Terminal.Control
         event Windows.Foundation.TypedEventHandler<Object, OpenHyperlinkEventArgs> OpenHyperlink;
         event Windows.Foundation.TypedEventHandler<Object, HyperlinkTooltipActionInvokedEventArgs> HyperlinkTooltipActionInvoked;
         event Windows.Foundation.TypedEventHandler<Object, ShowHyperlinkPreviewRequestedEventArgs> ShowHyperlinkPreviewRequested;
+        event Windows.Foundation.TypedEventHandler<Object, EditHyperlinkRuleRequestedEventArgs> EditHyperlinkRuleRequested;
         event Windows.Foundation.TypedEventHandler<Object, Object> SetTaskbarProgress;
         event Windows.Foundation.TypedEventHandler<Object, NoticeEventArgs> RaiseNotice;
         event Windows.Foundation.TypedEventHandler<Object, Object> WarningBell;

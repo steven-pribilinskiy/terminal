@@ -101,6 +101,18 @@ namespace Microsoft.Terminal.Control
         String IntegrationHint { get; };
     }
 
+    // "Take me to the rule that decided this card." RuleIndex is the position in
+    // hyperlink.tooltipRules, or -1 when nothing matched and the card is asking
+    // for the rules list itself. RuleName travels with it only to be checked
+    // against whatever now sits at that index, since the settings may have been
+    // edited between the hover and the click.
+    runtimeclass EditHyperlinkRuleRequestedEventArgs
+    {
+        EditHyperlinkRuleRequestedEventArgs(Int32 ruleIndex, String ruleName);
+        Int32 RuleIndex { get; };
+        String RuleName { get; };
+    }
+
     enum NoticeLevel
     {
         Debug = 10,

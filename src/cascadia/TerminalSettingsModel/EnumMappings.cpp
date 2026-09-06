@@ -40,7 +40,9 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
     DEFINE_ENUM_MAP(Model::HyperlinkMatchKind, HyperlinkMatchKind);
     DEFINE_ENUM_MAP(Model::PaneTitlebarVisibility, PaneTitlebarVisibility);
     DEFINE_ENUM_MAP(Model::HyperlinkIntegrationDisplayMode, HyperlinkIntegrationDisplayMode);
-    DEFINE_ENUM_MAP(Model::HyperlinkActionPlacement, HyperlinkActionPlacement);
+    // HyperlinkActionPlacement is written out below rather than by the macro,
+    // so the deprecated header/footer spellings stay readable from settings.json
+    // without also appearing twice in the picker.
     DEFINE_ENUM_MAP(Model::HyperlinkClickModifier, HyperlinkClickModifier);
     DEFINE_ENUM_MAP(Model::HyperlinkClickGesture, HyperlinkClickGesture);
     DEFINE_ENUM_MAP(Microsoft::Terminal::Control::CopyFormat, CopyFormat);
@@ -87,6 +89,23 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
             for (auto [enumStr, enumVal] : JsonUtils::ConversionTrait<Windows::UI::Text::FontWeight>::mappings)
             {
                 map.Insert(winrt::to_hstring(enumStr), enumVal);
+            }
+            return map;
+        }();
+        return enumMap;
+    }
+
+    winrt::Windows::Foundation::Collections::IMap<winrt::hstring, Model::HyperlinkActionPlacement> EnumMappings::HyperlinkActionPlacement()
+    {
+        static auto enumMap = []() {
+            auto map = single_threaded_map<winrt::hstring, Model::HyperlinkActionPlacement>();
+            for (auto [enumStr, enumVal] : JsonUtils::ConversionTrait<Model::HyperlinkActionPlacement>::mappings)
+            {
+                // exclude legacy values from enum map
+                if (enumStr != "footer" && enumStr != "header")
+                {
+                    map.Insert(winrt::to_hstring(enumStr), enumVal);
+                }
             }
             return map;
         }();

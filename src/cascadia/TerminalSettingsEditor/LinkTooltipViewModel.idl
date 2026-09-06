@@ -144,6 +144,7 @@ namespace Microsoft.Terminal.Settings.Editor
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, HyperlinkTooltipHideDelay);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, HyperlinkTooltipActions);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, HyperlinkTooltipHint);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, HyperlinkTooltipShowRule);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, HyperlinkPreviewInPane);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Microsoft.Terminal.Settings.Model.HyperlinkIntegrationDisplayMode, HyperlinkIntegrationDisplayMode);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Microsoft.Terminal.Settings.Model.HyperlinkActionPlacement, HyperlinkActionPlacement);
@@ -205,6 +206,11 @@ namespace Microsoft.Terminal.Settings.Editor
         // The same test, ignoring the rule currently open, for the Apply preset
         // menu: re-applying the preset a rule already is must stay available.
         Boolean IsPresetInUseElsewhere(String presetId);
+        // Opens one rule, given what the link tooltip knew about it: its position
+        // in the list, and the name it had at the time. Returns false when neither
+        // finds anything, so the caller can leave the user on the list rather than
+        // on some unrelated rule. See the implementation for why it is both.
+        Boolean SelectRule(Int32 ruleIndex, String ruleName);
         void ExpandAllRuleGroups();
         void CollapseAllRuleGroups();
     }

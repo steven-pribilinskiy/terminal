@@ -57,10 +57,16 @@ namespace Microsoft.Terminal.Settings.Model
         Left
     };
 
+    // Which edge of the link tooltip the row of action buttons sits on. Not top
+    // versus bottom: the card opens below the hovered link and flips above it
+    // when there is no room, so the same edge is nearest the link in one case
+    // and furthest from it in the other. These name the edge you actually mean.
+    // The values keep their old numbers, so FarFromLink is still the default and
+    // still means what "footer" meant for a card in its usual position.
     enum HyperlinkActionPlacement
     {
-        Footer = 0,
-        Header
+        FarFromLink = 0,
+        NearLink
     };
 
     // Which modifier keys must be held for a click to activate a link. None

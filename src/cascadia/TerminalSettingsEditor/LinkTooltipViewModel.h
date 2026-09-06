@@ -317,6 +317,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkTooltipHideDelay);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkTooltipActions);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkTooltipHint);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkTooltipShowRule);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkPreviewInPane);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkIntegrationDisplayMode);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkActionPlacement);
@@ -378,6 +379,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         // rule that already is that preset is a re-sync, not a duplicate, so the
         // Apply preset menu must not grey out the entry you are standing on.
         bool IsPresetInUseElsewhere(const winrt::hstring& presetId) const;
+        bool SelectRule(int32_t ruleIndex, const winrt::hstring& ruleName);
         void ExpandAllRuleGroups();
         void CollapseAllRuleGroups();
 

@@ -53,6 +53,7 @@
     X(bool, HyperlinkTooltipActions, true)                                                                        \
     X(winrt::Windows::Foundation::Collections::IVector<winrt::hstring>, HyperlinkTooltipButtons, nullptr)         \
     X(bool, HyperlinkTooltipHint, true)                                                                           \
+    X(bool, HyperlinkTooltipShowRule, false)                                                                      \
     X(bool, HyperlinkPreviewInPane, false)                                                                        \
     X(bool, ScrollToChangeOpacity, true)                                                                          \
     X(winrt::Windows::Foundation::IReference<winrt::Microsoft::Terminal::Core::Color>, TabColor, nullptr)         \
@@ -106,5 +107,5 @@
     X(winrt::Microsoft::Terminal::Control::HyperlinkClickModifier, HyperlinkAlternativeClickModifier, winrt::Microsoft::Terminal::Control::HyperlinkClickModifier::Ctrl)                  \
     X(winrt::Microsoft::Terminal::Control::HyperlinkClickGesture, HyperlinkAlternativeClickGesture, winrt::Microsoft::Terminal::Control::HyperlinkClickGesture::LeftClick)                \
     X(winrt::Microsoft::Terminal::Control::HyperlinkIntegrationDisplayMode, HyperlinkIntegrationDisplayMode, winrt::Microsoft::Terminal::Control::HyperlinkIntegrationDisplayMode::Above) \
-    X(winrt::Microsoft::Terminal::Control::HyperlinkActionPlacement, HyperlinkActionPlacement, winrt::Microsoft::Terminal::Control::HyperlinkActionPlacement::Footer) \
+    X(winrt::Microsoft::Terminal::Control::HyperlinkActionPlacement, HyperlinkActionPlacement, winrt::Microsoft::Terminal::Control::HyperlinkActionPlacement::FarFromLink) \
     X(winrt::hstring, DragDropDelimiter, L" ")

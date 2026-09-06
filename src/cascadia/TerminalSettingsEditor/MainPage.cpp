@@ -1208,6 +1208,29 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _Navigate(box_value(hstring{ linkTooltipTag }));
     }
 
+    // The one way into a specific page from outside the settings editor: the link
+    // tooltip's "Matched by <rule>" line, asking to edit the rule it just named.
+    //
+    // Navigate first and select second, in that order, because _Navigate builds a
+    // fresh LinkTooltipViewModel on the way in -- deliberately, so the page always
+    // opens on the rules list rather than on whichever rule was last open. Selecting
+    // beforehand would be undone by that. The nav item is selected explicitly
+    // afterwards for the same reason _Navigate does it for a click: nothing else
+    // will, since this did not come from the NavigationView.
+    void MainPage::NavigateToLinkTooltipRule(int32_t ruleIndex, const winrt::hstring& ruleName)
+    {
+        _Navigate(box_value(hstring{ linkTooltipTag }));
+        _SelectNavItemByTag(linkTooltipTag);
+
+        if (_linkTooltipVM && ruleIndex >= 0)
+        {
+            // Leaves the user on the rules list when it comes back false -- the rule
+            // may have been renamed or deleted since the tooltip named it, and the
+            // list is a better answer than an unrelated rule opened for editing.
+            _linkTooltipVM.SelectRule(ruleIndex, ruleName);
+        }
+    }
+
     void MainPage::_AppendProfilesRootCrumb()
     {
         _breadcrumbs.Append(winrt::make<Breadcrumb>(box_value(profilesTag), RS_(L"Nav_Profiles/Content"), BreadcrumbSubPage::None));

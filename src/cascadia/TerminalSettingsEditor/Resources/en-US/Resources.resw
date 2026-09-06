@@ -3546,11 +3546,13 @@
   <data name="LinkTooltip_IntegrationDisplayModeLeft.Content" xml:space="preserve">
     <value>Left of link (compact)</value>
   </data>
-  <data name="LinkTooltip_ActionPlacementFooter.Content" xml:space="preserve">
-    <value>Footer (bottom)</value>
+  <data name="LinkTooltip_ActionPlacementFarFromLink.Content" xml:space="preserve">
+    <value>Far edge</value>
+    <comment>One choice for which edge of the link tooltip its buttons sit on: the edge furthest from the link being pointed at.</comment>
   </data>
-  <data name="LinkTooltip_ActionPlacementHeader.Content" xml:space="preserve">
-    <value>Header (top)</value>
+  <data name="LinkTooltip_ActionPlacementNearLink.Content" xml:space="preserve">
+    <value>Next to the link</value>
+    <comment>One choice for which edge of the link tooltip its buttons sit on: the edge closest to the link being pointed at.</comment>
   </data>
   <data name="Globals_HyperlinkIntegrationDisplayMode.Header" xml:space="preserve">
     <value>Integration logo display</value>
@@ -3559,10 +3561,18 @@
     <value>Choose where the integration's logo is shown in the tooltip</value>
   </data>
   <data name="Globals_HyperlinkActionPlacement.Header" xml:space="preserve">
-    <value>Action button placement</value>
+    <value>Button row position</value>
   </data>
   <data name="Globals_HyperlinkActionPlacement.Description" xml:space="preserve">
-    <value>Choose whether action buttons appear at the top or bottom of the tooltip</value>
+    <value>The tooltip opens below the link, or above it when there is no room. This picks which edge of it the buttons sit on: the one next to the link, or the far one. Rule details always sit on the far edge.</value>
+  </data>
+  <data name="Globals_HyperlinkTooltipShowRule.Header" xml:space="preserve">
+    <value>Show which rule matched</value>
+    <comment>Header for a control to toggle whether the link tooltip names the rule that produced it.</comment>
+  </data>
+  <data name="Globals_HyperlinkTooltipShowRule.Description" xml:space="preserve">
+    <value>Names the rule the tooltip came from, on its far edge, and says so when no rule matched. Click the name to open that rule here.</value>
+    <comment>Additional text presented near "Globals_HyperlinkTooltipShowRule.Header".</comment>
   </data>
   <data name="Nav_Integrations.Content" xml:space="preserve">
     <value>Integrations</value>

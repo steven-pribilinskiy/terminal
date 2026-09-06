@@ -218,6 +218,18 @@
     <value>Show in pane</value>
     <comment>Label of a button on the link tooltip that opens the same preview in a larger pane beside the terminal.</comment>
   </data>
+  <data name="HyperlinkRuleMatchedPrefix" xml:space="preserve">
+    <value>Matched by</value>
+    <comment>Prefix on the link tooltip naming the rule that decided how the tooltip looks. Followed by the rule's name, e.g. "Matched by Jira: Issue links (URL)". Clicking it opens that rule's settings.</comment>
+  </data>
+  <data name="HyperlinkRuleUnnamed" xml:space="preserve">
+    <value>an unnamed rule</value>
+    <comment>Stands in for a rule's name on the link tooltip when the rule has not been given one. Follows "Matched by".</comment>
+  </data>
+  <data name="HyperlinkRuleNoMatch" xml:space="preserve">
+    <value>No rule matched</value>
+    <comment>Shown on the link tooltip when no link tooltip rule applied to the hovered link, so it is using the defaults. Clicking it opens the list of rules.</comment>
+  </data>
   <data name="HyperlinkActionOptions.PlaceholderText" xml:space="preserve">
     <value>Choose an action</value>
     <comment>Placeholder of the dropdown on the link tooltip that lists what the user can do to the linked item, such as moving an issue to another status.</comment>

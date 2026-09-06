@@ -11,6 +11,7 @@
 #include "OpenHyperlinkEventArgs.g.h"
 #include "HyperlinkTooltipActionInvokedEventArgs.g.h"
 #include "ShowHyperlinkPreviewRequestedEventArgs.g.h"
+#include "EditHyperlinkRuleRequestedEventArgs.g.h"
 #include "NoticeEventArgs.g.h"
 #include "ScrollPositionChangedArgs.g.h"
 #include "RendererWarningArgs.g.h"
@@ -144,6 +145,20 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     private:
         hstring _uri;
         hstring _integrationHint;
+    };
+
+    struct EditHyperlinkRuleRequestedEventArgs : public EditHyperlinkRuleRequestedEventArgsT<EditHyperlinkRuleRequestedEventArgs>
+    {
+    public:
+        EditHyperlinkRuleRequestedEventArgs(int32_t ruleIndex, hstring ruleName) :
+            _ruleIndex(ruleIndex), _ruleName(ruleName) {}
+
+        int32_t RuleIndex() { return _ruleIndex; };
+        hstring RuleName() { return _ruleName; };
+
+    private:
+        int32_t _ruleIndex;
+        hstring _ruleName;
     };
 
     struct NoticeEventArgs : public NoticeEventArgsT<NoticeEventArgs>
@@ -316,4 +331,5 @@ namespace winrt::Microsoft::Terminal::Control::factory_implementation
     BASIC_FACTORY(OpenHyperlinkEventArgs);
     BASIC_FACTORY(HyperlinkTooltipActionInvokedEventArgs);
     BASIC_FACTORY(ShowHyperlinkPreviewRequestedEventArgs);
+    BASIC_FACTORY(EditHyperlinkRuleRequestedEventArgs);
 }

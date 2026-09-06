@@ -372,6 +372,19 @@
                 </local:SettingsCard>
 
                 <!--
+                    Off by default: this is a diagnostic, and the answer it gives is
+                    most useful when a rule is not doing what you expected. Not under
+                    the button-row switch above, because it is not one of the buttons
+                    and stays useful with the whole row turned off.
+                -->
+                <local:SettingsCard x:Name="HyperlinkTooltipShowRule"
+                                    x:Uid="Globals_HyperlinkTooltipShowRule"
+                                    IsForkFeature="True">
+                    <ToggleSwitch IsOn="{x:Bind ViewModel.HyperlinkTooltipShowRule, Mode=TwoWay}"
+                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                </local:SettingsCard>
+
+                <!--
                     Which surface a hover uses, not which buttons it carries: on,
                     hovering opens the detail pane instead of the tooltip card.
                     Independent of the "Show in pane" button in the list above.

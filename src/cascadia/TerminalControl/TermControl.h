@@ -218,6 +218,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         til::typed_event<IInspectable, Control::OpenHyperlinkEventArgs> OpenHyperlink;
         til::typed_event<IInspectable, Control::HyperlinkTooltipActionInvokedEventArgs> HyperlinkTooltipActionInvoked;
         til::typed_event<IInspectable, Control::ShowHyperlinkPreviewRequestedEventArgs> ShowHyperlinkPreviewRequested;
+        til::typed_event<IInspectable, Control::EditHyperlinkRuleRequestedEventArgs> EditHyperlinkRuleRequested;
         til::typed_event<IInspectable, Control::NoticeEventArgs> RaiseNotice;
         til::typed_event<> HidePointerCursor;
         til::typed_event<> RestorePointerCursor;
@@ -387,7 +388,18 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             winrt::hstring primaryAction;
             winrt::hstring alternativeAction;
             Control::HyperlinkIntegrationDisplayMode integrationDisplayMode{ Control::HyperlinkIntegrationDisplayMode::Above };
-            Control::HyperlinkActionPlacement actionPlacement{ Control::HyperlinkActionPlacement::Footer };
+            Control::HyperlinkActionPlacement actionPlacement{ Control::HyperlinkActionPlacement::FarFromLink };
+            // Whether to name the rule that decided all of the above on the card.
+            bool showRule{ false };
+            // Which rule that was. The index, because a rule has no id of its own
+            // and its name is user-editable, may be empty and need not be unique --
+            // and because this list is a faithful 1:1 mirror of the model's, so the
+            // index is exact. The name comes along to display, and to check against
+            // before the settings page opens whatever is at that index now.
+            // -1 means no rule matched, which is worth saying out loud: it is the
+            // answer to "why is this link not being previewed the way I asked".
+            int32_t ruleIndex{ -1 };
+            winrt::hstring ruleName;
         };
         EffectiveHyperlinkTooltipSettings _currentHyperlinkTooltipSettings;
         EffectiveHyperlinkTooltipSettings _effectiveHyperlinkTooltipSettings(std::wstring_view uri, bool isFileLink) const;
@@ -444,6 +456,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void _HyperlinkActionApplyClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
         void _HyperlinkActionUndoClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
         void _HyperlinkShowInPaneClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
+        void _HyperlinkRuleInfoClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
         void _raiseShowHyperlinkPreviewRequested();
 
         // A preview whose integration returned rendered HTML is drawn by a WebView2
@@ -530,7 +543,13 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void _HyperlinkCommitCopyShaClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
         void _formatHighlightedUri(const winrt::hstring& uriText);
         void _applyActionPlacement();
+        void _applyRuleInfo();
         void _applyIntegrationDisplayMode();
+        // Which way the card was placed last time it was shown. The button row
+        // is asked to sit near the link or far from it, and the card opens below
+        // the link but flips above it when there is short of room -- so this is
+        // what turns that request into one of the two hosts.
+        bool _hyperlinkCardAboveLine{ false };
         std::wstring _currentCommitFullSha;
         void _showHyperlinkCard();
         void _hideHyperlinkCard();
