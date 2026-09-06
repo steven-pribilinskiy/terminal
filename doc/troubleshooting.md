@@ -183,6 +183,81 @@ The same class also arrives as a use-after-free: a lambda that captured a raw
 `ItemsSource`, read during teardown. Weak references, or capture the settings
 object rather than the view model.
 
+## Opening Settings kills the Terminal instantly
+
+Symptom-wise this is the twin of the section above, and it is a different bug.
+Telling them apart is worth thirty seconds, because the section above sends you
+looking for recursion and there is none.
+
+```
+Exception code: 0xc0000005   Fault offset: 0x4dbed
+Faulting module name: Microsoft.Terminal.Settings.Model.dll
+```
+
+Two things separate it from the stack overflow. The **faulting module is our own
+DLL**, not `Windows.UI.Xaml.dll`. And the event log holds **two records five
+seconds apart for one PID** -- `0xC0000005` first, then `0xC000041D` at the same
+offset. That pairing is one death reported twice, not a five-second recursion:
+the AV is the crash, and `0xC000041D` is only the kernel noting afterwards that
+the user callback never returned. The stack-overflow case has the same delay for
+a different reason, which is exactly why the two get confused.
+
+### The cause: a resource string that does not exist
+
+`ScopedResourceLoader::GetLocalizedString` is one unguarded line
+(`ScopedResourceLoader.cpp:36`):
+
+```cpp
+return _resourceMap.GetValue(resourceName, _resourceContext).ValueAsString();
+```
+
+A missing key does not give you a blank label. `GetValue` returns a **null**
+`ResourceCandidate` and `ValueAsString()` dereferences it. Every `RS_`, `RS_fmt`,
+`RS_switchable_` and `USES_RESOURCE` in the tree bottoms out here, so any absent
+string is a hard crash at the first lookup.
+
+The trap is that the key is often never written down. `ActionArgsMagic.h` pastes
+it together from the argument's own name -- `LOCALIZED_NAME(Amount)` becomes
+`L"AmountActionArgumentLocalized"` -- so adding one line to an args macro creates
+a resource requirement that no grep for the string will ever find. The Settings
+UI asks every action for its argument descriptors as it opens, so the miss lands
+the instant you go to Settings, far from the commit that caused it.
+
+`tools\Check-SettingsModelConsistency.ps1` now covers both halves (every action
+argument has its localized name; every key named in the Settings Model exists in
+the resw) and runs in CI **before** the build. Nothing later can catch this: the
+offending commit compiled, packaged and passed both test suites.
+
+### What found it, with no build and no running Terminal
+
+Windows was already writing full dumps to `%LOCALAPPDATA%\CrashDumps`, and the
+WinDbg package ships `cdb.exe`, which needs no elevation:
+
+```powershell
+& "$env:ProgramFiles\WindowsApps\Microsoft.WinDbg_*_x64__8wekyb3d8bbwe\amd64\cdb.exe" `
+    -z "$env:LOCALAPPDATA\CrashDumps\WindowsTerminal.exe.<pid>.dmp" `
+    -y 'srv*C:\symbols*https://msdl.microsoft.com/download/symbols' -c ".ecxr; k 30; q"
+```
+
+Our frames come back as `Module!DllGetActivationFactory+0xNNNN` because the
+payload ships no PDBs, which is still enough: subtract that export's RVA to get a
+module RVA, then read the code out of the shipped DLL with the MSVC `dumpbin` that
+Visual Studio installs (`dumpbin /disasm:nobytes`, image base `0x180000000`).
+The frame that loads the key shows it literally --
+
+```
+lea rax,[00000001801E6300h]      ; the key
+mov qword ptr [rbp-50h],1Dh      ; 29 wide chars
+```
+
+-- and mapping that RVA through the section table prints
+`"AmountActionArgumentLocalized"`. `makepri dump /if resources.pri /dt detailed`
+on the payload confirms whether a key really shipped, which beats reading the
+`.resw` and assuming.
+
+This is worth remembering generally: **the dumps are already there.** Neither
+this hunt nor the one above needed the Test slot, a rebuild, or the keyboard.
+
 ## The Dev slot went *backwards* after pressing promote
 
 What you see: you promote, `wtd` relaunches, and the tab row or About dialog now
