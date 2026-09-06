@@ -106,7 +106,7 @@ windowless processes first, and only then decides whether something real is up.
 ## The whole Terminal vanishes while you are in Settings
 
 What you see: you change something on a settings page, carry on, and every window
-disappears at once. No dialog, no error. The event log has:
+disappears a few seconds later. No dialog, no error. The event log has:
 
 ```
 Faulting application name: WindowsTerminal.exe
@@ -114,59 +114,72 @@ Faulting module name:      Windows.UI.Xaml.dll
 Exception code:            0xc000041d
 ```
 
-`0xC000041D` is `STATUS_FATAL_USER_CALLBACK_EXCEPTION`: an exception escaped a
-callback XAML invoked, so the process is failed fast rather than unwound. The
-faulting module being `Windows.UI.Xaml.dll` says the throw happened inside XAML's
-own dispatch, which is the tell that it came out of a binding.
+**Do not trust that exception code.** `0xC000041D` is
+`STATUS_FATAL_USER_CALLBACK_EXCEPTION`, which reads like "an exception escaped a
+XAML callback" and sends you hunting for a throw. The instance found on the Link
+Tooltip page was a **stack overflow** (`0xC00000FD`); `0xC000041D` is only the
+kernel reporting a user callback that never returned. There was no exception at
+all.
 
-**It is almost never the click you were making.** A reproducible instance on the
-Link Tooltip page:
+### The actual cause: a setter that announces its own property
 
-1. Open Settings, go to Link Tooltip.
-2. Scroll down and change **Integration logo display** to a different value.
-3. Scroll back up.
+A `Current*` view-model setter behind a combo box is the write half of
+`SelectedItem="{x:Bind ..., Mode=TwoWay}"`. The binding calls it *because* the
+selection already changed. Calling `_NotifyChanges(L"CurrentThatSameProperty")`
+inside it tells the binding to re-read the getter and assign `SelectedItem`
+again; the combo box raises its change; the binding calls the setter again.
 
-The process dies on step 3. Selecting the value only stores it; what throws is the
-*next realisation* of a row whose getter cannot resolve it, and XAML re-realises
-virtualised rows on scroll. So the crash lands one interaction after the cause,
-which is why it reads as "everything crashes at random".
+`GETSET_BINDABLE_ENUM_SETTING` in `Utils.h` deliberately does not notify, which
+is why every page built on the macro is unaffected and only pages with
+hand-written setters die. Announcing a *different* property is fine.
 
-### What this crash is NOT, established by bisecting a running build
+### Why it is so hard to recognise
 
-Worth writing down, because each of these took a round trip to rule out and the
-obvious guesses are all wrong:
+Every symptom points somewhere other than the cause:
 
-- **Not the shared card or the enum macro.** An upstream page using
-  `GETSET_BINDABLE_ENUM_SETTING` survives the identical change-then-scroll.
-- **Not the rules.** It crashes with `hyperlink.tooltipRules` set to `[]`.
-- **Not the integrations.** It crashes with all four `enabled: false`.
-- **Not the scroll.** Change a dropdown, then touch nothing: the process is gone
-  within fifteen seconds. The crash is *asynchronous*, and every "it dies when I
-  scroll" reading is the scroll merely occupying the time until it fires. This is
-  the single most misleading thing about it -- the crash lands one interaction
-  after its cause, which is why it reads as "any dropdown, at random".
-- **Not reachable through `Application.UnhandledException`.** Subscribing to it
-  and logging was tried; the handler never runs. `0xC000041D` is a fail-fast
-  raised at the COM callback boundary and never reaches XAML's managed-exception
-  path, so that event cannot name it. A vectored exception handler
-  (`AddVectoredExceptionHandler`, first-chance) or a WER local dump is the next
-  thing to try.
+- **It looks asynchronous.** It is not. It is a synchronous loop that takes about
+  five seconds to exhaust a megabyte of stack, so the process dies one
+  interaction after the click that started it -- which is why it reads as "any
+  dropdown, at random, later", and why "it dies when I scroll" is a coincidence:
+  the scroll was just occupying the time.
+- **Nothing catches it.** `Application.UnhandledException` never fires (a stack
+  overflow is not a managed exception). A first-chance vectored handler logs
+  nothing either, because no exception is raised. Both were tried here; both are
+  dead ends, and their silence is itself the clue that no throw is involved.
+- **Bisecting the data teaches nothing**, because the data is irrelevant: it
+  crashes with `hyperlink.tooltipRules` set to `[]` and with every integration
+  `enabled: false`.
 
-### The shape to look for
+### What actually finds it
 
-A binding getter that can throw. `IMap::Lookup` is the usual one — it throws
-`hresult_out_of_bounds` for an absent key, and settings view models are full of
-`_SomethingMap.Lookup(_Settings.Something())`. In a getter reached by `x:Bind`
-that is not a failed binding, it is a dead process.
+Attach a debugger; nothing else worked. WinDbg ships with `cdb.exe`, and no
+elevation is needed to debug your own process:
 
-`GETSET_BINDABLE_ENUM_SETTING` in `Utils.h` generates one of these for every
-bindable enum in the editor, so the guard lives there now and covers all of them;
-hand-written getters need their own, which is what `_lookupEnumEntry` is for in
-`LinkTooltipViewModel.cpp`. Returning `nullptr` leaves the combo box showing
-nothing selected, which is the correct outcome for a value the list does not have.
+```powershell
+$cdb = "C:\Program Files\WindowsApps\Microsoft.WinDbg_*_x64__8wekyb3d8bbwemd64\cdb.exe"
+# script.txt:  .symfix / .reload / sxe -c "kb 120; .logclose; qd" c00000fd / g
+& $cdb -p <pid-of-wtt> -cf script.txt -logo out.log
+```
 
-The same class of bug also arrives as a use-after-free: a lambda that captured a
-raw `this` and now lives inside a view model object XAML still holds through an
+Then reproduce. The stack names the loop directly -- a repeating cycle of
+`CItemsControl::SetValue` -> `NotifyPropertyChanged` ->
+`CEventSourceBase<IDependencyPropertyChangedCallback>::Raise` -> our frames ->
+`SetValueByKnownIndex` -> back to the top. Symbols for the fork's own DLLs are
+not published, so those frames show as `module+offset`, which is enough: seeing
+our module inside the cycle at all is the finding.
+
+### A related shape worth keeping in mind
+
+A binding getter that can *throw* produces a genuinely similar-looking crash.
+`IMap::Lookup` throws `hresult_out_of_bounds` for an absent key, and settings
+view models are full of `_SomethingMap.Lookup(_Settings.Something())`. In a
+getter reached by `x:Bind` that is not a failed binding, it is a dead process.
+The macro and `_lookupEnumEntry` in `LinkTooltipViewModel.cpp` both guard it now.
+That was not the cause of the crash above -- `Lookup` was never throwing -- but
+it is the other way to kill the process from a binding.
+
+The same class also arrives as a use-after-free: a lambda that captured a raw
+`this` and now lives inside a view model object XAML still holds through an
 `ItemsSource`, read during teardown. Weak references, or capture the settings
 object rather than the view model.
 
