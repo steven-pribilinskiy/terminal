@@ -54,6 +54,62 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _ViewModel.CollapseAllRuleGroups();
     }
 
+    // The preset menu's shape, shared by "Add rule" and "Apply preset" so the two
+    // cannot drift apart -- which they had, leaving Apply preset offering every
+    // preset including the ones already in the list.
+    struct PresetCategory
+    {
+        std::wstring name;
+        std::vector<const LinkTooltipPreset*> presets;
+    };
+
+    static std::vector<PresetCategory> _categorizedPresets()
+    {
+        std::vector<PresetCategory> categories = {
+            { L"GitHub", {} },
+            { L"Jira", {} },
+            { L"Slack", {} },
+            { L"Stith", {} },
+            { L"Git", {} },
+            { L"Files & Media", {} },
+            { L"General", {} }
+        };
+
+        for (const auto& preset : GetLinkTooltipPresets())
+        {
+            const std::wstring_view id{ preset.id };
+            if (id.rfind(L"github", 0) == 0)
+            {
+                categories[0].presets.push_back(&preset);
+            }
+            else if (id.rfind(L"jira", 0) == 0)
+            {
+                categories[1].presets.push_back(&preset);
+            }
+            else if (id.rfind(L"slack", 0) == 0)
+            {
+                categories[2].presets.push_back(&preset);
+            }
+            else if (id.rfind(L"stith", 0) == 0)
+            {
+                categories[3].presets.push_back(&preset);
+            }
+            else if (id.rfind(L"git", 0) == 0)
+            {
+                categories[4].presets.push_back(&preset);
+            }
+            else if (id.rfind(L"file", 0) == 0)
+            {
+                categories[5].presets.push_back(&preset);
+            }
+            else
+            {
+                categories[6].presets.push_back(&preset);
+            }
+        }
+        return categories;
+    }
+
     void LinkTooltip::AddRuleFlyout_Opening(const IInspectable& sender, const IInspectable& /*args*/)
     {
         const auto flyout = sender.try_as<Controls::MenuFlyout>();
@@ -89,59 +145,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         items.Append(Controls::MenuFlyoutSeparator{});
 
-        struct PresetCategory
-        {
-            std::wstring name;
-            std::vector<const LinkTooltipPreset*> presets;
-        };
-
-        auto getCategorizedPresets = []() {
-            std::vector<PresetCategory> categories = {
-                { L"GitHub", {} },
-                { L"Jira", {} },
-                { L"Slack", {} },
-                { L"Stith", {} },
-                { L"Git", {} },
-                { L"Files & Media", {} },
-                { L"General", {} }
-            };
-
-            for (const auto& preset : GetLinkTooltipPresets())
-            {
-                const std::wstring_view id{ preset.id };
-                if (id.rfind(L"github", 0) == 0)
-                {
-                    categories[0].presets.push_back(&preset);
-                }
-                else if (id.rfind(L"jira", 0) == 0)
-                {
-                    categories[1].presets.push_back(&preset);
-                }
-                else if (id.rfind(L"slack", 0) == 0)
-                {
-                    categories[2].presets.push_back(&preset);
-                }
-                else if (id.rfind(L"stith", 0) == 0)
-                {
-                    categories[3].presets.push_back(&preset);
-                }
-                else if (id.rfind(L"git", 0) == 0)
-                {
-                    categories[4].presets.push_back(&preset);
-                }
-                else if (id.rfind(L"file", 0) == 0)
-                {
-                    categories[5].presets.push_back(&preset);
-                }
-                else
-                {
-                    categories[6].presets.push_back(&preset);
-                }
-            }
-            return categories;
-        };
-
-        for (const auto& cat : getCategorizedPresets())
+        for (const auto& cat : _categorizedPresets())
         {
             if (cat.presets.empty())
             {
@@ -194,6 +198,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
     }
 
+    // Same menu as Add rule, and for the same reason: filling this rule from a
+    // preset another rule already is produces two rules matching the same links,
+    // where only the first can ever win. The one difference is which rules count --
+    // re-applying the preset THIS rule already is re-syncs it, so that entry stays
+    // live rather than greying itself out.
     void LinkTooltip::ApplyPresetFlyout_Opening(const IInspectable& sender, const IInspectable& /*args*/)
     {
         const auto flyout = sender.try_as<Controls::MenuFlyout>();
@@ -205,59 +214,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         auto items = flyout.Items();
         items.Clear();
 
-        struct PresetCategory
-        {
-            std::wstring name;
-            std::vector<const LinkTooltipPreset*> presets;
-        };
-
-        auto getCategorizedPresets = []() {
-            std::vector<PresetCategory> categories = {
-                { L"GitHub", {} },
-                { L"Jira", {} },
-                { L"Slack", {} },
-                { L"Stith", {} },
-                { L"Git", {} },
-                { L"Files & Media", {} },
-                { L"General", {} }
-            };
-
-            for (const auto& preset : GetLinkTooltipPresets())
-            {
-                const std::wstring_view id{ preset.id };
-                if (id.rfind(L"github", 0) == 0)
-                {
-                    categories[0].presets.push_back(&preset);
-                }
-                else if (id.rfind(L"jira", 0) == 0)
-                {
-                    categories[1].presets.push_back(&preset);
-                }
-                else if (id.rfind(L"slack", 0) == 0)
-                {
-                    categories[2].presets.push_back(&preset);
-                }
-                else if (id.rfind(L"stith", 0) == 0)
-                {
-                    categories[3].presets.push_back(&preset);
-                }
-                else if (id.rfind(L"git", 0) == 0)
-                {
-                    categories[4].presets.push_back(&preset);
-                }
-                else if (id.rfind(L"file", 0) == 0)
-                {
-                    categories[5].presets.push_back(&preset);
-                }
-                else
-                {
-                    categories[6].presets.push_back(&preset);
-                }
-            }
-            return categories;
-        };
-
-        for (const auto& cat : getCategorizedPresets())
+        for (const auto& cat : _categorizedPresets())
         {
             if (cat.presets.empty())
             {
@@ -266,6 +223,8 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
             Controls::MenuFlyoutSubItem subMenu;
             subMenu.Text(winrt::hstring{ cat.name });
+
+            auto anyAvailable = false;
 
             for (const auto* preset : cat.presets)
             {
@@ -277,6 +236,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 }
 
                 const winrt::hstring presetId{ preset->id };
+
+                if (_ViewModel.IsPresetInUseElsewhere(presetId))
+                {
+                    item.IsEnabled(false);
+                    Controls::ToolTipService::SetToolTip(item, box_value(RS_(L"LinkTooltip_AddRuleMenu_AlreadyAdded")));
+                    subMenu.Items().Append(item);
+                    continue;
+                }
+                anyAvailable = true;
+
                 item.Click([this, presetId](const auto&, const auto&) {
                     Dispatcher().RunAsync(Windows::UI::Core::CoreDispatcherPriority::Normal, [weakThis{ get_weak() }, presetId]() {
                         if (const auto self{ weakThis.get() })
@@ -290,6 +259,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 });
                 subMenu.Items().Append(item);
             }
+            subMenu.IsEnabled(anyAvailable);
             items.Append(subMenu);
         }
     }

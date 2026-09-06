@@ -164,6 +164,44 @@ namespace winrt::Microsoft::Terminal::Settings::Editor
         return nullptr;
     }
 
+    // A line each preset is meant to match, used to seed the rule editor's preview
+    // so the card can show the rule picking something out of real text instead of
+    // restating the regex the Pattern field already shows.
+    //
+    // Kept beside the presets rather than inside LinkTooltipPreset because it is
+    // editor chrome: CreateRuleFromPreset writes none of it, and nothing about a
+    // rule as saved depends on it. The two file-type presets have no sample
+    // because they carry no pattern -- what they match is decided by the scheme
+    // and file-type criteria, not by text.
+    inline std::wstring_view GetLinkTooltipPresetSample(const std::wstring_view id) noexcept
+    {
+        struct Sample
+        {
+            std::wstring_view id;
+            std::wstring_view text;
+        };
+
+        static constexpr Sample samples[] = {
+            { L"jira-issue-keys", L"Deployed PROJ-1234 to staging" },
+            { L"jira-links", L"https://acme.atlassian.net/browse/PROJ-1234" },
+            { L"github-prs-issues", L"https://github.com/microsoft/terminal/pull/18920" },
+            { L"github-commits", L"https://github.com/microsoft/terminal/commit/46100068f2a1" },
+            { L"github-repo-number", L"See terminal#18920 for the details" },
+            { L"git-commit-hashes", L"46100068 Record what the Settings crash actually was" },
+            { L"slack-messages", L"https://acme.slack.com/archives/C01ABCD2EFG/p1717171717123456" },
+            { L"stith-sessions", L"stith://session/9f3c1b2a-4d5e" },
+        };
+
+        for (const auto& sample : samples)
+        {
+            if (sample.id == id)
+            {
+                return sample.text;
+            }
+        }
+        return {};
+    }
+
     inline Model::HyperlinkTooltipRule CreateRuleFromPreset(const LinkTooltipPreset& preset)
     {
         Model::HyperlinkTooltipRule rule{};

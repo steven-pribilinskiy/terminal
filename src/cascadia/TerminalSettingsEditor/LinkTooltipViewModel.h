@@ -106,7 +106,8 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                                       Windows::Foundation::Collections::IMap<Model::HyperlinkMatchKind, Editor::EnumEntry> kindMap,
                                       Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> fileTypeGroupList,
                                       Windows::Foundation::Collections::IMap<Model::HyperlinkFileTypeGroup, Editor::EnumEntry> fileTypeGroupMap,
-                                      Windows::Foundation::Collections::IObservableVector<Editor::IntegrationChoiceViewModel> integrationChoices);
+                                      Windows::Foundation::Collections::IObservableVector<Editor::IntegrationChoiceViewModel> integrationChoices,
+                                      Windows::Foundation::Collections::IObservableVector<Editor::IntegrationChoiceViewModel> actionChoices);
         HyperlinkTooltipRuleViewModel(Model::HyperlinkTooltipRule rule, Model::WindowSettings windowSettings);
 
         using ViewModelHelper<HyperlinkTooltipRuleViewModel>::PropertyChanged;
@@ -129,6 +130,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             if (_Rule.Pattern() != value)
             {
                 _Rule.Pattern(value);
+                _recomputePreview();
                 _NotifyChanges(L"Pattern", L"SummaryText");
             }
         }
@@ -148,9 +150,25 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         Windows::Foundation::IInspectable CurrentIntegrationChoice() const;
         void CurrentIntegrationChoice(const Windows::Foundation::IInspectable& value);
 
-        void NotifySelectionProperties();
+        // Re-announces every property the rule editor binds, so opening a rule
+        // repopulates the page one property at a time instead of relying on the
+        // single batched "CurrentRule changed" update. See the call site in
+        // LinkTooltipViewModel::CurrentRule for why that batch cannot be trusted.
+        void NotifyAllProperties();
 
         hstring SummaryText() const;
+
+        // The rule editor's preview card: a line of sample text, and what this
+        // rule picks out of it. Editor-only state -- nothing here is saved.
+        hstring PreviewSample() const noexcept { return _PreviewSample; }
+        void PreviewSample(const hstring& value);
+        hstring PreviewStatus() const noexcept { return _PreviewStatus; }
+        bool HasPreviewMatch() const noexcept { return _HasPreviewMatch; }
+        hstring PreviewBefore() const noexcept { return _PreviewBefore; }
+        hstring PreviewMatch() const noexcept { return _PreviewMatch; }
+        hstring PreviewAfter() const noexcept { return _PreviewAfter; }
+        hstring PreviewCaptures() const noexcept { return _PreviewCaptures; }
+        bool HasPreviewCaptures() const noexcept { return !_PreviewCaptures.empty(); }
 
         hstring Schemes() const;
         void Schemes(const hstring& value);
@@ -207,9 +225,30 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         Windows::Foundation::Collections::IMap<Model::HyperlinkFileTypeGroup, Editor::EnumEntry> _FileTypeGroupMap;
         Windows::Foundation::Collections::IObservableVector<Editor::IntegrationChoiceViewModel> _IntegrationChoices;
         Windows::Foundation::Collections::IObservableVector<Editor::ButtonChoiceViewModel> _ButtonChoices;
-        Windows::Foundation::Collections::IVector<Editor::IntegrationChoiceViewModel> _ActionChoices;
+        Windows::Foundation::Collections::IObservableVector<Editor::IntegrationChoiceViewModel> _ActionChoices;
+
+        // What each override reverts to while it is switched off, so unticking a
+        // box and ticking it again brings the number back rather than the built-in
+        // default. It used to live in the number box itself, which is precisely
+        // what made an untouched rule save values nobody set -- see ShowDelay.
+        int32_t _ShadowShowDelay{ 250 };
+        int32_t _ShadowHideDelay{ 400 };
+        int32_t _ShadowMaxWidth{ 640 };
+        bool _ShadowShowInPane{ false };
+
+        hstring _PreviewSample;
+        hstring _PreviewStatus;
+        hstring _PreviewBefore;
+        hstring _PreviewMatch;
+        hstring _PreviewAfter;
+        hstring _PreviewCaptures;
+        bool _HasPreviewMatch{ false };
 
         void _raiseButtonChoicesChanged();
+        // Re-runs the pattern over the sample. Called by everything the result
+        // depends on: the sample itself, the pattern, the kind and the schemes.
+        void _storePreview();
+        void _recomputePreview();
     };
 
     struct RuleGroupViewModel : RuleGroupViewModelT<RuleGroupViewModel>, ViewModelHelper<RuleGroupViewModel>
@@ -304,6 +343,10 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         void CurrentAlternativeClickGesture(const Windows::Foundation::IInspectable& enumEntry);
 
         Windows::Foundation::Collections::IObservableVector<Editor::IntegrationChoiceViewModel> ActionChoices() const noexcept { return _ActionChoices; }
+        // The same list with a leading "inherit" entry, shared by every rule's two
+        // action pickers. One list for all of them on purpose -- see the comment on
+        // _RuleActionChoices in the constructor.
+        Windows::Foundation::Collections::IObservableVector<Editor::IntegrationChoiceViewModel> RuleActionChoices() const noexcept { return _RuleActionChoices; }
         Windows::Foundation::IInspectable CurrentPrimaryAction() const;
         void CurrentPrimaryAction(const Windows::Foundation::IInspectable& value);
         Windows::Foundation::IInspectable CurrentAlternativeAction() const;
@@ -331,6 +374,10 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         Editor::HyperlinkTooltipRuleViewModel RequestAddRule();
         Editor::HyperlinkTooltipRuleViewModel RequestAddRuleWithPreset(const winrt::hstring& presetId);
         bool IsPresetInUse(const winrt::hstring& presetId) const;
+        // The same test, ignoring the rule currently open. Applying a preset to the
+        // rule that already is that preset is a re-sync, not a duplicate, so the
+        // Apply preset menu must not grey out the entry you are standing on.
+        bool IsPresetInUseElsewhere(const winrt::hstring& presetId) const;
         void ExpandAllRuleGroups();
         void CollapseAllRuleGroups();
 
@@ -356,6 +403,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         Windows::Foundation::Collections::IObservableVector<Editor::EnumEntry> _ClickGestureList;
         Windows::Foundation::Collections::IMap<Model::HyperlinkClickGesture, Editor::EnumEntry> _ClickGestureMap;
         Windows::Foundation::Collections::IObservableVector<Editor::IntegrationChoiceViewModel> _ActionChoices;
+        Windows::Foundation::Collections::IObservableVector<Editor::IntegrationChoiceViewModel> _RuleActionChoices;
         Editor::HyperlinkTooltipRuleViewModel _CurrentRule{ nullptr };
         // Watches the rule being edited so a rename reaches the breadcrumb.
         Windows::UI::Xaml::Data::INotifyPropertyChanged::PropertyChanged_revoker _currentRuleChangedRevoker;
@@ -366,6 +414,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         void _applyAutomaticOrder();
         void _updateRuleGroups();
+        bool _isPresetInUse(const winrt::hstring& presetId, const Model::HyperlinkTooltipRule& except) const;
     };
 }
 

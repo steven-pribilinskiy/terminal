@@ -12,6 +12,12 @@
 #include "EnumEntry.h"
 #include "LinkTooltipPresets.h"
 
+// Last, and deliberately: <icu.h> is a large C header full of macros, and the
+// rule preview has to compile patterns the way the control does at runtime --
+// ICU, not std::wregex, which has no named groups at all. See
+// TermControl::_ruleTextMatches for what that difference already cost once.
+#include <til/regex.h>
+
 using namespace winrt::Windows::Foundation::Collections;
 using namespace winrt::Microsoft::Terminal::Settings::Model;
 
@@ -134,8 +140,8 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     // An id already in use that isn't one of the built-ins -- an entry under
     // "actions", say -- needs an entry of its own, or the picker would show
     // nothing selected and the first edit would silently rewrite the setting.
-    // Done once while building the list rather than lazily on lookup: the rule's
-    // list is a plain IVector, so a later Append would never reach the ComboBox.
+    // Done while building the list rather than lazily on lookup, so the entry is
+    // already there the first time the picker asks what is selected.
     static void _ensureActionChoice(const IVector<Editor::IntegrationChoiceViewModel>& choices, const winrt::hstring& id)
     {
         if (!choices || id.empty())
@@ -324,20 +330,256 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         return choices;
     }
 
+    // ---- Rule preview ---------------------------------------------------
+    //
+    // What the card at the top of the rule editor shows: the sample line, with
+    // the run this rule would actually pick out of it highlighted, and the named
+    // captures the preview pipeline would read back from it. It used to show the
+    // rule's own summary -- the pattern and the integration -- which is the same
+    // regex the Pattern field two rows below already shows, so it demonstrated
+    // nothing.
+
+    // The named capture groups a pattern declares, in the order it declares them.
+    // Same scan (and same rules about what ICU will accept as a name) as
+    // HyperlinkPreviewService::CollectGroupNames, because these are the names that
+    // service will look for when it builds a card from this rule.
+    static std::vector<std::wstring> _namedGroups(const std::wstring_view pattern)
+    {
+        std::vector<std::wstring> names;
+        for (size_t i = 0; i + 3 < pattern.size(); ++i)
+        {
+            if (pattern[i] != L'(' || pattern[i + 1] != L'?' || pattern[i + 2] != L'<')
+            {
+                continue;
+            }
+            // A backslash before the '(' makes it a literal.
+            if (i > 0 && pattern[i - 1] == L'\\')
+            {
+                continue;
+            }
+            // "(?<=" and "(?<!" are lookbehind, not a group name.
+            if (pattern[i + 3] == L'=' || pattern[i + 3] == L'!')
+            {
+                continue;
+            }
+            const auto close = pattern.find(L'>', i + 3);
+            if (close == std::wstring_view::npos)
+            {
+                continue;
+            }
+            const auto name = pattern.substr(i + 3, close - i - 3);
+            // ICU's rule: a letter followed by letters and digits. An underscore
+            // makes uregex_open reject the whole pattern, so a name carrying one
+            // could never come back anyway.
+            const auto usable = !name.empty() &&
+                                ((name.front() >= L'a' && name.front() <= L'z') || (name.front() >= L'A' && name.front() <= L'Z')) &&
+                                std::all_of(name.begin(), name.end(), [](wchar_t ch) {
+                                    return (ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z') || (ch >= L'0' && ch <= L'9');
+                                });
+            if (usable)
+            {
+                names.emplace_back(name);
+            }
+        }
+        return names;
+    }
+
+    // The scheme of a sample line, by the same reading TermControl applies to a
+    // hovered link: a bare POSIX path has no scheme of its own and counts as file.
+    static std::wstring _sampleScheme(const std::wstring_view sample)
+    {
+        if (sample.empty())
+        {
+            return {};
+        }
+        if (sample.front() == L'/')
+        {
+            return L"file";
+        }
+        const auto colon = sample.find(L':');
+        if (colon == std::wstring_view::npos || colon == 0)
+        {
+            return {};
+        }
+        std::wstring scheme{ sample.substr(0, colon) };
+        for (auto& ch : scheme)
+        {
+            if (ch >= L'A' && ch <= L'Z')
+            {
+                ch = static_cast<wchar_t>(ch - L'A' + L'a');
+            }
+            else if (!((ch >= L'a' && ch <= L'z') || (ch >= L'0' && ch <= L'9') || ch == L'+' || ch == L'-' || ch == L'.'))
+            {
+                return {};
+            }
+        }
+        return scheme;
+    }
+
+    // The sample line to seed a rule's preview with. Rules do not record the preset
+    // they came from, so this identifies one the same way IsPresetInUse does: by
+    // name first (what the list calls the rule), then by pattern. A rule that is
+    // nobody's preset starts with an empty box and the invitation to type in it.
+    static std::wstring_view _presetSampleFor(const Model::HyperlinkTooltipRule& rule)
+    {
+        if (!rule)
+        {
+            return {};
+        }
+
+        const std::wstring_view name{ rule.Name() };
+        const std::wstring_view pattern{ rule.Pattern() };
+        for (const auto& preset : GetLinkTooltipPresets())
+        {
+            if (preset.name == name || (!pattern.empty() && preset.pattern == pattern))
+            {
+                return GetLinkTooltipPresetSample(preset.id);
+            }
+        }
+        return {};
+    }
+
+    struct RulePreview
+    {
+        bool matched{ false };
+        std::wstring before;
+        std::wstring match;
+        std::wstring after;
+        std::wstring captures;
+        std::wstring status;
+    };
+
+    static RulePreview _computeRulePreview(const Model::HyperlinkMatchKind kind,
+                                           const std::wstring_view pattern,
+                                           const IVector<winrt::hstring>& schemes,
+                                           const std::wstring_view sample)
+    {
+        RulePreview result;
+
+        if (sample.empty())
+        {
+            result.status = L"Type a line above to see what this rule picks out of it.";
+            return result;
+        }
+
+        if (pattern.empty())
+        {
+            result.status = kind == Model::HyperlinkMatchKind::Text ?
+                                L"A text rule with no pattern has nothing to look for, so it never matches." :
+                                L"No pattern: this rule applies to every link that passes its scheme and file-type criteria.";
+            return result;
+        }
+
+        UErrorCode status = U_ZERO_ERROR;
+        const auto re = til::ICU::CreateRegex(pattern, UREGEX_CASE_INSENSITIVE, &status);
+        if (U_FAILURE(status) || !re)
+        {
+            // Exactly what happens at runtime: an uncompilable pattern is not an
+            // error anywhere, it simply never matches. Saying so here is the whole
+            // point of the card -- this is where a bad pattern becomes visible
+            // instead of silently costing you every card the rule was meant to draw.
+            result.status = L"This pattern is not valid, so the rule can never match. ICU syntax, not JavaScript: capture group names must be letters and digits only.";
+            return result;
+        }
+
+#pragma warning(suppress : 26490) // Don't use reinterpret_cast (type.1).
+        uregex_setText(re.get(), reinterpret_cast<const UChar*>(sample.data()), gsl::narrow_cast<int32_t>(sample.size()), &status);
+        if (U_FAILURE(status))
+        {
+            result.status = L"No match.";
+            return result;
+        }
+
+        // uregex_find, not uregex_matches, for both kinds. A link rule is matched
+        // against the whole URI that way at runtime, and a text rule's pattern is
+        // first what the buffer scanner uses to find the run in the first place --
+        // so "what would this find in this line" is the honest question here.
+        if (!uregex_find(re.get(), 0, &status) || U_FAILURE(status))
+        {
+            result.status = L"No match.";
+            return result;
+        }
+
+        status = U_ZERO_ERROR;
+        // Not `start`/`end`: winrt::begin/end are what iterate the scheme list
+        // further down, and a local called `end` hides the free function.
+        const auto matchStart = uregex_start(re.get(), 0, &status);
+        const auto matchEnd = uregex_end(re.get(), 0, &status);
+        if (U_FAILURE(status) || matchStart < 0 || matchEnd < matchStart || gsl::narrow_cast<size_t>(matchEnd) > sample.size())
+        {
+            result.status = L"No match.";
+            return result;
+        }
+
+        result.matched = true;
+        result.before = sample.substr(0, gsl::narrow_cast<size_t>(matchStart));
+        result.match = sample.substr(gsl::narrow_cast<size_t>(matchStart), gsl::narrow_cast<size_t>(matchEnd - matchStart));
+        result.after = sample.substr(gsl::narrow_cast<size_t>(matchEnd));
+        result.status = L"Matches.";
+
+        for (const auto& name : _namedGroups(pattern))
+        {
+            status = U_ZERO_ERROR;
+#pragma warning(suppress : 26490) // Don't use reinterpret_cast (type.1).
+            const auto number = uregex_groupNumberFromName(re.get(), reinterpret_cast<const UChar*>(name.data()), gsl::narrow_cast<int32_t>(name.size()), &status);
+            if (U_FAILURE(status) || number <= 0)
+            {
+                continue;
+            }
+
+            status = U_ZERO_ERROR;
+            const auto groupStart = uregex_start(re.get(), number, &status);
+            const auto groupEnd = uregex_end(re.get(), number, &status);
+            if (U_FAILURE(status) || groupStart < 0 || groupEnd < groupStart || gsl::narrow_cast<size_t>(groupEnd) > sample.size())
+            {
+                continue;
+            }
+
+            if (!result.captures.empty())
+            {
+                result.captures += L"  ·  ";
+            }
+            result.captures += name;
+            result.captures += L" = ";
+            result.captures += sample.substr(gsl::narrow_cast<size_t>(groupStart), gsl::narrow_cast<size_t>(groupEnd - groupStart));
+        }
+
+        // A link rule's scheme list is a criterion in its own right, so a pattern
+        // that matches is only half the answer. Say so rather than showing a green
+        // match for a rule that would never be consulted for this link.
+        if (kind == Model::HyperlinkMatchKind::Link && schemes && schemes.Size() > 0)
+        {
+            const auto scheme = _sampleScheme(sample);
+            const auto allowed = std::any_of(begin(schemes), end(schemes), [&](const auto& s) {
+                return til::equals_insensitive_ascii(std::wstring_view{ s }, scheme);
+            });
+            if (!allowed)
+            {
+                result.status = L"The pattern matches, but this rule only applies to ";
+                result.status += std::wstring_view{ _joinCommaList(schemes) };
+                result.status += L" links.";
+            }
+        }
+
+        return result;
+    }
+
     HyperlinkTooltipRuleViewModel::HyperlinkTooltipRuleViewModel(Model::HyperlinkTooltipRule rule,
                                                                  Model::WindowSettings windowSettings,
                                                                  IObservableVector<Editor::EnumEntry> kindList,
                                                                  IMap<Model::HyperlinkMatchKind, Editor::EnumEntry> kindMap,
                                                                  IObservableVector<Editor::EnumEntry> fileTypeGroupList,
                                                                  IMap<Model::HyperlinkFileTypeGroup, Editor::EnumEntry> fileTypeGroupMap,
-                                                                 IObservableVector<Editor::IntegrationChoiceViewModel> integrationChoices) :
+                                                                 IObservableVector<Editor::IntegrationChoiceViewModel> integrationChoices,
+                                                                 IObservableVector<Editor::IntegrationChoiceViewModel> actionChoices) :
         _Rule{ rule },
         _WindowSettings{ windowSettings },
         _KindList{ kindList },
         _KindMap{ kindMap },
         _FileTypeGroupList{ fileTypeGroupList },
         _FileTypeGroupMap{ fileTypeGroupMap },
-        _IntegrationChoices{ integrationChoices }
+        _IntegrationChoices{ integrationChoices },
+        _ActionChoices{ actionChoices }
     {
         if (!_Rule.CustomActions())
         {
@@ -394,13 +636,26 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
         _ButtonChoices = single_threaded_observable_vector<Editor::ButtonChoiceViewModel>(std::move(buttonVMs));
 
-        // A rule's action pickers carry an extra leading "inherit" entry the
-        // global ones don't have, so this list can't be shared with the page's.
-        // Built here rather than in the delegating constructor, because this is
-        // the one every rule actually goes through.
-        _ActionChoices = single_threaded_vector<Editor::IntegrationChoiceViewModel>(_buildActionChoices(true));
+        // A rule's action pickers carry an extra leading "inherit" entry the global
+        // ones don't have, so this list can't be the page's own ActionChoices -- but
+        // it is still ONE list shared by every rule, handed in by the page. It must
+        // not be per-rule: the two pickers bind their ItemsSource to it, and
+        // replacing a ComboBox's ItemsSource while it still holds a selection from
+        // the previous list throws, which silently abandoned the rest of the
+        // "current rule changed" binding update and left the whole editor blank.
+        // Only the fallback constructor below, which has no page to share with,
+        // builds one of its own.
+        if (!_ActionChoices)
+        {
+            _ActionChoices = single_threaded_observable_vector<Editor::IntegrationChoiceViewModel>(_buildActionChoices(true));
+        }
         _ensureActionChoice(_ActionChoices, _Rule.PrimaryAction());
         _ensureActionChoice(_ActionChoices, _Rule.AlternativeAction());
+
+        // Seed the preview with the line the rule's preset is meant to match, so
+        // the card demonstrates something the moment it opens.
+        _PreviewSample = winrt::hstring{ _presetSampleFor(_Rule) };
+        _storePreview();
 
         std::vector<Editor::HyperlinkTooltipActionViewModel> actionVMs;
         for (const auto& action : _Rule.CustomActions())
@@ -442,7 +697,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     }
 
     HyperlinkTooltipRuleViewModel::HyperlinkTooltipRuleViewModel(Model::HyperlinkTooltipRule rule, Model::WindowSettings windowSettings) :
-        HyperlinkTooltipRuleViewModel(rule, windowSettings, nullptr, nullptr, nullptr, nullptr, nullptr)
+        HyperlinkTooltipRuleViewModel(rule, windowSettings, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr)
     {
         INITIALIZE_BINDABLE_ENUM_SETTING(FileTypeGroup, HyperlinkFileTypeGroup, Model::HyperlinkFileTypeGroup, L"LinkTooltip_FileTypeGroup", L"Content");
         INITIALIZE_BINDABLE_ENUM_SETTING(Kind, HyperlinkMatchKind, Model::HyperlinkMatchKind, L"LinkTooltip_MatchKind", L"Content");
@@ -501,11 +756,6 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         return !name.empty() ? name : RS_(L"LinkTooltip_NewRulePlaceholder");
     }
 
-    void HyperlinkTooltipRuleViewModel::NotifySelectionProperties()
-    {
-        _NotifyChanges(L"CurrentKind", L"CurrentFileTypeGroup", L"CurrentIntegrationChoice");
-    }
-
     winrt::Windows::Foundation::IInspectable HyperlinkTooltipRuleViewModel::CurrentKind() const
     {
         if (_KindMap && _KindMap.HasKey(_Rule.Kind()))
@@ -523,6 +773,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             if (_Rule.Kind() != setting)
             {
                 _Rule.Kind(setting);
+                _recomputePreview();
                 _NotifyChanges(L"IsLinkKind", L"IsTextKind", L"SummaryText");
             }
         }
@@ -545,6 +796,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             if (_Rule.FileTypeGroup() != setting)
             {
                 _Rule.FileTypeGroup(setting);
+                _recomputePreview();
                 _NotifyChanges(L"SummaryText");
             }
         }
@@ -628,15 +880,122 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         return winrt::hstring{ parts };
     }
 
+    void HyperlinkTooltipRuleViewModel::PreviewSample(const hstring& value)
+    {
+        if (_PreviewSample == value)
+        {
+            return;
+        }
+        _PreviewSample = value;
+        _recomputePreview();
+        _NotifyChanges(L"PreviewSample");
+    }
+
+    // Storing without announcing, so the constructor can seed the card without
+    // raising an event from a half-built object.
+    void HyperlinkTooltipRuleViewModel::_storePreview()
+    {
+        const auto preview = _computeRulePreview(_Rule.Kind(),
+                                                 std::wstring_view{ _Rule.Pattern() },
+                                                 _Rule.Schemes(),
+                                                 std::wstring_view{ _PreviewSample });
+
+        _HasPreviewMatch = preview.matched;
+        _PreviewBefore = winrt::hstring{ preview.before };
+        _PreviewMatch = winrt::hstring{ preview.match };
+        _PreviewAfter = winrt::hstring{ preview.after };
+        _PreviewCaptures = winrt::hstring{ preview.captures };
+        _PreviewStatus = winrt::hstring{ preview.status };
+    }
+
+    void HyperlinkTooltipRuleViewModel::_recomputePreview()
+    {
+        _storePreview();
+        _NotifyChanges(L"HasPreviewMatch",
+                       L"PreviewBefore",
+                       L"PreviewMatch",
+                       L"PreviewAfter",
+                       L"PreviewCaptures",
+                       L"HasPreviewCaptures",
+                       L"PreviewStatus");
+    }
+
+    // Opening a rule announces one property -- CurrentRule -- and XAML answers it
+    // by walking every ViewModel.CurrentRule.* binding on the page in a single
+    // generated function. That function is straight-line code with no error
+    // handling, and it runs inside a PropertyChanged delegate, which
+    // winrt::impl::invoke wraps in a catch-all: the first target that throws
+    // silently abandons every binding after it, with no crash and nothing logged.
+    // That is exactly what happened here -- a ComboBox whose ItemsSource was being
+    // replaced while it still held a selection from the previous rule -- and the
+    // symptom was an editor that filled in the first time and came up completely
+    // blank on every visit afterwards.
+    //
+    // The ItemsSource swap is gone (see the shared RuleActionChoices list), but the
+    // page should not depend on that one batch surviving in the first place. Each
+    // name here is a separate event raise, so one bad target can only ever cost its
+    // own field.
+    //
+    // Safe to do now in a way it was not before: a Current* setter behind a
+    // ComboBox no longer announces its own property, so re-announcing one cannot
+    // start the write-read-write loop that used to exhaust the stack.
+    void HyperlinkTooltipRuleViewModel::NotifyAllProperties()
+    {
+        _NotifyChanges(L"Name",
+                       L"DisplayName",
+                       L"Enabled",
+                       L"SummaryText",
+                       L"CurrentKind",
+                       L"IsLinkKind",
+                       L"IsTextKind",
+                       L"Schemes",
+                       L"Pattern",
+                       L"CurrentFileTypeGroup",
+                       L"CustomExtensions",
+                       L"Integration",
+                       L"CurrentIntegrationChoice",
+                       L"ShowPreview",
+                       L"OverrideShowDelay",
+                       L"ShowDelay",
+                       L"OverrideHideDelay",
+                       L"HideDelay",
+                       L"OverrideMaxWidth",
+                       L"MaxWidth",
+                       L"OverrideButtons",
+                       L"ButtonChoices",
+                       L"OverrideShowInPane",
+                       L"ShowInPane",
+                       L"ActionChoices",
+                       L"CurrentPrimaryAction",
+                       L"CurrentAlternativeAction",
+                       L"CustomActions",
+                       L"PreviewSample",
+                       L"HasPreviewMatch",
+                       L"PreviewBefore",
+                       L"PreviewMatch",
+                       L"PreviewAfter",
+                       L"PreviewCaptures",
+                       L"HasPreviewCaptures",
+                       L"PreviewStatus");
+    }
+
     hstring HyperlinkTooltipRuleViewModel::Schemes() const
     {
         return _joinCommaList(_Rule.Schemes());
     }
 
+    // Guarded, because the two-way binding writes back whatever it was just handed:
+    // without this, every refresh of the box rewrote the rule's scheme list with an
+    // identical copy of itself and announced it as a change.
     void HyperlinkTooltipRuleViewModel::Schemes(const hstring& value)
     {
+        if (Schemes() == value)
+        {
+            return;
+        }
         auto parts = _splitCommaList(value);
         _Rule.Schemes(parts.empty() ? nullptr : single_threaded_vector<hstring>(std::move(parts)));
+        _recomputePreview();
         _NotifyChanges(L"Schemes", L"SummaryText");
     }
 
@@ -647,6 +1006,10 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     void HyperlinkTooltipRuleViewModel::CustomExtensions(const hstring& value)
     {
+        if (CustomExtensions() == value)
+        {
+            return;
+        }
         auto parts = _splitCommaList(value);
         _Rule.CustomExtensions(parts.empty() ? nullptr : single_threaded_vector<hstring>(std::move(parts)));
         _NotifyChanges(L"CustomExtensions");
@@ -654,7 +1017,19 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     void HyperlinkTooltipRuleViewModel::OverrideShowDelay(bool value)
     {
-        _Rule.TooltipShowDelay(value ? winrt::Windows::Foundation::IReference<int32_t>{ ShowDelay() } : nullptr);
+        if (OverrideShowDelay() == value)
+        {
+            return;
+        }
+        if (value)
+        {
+            _Rule.TooltipShowDelay(winrt::Windows::Foundation::IReference<int32_t>{ _ShadowShowDelay });
+        }
+        else
+        {
+            _ShadowShowDelay = ShowDelay();
+            _Rule.TooltipShowDelay(nullptr);
+        }
         _NotifyChanges(L"OverrideShowDelay", L"ShowDelay");
     }
 
@@ -664,18 +1039,43 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         {
             return value.Value();
         }
-        return 250;
+        return _ShadowShowDelay;
     }
 
+    // The number box is disabled until the override checkbox is ticked, so the only
+    // writes that can arrive while the override is off are the binding pushing the
+    // displayed default straight back at us -- and writing that to the rule would
+    // turn the override on and save a delay nobody chose, just for opening the rule.
+    // (Every one of those checkboxes came up ticked on a rule that had never been
+    // touched.) Keep the number for the next time the box is ticked, the way the
+    // pair is documented to behave, but leave the rule alone. Same instinct as the
+    // button checkboxes, which already refuse a stray write for the same reason.
     void HyperlinkTooltipRuleViewModel::ShowDelay(int32_t value)
     {
+        _ShadowShowDelay = value;
+        if (!OverrideShowDelay())
+        {
+            return;
+        }
         _Rule.TooltipShowDelay(winrt::Windows::Foundation::IReference<int32_t>{ value });
         _NotifyChanges(L"ShowDelay", L"OverrideShowDelay");
     }
 
     void HyperlinkTooltipRuleViewModel::OverrideHideDelay(bool value)
     {
-        _Rule.TooltipHideDelay(value ? winrt::Windows::Foundation::IReference<int32_t>{ HideDelay() } : nullptr);
+        if (OverrideHideDelay() == value)
+        {
+            return;
+        }
+        if (value)
+        {
+            _Rule.TooltipHideDelay(winrt::Windows::Foundation::IReference<int32_t>{ _ShadowHideDelay });
+        }
+        else
+        {
+            _ShadowHideDelay = HideDelay();
+            _Rule.TooltipHideDelay(nullptr);
+        }
         _NotifyChanges(L"OverrideHideDelay", L"HideDelay");
     }
 
@@ -685,18 +1085,35 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         {
             return value.Value();
         }
-        return 400;
+        return _ShadowHideDelay;
     }
 
     void HyperlinkTooltipRuleViewModel::HideDelay(int32_t value)
     {
+        _ShadowHideDelay = value;
+        if (!OverrideHideDelay())
+        {
+            return;
+        }
         _Rule.TooltipHideDelay(winrt::Windows::Foundation::IReference<int32_t>{ value });
         _NotifyChanges(L"HideDelay", L"OverrideHideDelay");
     }
 
     void HyperlinkTooltipRuleViewModel::OverrideMaxWidth(bool value)
     {
-        _Rule.TooltipMaxWidth(value ? winrt::Windows::Foundation::IReference<int32_t>{ MaxWidth() } : nullptr);
+        if (OverrideMaxWidth() == value)
+        {
+            return;
+        }
+        if (value)
+        {
+            _Rule.TooltipMaxWidth(winrt::Windows::Foundation::IReference<int32_t>{ _ShadowMaxWidth });
+        }
+        else
+        {
+            _ShadowMaxWidth = MaxWidth();
+            _Rule.TooltipMaxWidth(nullptr);
+        }
         _NotifyChanges(L"OverrideMaxWidth", L"MaxWidth");
     }
 
@@ -706,11 +1123,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         {
             return value.Value();
         }
-        return 640;
+        return _ShadowMaxWidth;
     }
 
     void HyperlinkTooltipRuleViewModel::MaxWidth(int32_t value)
     {
+        _ShadowMaxWidth = value;
+        if (!OverrideMaxWidth())
+        {
+            return;
+        }
         _Rule.TooltipMaxWidth(winrt::Windows::Foundation::IReference<int32_t>{ value });
         _NotifyChanges(L"MaxWidth", L"OverrideMaxWidth");
     }
@@ -768,7 +1190,19 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     void HyperlinkTooltipRuleViewModel::OverrideShowInPane(bool value)
     {
-        _Rule.ShowInPane(value ? winrt::Windows::Foundation::IReference<bool>{ ShowInPane() } : nullptr);
+        if (OverrideShowInPane() == value)
+        {
+            return;
+        }
+        if (value)
+        {
+            _Rule.ShowInPane(winrt::Windows::Foundation::IReference<bool>{ _ShadowShowInPane });
+        }
+        else
+        {
+            _ShadowShowInPane = ShowInPane();
+            _Rule.ShowInPane(nullptr);
+        }
         _NotifyChanges(L"OverrideShowInPane", L"ShowInPane");
     }
 
@@ -778,11 +1212,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         {
             return value.Value();
         }
-        return false;
+        return _ShadowShowInPane;
     }
 
     void HyperlinkTooltipRuleViewModel::ShowInPane(bool value)
     {
+        _ShadowShowInPane = value;
+        if (!OverrideShowInPane())
+        {
+            return;
+        }
         _Rule.ShowInPane(winrt::Windows::Foundation::IReference<bool>{ value });
         _NotifyChanges(L"ShowInPane", L"OverrideShowInPane");
     }
@@ -861,6 +1300,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _Rule.TooltipMaxWidth(nullptr);
         _Rule.Buttons(nullptr);
         _Rule.ShowInPane(nullptr);
+
+        // The preset knows what it is meant to match, so the card can demonstrate
+        // it straight away. An edited sample is left alone -- it is the user's test
+        // input, not the preset's.
+        if (_PreviewSample.empty())
+        {
+            _PreviewSample = winrt::hstring{ GetLinkTooltipPresetSample(presetId) };
+            _NotifyChanges(L"PreviewSample");
+        }
+        _recomputePreview();
 
         _NotifyChanges(L"Name",
                        L"DisplayName",
@@ -1093,6 +1542,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _ensureActionChoice(_ActionChoices, _WindowSettings.HyperlinkPrimaryAction());
         _ensureActionChoice(_ActionChoices, _WindowSettings.HyperlinkAlternativeAction());
 
+        // The same list plus a leading "inherit" entry, built once here and handed
+        // to every rule -- not built per rule. The rule editor's two action pickers
+        // bind their ItemsSource to it, and a ComboBox that is handed a different
+        // collection while it still holds a selection from the old one throws; that
+        // throw took the rest of the "current rule changed" binding update with it
+        // and left the whole editor blank on every visit after the first. One list
+        // means the ItemsSource never changes, and every choice a rule can select
+        // is by construction an item of the collection the picker is showing.
+        _RuleActionChoices = single_threaded_observable_vector<Editor::IntegrationChoiceViewModel>(_buildActionChoices(true));
+
         std::vector<Editor::ButtonChoiceViewModel> kindVMs;
         for (const auto& id : KnownClickableKindIds)
         {
@@ -1124,7 +1583,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         std::vector<Editor::HyperlinkTooltipRuleViewModel> ruleVMs;
         for (const auto& rule : rules)
         {
-            ruleVMs.push_back(make<HyperlinkTooltipRuleViewModel>(rule, _WindowSettings, _KindList, _KindMap, _FileTypeGroupList, _FileTypeGroupMap, _IntegrationChoices));
+            ruleVMs.push_back(make<HyperlinkTooltipRuleViewModel>(rule, _WindowSettings, _KindList, _KindMap, _FileTypeGroupList, _FileTypeGroupMap, _IntegrationChoices, _RuleActionChoices));
         }
         _CurrentView = single_threaded_observable_vector<Editor::HyperlinkTooltipRuleViewModel>(std::move(ruleVMs));
         _RuleGroups = single_threaded_observable_vector<Editor::RuleGroupViewModel>();
@@ -1436,8 +1895,28 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _currentRuleChangedRevoker.revoke();
         const auto wasEditing = static_cast<bool>(_CurrentRule);
         _CurrentRule = vm;
+        if (!_CurrentRule && wasEditing)
+        {
+            _updateRuleGroups();
+        }
+        _NotifyChanges(L"CurrentRule", L"IsEditingRule", L"IsNotEditingRule", L"CurrentRuleName");
+
         if (_CurrentRule)
         {
+            // "CurrentRule changed" is one event, and XAML answers it by running
+            // every ViewModel.CurrentRule.* binding on the page from a single
+            // generated function -- so one target that throws costs you all the
+            // ones after it, silently. Announce the rule's own properties as well,
+            // which is a separate event each, so opening a rule fills the editor in
+            // even if that batch does not survive. See NotifyAllProperties.
+            //
+            // Before the rename subscription below, not after: this raises Name and
+            // DisplayName, and the crumb has just been written from the same rule.
+            if (const auto self = get_self<HyperlinkTooltipRuleViewModel>(_CurrentRule))
+            {
+                self->NotifyAllProperties();
+            }
+
             _currentRuleChangedRevoker = _CurrentRule.PropertyChanged(winrt::auto_revoke, [this](auto&&, const Windows::UI::Xaml::Data::PropertyChangedEventArgs& args) {
                 if (args.PropertyName() == L"Name" || args.PropertyName() == L"DisplayName")
                 {
@@ -1445,11 +1924,6 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 }
             });
         }
-        else if (wasEditing)
-        {
-            _updateRuleGroups();
-        }
-        _NotifyChanges(L"CurrentRule", L"IsEditingRule", L"IsNotEditingRule", L"CurrentRuleName");
     }
 
     void LinkTooltipViewModel::RequestDeleteRule(const Editor::HyperlinkTooltipRuleViewModel& vm)
@@ -1471,7 +1945,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         Model::HyperlinkTooltipRule rule{};
         rule.Enabled(true);
         rule.CustomActions(winrt::single_threaded_vector<Model::HyperlinkTooltipAction>());
-        const auto vm = make<HyperlinkTooltipRuleViewModel>(rule, _WindowSettings, _KindList, _KindMap, _FileTypeGroupList, _FileTypeGroupMap, _IntegrationChoices);
+        const auto vm = make<HyperlinkTooltipRuleViewModel>(rule, _WindowSettings, _KindList, _KindMap, _FileTypeGroupList, _FileTypeGroupMap, _IntegrationChoices, _RuleActionChoices);
         CurrentView().Append(vm);
         // A blank rule classifies as Custom, which sorts last anyway, so this
         // leaves it at the end -- where the user is about to start editing it.
@@ -1486,6 +1960,28 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     // whose pattern is empty (the file-type ones) is identified by name and file-type
     // group, which is the only thing that distinguishes those from each other.
     bool LinkTooltipViewModel::IsPresetInUse(const winrt::hstring& presetId) const
+    {
+        return _isPresetInUse(presetId, nullptr);
+    }
+
+    // The Apply preset menu's variant. Applying to the rule that already is that
+    // preset re-syncs it -- which is a legitimate thing to want, and was in fact
+    // the only way to get a rule's fields back while the editor was coming up
+    // blank -- so it must not count as a duplicate.
+    bool LinkTooltipViewModel::IsPresetInUseElsewhere(const winrt::hstring& presetId) const
+    {
+        Model::HyperlinkTooltipRule except{ nullptr };
+        if (_CurrentRule)
+        {
+            if (const auto self = get_self<HyperlinkTooltipRuleViewModel>(_CurrentRule))
+            {
+                except = self->Rule();
+            }
+        }
+        return _isPresetInUse(presetId, except);
+    }
+
+    bool LinkTooltipViewModel::_isPresetInUse(const winrt::hstring& presetId, const Model::HyperlinkTooltipRule& except) const
     {
         const auto preset = FindLinkTooltipPreset(presetId);
         if (!preset)
@@ -1504,7 +2000,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         for (const auto& rule : rules)
         {
-            if (!rule)
+            if (!rule || (except && rule == except))
             {
                 continue;
             }
@@ -1576,7 +2072,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         if (const auto preset = FindLinkTooltipPreset(presetId))
         {
             const auto rule = CreateRuleFromPreset(*preset);
-            const auto vm = make<HyperlinkTooltipRuleViewModel>(rule, _WindowSettings, _KindList, _KindMap, _FileTypeGroupList, _FileTypeGroupMap, _IntegrationChoices);
+            const auto vm = make<HyperlinkTooltipRuleViewModel>(rule, _WindowSettings, _KindList, _KindMap, _FileTypeGroupList, _FileTypeGroupMap, _IntegrationChoices, _RuleActionChoices);
             CurrentView().Append(vm);
             _applyAutomaticOrder();
             return vm;

@@ -48,6 +48,21 @@ namespace Microsoft.Terminal.Settings.Editor
         Boolean Enabled;
         String SummaryText { get; };
 
+        // The preview card at the top of the rule editor: a line of sample text
+        // and what this rule actually picks out of it, split into the run before
+        // the match, the match itself, and the run after it so the card can
+        // highlight it. None of this is saved -- it is a live test of the pattern.
+        String PreviewSample;
+        String PreviewStatus { get; };
+        Boolean HasPreviewMatch { get; };
+        String PreviewBefore { get; };
+        String PreviewMatch { get; };
+        String PreviewAfter { get; };
+        // "key = PROJ-1234 - number = 18920", or empty when the pattern has no
+        // named groups (or did not match).
+        String PreviewCaptures { get; };
+        Boolean HasPreviewCaptures { get; };
+
         // Link rules match hovered links; text rules match plain terminal output.
         IInspectable CurrentKind;
         Windows.Foundation.Collections.IObservableVector<EnumEntry> KindList { get; };
@@ -156,6 +171,11 @@ namespace Microsoft.Terminal.Settings.Editor
         // What each chord runs. The ids are the card's own button ids plus
         // "none", so a chord and a button can be bound to the same thing.
         Windows.Foundation.Collections.IObservableVector<IntegrationChoiceViewModel> ActionChoices { get; };
+        // The per-rule variant of the list above, carrying an extra leading
+        // "inherit" entry. One list shared by every rule, so switching rules never
+        // swaps the ItemsSource out from under a ComboBox that still has a
+        // selection -- which is what silently broke the whole editor.
+        Windows.Foundation.Collections.IObservableVector<IntegrationChoiceViewModel> RuleActionChoices { get; };
         IInspectable CurrentPrimaryAction;
         IInspectable CurrentAlternativeAction;
 
@@ -182,6 +202,9 @@ namespace Microsoft.Terminal.Settings.Editor
         // True when a rule matching this preset is already in the list, so the
         // Add rule menu can grey the entry out rather than make a duplicate.
         Boolean IsPresetInUse(String presetId);
+        // The same test, ignoring the rule currently open, for the Apply preset
+        // menu: re-applying the preset a rule already is must stay available.
+        Boolean IsPresetInUseElsewhere(String presetId);
         void ExpandAllRuleGroups();
         void CollapseAllRuleGroups();
     }

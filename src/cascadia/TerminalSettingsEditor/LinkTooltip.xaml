@@ -502,21 +502,83 @@
             <TextBlock Style="{StaticResource TextBlockSubHeaderStyle}"
                        Text="{x:Bind ViewModel.CurrentRuleName, Mode=OneWay}" />
 
-            <!--  Live Preview of Match  -->
+            <!--
+                Live Preview of Match. The sample line is editable and the rest of
+                the card is what this rule actually finds in it - the run it would
+                match, highlighted where it sits, and the named captures the
+                preview pipeline reads back from it. It used to show the rule's own
+                summary, which is the same regex the Pattern field two rows below
+                already shows, so it demonstrated nothing.
+            -->
             <Border Margin="0,4,0,8"
                     Padding="12"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1"
                     CornerRadius="8">
-                <StackPanel Spacing="6">
+                <StackPanel Spacing="8">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <FontIcon FontSize="14" Glyph="&#xE8B9;" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
                         <TextBlock Text="Rule Preview" FontWeight="SemiBold" FontSize="13" />
                     </StackPanel>
-                    <TextBlock Text="{x:Bind ViewModel.CurrentRule.SummaryText, Mode=OneWay}"
-                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+
+                    <TextBox FontFamily="Cascadia Code, Consolas"
+                             FontSize="12"
+                             IsSpellCheckEnabled="False"
+                             PlaceholderText="Paste a line of output or a link to test this rule against"
+                             Text="{x:Bind ViewModel.CurrentRule.PreviewSample, Mode=TwoWay}" />
+
+                    <!--
+                        The match, highlighted where it sits. Three TextBlocks in a
+                        panel rather than three Runs in a paragraph: XAML collapses
+                        the whitespace between inline elements into a real space, so
+                        a run-based version would show a sample the rule never saw.
+                        (The Preview Appearance card above has exactly that seam in
+                        its mock URL.) A panel's children carry no such whitespace,
+                        and a Run cannot take a background either way.
+                    -->
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                  HorizontalScrollMode="Auto"
+                                  VerticalScrollBarVisibility="Disabled"
+                                  VerticalScrollMode="Disabled"
+                                  Visibility="{x:Bind ViewModel.CurrentRule.HasPreviewMatch, Mode=OneWay}">
+                        <StackPanel VerticalAlignment="Center"
+                                    Orientation="Horizontal">
+                            <TextBlock FontFamily="Cascadia Code, Consolas"
+                                       FontSize="12"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       Text="{x:Bind ViewModel.CurrentRule.PreviewBefore, Mode=OneWay}" />
+                            <Border Padding="3,1,3,1"
+                                    Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                    CornerRadius="3">
+                                <TextBlock FontFamily="Cascadia Code, Consolas"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+                                           Text="{x:Bind ViewModel.CurrentRule.PreviewMatch, Mode=OneWay}" />
+                            </Border>
+                            <TextBlock FontFamily="Cascadia Code, Consolas"
+                                       FontSize="12"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       Text="{x:Bind ViewModel.CurrentRule.PreviewAfter, Mode=OneWay}" />
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <TextBlock FontFamily="Cascadia Code, Consolas"
                                FontSize="12"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               Text="{x:Bind ViewModel.CurrentRule.PreviewCaptures, Mode=OneWay}"
+                               TextWrapping="Wrap"
+                               Visibility="{x:Bind ViewModel.CurrentRule.HasPreviewCaptures, Mode=OneWay}" />
+
+                    <TextBlock FontSize="12"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               Text="{x:Bind ViewModel.CurrentRule.PreviewStatus, Mode=OneWay}"
+                               TextWrapping="Wrap" />
+
+                    <TextBlock FontSize="12"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               Text="{x:Bind ViewModel.CurrentRule.SummaryText, Mode=OneWay}"
                                TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
@@ -694,10 +756,20 @@
             <TextBlock x:Uid="LinkTooltip_ClickActionsHeader"
                        Style="{StaticResource TextBlockSubHeaderStyle}" />
 
+            <!--
+                ItemsSource is the page's list, not the rule's, exactly like the
+                Match kind and Integration pickers above. A per-rule collection here
+                meant every rule switch handed these two boxes a different
+                ItemsSource while they still held the previous rule's selection,
+                which throws - and that throw was swallowed inside the binding
+                update, taking every field below it with it and leaving the editor
+                blank. One shared list also guarantees the item a rule selects is
+                an item of the collection the box is showing.
+            -->
             <local:SettingsCard x:Uid="LinkTooltip_RulePrimaryAction">
                 <ComboBox AutomationProperties.AccessibilityView="Content"
                           ItemTemplate="{StaticResource IntegrationChoiceComboBoxTemplate}"
-                          ItemsSource="{x:Bind ViewModel.CurrentRule.ActionChoices, Mode=OneWay}"
+                          ItemsSource="{x:Bind ViewModel.RuleActionChoices, Mode=OneWay}"
                           SelectedItem="{x:Bind ViewModel.CurrentRule.CurrentPrimaryAction, Mode=TwoWay}"
                           Style="{StaticResource ComboBoxSettingStyle}" />
             </local:SettingsCard>
@@ -705,7 +777,7 @@
             <local:SettingsCard x:Uid="LinkTooltip_RuleAlternativeAction">
                 <ComboBox AutomationProperties.AccessibilityView="Content"
                           ItemTemplate="{StaticResource IntegrationChoiceComboBoxTemplate}"
-                          ItemsSource="{x:Bind ViewModel.CurrentRule.ActionChoices, Mode=OneWay}"
+                          ItemsSource="{x:Bind ViewModel.RuleActionChoices, Mode=OneWay}"
                           SelectedItem="{x:Bind ViewModel.CurrentRule.CurrentAlternativeAction, Mode=TwoWay}"
                           Style="{StaticResource ComboBoxSettingStyle}" />
             </local:SettingsCard>
