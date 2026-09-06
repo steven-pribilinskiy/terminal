@@ -257,6 +257,75 @@ Symbolize in-process with dbghelp (`SymInitialize` + `SymFromAddr` over
 next to the built binaries and the path is embedded in the image, so frames
 resolve with no extra setup — as long as the binary and its PDB match.
 
+## A settings page comes up half filled in, and nothing crashes
+
+What you see: a page opens with some controls correct and the rest blank or
+stale. No dialog, no crash, nothing in the event log. On the Link Tooltip page
+this presented as a rule editor that worked the first time you opened a rule and
+came up completely empty on every visit afterwards — while the breadcrumb above
+it still named the rule correctly, and the list behind it still showed the
+rule's pattern.
+
+**The data is fine. The page never finished drawing itself.**
+
+### The cause: an exception swallowed inside a binding update
+
+A single `PropertyChanged` for a property with dependents — `CurrentRule`, say —
+is answered by XAML running *every* `ViewModel.CurrentRule.*` binding on the page
+from one generated function. That function is straight-line code with no error
+handling, and it runs inside a delegate. `winrt::impl::invoke` in the SDK's
+`base.h` wraps every delegate call in `catch (...)` and reports nothing:
+
+```cpp
+template <typename Delegate, typename... Arg>
+bool invoke(Delegate const& delegate, Arg const&... args) noexcept
+{
+    try { delegate(args...); }
+    catch (...) { return report_failed_invoke(); }
+    return true;
+}
+```
+
+So the first target that throws abandons every binding after it in that
+function, silently. No crash, because the throw never leaves the event raise.
+
+The instance found here was a ComboBox whose `ItemsSource` was being replaced
+while it still held a selection from the previous item. The fix was to bind
+`ItemsSource` to a **page-level** collection that never changes — which is what
+`KindList`, `FileTypeGroupList` and `IntegrationChoices` already did, and why
+only the two pickers built from a per-rule list were affected.
+
+### Reading the symptom
+
+The order matters and it is the whole diagnosis. Bindings are updated in
+**reverse document order**, with multiply-referenced properties hoisted first.
+So:
+
+- **What is still correct tells you where it stopped.** On the blank rule editor,
+  the `IsLinkKind`/`IsTextKind` visibilities were right for each rule while
+  everything else was stale — those two are hoisted to the front, and nothing
+  after them ran.
+- **A property announced on its own still works.** Applying a preset filled the
+  same page in completely, because `ApplyPreset` raises its properties one at a
+  time; each is a separate event raise, so one bad target costs only its own
+  field. That contrast is the confirmation.
+
+### Guarding against it
+
+Two habits, both used on that page now:
+
+- Never hand a `Selector` a different `ItemsSource` as part of a batched update.
+  Bind item lists to page-level properties.
+- For a page whose whole body hangs off one object, announce that object's
+  properties individually as well after the batch (`NotifyAllProperties`). It is
+  belt and braces, but the batch is not something a page should depend on.
+
+Note this is the *opposite* symptom to the stack overflow above, on the same
+page, from the same family of mistake: there, a setter announced its own
+property and never returned; here, a target threw and was silently dropped. If a
+settings page misbehaves, establish first whether it is dying or merely
+incomplete — they are found in completely different ways.
+
 ## Tests that lie
 
 Every one of these produced a confident, wrong conclusion.

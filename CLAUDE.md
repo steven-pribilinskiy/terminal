@@ -183,6 +183,24 @@ CI green means the build compiles, packages, and passes its two test suites — 
 that, and name the UI behaviour a `wtt` run would still need to confirm, rather than implying more
 than CI itself proved.
 
+**Two agents pushing to `main` at once will starve each other of CI results.** `build.yml` sets
+`concurrency: cancel-in-progress`, which is right for one person pushing repeatedly and actively
+harmful for two sharing a branch when a build takes ~40 minutes: each push cancels the run in
+flight, so the newest commit is always building and nothing older ever reports. One afternoon of
+this produced six runs and a single verdict, and that verdict was on the oldest commit in the
+stack — both of us had individually done the reasonable thing by pushing a small fix promptly.
+
+If another session is working in this tree, agree who pushes and when. Batching is strictly
+better here: one run over a stack of commits clears everyone's backlog at once, while a prompt
+push of a one-line fix costs the whole queue its answer. Check for a live run before pushing:
+
+```powershell
+gh run list --repo steven-pribilinskiy/terminal --limit 3
+```
+
+Note that `gh` resolves to `microsoft/terminal` in this checkout unless `--repo` is given, since
+`upstream` is a remote here — a bare `gh run list` reports on Microsoft's CI, not ours.
+
 ### The build tooling stays in the tree — CI needs it
 
 `tools\Deploy-TerminalSlots.ps1` is not local-only scaffolding: `build.yml` calls it directly
@@ -437,6 +455,57 @@ Scheduled Task action, and `TerminalPage::_armPromotionHelper` /
 `ShellExecuteExW`'s target instead of `powershell.exe`/`pwsh.exe` directly. Any new hidden launch
 this repo adds should follow the same pattern rather than reintroducing a bare `-WindowStyle
 Hidden`/`SW_HIDE` call.
+
+## What CI will not tell you, and what costs a round trip to learn
+
+Builds happen only in CI, so every mistake below costs ~40 minutes to discover.
+Three of them cost exactly that on 2026-09-06; the first cost more, because it
+does not fail at all.
+
+- **A packaged asset must be listed in `src/cascadia/CascadiaResources.build.items`.**
+  Nothing globs a folder. Every asset directory — `ProfileIcons`,
+  `ProfileGeneratorIcons`, `IntegrationIcons` — is an explicit `<Content Include>`
+  with a `<Link>`, and the `<Link>` is what decides where it lands in the package;
+  without one the file goes to the package root, and without the entry it is
+  simply absent. **This fails silently**: green build, package produced, missing
+  file, and you find out from a screenshot. Do not infer packaging from the built
+  payload — a folder being there only proves *something* packaged it. And note
+  the file extension: a grep filtered to `*.vcxproj`/`*.targets`/`*.props`/`*.wapproj`
+  will not match `.build.items` and will tell you nothing references it.
+- **A new runtimeclass with a constructor needs its `.g.cpp` compiled.** Declaring
+  one in an `.idl` makes `module.g.cpp` reference a factory; the definition only
+  exists once the generated `.g.cpp` is included somewhere. `EventArgs.cpp` lists
+  every type in `EventArgs.idl` for exactly this reason. Miss it and you get
+  `unresolved external symbol winrt_make_<Namespace>_<Type>` at link.
+- **Qualify `IInspectable` and `Input::` in the Cascadia sources.** Files here
+  carry `using namespace winrt::Windows::Foundation;` and
+  `using namespace winrt::Windows::UI;` alongside `...::Xaml;`, so a bare
+  `IInspectable` is ambiguous with the ABI struct of the same name at global
+  scope, and a bare `Input::PointerRoutedEventArgs` binds to `Windows::UI::Input`
+  rather than `Windows::UI::Xaml::Input`. Both were hit within an hour of each
+  other by two different sessions.
+- **`StyleProperty` is on `FrameworkElement`, not `Control`.** `Control` inherits
+  `Style`, but the static DP accessor is declared on the base.
+- **`GETSET_BINDABLE_ENUM_SETTING`'s setter raises no `PropertyChanged`.** If
+  anything on the page derives from that value, hand-write the setter and notify
+  the derived properties — but never the property the binding just wrote (see
+  `doc/troubleshooting.md`, "The whole Terminal vanishes while you are in Settings").
+
+Green means it compiles, packages and passes two unit suites. It says nothing
+about whether a page draws, an icon resolves, or a setting takes effect — see
+`doc/troubleshooting.md`, "A settings page comes up half filled in".
+
+### Two agents on one branch will starve each other of CI
+
+`.github/workflows/build.yml` sets `concurrency: cancel-in-progress`, which is
+right for one person pushing repeatedly and harmful for two sharing `main`: each
+push cancels the run in flight, and a Terminal build takes longer than the gap
+between two people's commits. On 2026-09-06 that produced six runs and one
+verdict, on the oldest commit of the stack.
+
+If someone else is working the tree: agree who holds, let one run cover both
+stacks, and stage commits by explicit path — never `git add -A` or `git commit -a`
+— so a shared working tree never sweeps up half of someone else's change.
 
 ## Settings UI: cards, expanders, and search
 
