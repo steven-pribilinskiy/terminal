@@ -857,6 +857,30 @@
     <value>This allows actions such as Global Summon and Quake Mode actions to work even when no windows are open.</value>
     <comment>Additional description for what the "allow headless" setting does. Presented near "Globals_AllowHeadless.Header".</comment>
   </data>
+  <data name="Globals_TabPosition.Header" xml:space="preserve">
+    <value>Tab position</value>
+    <comment>Header for a control to choose which edge of the window the row of tabs sits on.</comment>
+  </data>
+  <data name="Globals_TabPosition.Description" xml:space="preserve">
+    <value>Left and right show the tabs as a vertical sidebar you can resize by dragging its inner edge. Only Top can draw the tabs into the title bar.</value>
+    <comment>A description for what the "tab position" setting does. Presented near "Globals_TabPosition.Header". 'Left', 'right' and 'Top' must match the values for &lt;Globals_TabPositionLeft.Content&gt;, &lt;Globals_TabPositionRight.Content&gt; and &lt;Globals_TabPositionTop.Content&gt;.</comment>
+  </data>
+  <data name="Globals_TabPositionTop.Content" xml:space="preserve">
+    <value>Top</value>
+    <comment>An option to choose from for the "tab position" setting. When selected, the tabs run along the top of the window, above the terminal.</comment>
+  </data>
+  <data name="Globals_TabPositionBottom.Content" xml:space="preserve">
+    <value>Bottom</value>
+    <comment>An option to choose from for the "tab position" setting. When selected, the tabs run along the bottom of the window, below the terminal.</comment>
+  </data>
+  <data name="Globals_TabPositionLeft.Content" xml:space="preserve">
+    <value>Left</value>
+    <comment>An option to choose from for the "tab position" setting. When selected, the tabs are stacked in a vertical column on the left of the window, beside the terminal.</comment>
+  </data>
+  <data name="Globals_TabPositionRight.Content" xml:space="preserve">
+    <value>Right</value>
+    <comment>An option to choose from for the "tab position" setting. When selected, the tabs are stacked in a vertical column on the right of the window, beside the terminal.</comment>
+  </data>
   <data name="Globals_TabWidthMode.Header" xml:space="preserve">
     <value>Tab width mode</value>
     <comment>Header for a control to choose how wide the tabs are.</comment>

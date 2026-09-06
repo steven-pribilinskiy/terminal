@@ -2932,6 +2932,17 @@
           "description": "When set to true, the window will snap to the nearest character boundary on resize. When false, the window will resize smoothly",
           "type": "boolean"
         },
+        "tabPosition": {
+          "default": "top",
+          "description": "Which edge of the window the tab strip sits on. Possible values include:\n -\"top\" the shipped behavior, and the only position that can draw the tabs into the titlebar\n -\"bottom\" a horizontal strip below the terminal\n -\"left\" and \"right\" a vertical sidebar, resizable by dragging its inner edge.\nBottom, left and right leave the titlebar in place and put the strip in the window body, whatever showTabsInTitlebar is set to. Left and right also ignore tabWidthMode, which is width arithmetic that has no meaning in a vertical strip.",
+          "enum": [
+            "top",
+            "bottom",
+            "left",
+            "right"
+          ],
+          "type": "string"
+        },
         "tabWidthMode": {
           "default": "equal",
           "description": "Sets the width of the tabs. Possible values include:\n -\"equal\" sizes each tab to the same width\n -\"titleLength\" sizes each tab to the length of its title\n -\"compact\" sizes each tab to the length of its title when focused, and shrinks to the size of only the icon when the tab is unfocused.",

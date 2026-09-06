@@ -154,6 +154,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
                 { ShortcutAction::SwitchToTab, USES_RESOURCE(L"SwitchToTabCommandKey") },
                 { ShortcutAction::TabSearch, USES_RESOURCE(L"TabSearchCommandKey") },
                 { ShortcutAction::ToggleAlwaysOnTop, USES_RESOURCE(L"ToggleAlwaysOnTopCommandKey") },
+                { ShortcutAction::ToggleVerticalTabs, USES_RESOURCE(L"ToggleVerticalTabsCommandKey") },
                 { ShortcutAction::ToggleBlockSelection, USES_RESOURCE(L"ToggleBlockSelectionCommandKey") },
                 { ShortcutAction::ToggleBroadcastInput, USES_RESOURCE(L"ToggleBroadcastInputCommandKey") },
                 { ShortcutAction::ToggleCommandPalette, USES_RESOURCE(L"ToggleCommandPaletteCommandKey") },

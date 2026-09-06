@@ -1,0 +1,206 @@
+<!--
+    Copyright (c) Microsoft Corporation. All rights reserved. Licensed under
+    the MIT License. See LICENSE in the project root for license information.
+-->
+<!--
+    The tab strip, rotated into a column, for theme.window.tabPosition of "left"
+    or "right". TerminalPage::_ApplyTabPosition assigns VerticalTabViewStyle to
+    the TabView when it builds one of those layouts, and clears it again when it
+    doesn't - see _ResetRootGridLayout.
+
+    Why re-template rather than build a tab strip out of a ListView: everything
+    the WinUI control already does keeps working. Drag to reorder, drag out to
+    tear a tab into its own window, keyboard cycling, the automation tree screen
+    readers walk, tooltips, and the ~40 TabViewItemHeader* resource keys that
+    Tab::_ApplyTabColorOnUIThread overwrites per tab. Hand-rolling that list was
+    tried first and is the reason this file is markup instead of code.
+
+    The individual TabViewItem keeps its stock template deliberately. Its
+    FrameworkElement.HorizontalAlignment already defaults to Stretch, so inside a
+    vertically-oriented ItemsStackPanel each tab fills the column on its own. The
+    one thing that would break that is MUX writing an explicit Width onto every
+    item, which TabView::UpdateTabWidths does for the Equal and Compact width
+    modes - so TerminalPage::_UpdateTabWidthMode pins SizeToContent while the
+    strip is vertical, and no item style is needed here at all.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                    xmlns:local="using:TerminalApp"
+                    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                    xmlns:mux="using:Microsoft.UI.Xaml.Controls"
+                    xmlns:primitives="using:Microsoft.UI.Xaml.Controls.Primitives"
+                    mc:Ignorable="d">
+
+    <!--
+        The tab list itself. This is the line that actually turns the strip on
+        its side: ItemsStackPanel from Horizontal to Vertical, and the scroll
+        viewer's two axes swapped to match.
+
+        An explicit Style replaces the implicit one rather than layering on top
+        of it, so the ItemContainerTransitions setter from App.xaml has to be
+        repeated here or the entrance and add/delete animations this app
+        deliberately turned off would come back for side tabs only.
+    -->
+    <Style x:Key="VerticalTabViewListViewStyle"
+           TargetType="primitives:TabViewListView">
+        <Setter Property="VerticalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="TabNavigation" Value="Once" />
+        <Setter Property="IsSwipeEnabled" Value="False" />
+        <Setter Property="SingleSelectionFollowsFocus" Value="False" />
+
+        <!--  Swapped from the stock style, which disables vertical scrolling outright.  -->
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+        <Setter Property="ScrollViewer.HorizontalScrollMode" Value="Disabled" />
+        <Setter Property="ScrollViewer.IsHorizontalRailEnabled" Value="False" />
+        <Setter Property="ScrollViewer.VerticalScrollMode" Value="Enabled" />
+        <Setter Property="ScrollViewer.IsVerticalRailEnabled" Value="False" />
+        <Setter Property="ScrollViewer.ZoomMode" Value="Disabled" />
+        <Setter Property="ScrollViewer.IsDeferredScrollingEnabled" Value="False" />
+        <Setter Property="ScrollViewer.BringIntoViewOnFocusChange" Value="True" />
+
+        <!--  Matches the App.xaml override; see the comment above.  -->
+        <Setter Property="ItemContainerTransitions">
+            <Setter.Value>
+                <TransitionCollection>
+                    <ContentThemeTransition />
+                    <ReorderThemeTransition />
+                </TransitionCollection>
+            </Setter.Value>
+        </Setter>
+
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <ItemsStackPanel Orientation="Vertical" />
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        The TabView itself. The stock template lays TabContainerGrid out as four
+        columns - header, tabs, add button, footer - so this is the same four
+        slots turned into rows.
+
+        Every x:Name below is load-bearing: TabView's compiled code-behind looks
+        these parts up by name in OnApplyTemplate and will fail or silently stop
+        working if one goes missing. That is why LeftBottomBorderLine and
+        RightBottomBorderLine survive here despite a vertical strip having no
+        bottom border to draw - the SingleBottomBorderLine visual state below
+        still targets them by name.
+    -->
+    <Style x:Key="VerticalTabViewStyle"
+           TargetType="mux:TabView">
+        <Setter Property="VerticalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="Padding" Value="{ThemeResource TabViewHeaderPadding}" />
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="Background" Value="{ThemeResource TabViewBackground}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="mux:TabView">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <!--  The strip takes the height; the content presenter is unused here.  -->
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup>
+                                <VisualState x:Name="NormalBottomBorderLine" />
+                                <VisualState x:Name="SingleBottomBorderLine">
+                                    <VisualState.Setters>
+                                        <Setter Target="LeftBottomBorderLine.(Grid.RowSpan)" Value="4" />
+                                        <Setter Target="RightBottomBorderLine.Visibility" Value="Collapsed" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+
+                        <Grid x:Name="TabContainerGrid"
+                              Background="{TemplateBinding Background}"
+                              XYFocusKeyboardNavigation="Enabled">
+                            <Grid.RowDefinitions>
+                                <RowDefinition x:Name="LeftContentColumn" Height="Auto" />
+                                <RowDefinition x:Name="TabColumn" Height="*" />
+                                <RowDefinition x:Name="AddButtonColumn" Height="Auto" />
+                                <RowDefinition x:Name="RightContentColumn" Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <!--
+                                Kept for the named-part lookup and the visual state above.
+                                Collapsed because the horizontal rule they draw under a
+                                top strip has no meaning beside a vertical one.
+                            -->
+                            <Border x:Name="LeftBottomBorderLine"
+                                    Height="1"
+                                    VerticalAlignment="Bottom"
+                                    BorderBrush="{ThemeResource TabViewBorderBrush}"
+                                    BorderThickness="1"
+                                    Visibility="Collapsed" />
+                            <Border x:Name="RightBottomBorderLine"
+                                    Grid.Row="2"
+                                    Grid.RowSpan="2"
+                                    Height="1"
+                                    VerticalAlignment="Bottom"
+                                    BorderBrush="{ThemeResource TabViewBorderBrush}"
+                                    BorderThickness="1"
+                                    Visibility="Collapsed" />
+
+                            <ContentPresenter x:Name="LeftContentPresenter"
+                                              Grid.Row="0"
+                                              HorizontalAlignment="Stretch"
+                                              Content="{TemplateBinding TabStripHeader}"
+                                              ContentTemplate="{TemplateBinding TabStripHeaderTemplate}" />
+
+                            <primitives:TabViewListView x:Name="TabListView"
+                                                        Grid.Row="1"
+                                                        Padding="{TemplateBinding Padding}"
+                                                        AllowDrop="{TemplateBinding AllowDropTabs}"
+                                                        CanDragItems="{TemplateBinding CanDragTabs}"
+                                                        CanReorderItems="{TemplateBinding CanReorderTabs}"
+                                                        ItemTemplate="{TemplateBinding TabItemTemplate}"
+                                                        ItemTemplateSelector="{TemplateBinding TabItemTemplateSelector}"
+                                                        ItemsSource="{TemplateBinding TabItemsSource}"
+                                                        Style="{StaticResource VerticalTabViewListViewStyle}" />
+
+                            <Border Grid.Row="2"
+                                    Padding="{ThemeResource TabViewItemAddButtonContainerPadding}"
+                                    HorizontalAlignment="Stretch"
+                                    Visibility="{Binding IsAddTabButtonVisible, RelativeSource={RelativeSource TemplatedParent}}">
+                                <Button x:Name="AddButton"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Command="{TemplateBinding AddTabButtonCommand}"
+                                        CommandParameter="{TemplateBinding AddTabButtonCommandParameter}"
+                                        Content="&#xE710;"
+                                        HighContrastAdjustment="None"
+                                        IsTextScaleFactorEnabled="False"
+                                        Style="{ThemeResource TabViewButtonStyle}" />
+                            </Border>
+
+                            <ContentPresenter x:Name="RightContentPresenter"
+                                              Grid.Row="3"
+                                              HorizontalAlignment="Stretch"
+                                              Content="{TemplateBinding TabStripFooter}"
+                                              ContentTemplate="{TemplateBinding TabStripFooterTemplate}" />
+                        </Grid>
+
+                        <ContentPresenter x:Name="TabContentPresenter"
+                                          Grid.Row="1"
+                                          Background="{ThemeResource TabViewItemHeaderBackgroundSelected}"
+                                          BorderBrush="{TemplateBinding BorderBrush}"
+                                          BorderThickness="{TemplateBinding BorderThickness}" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

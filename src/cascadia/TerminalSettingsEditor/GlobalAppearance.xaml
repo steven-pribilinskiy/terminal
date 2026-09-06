@@ -97,9 +97,28 @@
                           Style="{StaticResource ToggleSwitchInExpanderStyle}" />
         </local:SettingsCard>
 
-        <!--  Tab Width Mode  -->
+        <!--  Tab Position  -->
+        <local:SettingsCard x:Name="TabPosition"
+                            x:Uid="Globals_TabPosition"
+                            IsForkFeature="True">
+            <ComboBox AutomationProperties.AccessibilityView="Content"
+                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                      ItemsSource="{x:Bind ViewModel.TabPositionList, Mode=OneWay}"
+                      SelectedItem="{x:Bind ViewModel.CurrentTabPosition, Mode=TwoWay}"
+                      SelectionChanged="{x:Bind ViewModel.TabPositionChanged}"
+                      Style="{StaticResource ComboBoxSettingStyle}" />
+        </local:SettingsCard>
+
+        <!--
+            Tab Width Mode. Disabled for a left or right strip: those modes
+            divide the strip's width among the tabs, which means nothing when
+            the strip is a column, so TerminalPage pins SizeToContent there.
+            Greying it out says so, rather than leaving a live-looking control
+            whose value is quietly ignored.
+        -->
         <local:SettingsCard x:Name="TabWidthMode"
-                            x:Uid="Globals_TabWidthMode">
+                            x:Uid="Globals_TabWidthMode"
+                            IsEnabled="{x:Bind ViewModel.TabWidthModeEnabled, Mode=OneWay}">
             <ComboBox AutomationProperties.AccessibilityView="Content"
                       ItemTemplate="{StaticResource EnumComboBoxTemplate}"
                       ItemsSource="{x:Bind ViewModel.TabWidthModeList, Mode=OneWay}"

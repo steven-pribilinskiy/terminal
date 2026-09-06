@@ -52,6 +52,23 @@ namespace Microsoft.Terminal.Settings.Model
         AfterCurrentTab,
     };
 
+    // Which edge of the window the tab strip sits on. Top is the shipped
+    // behavior; Left and Right turn the strip into a vertical sidebar.
+    //
+    // This is a window setting rather than a theme one, even though it is
+    // visually a chrome decision and sits beside useMica and frame in spirit.
+    // Themes cannot hold it: CascadiaSettings::ToJson deliberately skips the
+    // built-in themes when writing user settings back out, so a value stored on
+    // "dark", "light" or "system" - which is to say, on the default - would
+    // apply for the session and then vanish on the next reload.
+    enum TabPosition
+    {
+        Top,
+        Bottom,
+        Left,
+        Right,
+    };
+
     // How resuming a recognized agent or multiplexer session announces itself
     // on the next startup that finds one to resume. Independent of which
     // programs are eligible: this only matters once something is.
@@ -128,6 +145,7 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(NewTabPosition, NewTabPosition);
         INHERITABLE_SETTING(Boolean, ShowTitleInTitlebar);
         INHERITABLE_SETTING(Microsoft.UI.Xaml.Controls.TabViewWidthMode, TabWidthMode);
+        INHERITABLE_SETTING(TabPosition, TabPosition);
         INHERITABLE_SETTING(Boolean, UseAcrylicInTabRow);
         INHERITABLE_SETTING(Boolean, ShowTabsInTitlebar);
         INHERITABLE_SETTING(String, WordDelimiters);

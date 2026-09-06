@@ -39,6 +39,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
     DEFINE_ENUM_MAP(Model::HyperlinkFileTypeGroup, HyperlinkFileTypeGroup);
     DEFINE_ENUM_MAP(Model::HyperlinkMatchKind, HyperlinkMatchKind);
     DEFINE_ENUM_MAP(Model::PaneTitlebarVisibility, PaneTitlebarVisibility);
+    DEFINE_ENUM_MAP(Model::TabPosition, TabPosition);
     DEFINE_ENUM_MAP(Model::HyperlinkIntegrationDisplayMode, HyperlinkIntegrationDisplayMode);
     // HyperlinkActionPlacement is written out below rather than by the macro,
     // so the deprecated header/footer spellings stay readable from settings.json

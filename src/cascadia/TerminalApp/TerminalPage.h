@@ -59,6 +59,16 @@ namespace winrt::TerminalApp::implementation
 
     inline constexpr uint32_t DefaultRowsToScroll{ 3 };
 
+    // Vertical tab strip geometry, for TabPosition::Left and ::Right.
+    //
+    // The clamp is what Edge and VS Code settled on: under ~100px a tab title is
+    // down to a couple of characters and the strip is worse than useless, and
+    // past ~400px it eats a serious fraction of the terminal on a 1080p display.
+    inline constexpr double TabStripDefaultWidth{ 200.0 };
+    inline constexpr double TabStripMinWidth{ 100.0 };
+    inline constexpr double TabStripMaxWidth{ 400.0 };
+    inline constexpr double TabStripSplitterWidth{ 4.0 };
+
     enum StartupState : int
     {
         NotInitialized = 0,
@@ -312,6 +322,28 @@ namespace winrt::TerminalApp::implementation
         TerminalApp::TabRowControl _tabRow{ nullptr };
         Windows::UI::Xaml::Controls::Grid _tabContent{ nullptr };
         Microsoft::UI::Xaml::Controls::SplitButton _newTabButton{ nullptr };
+
+        // Which edge the tab strip is currently laid out on, and the grab handle
+        // between the strip and the content when that edge is Left or Right.
+        Microsoft::Terminal::Settings::Model::TabPosition _tabPosition{ Microsoft::Terminal::Settings::Model::TabPosition::Top };
+        Windows::UI::Xaml::Controls::Border _tabStripSplitter{ nullptr };
+
+        // For Left/Right only: the wrapper that stacks the info bars above the
+        // terminal inside the content column, since the root grid's rows are
+        // spent on the strip in that layout.
+        Windows::UI::Xaml::Controls::Grid _tabContentWrapper{ nullptr };
+
+        // Set while the tab row is parented to the titlebar, so the reset knows
+        // to ask for it back. _currentWindowSettings().ShowTabsInTitlebar() is
+        // not enough on its own: it stays true while the position is Left, when
+        // the row is in the page body regardless.
+        bool _tabRowInTitlebar{ false };
+
+        // Splitter drag state, only meaningful for Left/Right.
+        bool _splitterDragging{ false };
+        double _splitterDragStartX{ 0.0 };
+        double _splitterDragStartWidth{ 0.0 };
+        double _tabStripWidth{ TabStripDefaultWidth };
         Windows::UI::Xaml::Controls::MenuFlyout _workspaceFlyout{ nullptr };
         Windows::UI::Xaml::Controls::Button _workspaceDropdown{ nullptr };
         winrt::TerminalApp::ColorPickupFlyout _tabColorPicker{ nullptr };
@@ -467,6 +499,14 @@ namespace winrt::TerminalApp::implementation
         void _UpdateTabIcon(Tab& tab);
         void _UpdateTabView();
         void _UpdateTabWidthMode();
+
+        // Tab strip placement. _ApplyTabPosition is always safe to call again:
+        // it resets the root grid to its XAML shape first, which is what lets
+        // the setting and the toggle action take effect without a new window.
+        void _ApplyTabPosition();
+        void _ResetRootGridLayout();
+        void _BuildTabStripSplitter();
+        bool _TabStripIsVertical() const noexcept;
         void _SetBackgroundImage(const winrt::Microsoft::Terminal::Settings::Model::IAppearanceConfig& newAppearance);
 
         void _DuplicateFocusedTab();

@@ -648,6 +648,26 @@ namespace winrt::TerminalApp::implementation
         args.Handled(true);
     }
 
+    void TerminalPage::_HandleToggleVerticalTabs(const IInspectable& /*sender*/,
+                                                 const ActionEventArgs& args)
+    {
+        // Flips between the two positions worth a hotkey. Bottom and Right are
+        // reachable from the Settings UI and from settings.json; cycling all
+        // four here would make the binding unpredictable to press.
+        //
+        // Like toggleAlwaysOnTop, this writes to the in-memory settings rather
+        // than to settings.json, so the position reverts the next time the
+        // settings are reloaded. Use the Settings UI to make it stick.
+        const auto windowSettings = _currentWindowSettings();
+        windowSettings.TabPosition(windowSettings.TabPosition() == TabPosition::Top ?
+                                       TabPosition::Left :
+                                       TabPosition::Top);
+
+        _ApplyTabPosition();
+        _updateThemeColors();
+        args.Handled(true);
+    }
+
     void TerminalPage::_HandleToggleCommandPalette(const IInspectable& /*sender*/,
                                                    const ActionEventArgs& args)
     {

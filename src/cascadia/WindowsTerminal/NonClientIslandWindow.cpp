@@ -419,10 +419,24 @@ void NonClientIslandWindow::SetTitlebarContent(winrt::Windows::UI::Xaml::UIEleme
 {
     _titlebar.Content(content);
 
+    // A null content is the page handing the tab row back, which it does when
+    // theme.window.tabPosition moves the strip out of the titlebar and into the
+    // window body. Nothing to hook in that case, and try_as on an empty
+    // reference is not worth finding out about the hard way.
+    if (!content)
+    {
+        return;
+    }
+
     // GH#4288 - add a SizeChanged handler to this content. It's possible that
     // this element's size will change after the dragbar's. When that happens,
     // the drag bar won't send another SizeChanged event, because the dragbar's
     // _size_ didn't change, only its position.
+    //
+    // Toggling the tab position back and forth re-registers this each time the
+    // row returns to the titlebar. That is untidy but harmless: the handler only
+    // recomputes the drag rectangle, so running it more than once per resize
+    // costs a little arithmetic and changes nothing.
     const auto fwe = content.try_as<winrt::Windows::UI::Xaml::FrameworkElement>();
     if (fwe)
     {

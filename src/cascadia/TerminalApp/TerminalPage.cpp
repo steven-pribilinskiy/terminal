@@ -307,6 +307,442 @@ namespace winrt::TerminalApp::implementation
         return _settings.WindowSettings(_WindowProperties.WindowName());
     }
 
+    bool TerminalPage::_TabStripIsVertical() const noexcept
+    {
+        return _tabPosition == TabPosition::Left || _tabPosition == TabPosition::Right;
+    }
+
+    // Method Description:
+    // - Puts the root grid back into the shape TerminalPage.xaml declares: three
+    //   rows (Auto/Auto/*), no columns, tab row above the info bars above the
+    //   content, and every overlay on the content row.
+    // - This exists so _ApplyTabPosition can be called more than once. Without
+    //   it that function is monotonic - it appends column definitions and
+    //   re-parents children onto whatever the last layout left behind - so
+    //   changing the setting would corrupt the layout rather than change it, and
+    //   the position would only be settable at window creation.
+    void TerminalPage::_ResetRootGridLayout()
+    {
+        const auto root = this->Root();
+        const auto infoBars = this->InfoBarPanel();
+
+        // If the titlebar is holding the tab row, ask for it back before trying
+        // to put it anywhere. Raising this with null is what tells the host to
+        // clear its content presenter.
+        if (_tabRowInTitlebar)
+        {
+            SetTitleBarContent.raise(*this, nullptr);
+            _tabRowInTitlebar = false;
+        }
+
+        const auto detach = [](const auto& panel, const auto& child) {
+            if (panel && child)
+            {
+                uint32_t idx{};
+                if (panel.Children().IndexOf(child, idx))
+                {
+                    panel.Children().RemoveAt(idx);
+                }
+            }
+        };
+
+        // The info bars and the content live in the wrapper in the Left/Right
+        // layouts and directly in the root otherwise, so try both.
+        detach(_tabContentWrapper, infoBars);
+        detach(_tabContentWrapper, _tabContent);
+        detach(root, _tabContentWrapper);
+        detach(root, _tabStripSplitter);
+        detach(root, _tabRow);
+        detach(root, infoBars);
+        detach(root, _tabContent);
+
+        _tabContentWrapper = nullptr;
+        _tabStripSplitter = nullptr;
+
+        root.ColumnDefinitions().Clear();
+        root.RowDefinitions().Clear();
+        for (const auto& type : { GridUnitType::Auto, GridUnitType::Auto, GridUnitType::Star })
+        {
+            RowDefinition row;
+            row.Height(GridLengthHelper::FromValueAndType(1, type));
+            root.RowDefinitions().Append(row);
+        }
+
+        Grid::SetRow(_tabRow, 0);
+        Grid::SetColumn(_tabRow, 0);
+        Grid::SetRow(infoBars, 1);
+        Grid::SetColumn(infoBars, 0);
+        Grid::SetRow(_tabContent, 2);
+        Grid::SetColumn(_tabContent, 0);
+
+        // Insert at the front rather than append: everything else in the root is
+        // an overlay declared after these in XAML, and equal-z siblings draw in
+        // child order, so the overlays have to stay behind us in the collection.
+        root.Children().InsertAt(0, _tabRow);
+        root.Children().InsertAt(1, infoBars);
+        root.Children().InsertAt(2, _tabContent);
+
+        // Everything else in the root grid is an overlay, and TerminalPage.xaml
+        // puts all of them on the content row (see the GH#12775 note there).
+        for (uint32_t i = 3; i < root.Children().Size(); ++i)
+        {
+            if (const auto& fwe{ root.Children().GetAt(i).try_as<FrameworkElement>() })
+            {
+                Grid::SetRow(fwe, 2);
+                Grid::SetColumn(fwe, 0);
+            }
+        }
+
+        // Drop the vertical re-template and fall back to the stock TabView
+        // style. Leaving it applied to a horizontal strip would stretch every
+        // tab across the window. The per-item style rides along inside that
+        // template as the tab list's ItemContainerStyle, so this one call is
+        // enough to undo both halves.
+        _tabView.ClearValue(winrt::Windows::UI::Xaml::Controls::Control::StyleProperty());
+
+        // TabRowControl.xaml sets VerticalAlignment="Bottom" directly on the
+        // TabView. That is a local value, and a local value outranks a Style
+        // setter, so the vertical style cannot override it and the code has to
+        // put it back by hand. Bottom is what makes a horizontal strip sit flush
+        // against the underside of the titlebar.
+        _tabView.VerticalAlignment(VerticalAlignment::Bottom);
+        _tabRow.VerticalAlignment(VerticalAlignment::Stretch);
+    }
+
+    // Method Description:
+    // - Lays the root grid out so the tab strip sits on the edge named by the
+    //   active theme's window.tabPosition. Safe to call repeatedly: it resets to
+    //   the XAML layout first, which is what lets the Settings UI and the
+    //   toggleVerticalTabs action reflow a live window.
+    // - Note that only Top ever hands the tab row to the titlebar. The other
+    //   three positions leave showTabsInTitlebar's window frame exactly as it
+    //   is and put the strip in the page body, so switching position never
+    //   needs a different window class - and so never needs a new window.
+    void TerminalPage::_ApplyTabPosition()
+    {
+        const auto windowSettings = _currentWindowSettings();
+        _tabPosition = windowSettings.TabPosition();
+
+        _ResetRootGridLayout();
+
+        const auto root = this->Root();
+        const auto infoBars = this->InfoBarPanel();
+
+        switch (_tabPosition)
+        {
+        case TabPosition::Top:
+        {
+            // _ResetRootGridLayout already produced the Top layout. The only
+            // thing left is lifting the row into the titlebar if it was asked
+            // for.
+            if (windowSettings.ShowTabsInTitlebar())
+            {
+                uint32_t index{};
+                if (root.Children().IndexOf(_tabRow, index))
+                {
+                    root.Children().RemoveAt(index);
+                }
+
+                SetTitleBarContent.raise(*this, _tabRow);
+                _tabRowInTitlebar = true;
+
+                // GH#13143 Manually set the tab row's background to transparent
+                // here.
+                //
+                // We're doing it this way because ThemeResources are tricky. We
+                // default in XAML to using the appropriate ThemeResource
+                // background color for our TabRow. When tabs in the titlebar are
+                // _disabled_, this will ensure that the tab row has the correct
+                // theme-dependent value. When tabs in the titlebar are
+                // _enabled_ (the default), we'll switch the BG to Transparent,
+                // to let the Titlebar Control's background be used as the BG for
+                // the tab row.
+                //
+                // We can't do it the other way around (default to Transparent,
+                // only switch to a color when disabling tabs in the titlebar),
+                // because looking up the correct ThemeResource from and App
+                // dictionary is a capital-H Hard problem.
+                const auto transparent = Media::SolidColorBrush();
+                transparent.Color(Windows::UI::Colors::Transparent());
+                _tabRow.Background(transparent);
+            }
+            break;
+        }
+        case TabPosition::Bottom:
+        {
+            // Same three rows, reordered: info bars, content, then the strip.
+            uint32_t idx{};
+            if (root.Children().IndexOf(_tabRow, idx))
+            {
+                root.Children().RemoveAt(idx);
+            }
+            if (root.Children().IndexOf(infoBars, idx))
+            {
+                root.Children().RemoveAt(idx);
+            }
+            if (root.Children().IndexOf(_tabContent, idx))
+            {
+                root.Children().RemoveAt(idx);
+            }
+
+            root.RowDefinitions().Clear();
+            for (const auto& type : { GridUnitType::Auto, GridUnitType::Star, GridUnitType::Auto })
+            {
+                RowDefinition row;
+                row.Height(GridLengthHelper::FromValueAndType(1, type));
+                root.RowDefinitions().Append(row);
+            }
+
+            Grid::SetRow(infoBars, 0);
+            Grid::SetRow(_tabContent, 1);
+            Grid::SetRow(_tabRow, 2);
+
+            root.Children().InsertAt(0, infoBars);
+            root.Children().InsertAt(1, _tabContent);
+            root.Children().InsertAt(2, _tabRow);
+
+            // The overlays were parked on row 2 by the reset, which is the tab
+            // row in this layout. Move them onto the content row instead.
+            for (uint32_t i = 3; i < root.Children().Size(); ++i)
+            {
+                if (const auto& fwe{ root.Children().GetAt(i).try_as<FrameworkElement>() })
+                {
+                    Grid::SetRow(fwe, 1);
+                }
+            }
+            break;
+        }
+        case TabPosition::Left:
+        case TabPosition::Right:
+        {
+            const auto stripFirst = _tabPosition == TabPosition::Left;
+
+            uint32_t idx{};
+            if (root.Children().IndexOf(_tabRow, idx))
+            {
+                root.Children().RemoveAt(idx);
+            }
+            if (root.Children().IndexOf(infoBars, idx))
+            {
+                root.Children().RemoveAt(idx);
+            }
+            if (root.Children().IndexOf(_tabContent, idx))
+            {
+                root.Children().RemoveAt(idx);
+            }
+
+            // One row; the strip owns a column now, not a row.
+            root.RowDefinitions().Clear();
+            {
+                RowDefinition row;
+                row.Height(GridLengthHelper::FromValueAndType(1, GridUnitType::Star));
+                root.RowDefinitions().Append(row);
+            }
+
+            ColumnDefinition stripCol;
+            stripCol.Width(GridLengthHelper::FromPixels(_tabStripWidth));
+            stripCol.MinWidth(TabStripMinWidth);
+            stripCol.MaxWidth(TabStripMaxWidth);
+
+            ColumnDefinition splitterCol;
+            splitterCol.Width(GridLengthHelper::FromValueAndType(1, GridUnitType::Auto));
+
+            ColumnDefinition contentCol;
+            contentCol.Width(GridLengthHelper::FromValueAndType(1, GridUnitType::Star));
+
+            root.ColumnDefinitions().Clear();
+            if (stripFirst)
+            {
+                root.ColumnDefinitions().Append(stripCol);
+                root.ColumnDefinitions().Append(splitterCol);
+                root.ColumnDefinitions().Append(contentCol);
+            }
+            else
+            {
+                root.ColumnDefinitions().Append(contentCol);
+                root.ColumnDefinitions().Append(splitterCol);
+                root.ColumnDefinitions().Append(stripCol);
+            }
+
+            // The root's rows are spent, so the info bars need their own stack
+            // above the terminal inside the content column.
+            _tabContentWrapper = Grid();
+            {
+                RowDefinition infoRow;
+                infoRow.Height(GridLengthHelper::FromValueAndType(1, GridUnitType::Auto));
+                RowDefinition mainRow;
+                mainRow.Height(GridLengthHelper::FromValueAndType(1, GridUnitType::Star));
+                _tabContentWrapper.RowDefinitions().Append(infoRow);
+                _tabContentWrapper.RowDefinitions().Append(mainRow);
+            }
+            Grid::SetRow(infoBars, 0);
+            Grid::SetRow(_tabContent, 1);
+            _tabContentWrapper.Children().Append(infoBars);
+            _tabContentWrapper.Children().Append(_tabContent);
+
+            _BuildTabStripSplitter();
+
+            const auto stripColIdx = stripFirst ? 0 : 2;
+            const auto contentColIdx = stripFirst ? 2 : 0;
+
+            Grid::SetRow(_tabRow, 0);
+            Grid::SetColumn(_tabRow, stripColIdx);
+            Grid::SetRow(_tabStripSplitter, 0);
+            Grid::SetColumn(_tabStripSplitter, 1);
+            Grid::SetRow(_tabContentWrapper, 0);
+            Grid::SetColumn(_tabContentWrapper, contentColIdx);
+
+            root.Children().InsertAt(0, _tabRow);
+            root.Children().InsertAt(1, _tabStripSplitter);
+            root.Children().InsertAt(2, _tabContentWrapper);
+
+            // Overlays span the whole window. Their Grid.ColumnSpan="3" is
+            // declared in TerminalPage.xaml so the x:Load="False" ones are
+            // right whenever they finally materialize; here we only have to
+            // undo the reset's row and column.
+            for (uint32_t i = 3; i < root.Children().Size(); ++i)
+            {
+                if (const auto& fwe{ root.Children().GetAt(i).try_as<FrameworkElement>() })
+                {
+                    Grid::SetRow(fwe, 0);
+                    Grid::SetColumn(fwe, 0);
+                    Grid::SetColumnSpan(fwe, 3);
+                }
+            }
+
+            // A vertical strip fills its column top to bottom, unlike the
+            // horizontal one which hugs the bottom of the titlebar. This has to
+            // be set on the element rather than left to the style, because
+            // TabRowControl.xaml's VerticalAlignment="Bottom" is a local value
+            // and outranks any setter the vertical style could carry.
+            _tabRow.VerticalAlignment(VerticalAlignment::Stretch);
+            _tabView.VerticalAlignment(VerticalAlignment::Stretch);
+
+            if (const auto& res{ Application::Current().Resources() })
+            {
+                const auto key = box_value(winrt::hstring{ L"VerticalTabViewStyle" });
+                if (res.HasKey(key))
+                {
+                    if (const auto& style{ res.Lookup(key).try_as<Windows::UI::Xaml::Style>() })
+                    {
+                        _tabView.Style(style);
+                    }
+                }
+            }
+            break;
+        }
+        }
+
+        // TabWidthMode is width arithmetic that MUX performs against the strip's
+        // available width, so in a vertical strip Equal and Compact fight the
+        // layout. _UpdateTabWidthMode knows to pin SizeToContent there.
+        _UpdateTabWidthMode();
+    }
+
+    // Method Description:
+    // - Builds the drag handle that sits between a vertical tab strip and the
+    //   terminal content, and wires up the pointer handlers that resize the
+    //   strip's column.
+    void TerminalPage::_BuildTabStripSplitter()
+    {
+        _tabStripSplitter = Border();
+        _tabStripSplitter.Width(TabStripSplitterWidth);
+        _tabStripSplitter.HorizontalAlignment(HorizontalAlignment::Stretch);
+        _tabStripSplitter.VerticalAlignment(VerticalAlignment::Stretch);
+
+        // Opaque on purpose. The card-stroke brushes are translucent and leave a
+        // see-through seam between the strip and the terminal.
+        if (const auto& res{ Application::Current().Resources() })
+        {
+            for (const auto& name : { L"SolidBackgroundFillColorTertiaryBrush", L"SolidBackgroundFillColorBaseBrush" })
+            {
+                const auto key = box_value(winrt::hstring{ name });
+                if (res.HasKey(key))
+                {
+                    if (const auto& brush{ res.Lookup(key).try_as<Media::Brush>() })
+                    {
+                        _tabStripSplitter.Background(brush);
+                        break;
+                    }
+                }
+            }
+        }
+
+        _tabStripSplitter.PointerEntered([](const auto&, const auto&) {
+            if (const auto coreWindow = CoreWindow::GetForCurrentThread())
+            {
+                coreWindow.PointerCursor(CoreCursor{ CoreCursorType::SizeWestEast, 0 });
+            }
+        });
+
+        _tabStripSplitter.PointerExited([weakThis{ get_weak() }](const auto&, const auto&) {
+            const auto page{ weakThis.get() };
+            // Keep the resize cursor while a drag is in flight, even if the
+            // pointer has slipped off the 4px handle.
+            if (page && page->_splitterDragging)
+            {
+                return;
+            }
+            if (const auto coreWindow = CoreWindow::GetForCurrentThread())
+            {
+                coreWindow.PointerCursor(CoreCursor{ CoreCursorType::Arrow, 0 });
+            }
+        });
+
+        _tabStripSplitter.PointerPressed([weakThis{ get_weak() }](const auto& sender, const Input::PointerRoutedEventArgs& args) {
+            if (const auto page{ weakThis.get() })
+            {
+                const auto border = sender.template as<Border>();
+                border.CapturePointer(args.Pointer());
+                page->_splitterDragging = true;
+                page->_splitterDragStartX = args.GetCurrentPoint(page->Root()).Position().X;
+                page->_splitterDragStartWidth = page->_tabStripWidth;
+                args.Handled(true);
+            }
+        });
+
+        _tabStripSplitter.PointerMoved([weakThis{ get_weak() }](const auto&, const Input::PointerRoutedEventArgs& args) {
+            const auto page{ weakThis.get() };
+            if (!page || !page->_splitterDragging)
+            {
+                return;
+            }
+
+            const auto x = args.GetCurrentPoint(page->Root()).Position().X;
+            // Dragging right widens a left-hand strip and narrows a right-hand
+            // one, so the delta's sign follows the edge.
+            const auto delta = page->_tabPosition == TabPosition::Left ?
+                                   x - page->_splitterDragStartX :
+                                   page->_splitterDragStartX - x;
+
+            page->_tabStripWidth = std::clamp(page->_splitterDragStartWidth + delta,
+                                              TabStripMinWidth,
+                                              TabStripMaxWidth);
+
+            const auto root = page->Root();
+            const uint32_t stripColIdx = page->_tabPosition == TabPosition::Left ? 0u : 2u;
+            if (root.ColumnDefinitions().Size() > stripColIdx)
+            {
+                root.ColumnDefinitions().GetAt(stripColIdx).Width(GridLengthHelper::FromPixels(page->_tabStripWidth));
+            }
+            args.Handled(true);
+        });
+
+        _tabStripSplitter.PointerReleased([weakThis{ get_weak() }](const auto& sender, const Input::PointerRoutedEventArgs& args) {
+            if (const auto page{ weakThis.get() })
+            {
+                const auto border = sender.template as<Border>();
+                border.ReleasePointerCapture(args.Pointer());
+                page->_splitterDragging = false;
+                args.Handled(true);
+            }
+            if (const auto coreWindow = CoreWindow::GetForCurrentThread())
+            {
+                coreWindow.PointerCursor(CoreCursor{ CoreCursorType::Arrow, 0 });
+            }
+        });
+    }
+
     bool TerminalPage::IsRunningElevated() const noexcept
     {
         // GH#2455 - Make sure to try/catch calls to Application::Current,
@@ -369,37 +805,7 @@ namespace winrt::TerminalApp::implementation
             }
         });
 
-        if (_currentWindowSettings().ShowTabsInTitlebar())
-        {
-            // Remove the TabView from the page. We'll hang on to it, we need to
-            // put it in the titlebar.
-            uint32_t index = 0;
-            if (this->Root().Children().IndexOf(_tabRow, index))
-            {
-                this->Root().Children().RemoveAt(index);
-            }
-
-            // Inform the host that our titlebar content has changed.
-            SetTitleBarContent.raise(*this, _tabRow);
-
-            // GH#13143 Manually set the tab row's background to transparent here.
-            //
-            // We're doing it this way because ThemeResources are tricky. We
-            // default in XAML to using the appropriate ThemeResource background
-            // color for our TabRow. When tabs in the titlebar are _disabled_,
-            // this will ensure that the tab row has the correct theme-dependent
-            // value. When tabs in the titlebar are _enabled_ (the default),
-            // we'll switch the BG to Transparent, to let the Titlebar Control's
-            // background be used as the BG for the tab row.
-            //
-            // We can't do it the other way around (default to Transparent, only
-            // switch to a color when disabling tabs in the titlebar), because
-            // looking up the correct ThemeResource from and App dictionary is a
-            // capital-H Hard problem.
-            const auto transparent = Media::SolidColorBrush();
-            transparent.Color(Windows::UI::Colors::Transparent());
-            _tabRow.Background(transparent);
-        }
+        _ApplyTabPosition();
         _updateThemeColors();
 
         // Initialize the state of the CloseButtonOverlayMode property of
@@ -4469,9 +4875,15 @@ namespace winrt::TerminalApp::implementation
             }
         }
 
+        // Re-run the tab strip layout in case theme.window.tabPosition changed.
+        // This is what makes the position live: it resets the root grid to its
+        // XAML shape before re-applying, so switching edges reflows the window
+        // instead of needing a new one. It also calls _UpdateTabWidthMode for
+        // us, since the two interact.
+        _ApplyTabPosition();
+
         // repopulate the new tab button's flyout with entries for each
         // profile, which might have changed
-        _UpdateTabWidthMode();
         _CreateNewTabFlyout();
 
         // Reload the current value of alwaysOnTop from the settings file. This
@@ -5497,7 +5909,11 @@ namespace winrt::TerminalApp::implementation
             TitlebarBrush(backgroundSolidBrush);
         }
 
-        if (!_currentWindowSettings().ShowTabsInTitlebar())
+        // Keyed on where the row actually ended up, not on the setting. With a
+        // bottom or side strip, showTabsInTitlebar can still be true while the
+        // row sits in the page body, and there it needs a real background
+        // rather than the transparency that lets the titlebar show through.
+        if (!_tabRowInTitlebar)
         {
             _tabRow.Background(TitlebarBrush());
         }
@@ -6395,10 +6811,15 @@ namespace winrt::TerminalApp::implementation
         {
             if (const auto& item{ _tabView.ContainerFromIndex(i).try_as<winrt::MUX::Controls::TabViewItem>() })
             {
-                const auto posX{ e.GetPosition(item).X }; // The point of the drop, relative to the tab
-                const auto itemWidth{ item.ActualWidth() }; // The right of the tab
-                // If the drag point is on the left half of the tab, then insert here.
-                if (posX < itemWidth / 2)
+                // Measure along whichever axis the strip actually runs. A
+                // vertical strip stacks its tabs top to bottom, so the "first
+                // half of the tab" that decides the insertion point is the top
+                // half, not the left one.
+                const auto pos{ e.GetPosition(item) };
+                const auto offset{ _TabStripIsVertical() ? pos.Y : pos.X }; // The point of the drop, relative to the tab
+                const auto extent{ _TabStripIsVertical() ? item.ActualHeight() : item.ActualWidth() }; // The far edge of the tab
+                // If the drag point is on the leading half of the tab, then insert here.
+                if (offset < extent / 2)
                 {
                     index = i;
                     break;

@@ -20,6 +20,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         WINRT_PROPERTY(Windows::Foundation::Collections::IObservableVector<Model::Theme>, ThemeList, nullptr);
         GETSET_BINDABLE_ENUM_SETTING(NewTabPosition, Model::NewTabPosition, _WindowSettings.NewTabPosition);
         GETSET_BINDABLE_ENUM_SETTING(TabWidthMode, winrt::Microsoft::UI::Xaml::Controls::TabViewWidthMode, _WindowSettings.TabWidthMode);
+        GETSET_BINDABLE_ENUM_SETTING(TabPosition, Model::TabPosition, _WindowSettings.TabPosition);
         GETSET_BINDABLE_ENUM_SETTING(PaneTitlebarVisibility, Model::PaneTitlebarVisibility, _WindowSettings.PaneTitlebarVisibility);
 
     public:
@@ -31,6 +32,13 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         void InvertedDisableAnimations(bool value);
 
         void ShowTitlebarToggled(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::RoutedEventArgs& args);
+
+        // tabWidthMode is width arithmetic, so it has nothing to say about a
+        // vertical strip - TerminalPage pins SizeToContent there. This drives
+        // the dropdown's IsEnabled so the setting reads as inert rather than
+        // looking like it was ignored.
+        bool TabWidthModeEnabled();
+        void TabPositionChanged(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::Controls::SelectionChangedEventArgs& args);
 
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, AlwaysShowTabs);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, ShowTabsFullscreen);

@@ -30,6 +30,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     {
         INITIALIZE_BINDABLE_ENUM_SETTING(NewTabPosition, NewTabPosition, NewTabPosition, L"Globals_NewTabPosition", L"Content");
         INITIALIZE_BINDABLE_ENUM_SETTING(TabWidthMode, TabViewWidthMode, winrt::Microsoft::UI::Xaml::Controls::TabViewWidthMode, L"Globals_TabWidthMode", L"Content");
+        INITIALIZE_BINDABLE_ENUM_SETTING(TabPosition, TabPosition, Model::TabPosition, L"Globals_TabPosition", L"Content");
         INITIALIZE_BINDABLE_ENUM_SETTING(PaneTitlebarVisibility, PaneTitlebarVisibility, Model::PaneTitlebarVisibility, L"Globals_PaneTitlebarVisibility", L"Content");
         _UpdateThemeList();
     }
@@ -112,6 +113,21 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     void GlobalAppearanceViewModel::InvertedDisableAnimations(bool value)
     {
         _WindowSettings.DisableAnimations(!value);
+    }
+
+    bool GlobalAppearanceViewModel::TabWidthModeEnabled()
+    {
+        const auto position = _WindowSettings.TabPosition();
+        return position != Model::TabPosition::Left && position != Model::TabPosition::Right;
+    }
+
+    // The tab width dropdown's IsEnabled depends on the tab position dropdown,
+    // and nothing else would tell it that the position moved -- the bindable
+    // enum setter writes straight through to the settings without raising
+    // anything. So say so here.
+    void GlobalAppearanceViewModel::TabPositionChanged(const winrt::Windows::Foundation::IInspectable& /* sender */, const Controls::SelectionChangedEventArgs& /* args */)
+    {
+        _NotifyChanges(L"TabWidthModeEnabled");
     }
 
     void GlobalAppearanceViewModel::ShowTitlebarToggled(const winrt::Windows::Foundation::IInspectable& /* sender */, const RoutedEventArgs& /* args */)

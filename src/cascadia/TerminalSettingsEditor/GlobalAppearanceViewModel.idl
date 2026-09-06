@@ -21,6 +21,13 @@ namespace Microsoft.Terminal.Settings.Editor
         IInspectable CurrentTabWidthMode;
         Windows.Foundation.Collections.IObservableVector<Microsoft.Terminal.Settings.Editor.EnumEntry> TabWidthModeList { get; };
 
+        IInspectable CurrentTabPosition;
+        Windows.Foundation.Collections.IObservableVector<Microsoft.Terminal.Settings.Editor.EnumEntry> TabPositionList { get; };
+
+        // False while the strip is vertical, where tab width has no meaning.
+        Boolean TabWidthModeEnabled { get; };
+        void TabPositionChanged(IInspectable sender, Windows.UI.Xaml.Controls.SelectionChangedEventArgs args);
+
         IInspectable CurrentPaneTitlebarVisibility;
         Windows.Foundation.Collections.IObservableVector<Microsoft.Terminal.Settings.Editor.EnumEntry> PaneTitlebarVisibilityList { get; };
 

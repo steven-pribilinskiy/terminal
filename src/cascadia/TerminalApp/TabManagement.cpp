@@ -250,7 +250,21 @@ namespace winrt::TerminalApp::implementation
     // - Handle changes to the tab width set by the user
     void TerminalPage::_UpdateTabWidthMode()
     {
-        _tabView.TabWidthMode(_currentWindowSettings().TabWidthMode());
+        // Equal and Compact are width arithmetic: TabView::UpdateTabWidths
+        // divides the strip's available *width* among the items and writes an
+        // explicit Width onto each one. That lives in the compiled MUX binary,
+        // so re-templating the control cannot talk it out of it, and in a
+        // vertical strip it fights the layout - tabs come out sized to a
+        // fraction of a 200px column rather than filling it.
+        //
+        // SizeToContent is the one mode that doesn't do width math, so pin it
+        // there and let the item style stretch the tabs to the column instead.
+        // The user's tabWidthMode is left untouched in the settings and comes
+        // back the moment the strip is horizontal again; the Settings UI greys
+        // the control out meanwhile so the inert state is visible.
+        _tabView.TabWidthMode(_TabStripIsVertical() ?
+                                  winrt::Microsoft::UI::Xaml::Controls::TabViewWidthMode::SizeToContent :
+                                  _currentWindowSettings().TabWidthMode());
     }
 
     // Method Description:
@@ -276,7 +290,29 @@ namespace winrt::TerminalApp::implementation
         {
             // collapse/show the row that the tabs are in.
             // NaN is the special value XAML uses for "Auto" sizing.
-            _tabRow.Height(isVisible ? NAN : 0);
+            if (_TabStripIsVertical())
+            {
+                // The strip owns a column here, so its width is what hides it,
+                // and the splitter has to go with it - a 4px grab handle
+                // floating beside nothing is worse than useless.
+                _tabRow.Width(isVisible ? NAN : 0);
+                if (_tabStripSplitter)
+                {
+                    _tabStripSplitter.Visibility(isVisible ? Visibility::Visible : Visibility::Collapsed);
+                }
+
+                const auto root = this->Root();
+                const uint32_t stripColIdx = _tabPosition == TabPosition::Left ? 0u : 2u;
+                if (root.ColumnDefinitions().Size() > stripColIdx)
+                {
+                    root.ColumnDefinitions().GetAt(stripColIdx).Width(
+                        GridLengthHelper::FromPixels(isVisible ? _tabStripWidth : 0.0));
+                }
+            }
+            else
+            {
+                _tabRow.Height(isVisible ? NAN : 0);
+            }
         }
     }
 
