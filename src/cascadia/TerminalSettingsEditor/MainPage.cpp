@@ -114,28 +114,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         InitializeComponent();
         _UpdateBackgroundForMica();
 
-        // TEMPORARY DIAGNOSTIC -- remove once the Link Tooltip crash is fixed.
-        //
-        // An exception escaping a XAML callback fails the process fast (0xC000041D)
-        // with nothing in the event log naming it, and there is no debugger on this
-        // machine. XAML raises Application.UnhandledException first, so this is the
-        // one place the message can be captured. It only writes the message; it does
-        // not set Handled, so behaviour is unchanged and the process still dies --
-        // this exists to name the throw, not to hide it.
-        if (const auto app = Windows::UI::Xaml::Application::Current())
-        {
-            app.UnhandledException([](auto&&, const Windows::UI::Xaml::UnhandledExceptionEventArgs& e) {
-                try
-                {
-                    std::filesystem::path log{ wil::ExpandEnvironmentStringsW<std::wstring>(L"%TEMP%") };
-                    log /= L"wt-settings-unhandled.log";
-                    std::wofstream out{ log, std::ios::app };
-                    out << L"0x" << std::hex << static_cast<uint32_t>(e.Exception()) << std::dec
-                        << L" | " << std::wstring_view{ e.Message() } << L"\n";
-                }
-                CATCH_LOG();
-            });
-        }
+        // NB: Application.UnhandledException does NOT see the Link Tooltip crash.
+        // That was tried here and the handler never ran -- see
+        // doc/troubleshooting.md. 0xC000041D is a fail-fast raised at the COM
+        // callback boundary, which never reaches XAML's managed-exception path, so
+        // hooking that event is a dead end for this class of crash.
 
         _newTabMenuPageVM = winrt::make<NewTabMenuViewModel>(_settingsClone);
         _ntmViewModelChangedRevoker = _newTabMenuPageVM.PropertyChanged(winrt::auto_revoke, [this](auto&&, const PropertyChangedEventArgs& args) {

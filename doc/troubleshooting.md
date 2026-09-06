@@ -131,6 +131,27 @@ The process dies on step 3. Selecting the value only stores it; what throws is t
 virtualised rows on scroll. So the crash lands one interaction after the cause,
 which is why it reads as "everything crashes at random".
 
+### What this crash is NOT, established by bisecting a running build
+
+Worth writing down, because each of these took a round trip to rule out and the
+obvious guesses are all wrong:
+
+- **Not the shared card or the enum macro.** An upstream page using
+  `GETSET_BINDABLE_ENUM_SETTING` survives the identical change-then-scroll.
+- **Not the rules.** It crashes with `hyperlink.tooltipRules` set to `[]`.
+- **Not the integrations.** It crashes with all four `enabled: false`.
+- **Not the scroll.** Change a dropdown, then touch nothing: the process is gone
+  within fifteen seconds. The crash is *asynchronous*, and every "it dies when I
+  scroll" reading is the scroll merely occupying the time until it fires. This is
+  the single most misleading thing about it -- the crash lands one interaction
+  after its cause, which is why it reads as "any dropdown, at random".
+- **Not reachable through `Application.UnhandledException`.** Subscribing to it
+  and logging was tried; the handler never runs. `0xC000041D` is a fail-fast
+  raised at the COM callback boundary and never reaches XAML's managed-exception
+  path, so that event cannot name it. A vectored exception handler
+  (`AddVectoredExceptionHandler`, first-chance) or a WER local dump is the next
+  thing to try.
+
 ### The shape to look for
 
 A binding getter that can throw. `IMap::Lookup` is the usual one — it throws
