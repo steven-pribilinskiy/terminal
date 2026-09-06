@@ -21,7 +21,19 @@ Param(
     [string]$Branch = 'main',
     [string]$SlotRoot = 'C:\TerminalSlots',
     # Re-download even when the newest run is one we have already staged.
-    [switch]$Force
+    [switch]$Force,
+    # Stage a specific run instead of the newest successful one. Either the run
+    # id from `gh run list`, or any prefix of a commit sha.
+    #
+    # The point is going backwards. Without this the only build reachable is the
+    # newest green one, so when a promoted build turns out not to start there is
+    # nothing to fetch but the thing that just broke, and the only way back is to
+    # wait out another CI cycle. That happened on 2026-09-06 and cost an evening.
+    #
+    # Naming a run bypasses the "is it newer than what we staged" check, since
+    # going back to an older build is the whole intent.
+    [string]$RunId = '',
+    [string]$Commit = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -41,12 +53,24 @@ if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
     throw 'gh is not on PATH. Install the GitHub CLI and run `gh auth login`.'
 }
 
+$pinned = $RunId -or $Commit
+
 # --status success on purpose: a run that is still going has no artifact yet, and
 # one that failed has nothing worth installing. Asking for the newest SUCCESSFUL
 # run means a broken commit never displaces a working staged build.
+#
+# When a run is named, ask for a window of recent successful runs and pick out of
+# it, so -Commit can match a prefix. Still success-only: an artifact is what we
+# are after and only successful runs have one.
 $errFile = [System.IO.Path]::GetTempFileName()
-$runJson = gh run list --repo $Repo --workflow $Workflow --branch $Branch `
-    --status success --limit 1 --json databaseId,headSha,updatedAt 2>$errFile
+if ($pinned) {
+    $runJson = gh run list --repo $Repo --workflow $Workflow --branch $Branch `
+        --status success --limit 60 --json databaseId,headSha,updatedAt 2>$errFile
+}
+else {
+    $runJson = gh run list --repo $Repo --workflow $Workflow --branch $Branch `
+        --status success --limit 1 --json databaseId,headSha,updatedAt 2>$errFile
+}
 $code = $LASTEXITCODE
 $errText = (Get-Content $errFile -Raw -ErrorAction SilentlyContinue)
 Remove-Item $errFile -Force -ErrorAction SilentlyContinue
@@ -75,7 +99,28 @@ if ($code -ne 0) {
     throw "gh run list failed ($code): $errText"
 }
 
-$run = @($runJson | ConvertFrom-Json) | Select-Object -First 1
+$runs = @($runJson | ConvertFrom-Json)
+
+if ($pinned) {
+    if ($RunId) {
+        $run = $runs | Where-Object { "$($_.databaseId)" -eq $RunId } | Select-Object -First 1
+        if (-not $run) { throw "run $RunId is not among the recent successful $Workflow runs on $Branch" }
+    }
+    else {
+        $matched = @($runs | Where-Object { $_.headSha -like "$Commit*" })
+        if ($matched.Count -eq 0) { throw "no recent successful run for a commit starting '$Commit'" }
+        if ($matched.Count -gt 1) {
+            throw ("'{0}' matches {1} runs ({2}) -- give more of the sha or use -RunId" -f
+                $Commit, $matched.Count, (($matched | ForEach-Object { $_.headSha.Substring(0, 9) }) -join ', '))
+        }
+        $run = $matched[0]
+    }
+    Say ("Pinned to run {0} ({1})" -f $run.databaseId, $run.headSha.Substring(0, 9)) ([ConsoleColor]::Yellow)
+}
+else {
+    $run = $runs | Select-Object -First 1
+}
+
 if (-not $run) {
     Say 'No successful run to fetch.'
     return
@@ -85,7 +130,9 @@ if (-not $run) {
 # is already staged rather than what is running: re-downloading a payload we
 # already have on disk is the waste worth avoiding, and whether it is worth
 # PROMOTING is the Terminal's decision, not ours.
-if (-not $Force -and (Test-Path $MarkerPath)) {
+# A pinned run skips this: naming an older build is a deliberate request to go
+# back to it, and "you already have something newer" is not a reason to refuse.
+if (-not $pinned -and -not $Force -and (Test-Path $MarkerPath)) {
     $existing = $null
     try { $existing = Get-Content $MarkerPath -Raw | ConvertFrom-Json } catch { $existing = $null }
     # Also require test-staged-ci to exist: a marker written before this script

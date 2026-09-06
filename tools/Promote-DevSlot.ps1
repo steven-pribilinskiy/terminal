@@ -39,7 +39,21 @@ Param(
     # the same reason as $Staged: deleting a hardcoded name would clear some
     # other producer's marker and leave the promoted one still advertising
     # itself, which keeps the button lit in the build you just installed.
-    [string]$Marker = ''
+    [string]$Marker = '',
+    # How many superseded payloads to keep beside the slot, newest first, as
+    # dev.rollback.1, dev.rollback.2, and so on.
+    #
+    # This exists because the swap used to keep the outgoing build only until the
+    # new registration was asserted and then delete it. That covers a promotion
+    # that fails halfway and covers nothing else -- in particular it does not
+    # cover the case that actually happens, a promotion that succeeds onto a
+    # build which then turns out not to start. On 2026-09-06 that left the Dev
+    # slot unable to launch with no previous payload on disk and no way to fetch
+    # an older one, and the only route back was waiting forty minutes for CI.
+    #
+    # A payload is about 200 MB. Two of them is a rounding error against the cost
+    # of not being able to open your terminal.
+    [int]$KeepRollbacks = 2
 )
 
 $ErrorActionPreference = 'Stop'
@@ -232,8 +246,37 @@ try {
     $landed = (Get-AppxPackage -Name $PackageName).InstallLocation
     if ($landed -ne $Payload) { throw "registration landed at '$landed', expected '$Payload'" }
 
+    # The swap is committed. Rotate the outgoing payload into the rollback ring
+    # rather than deleting it: this is the copy you need when the build that just
+    # registered cleanly turns out not to start.
     if ($haveStaged -and (Test-Path $previous)) {
-        Remove-Item -Recurse -Force $previous -ErrorAction SilentlyContinue
+        if ($KeepRollbacks -gt 0) {
+            # Oldest first, so nothing is overwritten before it has moved up.
+            $oldest = Join-Path (Split-Path -Parent $Payload) ("{0}.rollback.{1}" -f (Split-Path -Leaf $Payload), $KeepRollbacks)
+            if (Test-Path $oldest) { Remove-Item -Recurse -Force $oldest -ErrorAction SilentlyContinue }
+            for ($i = $KeepRollbacks - 1; $i -ge 1; $i--) {
+                $from = Join-Path (Split-Path -Parent $Payload) ("{0}.rollback.{1}" -f (Split-Path -Leaf $Payload), $i)
+                $to   = Join-Path (Split-Path -Parent $Payload) ("{0}.rollback.{1}" -f (Split-Path -Leaf $Payload), $i + 1)
+                if (Test-Path $from) { Move-Item -LiteralPath $from -Destination $to -Force }
+            }
+            $slot1 = Join-Path (Split-Path -Parent $Payload) ("{0}.rollback.1" -f (Split-Path -Leaf $Payload))
+            Move-Item -LiteralPath $previous -Destination $slot1 -Force
+            Write-Log "kept the outgoing payload as $slot1"
+
+            # Record what it was, so a rollback can say what it is going back to
+            # rather than leaving you to guess from a timestamp.
+            $outgoing = Join-Path $slot1 'build-info.json'
+            if (-not (Test-Path $outgoing)) {
+                try {
+                    @{ promotedAwayAt = (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss') + ' UTC' } |
+                        ConvertTo-Json | Set-Content -LiteralPath $outgoing -Encoding UTF8
+                }
+                catch {}
+            }
+        }
+        else {
+            Remove-Item -Recurse -Force $previous -ErrorAction SilentlyContinue
+        }
     }
     Say ("Promoted: {0} now runs from {1}" -f $PackageName, $Payload) ([ConsoleColor]::Green)
 
