@@ -503,6 +503,7 @@ namespace winrt::TerminalApp::implementation
         void _ApplyTabPositionCore(const Microsoft::Terminal::Settings::Model::WindowSettings& windowSettings);
         void _ResetRootGridLayout();
         void _BuildTabStripSplitter();
+        void _MakeTabListVertical();
         bool _TabStripIsVertical() const noexcept;
         void _SetBackgroundImage(const winrt::Microsoft::Terminal::Settings::Model::IAppearanceConfig& newAppearance);
 

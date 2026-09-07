@@ -708,6 +708,7 @@ namespace winrt::TerminalApp::implementation
                     if (const auto& style{ res.Lookup(box_value(winrt::hstring{ L"VerticalTabViewStyle" })).try_as<Windows::UI::Xaml::Style>() })
                     {
                         _tabView.Style(style);
+                        _MakeTabListVertical();
                     }
                 }
             }
@@ -720,6 +721,74 @@ namespace winrt::TerminalApp::implementation
         // TabWidthMode is applied by the caller, once the position has actually
         // settled - including when a failure here has knocked it back to Top,
         // where the user's real tabWidthMode has to come back.
+    }
+
+    // Method Description:
+    // - Turns the tab list inside the re-templated TabView on its side.
+    // - Everything here is a LOCAL VALUE on the element, not a setter in a
+    //   Style, and that is the entire point. An explicit Style replaces the
+    //   implicit one outright instead of layering onto it, and MUX's implicit
+    //   primitives:TabViewListView style is where that control's ControlTemplate
+    //   lives - a ScrollViewer around an ItemsPresenter, plus the named parts
+    //   TabView::OnApplyTemplate goes looking for. A style that set the items
+    //   panel and the scroll axes but no Template left the list with no visual
+    //   tree at all. XAML accepts that; it dies one tick later during render,
+    //   E_FAIL inside CCoreServices::NWDrawTree, with none of our frames on the
+    //   stack - so it presents as an unattributable fail-fast and no try/catch
+    //   around the layout can see it. That was the "tabPosition: left" crash.
+    // - Setting the same properties directly keeps MUX's template, its
+    //   ScrollViewer and its named parts, and changes only the orientation.
+    void TerminalPage::_MakeTabListVertical()
+    {
+        // Assigning Style defers re-templating to the next measure pass, and the
+        // child has to exist now for GetTemplateChild to find it.
+        _tabView.ApplyTemplate();
+
+        const auto& templatedTabView{ _tabView.try_as<Windows::UI::Xaml::Controls::IControlProtected>() };
+        if (!templatedTabView)
+        {
+            return;
+        }
+
+        // ListView, not TabViewListView: the derived type adds nothing we need
+        // here and would drag in the MUX primitives projection.
+        const auto& tabList{ templatedTabView.GetTemplateChild(L"TabListView").try_as<Windows::UI::Xaml::Controls::ListView>() };
+        if (!tabList)
+        {
+            return;
+        }
+
+        // An ItemsPanelTemplate has no code-first constructor; parsing one is
+        // how you make a panel template at runtime. Kept as markup rather than
+        // as a keyed resource so it cannot affect application load - this file's
+        // resource dictionary is merged by App.xaml on every launch, whatever
+        // the tab position is.
+        static constexpr std::wstring_view verticalItemsPanel{
+            LR"(<ItemsPanelTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><ItemsStackPanel Orientation="Vertical" /></ItemsPanelTemplate>)"
+        };
+        if (const auto& panel{ Windows::UI::Xaml::Markup::XamlReader::Load(winrt::hstring{ verticalItemsPanel }).try_as<Windows::UI::Xaml::Controls::ItemsPanelTemplate>() })
+        {
+            tabList.ItemsPanel(panel);
+        }
+
+        // The stock style pins the list to the top of its slot and sizes each
+        // item to its content; in a column it should fill the strip, and the
+        // items should fill its width.
+        tabList.VerticalAlignment(VerticalAlignment::Stretch);
+        tabList.HorizontalAlignment(HorizontalAlignment::Stretch);
+        tabList.HorizontalContentAlignment(HorizontalAlignment::Stretch);
+
+        // The stock style scrolls horizontally and pins the vertical axis shut.
+        // A column-shaped strip needs exactly the opposite. The list's template
+        // reads these through TemplateBindings, so setting them after the
+        // template has been applied still reaches the ScrollViewer.
+        using winrt::Windows::UI::Xaml::Controls::ScrollBarVisibility;
+        using winrt::Windows::UI::Xaml::Controls::ScrollMode;
+        using winrt::Windows::UI::Xaml::Controls::ScrollViewer;
+        ScrollViewer::SetHorizontalScrollBarVisibility(tabList, ScrollBarVisibility::Disabled);
+        ScrollViewer::SetHorizontalScrollMode(tabList, ScrollMode::Disabled);
+        ScrollViewer::SetVerticalScrollBarVisibility(tabList, ScrollBarVisibility::Auto);
+        ScrollViewer::SetVerticalScrollMode(tabList, ScrollMode::Enabled);
     }
 
     // Method Description:

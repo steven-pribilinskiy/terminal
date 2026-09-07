@@ -33,14 +33,26 @@
                     mc:Ignorable="d">
 
     <!--
-        The tab list itself. This is the line that actually turns the strip on
-        its side: ItemsStackPanel from Horizontal to Vertical, and the scroll
-        viewer's two axes swapped to match.
+        NOT APPLIED, and deliberately still here. This is what the tab list used
+        to be styled with, and it is the bug: an explicit Style REPLACES the
+        implicit one rather than layering on top of it, and MUX's implicit
+        primitives:TabViewListView style is where the control's ControlTemplate
+        lives. Setting the items panel and the scroll axes without a Template
+        left the list with no visual tree at all - which XAML accepts, and then
+        fails to render one tick later, E_FAIL inside CCoreServices::NWDrawTree
+        with none of our frames on the stack. That is the crash "tabPosition:
+        left" produced, and nothing around _ApplyTabPosition can catch it.
 
-        An explicit Style replaces the implicit one rather than layering on top
-        of it, so the ItemContainerTransitions setter from App.xaml has to be
-        repeated here or the entrance and add/delete animations this app
-        deliberately turned off would come back for side tabs only.
+        TerminalPage::_MakeTabListVertical now sets the same three things as
+        local values on the element instead, so MUX's template, its ScrollViewer
+        and its named parts all survive.
+
+        Kept rather than deleted for one build only. f1e9417d1 rewrote this file
+        and the result would not launch at all, on any tabPosition, and which of
+        its several changes did that is still unknown - so this commit changes
+        exactly one thing in here (the Style= reference on TabListView, below)
+        and nothing else. Once a build proves the Terminal still starts, this
+        block goes.
     -->
     <Style x:Key="VerticalTabViewListViewStyle"
            TargetType="primitives:TabViewListView">
@@ -167,8 +179,7 @@
                                                         CanReorderItems="{TemplateBinding CanReorderTabs}"
                                                         ItemTemplate="{TemplateBinding TabItemTemplate}"
                                                         ItemTemplateSelector="{TemplateBinding TabItemTemplateSelector}"
-                                                        ItemsSource="{TemplateBinding TabItemsSource}"
-                                                        Style="{StaticResource VerticalTabViewListViewStyle}" />
+                                                        ItemsSource="{TemplateBinding TabItemsSource}" />
 
                             <Border Grid.Row="2"
                                     Padding="{ThemeResource TabViewItemAddButtonContainerPadding}"
