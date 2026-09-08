@@ -73,6 +73,33 @@
                             Value="{x:Bind ViewModel.CiPollIntervalMinutes, Mode=TwoWay}" />
         </local:SettingsCard>
 
+        <!--
+            The provenance mark. This row is itself one of ours, so it carries the
+            mark it controls - which doubles as the preview of what turning it on
+            does. It lives here rather than on Appearance because what it changes
+            is how the editor describes itself, not how the Terminal looks.
+        -->
+        <local:SettingsCard x:Name="AylithImprint"
+                            x:Uid="Globals_AylithImprint"
+                            IsForkFeature="True">
+            <ToggleSwitch IsOn="{x:Bind ViewModel.AylithImprint, Mode=TwoWay}"
+                          Style="{StaticResource ToggleSwitchInExpanderStyle}"
+                          Toggled="{x:Bind ViewModel.AylithImprintToggled}" />
+        </local:SettingsCard>
+
+        <!--
+            The companion mark, for settings upstream has but hides in
+            settings.json. This row is itself a fork addition, so it carries the
+            filled mark rather than the hollow one it controls.
+        -->
+        <local:SettingsCard x:Name="AylithImprintJsonOnly"
+                            x:Uid="Globals_AylithImprintJsonOnly"
+                            IsForkFeature="True">
+            <ToggleSwitch IsOn="{x:Bind ViewModel.AylithImprintJsonOnly, Mode=TwoWay}"
+                          Style="{StaticResource ToggleSwitchInExpanderStyle}"
+                          Toggled="{x:Bind ViewModel.AylithImprintJsonOnlyToggled}" />
+        </local:SettingsCard>
+
         <!--  Reset Application State  -->
         <local:SettingsCard x:Name="ResetApplicationState"
                             x:Uid="Settings_ResetApplicationState">

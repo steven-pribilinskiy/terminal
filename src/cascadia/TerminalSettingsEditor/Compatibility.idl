@@ -15,9 +15,16 @@ namespace Microsoft.Terminal.Settings.Editor
         void ResetApplicationState();
         void ResetToDefaultSettings();
 
+        // Pushes the new value to SettingsCard's app-wide flag, so rows already on
+        // screen pick the mark up without waiting to be rebuilt.
+        void AylithImprintToggled(IInspectable sender, Windows.UI.Xaml.RoutedEventArgs args);
+        void AylithImprintJsonOnlyToggled(IInspectable sender, Windows.UI.Xaml.RoutedEventArgs args);
+
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, AllowHeadless);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, DebugFeaturesEnabled);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, CiPollIntervalMinutes);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, AylithImprint);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, AylithImprintJsonOnly);
 
         IInspectable CurrentTextMeasurement;
         Windows.Foundation.Collections.IObservableVector<Microsoft.Terminal.Settings.Editor.EnumEntry> TextMeasurementList { get; };

@@ -23,9 +23,14 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         void ResetApplicationState();
         void ResetToDefaultSettings();
 
+        void AylithImprintToggled(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::RoutedEventArgs& args);
+        void AylithImprintJsonOnlyToggled(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::RoutedEventArgs& args);
+
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_settings.GlobalSettings(), AllowHeadless);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_settings.GlobalSettings(), DebugFeaturesEnabled);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_settings.GlobalSettings(), CiPollIntervalMinutes);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_settings.GlobalSettings(), AylithImprint);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_settings.GlobalSettings(), AylithImprintJsonOnly);
         GETSET_BINDABLE_ENUM_SETTING(TextMeasurement, winrt::Microsoft::Terminal::Control::TextMeasurement, _settings.WindowSettingsDefaults().TextMeasurement);
         GETSET_BINDABLE_ENUM_SETTING(AmbiguousWidth, winrt::Microsoft::Terminal::Control::AmbiguousWidth, _settings.WindowSettingsDefaults().AmbiguousWidth);
 
