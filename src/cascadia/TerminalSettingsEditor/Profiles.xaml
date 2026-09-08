@@ -46,7 +46,8 @@
         </local:SettingsCard>
 
         <!--  Terminal profiles section  -->
-        <local:SettingsExpander x:Uid="Profiles_TerminalProfilesHeader"
+        <local:SettingsExpander x:Name="TerminalProfilesHeader"
+                                x:Uid="Profiles_TerminalProfilesHeader"
                                 IsExpanded="True"
                                 ItemsSource="{x:Bind ViewModel.Profiles, Mode=OneWay}">
             <local:SettingsExpander.HeaderIcon>

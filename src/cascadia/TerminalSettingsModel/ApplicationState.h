@@ -46,6 +46,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
     X(FileSource::Local, std::unordered_set<hstring>, DismissedBadges, "dismissedBadges")                                                                                 \
     X(FileSource::Local, Windows::Foundation::Collections::IMap<hstring COMMA Model::WindowLayout>, PersistedWorkspaces, "persistedWorkspaces")                           \
     X(FileSource::Local, Windows::Foundation::Collections::IMap<hstring COMMA Model::WindowGeometry>, PersistedWindowGeometries, "persistedWindowGeometries")             \
+    X(FileSource::Local, Windows::Foundation::Collections::IMap<hstring COMMA bool>, ExpandedSettingsGroups, "expandedSettingsGroups")                                    \
     X(FileSource::Shared, bool, SSHFolderGenerated, "sshFolderGenerated", false)
 
     struct WindowLayout : WindowLayoutT<WindowLayout>
@@ -108,6 +109,9 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
 
         void SaveWindowGeometry(const hstring& name, const Model::WindowGeometry& geometry);
         Model::WindowGeometry LookupWindowGeometry(const hstring& name);
+
+        void SetSettingsGroupExpanded(const hstring& key, bool expanded);
+        Windows::Foundation::IReference<bool> SettingsGroupExpanded(const hstring& key) const;
 
         // State getters/setters
 #define MTSM_APPLICATION_STATE_GEN(source, type, name, key, ...) \

@@ -395,6 +395,38 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         return false;
     }
 
+    // Which settings groups the user has opened or closed in the Settings UI.
+    // Only groups they have actually touched appear here, which is why this
+    // returns an IReference rather than a bool: "never seen" has to stay
+    // distinguishable from "deliberately collapsed", so that the IsExpanded the
+    // markup asks for still wins until the user has said otherwise.
+    void ApplicationState::SetSettingsGroupExpanded(const hstring& key, bool expanded)
+    {
+        {
+            const auto state = _state.lock();
+            if (!state->ExpandedSettingsGroups || !*state->ExpandedSettingsGroups)
+            {
+                state->ExpandedSettingsGroups = winrt::single_threaded_map<hstring, bool>();
+            }
+            (*state->ExpandedSettingsGroups).Insert(key, expanded);
+        }
+        _throttler();
+    }
+
+    Windows::Foundation::IReference<bool> ApplicationState::SettingsGroupExpanded(const hstring& key) const
+    {
+        const auto state = _state.lock_shared();
+        if (state->ExpandedSettingsGroups && *state->ExpandedSettingsGroups)
+        {
+            const auto map = *state->ExpandedSettingsGroups;
+            if (map.HasKey(key))
+            {
+                return Windows::Foundation::IReference<bool>{ map.Lookup(key) };
+            }
+        }
+        return nullptr;
+    }
+
     void ApplicationState::SaveWorkspace(const hstring& name, const Model::WindowLayout& layout)
     {
         {
