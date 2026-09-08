@@ -575,33 +575,48 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     void MainPage::_NavigateToProfileSubPage(const Editor::ProfileViewModel& profile, ProfileSubPage page, const IInspectable& breadcrumbTag, const hstring& elementToFocus)
     {
+        // Frame::Navigate returns false rather than throwing when the page cannot
+        // be activated, and every branch here used to discard it. That is half of
+        // why "Terminal Emulation does nothing" was so hard to pin down: a page
+        // that refuses to load looked exactly like a click that never arrived,
+        // and the breadcrumb was appended either way - so the trail claimed a
+        // page the frame had never shown.
+        //
+        // Now the crumb is only appended if the navigation actually happened,
+        // and a refusal says so once rather than failing silently. Uniform
+        // across all four sub-pages: whichever one breaks next should not need
+        // this diagnosed a second time.
+        const auto navigate = [&](auto&& pageType, const hstring& crumbText, BreadcrumbSubPage crumb) {
+            if (contentFrame().Navigate(pageType, winrt::make<NavigateToPageArgs>(profile, *this, elementToFocus)))
+            {
+                if (crumb != BreadcrumbSubPage::None)
+                {
+                    _breadcrumbs.Append(winrt::make<Breadcrumb>(breadcrumbTag, crumbText, crumb));
+                }
+                return true;
+            }
+
+            OutputDebugStringW(fmt::format(FMT_COMPILE(L"[SettingsEditor] Navigate to profile sub-page {} was refused\n"),
+                                           static_cast<int32_t>(page))
+                                   .c_str());
+            return false;
+        };
+
         if (page == ProfileSubPage::Base)
         {
-            contentFrame().Navigate(xaml_typename<Editor::Profiles_Base>(), winrt::make<NavigateToPageArgs>(profile, *this, elementToFocus));
+            navigate(xaml_typename<Editor::Profiles_Base>(), {}, BreadcrumbSubPage::None);
         }
         else if (page == ProfileSubPage::Appearance)
         {
-            contentFrame().Navigate(xaml_typename<Editor::Profiles_Appearance>(), winrt::make<NavigateToPageArgs>(profile, *this, elementToFocus));
-            _breadcrumbs.Append(winrt::make<Breadcrumb>(breadcrumbTag, RS_(L"Profile_Appearance/Header"), BreadcrumbSubPage::Profile_Appearance));
+            navigate(xaml_typename<Editor::Profiles_Appearance>(), RS_(L"Profile_Appearance/Header"), BreadcrumbSubPage::Profile_Appearance);
         }
         else if (page == ProfileSubPage::Terminal)
         {
-            // Frame::Navigate returns false rather than throwing when the page
-            // cannot be activated, and every caller here ignored it - so a page
-            // that refuses to load is indistinguishable from a click that never
-            // arrived. Reported because "Terminal Emulation does nothing" is
-            // exactly that ambiguity, and it cost a diagnosis round.
-            const auto navigated = contentFrame().Navigate(xaml_typename<Editor::Profiles_Terminal>(), winrt::make<NavigateToPageArgs>(profile, *this, elementToFocus));
-            if (!navigated)
-            {
-                OutputDebugStringW(L"[SettingsEditor] Navigate(Profiles_Terminal) returned false\n");
-            }
-            _breadcrumbs.Append(winrt::make<Breadcrumb>(breadcrumbTag, RS_(L"Profile_Terminal/Header"), BreadcrumbSubPage::Profile_Terminal));
+            navigate(xaml_typename<Editor::Profiles_Terminal>(), RS_(L"Profile_Terminal/Header"), BreadcrumbSubPage::Profile_Terminal);
         }
         else if (page == ProfileSubPage::Advanced)
         {
-            contentFrame().Navigate(xaml_typename<Editor::Profiles_Advanced>(), winrt::make<NavigateToPageArgs>(profile, *this, elementToFocus));
-            _breadcrumbs.Append(winrt::make<Breadcrumb>(breadcrumbTag, RS_(L"Profile_Advanced/Header"), BreadcrumbSubPage::Profile_Advanced));
+            navigate(xaml_typename<Editor::Profiles_Advanced>(), RS_(L"Profile_Advanced/Header"), BreadcrumbSubPage::Profile_Advanced);
         }
         SettingsMainPage_ScrollViewer().ScrollToVerticalOffset(0);
     }
@@ -843,6 +858,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         {
             _AppendProfilesRootCrumb();
             selectedNavTag = profilesTag;
+
+            // Setting CurrentPage below is meant not to navigate - the handler is
+            // registered afterwards for exactly that reason. But the revoker is a
+            // single member that _SetupProfileEventHandling only replaces at the
+            // END of this block, so until then the handler from the PREVIOUS visit
+            // to a profile is still subscribed, and it fires on these
+            // assignments: it re-navigates and appends a second copy of the
+            // crumbs, using the tag and name it captured last time. Revoking up
+            // front is what actually makes the comment below true.
+            _profileViewModelChangedRevoker.revoke();
 
             if (profile.Orphaned())
             {

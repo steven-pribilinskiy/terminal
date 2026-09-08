@@ -807,21 +807,32 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         return {};
     }
 
-    winrt::Windows::Foundation::IInspectable SettingsCardAutomationPeer::GetPatternCore(PatternInterface patternInterface) const
+    winrt::Windows::Foundation::IInspectable SettingsCardAutomationPeer::GetPatternCore(PatternInterface /*patternInterface*/) const
     {
-        if (patternInterface == PatternInterface::Invoke)
-        {
-            if (const auto card{ Owner().try_as<Editor::SettingsCard>() })
-            {
-                if (card.IsClickEnabled())
-                {
-                    // Only provide Invoke pattern if the card is clickable.
-                    return *this;
-                }
-            }
-            return nullptr;
-        }
-        // ButtonBaseAutomationPeer only provides Invoke; everything else returns null.
+        // Deliberately NOT advertising Invoke, even though a clickable card
+        // looks like it should.
+        //
+        // This used to return *this for PatternInterface::Invoke. That was a
+        // lie: this peer derives from ButtonBaseAutomationPeerT, which supplies
+        // no IInvokeProvider, and nothing here implements one - so a UIA client
+        // asking for the pattern got back an object whose QueryInterface for
+        // IInvokeProvider fails. Claiming a pattern and then failing the QI is
+        // worse than not claiming it, because a client has no way to tell that
+        // apart from a broken control.
+        //
+        // It cannot simply be implemented, either. ButtonBase's entire public
+        // surface is ClickMode, IsPointerOver, IsPressed, Command,
+        // CommandParameter and Click as add/remove only - there is no way to
+        // RAISE Click from outside, and Click is what every SettingsCard in this
+        // editor is wired to (Profiles_Base.xaml's three navigator cards among
+        // them). An honest Invoke would mean giving SettingsCard its own
+        // activation path rather than inheriting ButtonBase's, which is a
+        // change to a control ported wholesale from the Community Toolkit.
+        //
+        // So: the card remains operable by pointer and by keyboard (ButtonBase
+        // handles Enter/Space itself), and reports as a Button because that is
+        // what it behaves like. What a screen reader loses is programmatic
+        // invocation, which it did not actually have before this either.
         return nullptr;
     }
 }

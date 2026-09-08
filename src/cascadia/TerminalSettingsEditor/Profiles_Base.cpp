@@ -33,6 +33,17 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _weakWindowRoot = args.WindowRoot();
         BringIntoViewWhenLoaded(args.ElementToFocus());
 
+        // We are the Base page, so that is what CurrentPage should say while we
+        // are up. The view model outlives this page, so without this it still
+        // holds whichever sub-page was last visited - and because its setter is
+        // guarded on inequality, clicking that sub-page's card again assigned the
+        // value it already held, raised no PropertyChanged, and navigated
+        // nowhere. That is what made "Terminal Emulation does nothing" look like
+        // a dead card rather than a stale one.
+        //
+        // Silent by design - see ClearCurrentPage.
+        winrt::get_self<ProfileViewModel>(_Profile)->ClearCurrentPage();
+
         // Check the use parent directory box if the starting directory is empty
         if (_Profile.StartingDirectory().empty())
         {
@@ -79,16 +90,6 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     void Profiles_Base::Terminal_Click(const IInspectable& /*sender*/, const RoutedEventArgs& /*args*/)
     {
-        // CurrentPage is a VIEW_MODEL_OBSERVABLE_PROPERTY, and its setter is
-        // guarded on inequality: assigning the value it already holds raises no
-        // PropertyChanged, so MainPage never hears about it and nothing
-        // navigates. A click that lands on a card whose page is already current
-        // therefore does nothing at all, and looks identical to a click that was
-        // never delivered. Say which of the two happened.
-        if (_Profile.CurrentPage() == ProfileSubPage::Terminal)
-        {
-            OutputDebugStringW(L"[SettingsEditor] Terminal_Click: CurrentPage already Terminal, no navigation will occur\n");
-        }
         _Profile.CurrentPage(ProfileSubPage::Terminal);
     }
 

@@ -115,6 +115,27 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         til::typed_event<Editor::ProfileViewModel, Editor::DeleteProfileEventArgs> DeleteProfileRequested;
 
         VIEW_MODEL_OBSERVABLE_PROPERTY(ProfileSubPage, CurrentPage);
+
+        // Put CurrentPage back to Base WITHOUT raising PropertyChanged.
+        //
+        // This exists because the navigator cards on Profiles_Base drive
+        // navigation by assigning CurrentPage, and VIEW_MODEL_OBSERVABLE_PROPERTY
+        // guards its setter on inequality. A view model outlives the page, so
+        // once you had visited Terminal Emulation, CurrentPage stayed Terminal -
+        // and the next click on that card assigned the value it already held,
+        // raised nothing, and navigated nowhere. The card looked dead, and
+        // looked identical to a click that was never delivered.
+        //
+        // Profiles_Base calls this as it is navigated to, so the card always
+        // represents a real change. Silent on purpose: announcing Base here
+        // would send MainPage straight back round to re-navigate to the page
+        // that is already being shown.
+        //
+        // public: because VIEW_MODEL_OBSERVABLE_PROPERTY leaves the class in
+        // private scope, and this is reached from Profiles_Base through
+        // get_self - it is implementation-only and deliberately not in the .idl.
+    public:
+        void ClearCurrentPage() noexcept { _CurrentPage = ProfileSubPage::Base; }
         VIEW_MODEL_OBSERVABLE_PROPERTY(Windows::Foundation::Collections::IObservableVector<Editor::BellSoundViewModel>, CurrentBellSounds);
 
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_profile, Guid);
