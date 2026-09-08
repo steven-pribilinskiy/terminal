@@ -92,6 +92,19 @@ namespace Microsoft.Terminal.Settings.Model
         AfterTabs,
     };
 
+    // Where the Settings UI opens.
+    //
+    // Window is declared but NOT implemented: it needs a second top-level
+    // window, and nothing in the app creates one for Settings today. It is
+    // rejected at load with a warning rather than quietly treated as Tab, so
+    // the value never looks supported before it is.
+    enum SettingsUIHost
+    {
+        Tab,
+        Dialog,
+        Window,
+    };
+
     // How resuming a recognized agent or multiplexer session announces itself
     // on the next startup that finds one to resume. Independent of which
     // programs are eligible: this only matters once something is.

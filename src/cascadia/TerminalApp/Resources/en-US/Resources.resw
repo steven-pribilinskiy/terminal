@@ -1089,6 +1089,13 @@ Applying on next launch closes nothing now: the swap happens once you have close
   <data name="InvalidRegex" xml:space="preserve">
     <value>An invalid regular expression was found.</value>
   </data>
+  <data name="SettingsUIHostNotImplemented" xml:space="preserve">
+    <value>"settingsUIHost": "window" is not implemented yet. Settings will open in a tab. Use "dialog" to open it over the current window instead.</value>
+  </data>
+  <data name="SettingsUIDialogClose" xml:space="preserve">
+    <value>Close</value>
+    <comment>The button that dismisses the Settings UI when it is shown as a dialog over the window.</comment>
+  </data>
   <data name="LinkPreviewRefreshButton.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
     <value>Refresh</value>
     <comment>Accessible name of the button in the link preview pane that fetches the linked item again.</comment>

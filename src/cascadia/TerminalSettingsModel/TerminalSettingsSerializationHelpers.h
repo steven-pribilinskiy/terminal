@@ -720,6 +720,15 @@ JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::NewTabButtonPosi
     };
 };
 
+JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::SettingsUIHost)
+{
+    JSON_MAPPINGS(3) = {
+        pair_type{ "tab", ValueType::Tab },
+        pair_type{ "dialog", ValueType::Dialog },
+        pair_type{ "window", ValueType::Window },
+    };
+};
+
 JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::WindowDock)
 {
     JSON_MAPPINGS(5) = {

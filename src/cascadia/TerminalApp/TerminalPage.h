@@ -258,6 +258,7 @@ namespace winrt::TerminalApp::implementation
         bool IsRunningElevated() const noexcept;
 
         void OpenSettingsUI();
+        safe_void_coroutine _OpenSettingsDialog();
         void WindowActivated(const bool activated);
         bool FocusTab(const winrt::TerminalApp::Tab& tab);
 

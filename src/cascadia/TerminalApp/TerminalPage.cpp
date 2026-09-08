@@ -5949,6 +5949,12 @@ namespace winrt::TerminalApp::implementation
     // - <none>
     void TerminalPage::OpenSettingsUI()
     {
+        if (_currentWindowSettings().SettingsUIHost() == SettingsUIHost::Dialog)
+        {
+            _OpenSettingsDialog();
+            return;
+        }
+
         // If we're holding the settings tab's switch command, don't create a new one, switch to the existing one.
         if (!_settingsTab)
         {
@@ -5960,6 +5966,61 @@ namespace winrt::TerminalApp::implementation
         {
             _tabView.SelectedItem(_settingsTab.TabViewItem());
         }
+    }
+
+    // Method Description:
+    // - Shows the Settings UI over the window instead of beside the terminals,
+    //   for settingsUIHost "dialog".
+    // - Reuses _makeSettingsContent, so the page arrives with everything the tab
+    //   host gives it: the hosting window for its file pickers, the KeyDown hook
+    //   that lets unhandled keys still run commands (GH#8767), the OpenJson and
+    //   load-warning handlers, and the _settingsUI pointer a deep link steers.
+    //   Only the container differs.
+    safe_void_coroutine TerminalPage::_OpenSettingsDialog()
+    {
+        const auto lifetime = get_strong();
+
+        const auto presenter{ _dialogPresenter.get() };
+        if (!presenter)
+        {
+            co_return;
+        }
+
+        const auto content{ _makeSettingsContent() };
+        const auto root{ content.GetRoot() };
+        if (!root)
+        {
+            co_return;
+        }
+
+        // Sized against the window rather than left to the content. The settings
+        // page is a two-pane navigation view and will happily measure to
+        // something far larger than the window it is sitting over.
+        const auto available{ this->Root() };
+        if (available && available.ActualWidth() > 0 && available.ActualHeight() > 0)
+        {
+            static constexpr auto fraction{ 0.85 };
+            root.Width(std::max(480.0, available.ActualWidth() * fraction));
+            root.Height(std::max(360.0, available.ActualHeight() * fraction));
+        }
+
+        Controls::ContentDialog dialog{};
+        dialog.Content(root);
+
+        // No primary button: there is nothing to confirm, the page saves itself.
+        // The close button is also what gives us Esc for free.
+        dialog.CloseButtonText(RS_(L"SettingsUIDialogClose"));
+        dialog.DefaultButton(Controls::ContentDialogButton::Close);
+
+        // XAML Islands allows one dialog per thread, and TerminalWindow::ShowDialog
+        // already enforces that - so a second Ctrl+, while this is up replaces it
+        // rather than stacking, which is the behaviour we want anyway.
+        co_await presenter.ShowDialog(dialog);
+
+        // Let go of the page so the next open builds a fresh one. Leaving it
+        // parented to a dismissed dialog is what would make the second open come
+        // up blank.
+        dialog.Content(nullptr);
     }
 
     // Method Description:

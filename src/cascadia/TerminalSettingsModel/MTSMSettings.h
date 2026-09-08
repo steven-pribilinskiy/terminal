@@ -96,6 +96,7 @@ Author(s):
     X(winrt::Microsoft::UI::Xaml::Controls::TabViewWidthMode, TabWidthMode, "tabWidthMode", winrt::Microsoft::UI::Xaml::Controls::TabViewWidthMode::Equal)                                            \
     X(Model::TabPosition, TabPosition, "tabPosition", Model::TabPosition::Top)                                                                                                                        \
     X(Model::NewTabButtonPosition, NewTabButtonPosition, "newTabButtonPosition", Model::NewTabButtonPosition::Bottom)                                                                                 \
+    X(Model::SettingsUIHost, SettingsUIHost, "settingsUIHost", Model::SettingsUIHost::Tab)                                                                                                            \
     X(uint32_t, PaneResizeStep, "paneResizeStep", 5)                                                                                                                                                  \
     X(bool, CloseWindowOnLastTab, "closeWindowOnLastTab", true)                                                                                                                                       \
     X(bool, ShowTabIndex, "showTabIndex", false)                                                                                                                                                      \

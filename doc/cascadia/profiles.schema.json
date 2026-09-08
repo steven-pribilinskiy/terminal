@@ -3013,6 +3013,16 @@
           ],
           "type": "string"
         },
+        "settingsUIHost": {
+          "default": "tab",
+          "description": "Where the Settings UI opens. Possible values include:\n -\"tab\" as a tab in the current window, alongside the terminals\n -\"dialog\" as a modal dialog over the current window, which dims the terminal and closes on Esc\n -\"window\" in a window of its own. NOT YET IMPLEMENTED: this value is rejected at load with a warning rather than silently behaving like \"tab\".",
+          "enum": [
+            "tab",
+            "dialog",
+            "window"
+          ],
+          "type": "string"
+        },
         "tabWidthMode": {
           "default": "equal",
           "description": "Sets the width of the tabs. Possible values include:\n -\"equal\" sizes each tab to the same width\n -\"titleLength\" sizes each tab to the length of its title\n -\"compact\" sizes each tab to the length of its title when focused, and shrinks to the size of only the icon when the tab is unfocused.",

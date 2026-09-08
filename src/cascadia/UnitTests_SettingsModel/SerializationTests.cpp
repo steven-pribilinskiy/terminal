@@ -124,6 +124,8 @@ namespace SettingsModelUnitTests
                 "showTerminalTitleInTitlebar": true,
                 "tabWidthMode": "equal",
                 "tabPosition": "top",
+                "newTabButtonPosition": "bottom",
+                "settingsUIHost": "tab",
                 "showTabIndex": false,
                 "closeWindowOnLastTab": true,
                 "paneResizeStep": 5,
