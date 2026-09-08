@@ -351,6 +351,12 @@ namespace winrt::TerminalApp::implementation
             }
         };
 
+        // Before anything looks for _tabRow in the root: a vertical layout nests
+        // it inside the sidebar grid, so it is not a child of the root at all.
+        // This hands the footer back to the TabView and returns the tab row to
+        // the top level, which is the shape the rest of this function assumes.
+        _TeardownTabStripPanel();
+
         detach(root, _tabStripSplitter);
         detach(root, _tabRow);
         detach(root, infoBars);
@@ -403,18 +409,11 @@ namespace winrt::TerminalApp::implementation
             }
         }
 
-        // The TabView's template is deliberately NOT touched here. It used to be
-        // cleared on every reset and re-applied by the Left/Right branch, and
-        // that cost the window its tabs: _ApplyTabPosition runs on every
-        // settings reload, so saving any setting at all re-templated the TabView
-        // twice. The tab items are live TabViewItem elements - TabManagement.cpp
-        // inserts them straight into TabItems - so each re-template hands the
-        // same elements to a brand new TabViewListView, and they do not survive
-        // it. Measured: one tab before a reload, zero after, and no later reload
-        // brings it back.
-        //
-        // _SyncTabViewTemplate owns that decision now and only acts on a real
-        // change of orientation.
+        // Nothing here touches the TabView's template, because nothing anywhere
+        // does any more: MUX's stock one is applied at construction and stays
+        // for the life of the window. _SetTabStripOrientation changes an
+        // orientation on the already-realized items panel instead, which is what
+        // finally stopped this losing the tabs - see the long note there.
 
         // TabRowControl.xaml sets VerticalAlignment="Bottom" directly on the
         // TabView. That is a local value, and a local value outranks a Style
@@ -501,8 +500,7 @@ namespace winrt::TerminalApp::implementation
     void TerminalPage::_ApplyTabPositionCore(const Microsoft::Terminal::Settings::Model::WindowSettings& windowSettings)
     {
         _ResetRootGridLayout();
-        _SyncTabViewTemplate(_TabStripIsVertical());
-        _ApplyNewTabButtonPosition(windowSettings);
+        _SetTabStripOrientation(_TabStripIsVertical());
 
         const auto root = this->Root();
         const auto infoBars = this->InfoBarPanel();
@@ -658,14 +656,19 @@ namespace winrt::TerminalApp::implementation
 
             _BuildTabStripSplitter();
 
+            // The sidebar: the tab row, and under it the footer taken out of the
+            // TabView. Built before the grid positions are assigned because it,
+            // not _tabRow, is what goes in the strip column from here on.
+            _BuildTabStripPanel();
+
             const auto stripColIdx = stripFirst ? 0 : 2;
             const auto contentColIdx = stripFirst ? 2 : 0;
 
             // The strip and its grab handle run the full height beside the
             // content; the info bars and the terminal keep their own two rows.
-            Grid::SetRow(_tabRow, 0);
-            Grid::SetRowSpan(_tabRow, 2);
-            Grid::SetColumn(_tabRow, stripColIdx);
+            Grid::SetRow(_tabStripPanel, 0);
+            Grid::SetRowSpan(_tabStripPanel, 2);
+            Grid::SetColumn(_tabStripPanel, stripColIdx);
             Grid::SetRow(_tabStripSplitter, 0);
             Grid::SetRowSpan(_tabStripSplitter, 2);
             Grid::SetColumn(_tabStripSplitter, 1);
@@ -674,7 +677,7 @@ namespace winrt::TerminalApp::implementation
             Grid::SetRow(_tabContent, 1);
             Grid::SetColumn(_tabContent, contentColIdx);
 
-            root.Children().InsertAt(0, _tabRow);
+            root.Children().InsertAt(0, _tabStripPanel);
             root.Children().InsertAt(1, _tabStripSplitter);
             root.Children().InsertAt(2, infoBars);
             root.Children().InsertAt(3, _tabContent);
@@ -703,9 +706,10 @@ namespace winrt::TerminalApp::implementation
             _tabRow.VerticalAlignment(VerticalAlignment::Stretch);
             _tabView.VerticalAlignment(VerticalAlignment::Stretch);
 
-            // The re-template itself is _SyncTabViewTemplate's job, and it ran
-            // before this switch. It is not done here because doing it here
-            // meant doing it on every settings reload.
+            // The orientation itself was set by _SetTabStripOrientation before
+            // this switch ran, and it is deliberately not done here: this branch
+            // is reached on every settings reload, and anything that rebuilds
+            // rather than adjusts would pay that cost each time.
             break;
         }
         }
@@ -727,6 +731,10 @@ namespace winrt::TerminalApp::implementation
             _BuildTitlebarStrip(_TabStripIsVertical());
         }
 
+        // After the switch, not before it: this positions rows in the sidebar
+        // grid, and only the Left/Right branch builds one.
+        _ApplyNewTabButtonPosition(windowSettings);
+
         // TabWidthMode is width arithmetic that MUX performs against the strip's
         // TabWidthMode is applied by the caller, once the position has actually
         // settled - including when a failure here has knocked it back to Top,
@@ -734,15 +742,140 @@ namespace winrt::TerminalApp::implementation
     }
 
     // Method Description:
+    // - Builds the sidebar that a vertical strip lives in: the tab row, and
+    //   under it the footer lifted out of the TabView.
+    // - Safe to call repeatedly; _TeardownTabStripPanel is the inverse, and the
+    //   reset runs it before every layout.
+    //
+    // The footer has to be lifted because MUX's stock TabContainerGrid is four
+    // COLUMNS - header | tabs | add button | footer - and the footer's column is
+    // the Star one. Left alone in a 200px strip it sits to the RIGHT of the tabs
+    // and takes the width with it. Rewriting those ColumnDefinitions is not an
+    // option: TabView::UpdateTabWidths is compiled into MUX and holds references
+    // to all four, so a layout built by fighting it breaks invisibly on any MUX
+    // update.
+    //
+    // Lifting it is also strictly better than the rotated template this replaces
+    // - it puts the new tab button and the slot badge in a grid we own, so they
+    // can be placed separately instead of sharing one template row.
+    //
+    // Re-parenting _tabRow into here is safe in a way re-parenting _tabContent
+    // would not be: the tab row contains tab headers, while _tabContent hosts the
+    // panes and therefore live SwapChainPanels, which do not survive a change of
+    // parent (see the note in the Left/Right branch).
+    void TerminalPage::_BuildTabStripPanel()
+    {
+        if (!_tabStripPanel)
+        {
+            Controls::Grid panel;
+
+            // Three rows: the tab row, the footer, and slack. Which of the first
+            // and last carries the Star is what _ApplyNewTabButtonPosition
+            // decides; the footer is always Auto.
+            for (const auto& type : { GridUnitType::Star, GridUnitType::Auto, GridUnitType::Auto })
+            {
+                RowDefinition row;
+                row.Height(GridLengthHelper::FromValueAndType(1, type));
+                panel.RowDefinitions().Append(row);
+            }
+
+            _tabStripPanel = panel;
+        }
+
+        // A XAML element has exactly one parent, so the footer has to be taken
+        // off the TabView before it can be added here - the same two-step the
+        // titlebar strip uses for TabStripHeader.
+        if (!_borrowedTabStripFooter)
+        {
+            if (const auto& footer{ _tabRow.TabView().TabStripFooter() })
+            {
+                _tabRow.TabView().TabStripFooter(nullptr);
+                _borrowedTabStripFooter = footer;
+            }
+        }
+
+        _tabStripPanel.Children().Clear();
+
+        // _tabRow may still be parented to the root grid from the previous
+        // layout; the reset detaches it, but be explicit rather than relying on
+        // call order.
+        if (const auto& parent{ Media::VisualTreeHelper::GetParent(_tabRow).try_as<Controls::Panel>() })
+        {
+            uint32_t idx{};
+            if (parent.Children().IndexOf(_tabRow, idx))
+            {
+                parent.Children().RemoveAt(idx);
+            }
+        }
+
+        Grid::SetRow(_tabRow, 0);
+        _tabStripPanel.Children().Append(_tabRow);
+
+        if (const auto& footer{ _borrowedTabStripFooter.try_as<FrameworkElement>() })
+        {
+            Grid::SetRow(footer, 1);
+            footer.HorizontalAlignment(HorizontalAlignment::Stretch);
+            _tabStripPanel.Children().Append(footer);
+        }
+    }
+
+    // Method Description:
+    // - Unwinds _BuildTabStripPanel: hands the footer back to the TabView, puts
+    //   the tab row back at the top level, and drops the sidebar.
+    // - The footer MUST go back, or the new tab button is missing from every
+    //   other layout - it has one parent and the sidebar would still own it.
+    void TerminalPage::_TeardownTabStripPanel()
+    {
+        if (!_tabStripPanel)
+        {
+            return;
+        }
+
+        _tabStripPanel.Children().Clear();
+
+        if (_borrowedTabStripFooter)
+        {
+            // Drop what the sidebar layout set on it. These are local values, so
+            // without this they would outrank the stock template's own alignment
+            // once the footer is back in a horizontal strip.
+            if (const auto& footer{ _borrowedTabStripFooter.try_as<FrameworkElement>() })
+            {
+                footer.ClearValue(FrameworkElement::HorizontalAlignmentProperty());
+                Grid::SetRow(footer, 0);
+            }
+
+            _tabRow.TabView().TabStripFooter(_borrowedTabStripFooter);
+            _borrowedTabStripFooter = nullptr;
+        }
+
+        if (const auto& parent{ Media::VisualTreeHelper::GetParent(_tabStripPanel).try_as<Controls::Panel>() })
+        {
+            uint32_t idx{};
+            if (parent.Children().IndexOf(_tabStripPanel, idx))
+            {
+                parent.Children().RemoveAt(idx);
+            }
+        }
+
+        // Spans set while it was in the three-column layout would otherwise be
+        // inherited by the next one.
+        Grid::SetRow(_tabRow, 0);
+        Grid::SetRowSpan(_tabRow, 1);
+        Grid::SetColumn(_tabRow, 0);
+        Grid::SetColumnSpan(_tabRow, 1);
+
+        _tabStripPanel = nullptr;
+    }
+
+    // Method Description:
     // - Puts the new tab button either at the foot of a vertical strip or
     //   directly under the last tab, per newTabButtonPosition.
-    // - The template's rows are header / tab list / add button / footer. Which
-    //   one carries the Star is what decides where the slack goes, and so where
-    //   the button ends up:
-    //     bottom    - list Star, footer Auto: the list fills the column and the
-    //                 footer is pinned under it.
-    //     afterTabs - list Auto, footer Star: the list is only as tall as its
-    //                 tabs, the button sits immediately beneath them, and the
+    // - The sidebar's rows are tab row / footer / slack. Which of the first and
+    //   last carries the Star decides where the button ends up:
+    //     bottom    - tab row Star, slack Auto: the strip fills the column and
+    //                 the footer is pinned under it, at the window's foot.
+    //     afterTabs - tab row Auto, slack Star: the strip is only as tall as its
+    //                 tabs, the footer sits immediately beneath them, and the
     //                 empty space falls below.
     // - An Auto row is measured against infinity, so afterTabs on its own would
     //   let a long tab list grow straight past the bottom of the window and take
@@ -750,289 +883,62 @@ namespace winrt::TerminalApp::implementation
     //   is what keeps it scrolling rather than overflowing.
     void TerminalPage::_ApplyNewTabButtonPosition(const Microsoft::Terminal::Settings::Model::WindowSettings& windowSettings)
     {
-        if (!_tabViewIsVertical)
-        {
-            return;
-        }
-
-        const auto& templated{ _tabView.try_as<Windows::UI::Xaml::Controls::IControlProtected>() };
-        if (!templated)
-        {
-            return;
-        }
-
-        // Named "Column" because the vertical template reuses MUX's part names
-        // on RowDefinitions - TabView looks them up as ColumnDefinitions, gets
-        // nothing, and skips width arithmetic that a vertical strip does not
-        // want anyway.
-        const auto& listRow{ templated.GetTemplateChild(L"TabColumn").try_as<Controls::RowDefinition>() };
-        const auto& footerRow{ templated.GetTemplateChild(L"RightContentColumn").try_as<Controls::RowDefinition>() };
-        if (!listRow || !footerRow)
+        if (!_tabViewIsVertical || !_tabStripPanel || _tabStripPanel.RowDefinitions().Size() < 3u)
         {
             return;
         }
 
         const auto afterTabs{ windowSettings.NewTabButtonPosition() == NewTabButtonPosition::AfterTabs };
 
-        listRow.Height(GridLengthHelper::FromValueAndType(1, afterTabs ? GridUnitType::Auto : GridUnitType::Star));
-        footerRow.Height(GridLengthHelper::FromValueAndType(1, afterTabs ? GridUnitType::Star : GridUnitType::Auto));
+        _tabStripPanel.RowDefinitions().GetAt(0).Height(
+            GridLengthHelper::FromValueAndType(1, afterTabs ? GridUnitType::Auto : GridUnitType::Star));
+        _tabStripPanel.RowDefinitions().GetAt(2).Height(
+            GridLengthHelper::FromValueAndType(1, afterTabs ? GridUnitType::Star : GridUnitType::Auto));
 
-        if (const auto& footer{ templated.GetTemplateChild(L"RightContentPresenter").try_as<FrameworkElement>() })
-        {
-            // Top, so the footer hugs the tabs rather than floating in the
-            // middle of the slack its Star row now owns.
-            footer.VerticalAlignment(afterTabs ? VerticalAlignment::Top : VerticalAlignment::Stretch);
-        }
+        // The tab row follows its row: hugging its content when the row is Auto,
+        // filling it otherwise.
+        _tabRow.VerticalAlignment(afterTabs ? VerticalAlignment::Top : VerticalAlignment::Stretch);
 
         _ClampVerticalTabList();
     }
 
     // Method Description:
-    // - Caps the tab list's height at what is actually left in the strip, so an
-    //   Auto row cannot push the new tab button off the bottom of the window.
-    // - Harmless in the Star layout, where the row already does this - one code
-    //   path is worth more here than skipping an assignment.
+    // - Sizes the tab list to the sidebar: its width pinned to the strip, its
+    //   height capped at what is left, so an Auto row cannot push the new tab
+    //   button off the bottom of the window.
+    // - Harmless in the Star layout, where the row already caps the height - one
+    //   code path is worth more here than skipping an assignment.
     void TerminalPage::_ClampVerticalTabList()
     {
-        if (!_tabViewIsVertical || !_verticalTabList)
+        if (!_tabViewIsVertical || !_tabStripList)
         {
             return;
         }
 
+        // Width, and this is load-bearing rather than cosmetic. The stock
+        // TabColumn is Auto, so the list would measure to its tabs' own desired
+        // width and leave the strip's remaining width to the footer column -
+        // which is the Star one. Giving the list an explicit width pins the Auto
+        // column to the strip instead, and does it without touching a single
+        // ColumnDefinition that MUX's compiled UpdateTabWidths also writes to.
+        const auto strip{ _tabStripPanel ? _tabStripPanel.ActualWidth() : 0.0 };
+        if (strip > 0)
+        {
+            _tabStripList.Width(strip);
+        }
+
+        // Height: an Auto row measures against infinity, so without this a long
+        // tab list grows past the bottom of the window and takes the new tab
+        // button with it. Capping the list makes it scroll instead.
+        //
+        // Nothing is reserved for the TabView's own header and footer presenters
+        // any more - both are empty, their content having been borrowed into the
+        // titlebar and the sidebar respectively.
         const auto available{ _tabView.ActualHeight() };
-        if (available <= 0)
+        if (available > 0)
         {
-            return;
+            _tabStripList.MaxHeight(available);
         }
-
-        auto reserved{ 0.0 };
-        if (const auto& templated{ _tabView.try_as<Windows::UI::Xaml::Controls::IControlProtected>() })
-        {
-            for (const auto& part : { L"RightContentPresenter", L"LeftContentPresenter" })
-            {
-                if (const auto& e{ templated.GetTemplateChild(part).try_as<FrameworkElement>() })
-                {
-                    // DesiredSize, not ActualHeight: in the afterTabs layout the
-                    // footer's row owns the Star, so its ActualHeight can be the
-                    // whole slack. DesiredSize is what its content measured to,
-                    // whichever row it happens to be sitting in.
-                    reserved += e.DesiredSize().Height;
-                }
-            }
-        }
-
-        _verticalTabList.MaxHeight(std::max(0.0, available - reserved));
-    }
-
-    // Method Description:
-    // - Applies or removes the vertical TabView template, and does NOTHING when
-    //   the orientation has not changed.
-    // - That last part is the whole reason this exists. _ApplyTabPosition runs
-    //   on every settings reload, and it used to clear the template and put it
-    //   back each time. The tab items are live TabViewItem elements, not data -
-    //   TabManagement.cpp inserts them straight into TabItems - so every
-    //   re-template handed the same elements to a freshly built
-    //   TabViewListView, and they did not survive the trip. Saving any setting
-    //   at all, from any settings page, emptied a vertical tab strip: measured
-    //   one tab before the reload and zero after, with no later reload bringing
-    //   it back, and the new-tab button then faulting on a list in that state.
-    void TerminalPage::_SyncTabViewTemplate(const bool vertical)
-    {
-        if (!_tabView || vertical == _tabViewIsVertical)
-        {
-            return;
-        }
-
-        // Take the tabs out of the TabView before its template changes, and put
-        // them back afterwards.
-        //
-        // TabItems holds live TabViewItem ELEMENTS, not data - TabManagement.cpp
-        // inserts them directly - so they are visual children of the
-        // TabViewListView that the current template built. Re-templating builds
-        // a new list, and elements that still have a parent do not arrive in it:
-        // the strip comes up empty and stays empty for the rest of the session.
-        // Measured on a live window: one tab before a top->left change, zero
-        // after, and zero for every position changed to after that.
-        //
-        // Skipping the redundant re-templates was not enough on its own. This is
-        // the one re-template that has to happen, and it is the one that hurt.
-        const auto items{ _tabView.TabItems() };
-        std::vector<winrt::Windows::Foundation::IInspectable> saved;
-        saved.reserve(items.Size());
-        for (const auto& item : items)
-        {
-            saved.emplace_back(item);
-        }
-        const auto selectedIndex{ _tabView.SelectedIndex() };
-
-        // _removing is the existing suppression for "the collection is being
-        // rewritten, ignore what the selection does" - without it the selection
-        // collapsing to -1 walks into _UpdatedSelectedTab with nothing selected.
-        _removing = true;
-        items.Clear();
-        _removing = false;
-
-        // Clear() alone is not enough, and this is the second thing that caught
-        // me out here. ListView tears its containers down on the next layout
-        // pass, not inside the collection change - so immediately after Clear()
-        // the TabViewItems are still parented to the old panel, and re-adding
-        // them threw:
-        //
-        //   Windows.Foundation.Collections.h(685) [IVector::Append]
-        //   LogHr 8000FFFF Catastrophic failure
-        //
-        // which _ApplyTabPosition caught and logged, leaving a strip with no
-        // tabs and no crash to point at it. Forcing the pass here completes the
-        // removal while the old template is still the live one.
-        _tabView.UpdateLayout();
-
-        if (!vertical)
-        {
-            // Back to the stock TabView style. Leaving the vertical one applied
-            // to a horizontal strip would stretch every tab across the window.
-            // FrameworkElement, not Control: Control inherits the Style property
-            // but the static accessor is declared on the base.
-            _tabView.ClearValue(winrt::Windows::UI::Xaml::FrameworkElement::StyleProperty());
-            _verticalTabViewSizeChangedRevoker.revoke();
-            _verticalTabList = nullptr;
-            _tabViewIsVertical = false;
-            _RestoreTabItems(saved, selectedIndex);
-            return;
-        }
-
-        // Lookup, not HasKey-then-Lookup. ResourceDictionary::HasKey only
-        // inspects the dictionary it is called on and does NOT walk
-        // MergedDictionaries, while Lookup does - and VerticalTabViewStyle
-        // arrives through App.xaml's merged dictionaries. Guarding with HasKey
-        // therefore answered "no" for a key that is perfectly resolvable, and
-        // silently skipped the re-template: a vertical strip would come up with
-        // the horizontal template squeezed into a 200px column. Lookup throws
-        // when the key really is absent, hence the try/catch rather than a guard.
-        try
-        {
-            if (const auto& res{ Application::Current().Resources() })
-            {
-                if (const auto& style{ res.Lookup(box_value(winrt::hstring{ L"VerticalTabViewStyle" })).try_as<Windows::UI::Xaml::Style>() })
-                {
-                    _tabView.Style(style);
-                    _MakeTabListVertical();
-                    _tabViewIsVertical = true;
-                }
-            }
-        }
-        catch (...)
-        {
-            LOG_CAUGHT_EXCEPTION();
-
-            // Put the stock template back, and note why logging alone is not
-            // enough. A ControlTemplate that throws part-way through expansion
-            // leaves the TabView with a half-built visual tree. XAML does not
-            // fail at that moment - it fails on the next measure pass, inside
-            // CCoreServices::NWDrawTree, as an E_FAIL fail-fast with none of our
-            // frames on the stack and nothing anywhere that can catch it.
-            //
-            // That is precisely how one unresolvable resource key in
-            // VerticalTabViewStyle.xaml turned into a Terminal that could not be
-            // opened: the throw WAS caught, and logged, and the broken template
-            // was left applied anyway. Clearing it costs a vertical strip that
-            // comes up looking like a horizontal one, which is a bad afternoon
-            // rather than a lost one.
-            _tabView.ClearValue(winrt::Windows::UI::Xaml::FrameworkElement::StyleProperty());
-            _tabView.ApplyTemplate();
-            _verticalTabViewSizeChangedRevoker.revoke();
-            _verticalTabList = nullptr;
-            _tabViewIsVertical = false;
-        }
-
-        _RestoreTabItems(saved, selectedIndex);
-    }
-
-    // Method Description:
-    // - Puts the tab items back after a re-template, and re-selects whichever
-    //   one was selected. Split out only because both halves of
-    //   _SyncTabViewTemplate need it and the early return would otherwise skip it.
-    void TerminalPage::_RestoreTabItems(const std::vector<winrt::Windows::Foundation::IInspectable>& saved,
-                                        const int32_t selectedIndex)
-    {
-        if (saved.empty())
-        {
-            return;
-        }
-
-        // The new template has to be realized before anything is handed to it,
-        // for the same reason the old one had to finish letting go.
-        _tabView.ApplyTemplate();
-        _tabView.UpdateLayout();
-
-        const auto items{ _tabView.TabItems() };
-
-        // Suppressed the same way the removal was: the tab Terminal considers
-        // focused has not changed, so _UpdatedSelectedTab has nothing to do and
-        // would only run against a half-filled collection on the way past.
-        _removing = true;
-        auto restored{ 0u };
-        for (const auto& item : saved)
-        {
-            // Take the item off whatever is still holding it before offering it
-            // to the new list.
-            //
-            // This is the fourth attempt at this bug and the first one that
-            // stopped asking XAML nicely. Clear() does not unparent a
-            // TabViewItem, and neither does UpdateLayout() after it - measured,
-            // both times, as "restored 0 of 1 tabs" with IVector::Append
-            // returning 8000FFFF, which is what UWP raises for an element that
-            // already has a parent. The old panel is gone by then, so nothing is
-            // ever going to come along and let go on its own; the only thing
-            // left holding the item is a dead ItemsStackPanel, and Panel's
-            // Children collection can be told to drop it directly.
-            if (const auto& element{ item.try_as<FrameworkElement>() })
-            {
-                if (const auto& parent{ Media::VisualTreeHelper::GetParent(element).try_as<Controls::Panel>() })
-                {
-                    uint32_t idx{};
-                    if (parent.Children().IndexOf(element, idx))
-                    {
-                        parent.Children().RemoveAt(idx);
-                    }
-                }
-
-                // If something still owns it, say what. Guessing at the owner is
-                // what cost the previous three attempts.
-                if (const auto& stillParented{ Media::VisualTreeHelper::GetParent(element) })
-                {
-                    OutputDebugStringW(fmt::format(FMT_COMPILE(L"[TerminalApp] tab item still parented to {} before re-add\n"),
-                                                   std::wstring_view{ winrt::get_class_name(stillParented) })
-                                           .c_str());
-                }
-            }
-
-            // Individually guarded, and it logs. A failure here empties the tab
-            // strip, and the whole reason this bug survived two attempts is that
-            // it did so silently - the throw was swallowed by the catch around
-            // _ApplyTabPositionCore and all anyone saw was tabs going missing.
-            // If it ever comes back, the log says which item and why.
-            try
-            {
-                items.Append(item);
-                ++restored;
-            }
-            CATCH_LOG();
-        }
-        if (selectedIndex >= 0 && selectedIndex < gsl::narrow_cast<int32_t>(restored))
-        {
-            _tabView.SelectedIndex(selectedIndex);
-        }
-        _removing = false;
-
-        if (restored != saved.size())
-        {
-            OutputDebugStringW(fmt::format(FMT_COMPILE(L"[TerminalApp] tab strip re-template restored {} of {} tabs\n"),
-                                           restored,
-                                           saved.size())
-                                   .c_str());
-        }
-
-        _ClampVerticalTabList();
     }
 
     // Method Description:
@@ -1142,91 +1048,127 @@ namespace winrt::TerminalApp::implementation
     }
 
     // Method Description:
-    // - Turns the tab list inside the re-templated TabView on its side: a
-    //   vertical items panel, and the two scroll axes swapped.
-    // - These are local values on the element rather than setters in a Style
-    //   because nothing then has to be restated. App.xaml carries an implicit
-    //   primitives:TabViewListView style (the one that suppresses the entrance
-    //   and add/delete transitions), and the style this replaced had to repeat
-    //   that setter to avoid losing it.
-    // - A correction, because the commit that introduced this and the one before
-    //   it both asserted the opposite: an explicit Style does NOT cost a control
-    //   its ControlTemplate. UWP applies the built-in style from DefaultStyleKey
-    //   underneath FrameworkElement::Style, so a Style with no Template setter
-    //   layers onto the default template rather than replacing it. Two proofs in
-    //   this app: the implicit TabViewListView style just mentioned sets only
-    //   ItemContainerTransitions and the horizontal strip has always drawn, and
-    //   ColorButtonStyle is applied by key to the colour-picker buttons with no
-    //   Template anywhere in its BasedOn chain. So "the vertical list had no
-    //   visual tree" was never the cause of the tabPosition "left" crash, and
-    //   that crash is still undiagnosed - see the note in VerticalTabViewStyle.xaml.
-    // - What this function is still worth: it is the smaller, more honest way to
-    //   express the one thing that has to change. It is not a fix for the crash.
-    void TerminalPage::_MakeTabListVertical()
+    // - Lays the tab strip out as a column or a row, IN PLACE. MUX's stock
+    //   TabView template stays applied for the life of the window; this only
+    //   changes an orientation, two scroll axes and some alignment.
+    // - Idempotent and reversible in both directions.
+    //
+    // Why it works this way, because five attempts did not:
+    //
+    // This used to swap _tabView.Style() to a hand-written copy of MUX's
+    // ControlTemplate, rotated 90 degrees. That cannot be made to work.
+    // TabView.TabItems holds LIVE TabViewItem elements - TabManagement.cpp
+    // inserts them straight into the collection - and a re-template hands those
+    // same elements to a brand new TabViewListView. They do not survive it: the
+    // items came back with IVector::Append returning E_UNEXPECTED, and after
+    // four rounds of saving, detaching and restoring them the count still went
+    // 1, 0, 0, 0, 0. The last capture disproved the final theory too, showing no
+    // visual parent at all and Append still refusing. So the template swap is
+    // gone, along with the file it applied - which is also where the FIRST crash
+    // in this sequence came from, a TabViewButtonStyle lookup that MUX declares
+    // with x:Name rather than x:Key and therefore does not publish.
+    //
+    // Flipping the realized panel's Orientation touches one DependencyProperty
+    // on an object that already exists. No container is regenerated, nothing is
+    // re-parented, and TabItems is never read or written - so the entire failure
+    // class above cannot occur.
+    void TerminalPage::_SetTabStripOrientation(const bool vertical)
     {
-        // Assigning Style defers re-templating to the next measure pass, and the
-        // child has to exist now for GetTemplateChild to find it.
+        if (!_tabView)
+        {
+            return;
+        }
+
+        // The stock template is applied at construction, so this is a no-op in
+        // the steady state - but a cold start can reach here before the first
+        // measure pass, and GetTemplateChild finds nothing until it has run.
         _tabView.ApplyTemplate();
 
-        const auto& templatedTabView{ _tabView.try_as<Windows::UI::Xaml::Controls::IControlProtected>() };
-        if (!templatedTabView)
+        if (!_tabStripList)
         {
-            return;
+            const auto& templatedTabView{ _tabView.try_as<Windows::UI::Xaml::Controls::IControlProtected>() };
+            if (!templatedTabView)
+            {
+                return;
+            }
+
+            // ListView, not TabViewListView: the derived type adds nothing we
+            // need here and would drag in the MUX primitives projection.
+            _tabStripList = templatedTabView.GetTemplateChild(L"TabListView").try_as<Windows::UI::Xaml::Controls::ListView>();
+            if (!_tabStripList)
+            {
+                return;
+            }
+
+            // Once, not per orientation change: the part outlives every layout
+            // because the template is never replaced.
+            _tabStripSizeChangedRevoker = _tabView.SizeChanged(winrt::auto_revoke, [weakThis = get_weak()](auto&&, auto&&) {
+                if (const auto page{ weakThis.get() })
+                {
+                    page->_ClampVerticalTabList();
+                }
+            });
         }
 
-        // ListView, not TabViewListView: the derived type adds nothing we need
-        // here and would drag in the MUX primitives projection.
-        const auto& tabList{ templatedTabView.GetTemplateChild(L"TabListView").try_as<Windows::UI::Xaml::Controls::ListView>() };
-        if (!tabList)
+        const auto& tabList{ _tabStripList };
+
+        // The crux. ItemsPanelRoot is the panel the ListView has already
+        // realized, so setting Orientation on it re-measures in place.
+        if (const auto& panel{ tabList.ItemsPanelRoot().try_as<Windows::UI::Xaml::Controls::ItemsStackPanel>() })
         {
-            return;
+            panel.Orientation(vertical ? Controls::Orientation::Vertical : Controls::Orientation::Horizontal);
+        }
+        else
+        {
+            // No panel realized yet - only reachable before the list's first
+            // measure, when it has no containers to lose either. An
+            // ItemsPanelTemplate has no code-first constructor, so parsing one
+            // is how you make a panel template at runtime.
+            static constexpr std::wstring_view verticalPanel{
+                LR"(<ItemsPanelTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><ItemsStackPanel Orientation="Vertical" /></ItemsPanelTemplate>)"
+            };
+            static constexpr std::wstring_view horizontalPanel{
+                LR"(<ItemsPanelTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><ItemsStackPanel Orientation="Horizontal" /></ItemsPanelTemplate>)"
+            };
+            const auto markup{ vertical ? verticalPanel : horizontalPanel };
+            if (const auto& parsed{ Windows::UI::Xaml::Markup::XamlReader::Load(winrt::hstring{ markup }).try_as<Windows::UI::Xaml::Controls::ItemsPanelTemplate>() })
+            {
+                tabList.ItemsPanel(parsed);
+            }
         }
 
-        // An ItemsPanelTemplate has no code-first constructor; parsing one is
-        // how you make a panel template at runtime. Kept as markup rather than
-        // as a keyed resource so it cannot affect application load - this file's
-        // resource dictionary is merged by App.xaml on every launch, whatever
-        // the tab position is.
-        static constexpr std::wstring_view verticalItemsPanel{
-            LR"(<ItemsPanelTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><ItemsStackPanel Orientation="Vertical" /></ItemsPanelTemplate>)"
-        };
-        if (const auto& panel{ Windows::UI::Xaml::Markup::XamlReader::Load(winrt::hstring{ verticalItemsPanel }).try_as<Windows::UI::Xaml::Controls::ItemsPanelTemplate>() })
-        {
-            tabList.ItemsPanel(panel);
-        }
-
-        // The stock style pins the list to the top of its slot and sizes each
+        // The stock template pins the list to the top of its slot and sizes each
         // item to its content; in a column it should fill the strip, and the
-        // items should fill its width.
-        tabList.VerticalAlignment(VerticalAlignment::Stretch);
-        tabList.HorizontalAlignment(HorizontalAlignment::Stretch);
-        tabList.HorizontalContentAlignment(HorizontalAlignment::Stretch);
+        // items should fill its width. ClearValue rather than an explicit value
+        // on the way back, so the stock style's own setters apply again.
+        if (vertical)
+        {
+            tabList.VerticalAlignment(VerticalAlignment::Stretch);
+            tabList.HorizontalAlignment(HorizontalAlignment::Stretch);
+            tabList.HorizontalContentAlignment(HorizontalAlignment::Stretch);
+        }
+        else
+        {
+            tabList.ClearValue(FrameworkElement::VerticalAlignmentProperty());
+            tabList.ClearValue(FrameworkElement::HorizontalAlignmentProperty());
+            tabList.ClearValue(Controls::Control::HorizontalContentAlignmentProperty());
+            tabList.ClearValue(FrameworkElement::WidthProperty());
+            tabList.ClearValue(FrameworkElement::MaxHeightProperty());
+        }
 
         // The stock style scrolls horizontally and pins the vertical axis shut.
-        // A column-shaped strip needs exactly the opposite. The list's template
-        // reads these through TemplateBindings, so setting them after the
-        // template has been applied still reaches the ScrollViewer.
+        // A column-shaped strip needs exactly the opposite, and going back needs
+        // the original restored - which the old code never did, because it could
+        // only ever travel one way.
         using winrt::Windows::UI::Xaml::Controls::ScrollBarVisibility;
         using winrt::Windows::UI::Xaml::Controls::ScrollMode;
         using winrt::Windows::UI::Xaml::Controls::ScrollViewer;
-        ScrollViewer::SetHorizontalScrollBarVisibility(tabList, ScrollBarVisibility::Disabled);
-        ScrollViewer::SetHorizontalScrollMode(tabList, ScrollMode::Disabled);
-        ScrollViewer::SetVerticalScrollBarVisibility(tabList, ScrollBarVisibility::Auto);
-        ScrollViewer::SetVerticalScrollMode(tabList, ScrollMode::Enabled);
+        ScrollViewer::SetHorizontalScrollBarVisibility(tabList, vertical ? ScrollBarVisibility::Disabled : ScrollBarVisibility::Auto);
+        ScrollViewer::SetHorizontalScrollMode(tabList, vertical ? ScrollMode::Disabled : ScrollMode::Enabled);
+        ScrollViewer::SetVerticalScrollBarVisibility(tabList, vertical ? ScrollBarVisibility::Auto : ScrollBarVisibility::Disabled);
+        ScrollViewer::SetVerticalScrollMode(tabList, vertical ? ScrollMode::Enabled : ScrollMode::Disabled);
 
-        // Kept so _ClampVerticalTabList can reach it without walking the
-        // template again on every resize.
-        _verticalTabList = tabList;
-
-        // auto_revoke because the list this closes over is replaced whenever the
-        // template is, and a handler left pointing at the old one would clamp a
-        // ListView that is no longer in the tree.
-        _verticalTabViewSizeChangedRevoker = _tabView.SizeChanged(winrt::auto_revoke, [weakThis = get_weak()](auto&&, auto&&) {
-            if (const auto page{ weakThis.get() })
-            {
-                page->_ClampVerticalTabList();
-            }
-        });
+        _tabViewIsVertical = vertical;
     }
 
     // Method Description:

@@ -310,6 +310,14 @@ namespace winrt::TerminalApp::implementation
                     _tabStripSplitter.Visibility(isVisible ? Visibility::Visible : Visibility::Collapsed);
                 }
 
+                // The sidebar holds the new tab button as well as the tab row, so
+                // zeroing the row alone would leave the button to be clipped by a
+                // 0-width column rather than actually hidden.
+                if (_tabStripPanel)
+                {
+                    _tabStripPanel.Visibility(isVisible ? Visibility::Visible : Visibility::Collapsed);
+                }
+
                 const auto root = this->Root();
                 const uint32_t stripColIdx = _tabPosition == TabPosition::Left ? 0u : 2u;
                 if (root.ColumnDefinitions().Size() > stripColIdx)

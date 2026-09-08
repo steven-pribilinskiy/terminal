@@ -328,16 +328,34 @@ namespace winrt::TerminalApp::implementation
         Microsoft::Terminal::Settings::Model::TabPosition _tabPosition{ Microsoft::Terminal::Settings::Model::TabPosition::Top };
         Windows::UI::Xaml::Controls::Border _tabStripSplitter{ nullptr };
 
-        // Whether the vertical re-template is currently on the TabView. Guards
-        // _SyncTabViewTemplate against re-templating when nothing changed, which
-        // is what emptied the strip on every settings reload.
+        // Whether the strip is currently laid out as a column. Records state
+        // only - there is no longer a template to guard, since the TabView keeps
+        // MUX's stock one for the life of the window.
         bool _tabViewIsVertical{ false };
 
-        // The tab list inside the vertical template, and the resize hook that
-        // caps its height. Both belong to whichever template is applied right
-        // now, so both are dropped the moment the strip goes horizontal again.
-        Windows::UI::Xaml::Controls::ListView _verticalTabList{ nullptr };
-        Windows::UI::Xaml::FrameworkElement::SizeChanged_revoker _verticalTabViewSizeChangedRevoker;
+        // MUX's TabListView template part, cached so the resize hook does not
+        // have to walk the template on every SizeChanged. The stock template is
+        // never replaced, so this stays valid for the life of the TabView and is
+        // looked up exactly once.
+        Windows::UI::Xaml::Controls::ListView _tabStripList{ nullptr };
+        Windows::UI::Xaml::FrameworkElement::SizeChanged_revoker _tabStripSizeChangedRevoker;
+
+        // The sidebar that holds the tab row and, beneath it, the footer taken
+        // out of the TabView (the new tab button and the slot badge).
+        //
+        // The footer has to come out because MUX's stock TabContainerGrid is
+        // four COLUMNS - header, tabs, add button, footer - and the footer's is
+        // the Star one. Left where it is, it sits to the right of the tabs in a
+        // 200px strip and eats the width. Rewriting those ColumnDefinitions is
+        // not an option: TabView::UpdateTabWidths is compiled into MUX and holds
+        // references to all four.
+        //
+        // _borrowedTabStripFooter is the TabView's TabStripFooter while this
+        // grid holds it, and - exactly like _borrowedTabStripHeader - has to go
+        // back before the grid is dropped, or the new tab button is gone from
+        // every layout.
+        Windows::UI::Xaml::Controls::Grid _tabStripPanel{ nullptr };
+        Windows::Foundation::IInspectable _borrowedTabStripFooter{ nullptr };
 
 
         // Set while the tab row is parented to the titlebar, so the reset knows
@@ -526,9 +544,9 @@ namespace winrt::TerminalApp::implementation
         void _ApplyTabPositionCore(const Microsoft::Terminal::Settings::Model::WindowSettings& windowSettings);
         void _ResetRootGridLayout();
         void _BuildTabStripSplitter();
-        void _MakeTabListVertical();
-        void _SyncTabViewTemplate(const bool vertical);
-        void _RestoreTabItems(const std::vector<winrt::Windows::Foundation::IInspectable>& saved, const int32_t selectedIndex);
+        void _SetTabStripOrientation(const bool vertical);
+        void _BuildTabStripPanel();
+        void _TeardownTabStripPanel();
         void _ApplyNewTabButtonPosition(const Microsoft::Terminal::Settings::Model::WindowSettings& windowSettings);
         void _ClampVerticalTabList();
         void _BuildTitlebarStrip(const bool borrowTabStripHeader);
