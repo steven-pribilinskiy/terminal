@@ -162,3 +162,49 @@ jobs:
             C:\TerminalSlots\dev-pending.json
           if-no-files-found: error
           retention-days: 14
+
+      # An .msix layout carries no PDBs, so a crash in wtt decodes to
+      # "TerminalApp!DllGetActivationFactory+0x4c9a4" and names nothing of ours.
+      # That is not a theoretical loss: on 2026-09-08 a live cdb capture of the
+      # tabPosition "left" fail-fast produced a complete XAML stack -- NWDrawTree,
+      # UpdateLayout, CGrid::MeasureCell, FrameworkElement_MeasureOverride -- and
+      # then four unnamed TerminalApp frames where the actual throw was, which is
+      # exactly the part that needed reading.
+      #
+      # Only the five modules whose code we write. bin\ holds PDBs for every
+      # dependency too and none of those are worth the upload.
+      - name: Collect symbols
+        shell: pwsh
+        run: |
+          $out = 'C:\TerminalSlots\symbols'
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $want = @(
+            'TerminalApp.pdb'
+            'WindowsTerminal.pdb'
+            'Microsoft.Terminal.Control.pdb'
+            'Microsoft.Terminal.Settings.Model.pdb'
+            'Microsoft.Terminal.Settings.Editor.pdb'
+          )
+          foreach ($name in $want) {
+            $pdb = Get-ChildItem .\bin\x64\Release -Recurse -Filter $name -ErrorAction SilentlyContinue |
+                     Sort-Object Length -Descending | Select-Object -First 1
+            if ($pdb) {
+              Copy-Item $pdb.FullName (Join-Path $out $name) -Force
+              Write-Host ("  {0,-44} {1,6:N1} MB" -f $name, ($pdb.Length / 1MB))
+            }
+            else {
+              Write-Host "  $name -- not found"
+            }
+          }
+
+      # A separate artifact so staging a build stays a small download: symbols are
+      # an order of magnitude larger than the payload and are only wanted when
+      # something is actually being debugged. Shorter retention for the same
+      # reason -- a stack older than a few days is being read against the wrong
+      # commit anyway.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dev-symbols
+          path: C:\TerminalSlots\symbols
+          if-no-files-found: warn
+          retention-days: 5

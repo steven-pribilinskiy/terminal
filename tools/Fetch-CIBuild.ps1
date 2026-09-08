@@ -33,16 +33,32 @@ Param(
     # Naming a run bypasses the "is it newer than what we staged" check, since
     # going back to an older build is the whole intent.
     [string]$RunId = '',
-    [string]$Commit = ''
+    [string]$Commit = '',
+    # Also fetch the PDBs build.yml uploads as 'dev-symbols', into
+    # $SlotRoot\symbols, replacing whatever was there.
+    #
+    # Off by default because they are an order of magnitude larger than the
+    # payload and only matter while something is being debugged -- and because the
+    # poller runs this on a timer. Pass it when you are about to read a stack:
+    # without symbols a crash in wtt decodes to TerminalApp+0x<offset> and names
+    # nothing of ours, which is what made the tabPosition "left" fail-fast
+    # unreadable on 2026-09-08.
+    #
+    # The directory is flat and replaced wholesale rather than keyed on the
+    # commit, because symbols are only ever wanted for the build just staged, and
+    # stale PDBs beside a newer payload resolve to plausible wrong functions.
+    [switch]$WithSymbols
 )
 
 $ErrorActionPreference = 'Stop'
 
 $ArtifactName     = 'dev-payload'
+$SymbolArtifact   = 'dev-symbols'
 $StageDir         = Join-Path $SlotRoot 'dev-staged-ci'
 $MarkerPath       = Join-Path $SlotRoot 'dev-pending-ci.json'
 $TestStageDir     = Join-Path $SlotRoot 'test-staged-ci'
 $TestMarkerPath   = Join-Path $SlotRoot 'test-pending-ci.json'
+$SymbolDir        = Join-Path $SlotRoot 'symbols'
 
 function Say {
     Param([string]$Message, [ConsoleColor]$Color = [ConsoleColor]::Gray)
@@ -51,6 +67,49 @@ function Say {
 
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
     throw 'gh is not on PATH. Install the GitHub CLI and run `gh auth login`.'
+}
+
+# Separate from the payload download so it can run on its own: asking for symbols
+# against a build that is already staged is the common case (you only want them
+# once a crash has happened), and the early "nothing to do" exit below would
+# otherwise skip them.
+#
+# Never fatal. A run from before build.yml grew the symbols step has no such
+# artifact, and that is a reason to say so rather than to fail a fetch whose
+# payload half succeeded.
+function Get-CISymbols {
+    Param([string]$RunDatabaseId, [string]$Sha)
+
+    $temp = Join-Path ([System.IO.Path]::GetTempPath()) ("wt-sym-" + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Force -Path $temp | Out-Null
+    try {
+        gh run download $RunDatabaseId --repo $Repo --name $SymbolArtifact --dir $temp 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Say "No '$SymbolArtifact' artifact on run $RunDatabaseId (older build, or it expired)." ([ConsoleColor]::DarkYellow)
+            return
+        }
+
+        $pdbs = @(Get-ChildItem $temp -Filter '*.pdb' -File -ErrorAction SilentlyContinue)
+        if ($pdbs.Count -eq 0) {
+            Say "'$SymbolArtifact' held no .pdb files." ([ConsoleColor]::DarkYellow)
+            return
+        }
+
+        if (Test-Path $SymbolDir) { Remove-Item -Recurse -Force $SymbolDir }
+        New-Item -ItemType Directory -Force -Path $SymbolDir | Out-Null
+        foreach ($pdb in $pdbs) { Move-Item $pdb.FullName (Join-Path $SymbolDir $pdb.Name) -Force }
+
+        # So a stack read six weeks later cannot silently be read against the
+        # wrong build.
+        Set-Content -Path (Join-Path $SymbolDir 'commit.txt') -Value $Sha -Encoding UTF8
+
+        $mb = [math]::Round((($pdbs | Measure-Object Length -Sum).Sum / 1MB), 1)
+        Say "Symbols: $($pdbs.Count) pdb, $mb MB -> $SymbolDir" ([ConsoleColor]::Green)
+        Say "  cdb/windbg: set _NT_SYMBOL_PATH to include $SymbolDir" ([ConsoleColor]::DarkGray)
+    }
+    finally {
+        Remove-Item -Recurse -Force $temp -ErrorAction SilentlyContinue
+    }
 }
 
 $pinned = $RunId -or $Commit
@@ -140,6 +199,7 @@ if (-not $pinned -and -not $Force -and (Test-Path $MarkerPath)) {
     # and the Test payload would never get backfilled.
     if ($existing -and $existing.commitFull -eq $run.headSha -and (Test-Path $StageDir) -and (Test-Path $TestStageDir)) {
         Say "Already staged: $($run.headSha.Substring(0,9)). Nothing to do."
+        if ($WithSymbols) { Get-CISymbols -RunDatabaseId $run.databaseId -Sha $run.headSha }
         return
     }
 }
@@ -210,6 +270,8 @@ try {
             Copy-Item (Join-Path $PSScriptRoot $helperName) $helper -Force
         }
     }
+
+    if ($WithSymbols) { Get-CISymbols -RunDatabaseId $run.databaseId -Sha $run.headSha }
 
     Say "Staged $($info.commit) ($($info.branch)) built $($info.timestampUtc)" ([ConsoleColor]::Green)
     Say 'wtd will offer it as an update.'

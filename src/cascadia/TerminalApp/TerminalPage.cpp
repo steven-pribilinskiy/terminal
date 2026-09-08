@@ -724,20 +724,26 @@ namespace winrt::TerminalApp::implementation
     }
 
     // Method Description:
-    // - Turns the tab list inside the re-templated TabView on its side.
-    // - Everything here is a LOCAL VALUE on the element, not a setter in a
-    //   Style, and that is the entire point. An explicit Style replaces the
-    //   implicit one outright instead of layering onto it, and MUX's implicit
-    //   primitives:TabViewListView style is where that control's ControlTemplate
-    //   lives - a ScrollViewer around an ItemsPresenter, plus the named parts
-    //   TabView::OnApplyTemplate goes looking for. A style that set the items
-    //   panel and the scroll axes but no Template left the list with no visual
-    //   tree at all. XAML accepts that; it dies one tick later during render,
-    //   E_FAIL inside CCoreServices::NWDrawTree, with none of our frames on the
-    //   stack - so it presents as an unattributable fail-fast and no try/catch
-    //   around the layout can see it. That was the "tabPosition: left" crash.
-    // - Setting the same properties directly keeps MUX's template, its
-    //   ScrollViewer and its named parts, and changes only the orientation.
+    // - Turns the tab list inside the re-templated TabView on its side: a
+    //   vertical items panel, and the two scroll axes swapped.
+    // - These are local values on the element rather than setters in a Style
+    //   because nothing then has to be restated. App.xaml carries an implicit
+    //   primitives:TabViewListView style (the one that suppresses the entrance
+    //   and add/delete transitions), and the style this replaced had to repeat
+    //   that setter to avoid losing it.
+    // - A correction, because the commit that introduced this and the one before
+    //   it both asserted the opposite: an explicit Style does NOT cost a control
+    //   its ControlTemplate. UWP applies the built-in style from DefaultStyleKey
+    //   underneath FrameworkElement::Style, so a Style with no Template setter
+    //   layers onto the default template rather than replacing it. Two proofs in
+    //   this app: the implicit TabViewListView style just mentioned sets only
+    //   ItemContainerTransitions and the horizontal strip has always drawn, and
+    //   ColorButtonStyle is applied by key to the colour-picker buttons with no
+    //   Template anywhere in its BasedOn chain. So "the vertical list had no
+    //   visual tree" was never the cause of the tabPosition "left" crash, and
+    //   that crash is still undiagnosed - see the note in VerticalTabViewStyle.xaml.
+    // - What this function is still worth: it is the smaller, more honest way to
+    //   express the one thing that has to change. It is not a fix for the crash.
     void TerminalPage::_MakeTabListVertical()
     {
         // Assigning Style defers re-templating to the next measure pass, and the

@@ -33,26 +33,36 @@
                     mc:Ignorable="d">
 
     <!--
-        NOT APPLIED, and deliberately still here. This is what the tab list used
-        to be styled with, and it is the bug: an explicit Style REPLACES the
-        implicit one rather than layering on top of it, and MUX's implicit
-        primitives:TabViewListView style is where the control's ControlTemplate
-        lives. Setting the items panel and the scroll axes without a Template
-        left the list with no visual tree at all - which XAML accepts, and then
-        fails to render one tick later, E_FAIL inside CCoreServices::NWDrawTree
-        with none of our frames on the stack. That is the crash "tabPosition:
-        left" produced, and nothing around _ApplyTabPosition can catch it.
+        NOT APPLIED. TerminalPage::_MakeTabListVertical sets the orientation and
+        the scroll axes as local values on the element instead.
 
-        TerminalPage::_MakeTabListVertical now sets the same three things as
-        local values on the element instead, so MUX's template, its ScrollViewer
-        and its named parts all survive.
+        This block used to be blamed for the "tabPosition: left" crash, on the
+        theory that a Style without a Template setter leaves the control with no
+        visual tree. That theory is WRONG, and it is written down here because two
+        commits acted on it. UWP applies a control's built-in style (from
+        DefaultStyleKey) underneath FrameworkElement::Style, so a Style that sets
+        no Template layers onto the default template rather than replacing it.
+        Proof, in this app: App.xaml's implicit primitives:TabViewListView style
+        sets only ItemContainerTransitions and the horizontal strip has always
+        drawn; ColorButtonStyle is applied by key to the colour-picker buttons and
+        nothing in its BasedOn chain sets a Template either.
 
-        Kept rather than deleted for one build only. f1e9417d1 rewrote this file
-        and the result would not launch at all, on any tabPosition, and which of
-        its several changes did that is still unknown - so this commit changes
-        exactly one thing in here (the Style= reference on TabListView, below)
-        and nothing else. Once a build proves the Terminal still starts, this
-        block goes.
+        So the left/right crash is still undiagnosed. It wants a live first-chance
+        stack, not another theory: attach cdb to wtt and flip the setting to force
+        a hot reload, which is what produced the only real evidence so far (E_FAIL
+        out of TerminalApp, first-chance stack inside CCoreServices::NWDrawTree).
+
+        Kept rather than deleted because f1e9417d1 rewrote this file and the
+        result would not launch at all, on any tabPosition, and which of its
+        several changes did that was unknown. The markup delta was therefore held
+        to exactly one attribute - the Style= reference on TabListView below - so
+        that a build would tell us something, and it did: e9b604904 starts.
+
+        So f1e9417d1's breakage is one of the changes this pass did NOT make:
+        deleting this block, the seven attributes it added to TabListView, or the
+        ItemsPanel property element it put on that element. Narrowing that is
+        worth one build on its own, and this block stays until then so the next
+        change to this file is still attributable.
     -->
     <Style x:Key="VerticalTabViewListViewStyle"
            TargetType="primitives:TabViewListView">
