@@ -184,6 +184,7 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(Microsoft.UI.Xaml.Controls.TabViewWidthMode, TabWidthMode);
         INHERITABLE_SETTING(TabPosition, TabPosition);
         INHERITABLE_SETTING(NewTabButtonPosition, NewTabButtonPosition);
+        INHERITABLE_SETTING(SettingsUIHost, SettingsUIHost);
         INHERITABLE_SETTING(UInt32, PaneResizeStep);
         INHERITABLE_SETTING(Boolean, CloseWindowOnLastTab);
         INHERITABLE_SETTING(Boolean, ShowTabIndex);
