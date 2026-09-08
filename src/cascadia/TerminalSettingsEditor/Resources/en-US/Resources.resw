@@ -1009,6 +1009,26 @@
     <value>Under the last tab</value>
     <comment>An option to choose from for the "new tab button position" setting. When selected, the button sits immediately below the last tab, and moves down as tabs are opened.</comment>
   </data>
+  <data name="Globals_SettingsUIHost.Header" xml:space="preserve">
+    <value>Open settings in</value>
+    <comment>Header for a control to choose where the settings pages themselves appear when opened.</comment>
+  </data>
+  <data name="Globals_SettingsUIHost.Description" xml:space="preserve">
+    <value>Where this settings page appears when you open it. A dialog keeps your terminal in view behind it and closes with Esc.</value>
+    <comment>A description for what the "open settings in" setting does. Presented near "Globals_SettingsUIHost.Header". 'Esc' is the name of the Escape key and should not be translated if the key is labelled that way locally.</comment>
+  </data>
+  <data name="Globals_SettingsUIHostTab.Content" xml:space="preserve">
+    <value>A tab</value>
+    <comment>An option to choose from for the "open settings in" setting. When selected, settings open as another tab in the window, alongside the terminals.</comment>
+  </data>
+  <data name="Globals_SettingsUIHostDialog.Content" xml:space="preserve">
+    <value>A dialog over the window</value>
+    <comment>An option to choose from for the "open settings in" setting. When selected, settings open centred over the current window, dimming the terminal behind them.</comment>
+  </data>
+  <data name="Globals_SettingsUIHostWindow.Content" xml:space="preserve">
+    <value>Its own window (not yet available)</value>
+    <comment>An option to choose from for the "open settings in" setting. Listed but not implemented yet: choosing it falls back to a tab and reports a settings warning. Keep the parenthetical, it is what tells the user why nothing changes.</comment>
+  </data>
   <data name="Globals_TabWidthMode.Header" xml:space="preserve">
     <value>Tab width mode</value>
     <comment>Header for a control to choose how wide the tabs are.</comment>

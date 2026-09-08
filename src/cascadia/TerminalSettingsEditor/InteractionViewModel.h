@@ -20,6 +20,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         GETSET_BINDABLE_ENUM_SETTING(TabSwitcherMode, Model::TabSwitcherMode, _WindowSettings.TabSwitcherMode);
         GETSET_BINDABLE_ENUM_SETTING(CopyFormat, winrt::Microsoft::Terminal::Control::CopyFormat, _WindowSettings.CopyFormatting);
         GETSET_BINDABLE_ENUM_SETTING(ConfirmOnClose, Model::ConfirmOnClose, _GlobalSettings.ConfirmOnClose);
+        GETSET_BINDABLE_ENUM_SETTING(SettingsUIHost, Model::SettingsUIHost, _WindowSettings.SettingsUIHost);
 
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, CopyOnSelect);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, TrimBlockSelection);

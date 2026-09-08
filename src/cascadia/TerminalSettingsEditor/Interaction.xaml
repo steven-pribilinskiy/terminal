@@ -138,6 +138,17 @@
                 <ToggleSwitch IsOn="{x:Bind ViewModel.EnableColorSelection, Mode=TwoWay}"
                               Style="{StaticResource ToggleSwitchInExpanderStyle}" />
             </local:SettingsCard>
+
+            <!--  Where the Settings UI opens  -->
+            <local:SettingsCard x:Name="SettingsUIHost"
+                                x:Uid="Globals_SettingsUIHost"
+                                IsForkFeature="True">
+                <ComboBox AutomationProperties.AccessibilityView="Content"
+                          ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                          ItemsSource="{x:Bind ViewModel.SettingsUIHostList}"
+                          SelectedItem="{x:Bind ViewModel.CurrentSettingsUIHost, Mode=TwoWay}"
+                          Style="{StaticResource ComboBoxSettingStyle}" />
+            </local:SettingsCard>
         </StackPanel>
 
         <StackPanel Style="{StaticResource SettingsStackStyle}">

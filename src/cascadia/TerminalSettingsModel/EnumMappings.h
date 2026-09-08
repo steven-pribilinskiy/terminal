@@ -51,6 +51,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, ConfirmOnClose> ConfirmOnClose();
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, TabPosition> TabPosition();
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, NewTabButtonPosition> NewTabButtonPosition();
+        static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, SettingsUIHost> SettingsUIHost();
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, IconStyle> IconStyle();
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, TabCloseButtonVisibility> TabCloseButtonVisibility();
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, WindowDock> WindowDock();
