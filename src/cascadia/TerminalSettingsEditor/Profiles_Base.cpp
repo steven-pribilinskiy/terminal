@@ -79,6 +79,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     void Profiles_Base::Terminal_Click(const IInspectable& /*sender*/, const RoutedEventArgs& /*args*/)
     {
+        // CurrentPage is a VIEW_MODEL_OBSERVABLE_PROPERTY, and its setter is
+        // guarded on inequality: assigning the value it already holds raises no
+        // PropertyChanged, so MainPage never hears about it and nothing
+        // navigates. A click that lands on a card whose page is already current
+        // therefore does nothing at all, and looks identical to a click that was
+        // never delivered. Say which of the two happened.
+        if (_Profile.CurrentPage() == ProfileSubPage::Terminal)
+        {
+            OutputDebugStringW(L"[SettingsEditor] Terminal_Click: CurrentPage already Terminal, no navigation will occur\n");
+        }
         _Profile.CurrentPage(ProfileSubPage::Terminal);
     }
 

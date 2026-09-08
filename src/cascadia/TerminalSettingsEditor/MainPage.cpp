@@ -586,7 +586,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
         else if (page == ProfileSubPage::Terminal)
         {
-            contentFrame().Navigate(xaml_typename<Editor::Profiles_Terminal>(), winrt::make<NavigateToPageArgs>(profile, *this, elementToFocus));
+            // Frame::Navigate returns false rather than throwing when the page
+            // cannot be activated, and every caller here ignored it - so a page
+            // that refuses to load is indistinguishable from a click that never
+            // arrived. Reported because "Terminal Emulation does nothing" is
+            // exactly that ambiguity, and it cost a diagnosis round.
+            const auto navigated = contentFrame().Navigate(xaml_typename<Editor::Profiles_Terminal>(), winrt::make<NavigateToPageArgs>(profile, *this, elementToFocus));
+            if (!navigated)
+            {
+                OutputDebugStringW(L"[SettingsEditor] Navigate(Profiles_Terminal) returned false\n");
+            }
             _breadcrumbs.Append(winrt::make<Breadcrumb>(breadcrumbTag, RS_(L"Profile_Terminal/Header"), BreadcrumbSubPage::Profile_Terminal));
         }
         else if (page == ProfileSubPage::Advanced)

@@ -231,6 +231,14 @@ the next time you want that worktree. Check with Windows git (`/mnt/c/Program Fi
 
 ### When something you built will not run
 
+For a crash or a silent UI failure — a `0xc000027b` fail-fast, controls that vanish without a
+crash, a template that will not render — use the **`terminal-fork-diagnostics`** skill
+(`.claude/skills/terminal-fork-diagnostics/`) rather than reasoning about it. It carries the cdb
+capture procedure, the HRESULT decoder, the UI Automation verification scripts, and the MUX/UWP
+traps this repo has already paid for. Its first rule is the one worth repeating here: **a XAML
+failure in this app almost never fails where you can see it**, so capture a first-chance stack
+before forming a theory. Builds cost forty minutes; a capture costs four.
+
 Read [`doc/troubleshooting.md`](doc/troubleshooting.md) **before** you start bisecting or reading
 code. It covers the slot-specific failures and, more usefully, the tests that produce confident
 wrong answers: a payload exe launched directly has no package identity and aborts with

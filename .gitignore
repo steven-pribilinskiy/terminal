@@ -286,3 +286,6 @@ profiles.json
 
 # MSBuildCache
 /MSBuildCacheLogs/
+
+# Claude Code's per-machine state. The skills beside it are checked in on purpose.
+.claude/settings.local.json
