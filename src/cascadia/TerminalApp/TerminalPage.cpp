@@ -712,7 +712,26 @@ namespace winrt::TerminalApp::implementation
                     }
                 }
             }
-            CATCH_LOG();
+            catch (...)
+            {
+                LOG_CAUGHT_EXCEPTION();
+
+                // Put the stock template back, and note why logging alone is not
+                // enough. A ControlTemplate that throws part-way through
+                // expansion leaves the TabView with a half-built visual tree.
+                // XAML does not fail at that moment - it fails on the next
+                // measure pass, inside CCoreServices::NWDrawTree, as an E_FAIL
+                // fail-fast with none of our frames on the stack and nothing
+                // anywhere that can catch it.
+                //
+                // That is precisely how one unresolvable resource key in
+                // VerticalTabViewStyle.xaml turned into a Terminal that could not
+                // be opened: the throw WAS caught here and logged, and the broken
+                // template was left applied anyway. Clearing it costs a vertical
+                // strip that comes up looking like a horizontal one, which is a
+                // bad afternoon rather than a lost one.
+                _tabView.ClearValue(winrt::Windows::UI::Xaml::FrameworkElement::StyleProperty());
+            }
             break;
         }
         }

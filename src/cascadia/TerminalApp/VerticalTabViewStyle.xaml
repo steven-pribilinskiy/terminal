@@ -195,15 +195,54 @@
                                     Padding="{ThemeResource TabViewItemAddButtonContainerPadding}"
                                     HorizontalAlignment="Stretch"
                                     Visibility="{Binding IsAddTabButtonVisible, RelativeSource={RelativeSource TemplatedParent}}">
+                                <!--
+                                    Sized and coloured here rather than through
+                                    MUX's TabViewButtonStyle, and this is THE bug
+                                    that made "tabPosition: left" kill the window.
+
+                                    That style is declared in MUX's Generic.xaml
+                                    with x:Name, not x:Key, so it resolves inside
+                                    that dictionary and nowhere else. A copy of
+                                    MUX's template living in an app dictionary
+                                    cannot see it, and the lookup throws
+                                    0x802B000A "Cannot find a Resource with the
+                                    Name/Key TabViewButtonStyle" part-way through
+                                    expanding this template. TerminalPage caught
+                                    and logged that - and then the half-built
+                                    TabView went into the next measure pass and
+                                    took the process with it: E_FAIL inside
+                                    CCoreServices::NWDrawTree, no frame of ours on
+                                    the stack, nothing to catch.
+
+                                    Same trap applies to TabViewScrollViewerStyle
+                                    and every other x:Name'd helper in that file.
+                                    Anything this template references has to be a
+                                    key the app can actually resolve.
+
+                                    No Style at all is the smallest safe answer:
+                                    local values layer over the platform's default
+                                    Button style, so the hover and pressed visuals
+                                    still come from the system template for free.
+                                    SymbolThemeFontFamily and ControlCornerRadius
+                                    are proven reachable - App.xaml and
+                                    CommandPalette.xaml already use both.
+                                -->
                                 <Button x:Name="AddButton"
+                                        Width="24"
+                                        Height="24"
+                                        Padding="0"
                                         HorizontalAlignment="Center"
                                         VerticalAlignment="Center"
+                                        Background="Transparent"
+                                        BorderThickness="0"
                                         Command="{TemplateBinding AddTabButtonCommand}"
                                         CommandParameter="{TemplateBinding AddTabButtonCommandParameter}"
                                         Content="&#xE710;"
+                                        CornerRadius="{ThemeResource ControlCornerRadius}"
+                                        FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                                        FontSize="12"
                                         HighContrastAdjustment="None"
-                                        IsTextScaleFactorEnabled="False"
-                                        Style="{ThemeResource TabViewButtonStyle}" />
+                                        IsTextScaleFactorEnabled="False" />
                             </Border>
 
                             <ContentPresenter x:Name="RightContentPresenter"
@@ -213,9 +252,19 @@
                                               ContentTemplate="{TemplateBinding TabStripFooterTemplate}" />
                         </Grid>
 
+                        <!--
+                            Named for TabView::OnApplyTemplate's lookup and
+                            otherwise unused: the Terminal renders tab content
+                            itself, so nothing is ever put in here. The stock
+                            template gives it a TabViewItemHeaderBackgroundSelected
+                            background; that is the one resource reference in this
+                            file whose reachability the crash log could NOT prove,
+                            because expansion died at the add button just above it.
+                            An invisible presenter is not worth a second unproven
+                            lookup, so it does not get one.
+                        -->
                         <ContentPresenter x:Name="TabContentPresenter"
                                           Grid.Row="1"
-                                          Background="{ThemeResource TabViewItemHeaderBackgroundSelected}"
                                           BorderBrush="{TemplateBinding BorderBrush}"
                                           BorderThickness="{TemplateBinding BorderThickness}" />
                     </Grid>
