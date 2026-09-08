@@ -82,13 +82,41 @@ if (-not $w) { throw 'wtt never reached a window' }
 Write-Host "wtt pid $($w.Id), starting state $Setting=$From"
 Start-Sleep -Seconds 5
 
-# e06d7363 is a C++ throw; c000027b is the XAML stowed-exception fail-fast.
-# .exr -1 carries the HRESULT a dump would have lost.
+# Three traps, and the order they matter in:
+#
+#   40080201  RoOriginateError. This is the one to read FIRST when an HRESULT
+#             comes back across an ABI boundary. A C++ throw on our side only
+#             shows OUR frames - the callee has already returned - so it says
+#             what we were doing and never who refused. The originate fires
+#             INSIDE the component that rejected the call, so its stack names
+#             the actual objector.
+#   e06d7363  a C++ throw.
+#   c000027b  the XAML stowed-exception fail-fast.
+#
+# .exr -1 carries the HRESULT a minidump would have lost.
 $detach = if ($KeepWindow) { '.detach' } else { '' }
+# NOT .symfix. It REPLACES the symbol path with Microsoft's server, throwing
+# away the local PDBs that were just staged - which is how a capture can look
+# perfectly healthy and still render every frame of ours as
+# TerminalApp!DllGetActivationFactory+<huge offset>. That is the export table
+# being guessed at, not symbols. _NT_SYMBOL_PATH is already set correctly by
+# this script; append to it rather than clobbering it.
+#
+# And reload only OUR module. A bare `.reload /f` force-reloads every module in
+# the process from the symbol server - two and a half minutes here, long enough
+# that the trigger fires before `g` runs and the traps never arm. The capture
+# then looks like "no exception happened", which is the most misleading result
+# this script can produce.
+#
+# `lm vm` reports what actually loaded, because a symbol path that validates and
+# a PDB that matches are different things.
 @"
-.symfix
-.reload
+.sympath+ $symbols
+.reload /f TerminalApp.dll
+.echo ==SYMBOLS==
+lm vm TerminalApp
 .echo ==ATTACHED==
+sxe -c ".echo ==ORIGINATE==; .exr -1; kb 24; gn" 40080201
 sxe -c ".echo ==THROW==; .exr -1; kb 40; gn" e06d7363
 sxe -c ".echo ==FAILFAST==; .exr -1; kb 60; gn" c000027b
 g
