@@ -485,7 +485,11 @@ does not fail at all.
   rather than `Windows::UI::Xaml::Input`. Both were hit within an hour of each
   other by two different sessions.
 - **`StyleProperty` is on `FrameworkElement`, not `Control`.** `Control` inherits
-  `Style`, but the static DP accessor is declared on the base.
+  `Style`, but the static DP accessor is declared on the base. Same trap with
+  **`Grid::SetRow`/`SetColumn`/`SetRowSpan`/`SetColumnSpan`**, which take a
+  `FrameworkElement` even though `Grid::Children().Append` takes a `UIElement` —
+  so `try_as<UIElement>` on something you are about to position in a grid is a
+  compile error one round trip away.
 - **`GETSET_BINDABLE_ENUM_SETTING`'s setter raises no `PropertyChanged`.** If
   anything on the page derives from that value, hand-write the setter and notify
   the derived properties — but never the property the binding just wrote (see

@@ -837,7 +837,10 @@ namespace winrt::TerminalApp::implementation
                     // ContentPresenter, and XAML refuses to give an element a
                     // second parent - it throws rather than reparenting.
                     tabView.TabStripHeader(nullptr);
-                    if (const auto& element{ header.try_as<UIElement>() })
+                    // FrameworkElement, not UIElement: Grid's attached-property
+                    // setters are declared on FrameworkElement, so SetColumn
+                    // will not take a UIElement even though Children() will.
+                    if (const auto& element{ header.try_as<FrameworkElement>() })
                     {
                         Controls::Grid::SetColumn(element, 0);
                         strip.Children().Append(element);
