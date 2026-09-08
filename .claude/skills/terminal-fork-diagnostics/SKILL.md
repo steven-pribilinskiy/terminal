@@ -119,10 +119,24 @@ a missing-template theory without checking this first.
   still holding them belongs to a template that no longer exists, so nothing
   will ever release it on its own; remove the child from its parent `Panel`'s
   `Children` explicitly.
-- Prefer not re-templating at all. `ItemsControl::ItemsPanelRoot()` exposes the
-  realized panel, so `ItemsStackPanel::Orientation` can be flipped in place, and
-  a `Grid`'s row/column definitions can be rebuilt at runtime - neither
-  re-parents anything.
+- Do not re-template at all. This is settled: `TerminalPage::_SetTabStripOrientation`
+  flips `ItemsStackPanel::Orientation` on the panel `ItemsControl::ItemsPanelRoot()`
+  returns, which is one DependencyProperty on an object that already exists, so
+  no container is regenerated and `TabItems` is never touched. Five attempts to
+  make the swap survive all failed; the sixth deleted it.
+- What the stock template forces, once you stop replacing it: `TabContainerGrid`
+  is four **columns** (`LeftContentColumn | TabColumn | AddButtonColumn |
+  RightContentColumn`) and the footer's is the `*` one, so in a narrow strip the
+  footer sits right of the tabs and eats the width. Do not rewrite those
+  `ColumnDefinition`s - MUX's compiled `UpdateTabWidths` holds references to all
+  four and writes to them. Borrow the content out into a grid you own instead
+  (`TabStripFooter(nullptr)` first - one parent per element), and give the list
+  an explicit `Width` so the `Auto` column measures to the strip.
+
+**You cannot read MUX's stock templates here.** Builds are CI-only and the local
+`packages\` tree is deleted, so `microsoft.ui.xaml\*\Generic.xaml` is not on disk
+and is not in the NuGet cache either. Work from template *part names* via
+`GetTemplateChild` and from the projection headers below, not from the markup.
 
 **`GetTotalNonClientExclusiveSize().height` includes the titlebar** for
 `NonClientIslandWindow`. Using it as a window height overhangs the work area by
@@ -136,17 +150,61 @@ border - the same thickness on every side, already halved elsewhere to compute
 `try_as<UIElement>` on something you are about to position is a compile error
 one CI round away.
 
+**A `SettingsCard` cannot be invoked over UI Automation, so it cannot be clicked
+by script.** `SettingsCardAutomationPeer` derives from `ButtonBaseAutomationPeerT`,
+which supplies no `IInvokeProvider`, and `ButtonBase`'s entire public surface is
+`ClickMode`, `IsPointerOver`, `IsPressed`, `Command`, `CommandParameter` and
+`Click` as add/remove only - there is no way to raise `Click` from outside. Every
+card in the editor is wired to `Click`. To drive one, take its bounding rectangle
+from `Get-UiaSnapshot.ps1` and click the centre with `AgentDriver.exe`, honouring
+the idle rules in the global `CLAUDE.md`.
+
+## Check a WinRT API before spending a build on it
+
+The projected headers under `src/cascadia/TerminalApp/*/Generated Files/winrt/impl/`
+are checked in by nobody and deleted by nothing, and they are the authority on
+what a type actually exposes. Reading them turns "does this API exist, and is it
+settable?" from a 40-minute CI question into a grep. This is how the tab-strip
+rework was de-risked before a single build:
+
+```bash
+g="src/cascadia/TerminalApp/dll/Generated Files/winrt/impl/Windows.UI.Xaml.Controls.0.h"
+grep -n "ItemsPanelRoot" "$g"                       # -> on IItemsControl2, public getter
+awk '/struct consume_.*IItemsStackPanel\b/,/^    };/' "$g" | grep Orientation
+                                                    # -> getter AND setter: the flip is legal
+```
+
+Two things to read off them, both of which decided a design this session:
+
+- **A property with only a `[[nodiscard]] auto Foo() const;` and no
+  `auto Foo(T const&) const;` is read-only.** That is how `ButtonBase` was shown
+  to have no way to raise `Click`, which killed an entire planned fix.
+- **Which interface a member lives on** tells you what to `try_as` to. `consume_*`
+  struct names map one-to-one onto the interfaces.
+
+If the headers are absent (a fresh clone that has never built), the same answers
+are in the Windows SDK metadata - but do not guess, and do not "just try it" when
+trying it costs a CI cycle.
+
 ## Gates that cost seconds and save a round trip
 
 Run these before pushing anything:
 
 ```powershell
 .\tools\Check-SettingsModelConsistency.ps1   # missing resw strings, enum labels
+.\tools\GenerateSettingsIndex.ps1 -SourceDir .\src\cascadia\TerminalSettingsEditor -OutputDir <scratch>
 ```
 
-That one matters most: a missing resource string compiles, packages, passes both
+The first matters most: a missing resource string compiles, packages, passes both
 test suites, and then access-violates the first time the Settings UI asks for a
-name. Also worth the few seconds - parse what you edited:
+name. It also catches an `MTSMSettings.h` entry with no matching
+`INHERITABLE_SETTING` in the `.idl` - which compiles and packages and simply does
+not work. It earned its keep on `settingsUIHost` while that was being added.
+
+The second is safe to run by hand into a scratch directory (the build runs it
+into `Generated Files`). Grep the output for a new card's uid: an entry with an
+empty `ElementName` means search will land on the page but never scroll to the
+setting, which is the symptom of a missing `x:Name`. Also worth the few seconds - parse what you edited:
 
 ```powershell
 Get-Content .\src\cascadia\TerminalSettingsModel\defaults.json -Raw | ConvertFrom-Json

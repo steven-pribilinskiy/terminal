@@ -67,6 +67,10 @@ foreach ($ct in $ControlTypes) {
 }
 
 Write-Host ''
-Write-Host 'Note: Invoke() on a SettingsCard does nothing - the peer advertises the'
-Write-Host 'pattern but ButtonBaseAutomationPeer supplies no IInvokeProvider. An'
-Write-Host 'automated click on a settings card proves nothing either way.'
+Write-Host 'Note: a SettingsCard cannot be invoked over UIA, so do not try. Its peer'
+Write-Host 'derives from ButtonBaseAutomationPeer, which supplies no IInvokeProvider,'
+Write-Host 'and ButtonBase exposes no way to raise Click from outside - while Click is'
+Write-Host 'what every card in the editor is wired to. It no longer claims the pattern'
+Write-Host 'either, so a client gets an honest "not available" rather than a failed QI.'
+Write-Host 'To drive a card, click the centre of the rectangle printed above with'
+Write-Host 'AgentDriver.exe, honouring the idle rules in the global CLAUDE.md.'
