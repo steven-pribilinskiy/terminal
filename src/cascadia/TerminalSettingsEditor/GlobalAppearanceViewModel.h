@@ -45,6 +45,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         bool NewTabButtonPositionEnabled();
         void TabPositionChanged(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::Controls::SelectionChangedEventArgs& args);
 
+        // The docked size means nothing until an edge is chosen, so the slider
+        // greys out with the dropdown rather than sitting there being ignored.
+        bool DockSizeEnabled();
+        void DockWindowChanged(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::Controls::SelectionChangedEventArgs& args);
+
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, AlwaysShowTabs);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, ShowTabsFullscreen);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, ShowTabIndex);
@@ -59,11 +64,6 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, MinimizeToNotificationArea);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, ShowAdminShield);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, EnableUnfocusedAcrylic);
-        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, AylithImprint);
-        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, AylithImprintJsonOnly);
-
-        void AylithImprintToggled(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::RoutedEventArgs& args);
-        void AylithImprintJsonOnlyToggled(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::RoutedEventArgs& args);
 
     private:
         Model::GlobalAppSettings _GlobalSettings;

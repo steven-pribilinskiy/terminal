@@ -898,7 +898,7 @@
     <comment>Header for a slider choosing how much of the screen a docked window takes up. The value is a percentage.</comment>
   </data>
   <data name="Globals_DockSize.Description" xml:space="preserve">
-    <value>How much of the screen the docked window covers, as a percentage. Has no effect when docking is off.</value>
+    <value>How much of the screen the docked window covers, as a percentage.</value>
     <comment>A description for what the "docked size" setting does. Presented near "Globals_DockSize.Header".</comment>
   </data>
   <data name="Globals_TabIconStyle.Header" xml:space="preserve">
@@ -1032,6 +1032,10 @@
   <data name="Globals_Theme.Header" xml:space="preserve">
     <value>Application Theme</value>
     <comment>Header for a control to choose the theme colors used in the app.</comment>
+  </data>
+  <data name="Globals_Theme.Description" xml:space="preserve">
+    <value>The theme also decides where acrylic is allowed.</value>
+    <comment>A description for the group of settings headed by "Globals_Theme.Header", which contains the two acrylic settings.</comment>
   </data>
   <data name="Globals_ThemeDark.Content" xml:space="preserve">
     <value>Dark</value>
@@ -2092,6 +2096,38 @@
   <data name="Globals_WarningsHeader.Text" xml:space="preserve">
     <value>Warnings</value>
     <comment>Header for a group of settings that control the warnings in the app.</comment>
+  </data>
+  <data name="Globals_VisualStyleHeader.Text" xml:space="preserve">
+    <value>Visual style</value>
+    <comment>Header for the section of settings that control how the app is painted - its theme, its materials, and its animations.</comment>
+  </data>
+  <data name="Globals_TabsAndLayoutHeader.Text" xml:space="preserve">
+    <value>Tabs and layout</value>
+    <comment>Header for the section of settings that control the tabs and the title bar.</comment>
+  </data>
+  <data name="Globals_WindowBehaviourHeader.Text" xml:space="preserve">
+    <value>Window behaviour</value>
+    <comment>Header for the section of settings that control how the app's window behaves on the desktop.</comment>
+  </data>
+  <data name="Globals_SystemIntegrationHeader.Text" xml:space="preserve">
+    <value>System integration and notifications</value>
+    <comment>Header for the section of settings that control how the app appears elsewhere in Windows, such as in the notification area.</comment>
+  </data>
+  <data name="Globals_TabStripGroup.Header" xml:space="preserve">
+    <value>Tab strip</value>
+    <comment>Header for a group of settings that control how the row or column of tabs is drawn.</comment>
+  </data>
+  <data name="Globals_TabStripGroup.Description" xml:space="preserve">
+    <value>Where the tabs sit, how wide they are, and what each one shows.</value>
+    <comment>A description for the group of settings headed by "Globals_TabStripGroup.Header".</comment>
+  </data>
+  <data name="Globals_TitlebarGroup.Header" xml:space="preserve">
+    <value>Title bar</value>
+    <comment>Header for a group of settings that control the app's title bar.</comment>
+  </data>
+  <data name="Globals_TitlebarGroup.Description" xml:space="preserve">
+    <value>Whether there is a title bar at all, and what it says.</value>
+    <comment>A description for the group of settings headed by "Globals_TitlebarGroup.Header".</comment>
   </data>
   <data name="Profile_WindowHeader.Text" xml:space="preserve">
     <value>Window</value>

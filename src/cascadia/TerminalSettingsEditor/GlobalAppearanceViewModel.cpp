@@ -5,7 +5,6 @@
 #include "GlobalAppearanceViewModel.h"
 #include "GlobalAppearanceViewModel.g.cpp"
 #include "EnumEntry.h"
-#include "SettingsCard.h"
 
 using namespace winrt;
 using namespace winrt::Windows::UI::Xaml;
@@ -143,6 +142,21 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _NotifyChanges(L"TabWidthModeEnabled", L"NewTabButtonPositionEnabled");
     }
 
+    // The docked size is a fraction of the screen for a window that is docked to
+    // an edge. With no edge chosen there is nothing for it to be a fraction of.
+    bool GlobalAppearanceViewModel::DockSizeEnabled()
+    {
+        return _WindowSettings.DockWindow() != Model::WindowDock::Off;
+    }
+
+    // Same reason as TabPositionChanged: GETSET_BINDABLE_ENUM_SETTING's setter
+    // writes straight through without raising PropertyChanged, so the slider
+    // would otherwise stay greyed until the page was rebuilt.
+    void GlobalAppearanceViewModel::DockWindowChanged(const winrt::Windows::Foundation::IInspectable& /* sender */, const Controls::SelectionChangedEventArgs& /* args */)
+    {
+        _NotifyChanges(L"DockSizeEnabled");
+    }
+
     void GlobalAppearanceViewModel::ShowTitlebarToggled(const winrt::Windows::Foundation::IInspectable& /* sender */, const RoutedEventArgs& /* args */)
     {
         // Set AlwaysShowTabs to true if ShowTabsInTitlebar was toggled OFF -> ON
@@ -152,30 +166,4 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
     }
 
-    // The setting lives on the settings clone and is only written on Save, but the
-    // mark is a property of the editor's own chrome -- it should follow the switch
-    // immediately, on every page, including this one. So the value is pushed
-    // straight to SettingsCard rather than waiting to be reloaded.
-    void GlobalAppearanceViewModel::AylithImprintToggled(const winrt::Windows::Foundation::IInspectable& sender, const RoutedEventArgs& /* args */)
-    {
-        // Read the switch, not AylithImprint(). Toggled and the TwoWay binding's
-        // write-back are not ordered against each other, so the projected property
-        // can still be reporting the old value here -- which meant this pushed
-        // "false" on the way on, and the mark never appeared anywhere.
-        if (const auto toggle = sender.try_as<winrt::Windows::UI::Xaml::Controls::ToggleSwitch>())
-        {
-            SettingsCard::ImprintEnabled(toggle.IsOn());
-        }
-    }
-
-    // Same reasoning as AylithImprintToggled, including reading the switch rather
-    // than the projected property: Toggled and the TwoWay binding's write-back are
-    // not ordered against each other.
-    void GlobalAppearanceViewModel::AylithImprintJsonOnlyToggled(const winrt::Windows::Foundation::IInspectable& sender, const RoutedEventArgs& /* args */)
-    {
-        if (const auto toggle = sender.try_as<winrt::Windows::UI::Xaml::Controls::ToggleSwitch>())
-        {
-            SettingsCard::JsonOnlyImprintEnabled(toggle.IsOn());
-        }
-    }
 }

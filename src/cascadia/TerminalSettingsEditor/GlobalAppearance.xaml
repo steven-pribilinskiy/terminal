@@ -26,277 +26,369 @@
         </ResourceDictionary>
     </Page.Resources>
 
-    <StackPanel Spacing="2"
-                Style="{StaticResource SettingsStackStyle}">
-        <!--  Theme  -->
-        <local:SettingsCard x:Name="Theme"
-                            x:Uid="Globals_Theme">
-            <ComboBox AutomationProperties.AccessibilityView="Content"
-                      ItemsSource="{x:Bind ViewModel.ThemeList, Mode=OneWay}"
-                      SelectedItem="{x:Bind ViewModel.CurrentTheme, Mode=TwoWay}"
-                      Style="{StaticResource ComboBoxSettingStyle}">
-                <ComboBox.ItemTemplate>
-                    <DataTemplate x:DataType="model:Theme">
-                        <TextBlock Text="{x:Bind local:GlobalAppearanceViewModel.ThemeNameConverter((model:Theme)), Mode=OneWay}" />
-                    </DataTemplate>
-                </ComboBox.ItemTemplate>
-            </ComboBox>
-        </local:SettingsCard>
+    <!--
+        Sections, then groups, then rows. This page carries more settings than any
+        other and grew a third again with the fork's additions, so a flat run of
+        cards had become a page you scroll rather than read. The shape here follows
+        the settings-UI grouping upstream is converging on (microsoft/terminal
+        #20200, tracked by #17000): a TextBlockSubHeaderStyle heading per section,
+        a SettingsExpander for anything that is genuinely a group, and a plain
+        SettingsCard for anything that is not. A lone setting stays a card - an
+        expander around one row is just a click in the way.
 
-        <!--  Position of new tab  -->
-        <local:SettingsCard x:Name="NewTabPosition"
-                            x:Uid="Globals_NewTabPosition">
-            <ComboBox AutomationProperties.AccessibilityView="Content"
-                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
-                      ItemsSource="{x:Bind ViewModel.NewTabPositionList, Mode=OneWay}"
-                      SelectedItem="{x:Bind ViewModel.CurrentNewTabPosition, Mode=TwoWay}"
-                      Style="{StaticResource ComboBoxSettingStyle}" />
-        </local:SettingsCard>
+        Which group is open is remembered per user; see SettingsExpander.cpp.
+    -->
+    <StackPanel>
 
-        <!--  Show Titlebar  -->
-        <local:SettingsCard x:Name="ShowTitlebar"
-                            x:Uid="Globals_ShowTitlebar">
-            <ToggleSwitch IsOn="{x:Bind ViewModel.ShowTabsInTitlebar, Mode=TwoWay}"
-                          Style="{StaticResource ToggleSwitchInExpanderStyle}"
-                          Toggled="{x:Bind ViewModel.ShowTitlebarToggled}" />
-        </local:SettingsCard>
+        <!--  Grouping: Visual style  -->
+        <StackPanel Style="{StaticResource SettingsStackStyle}">
+            <TextBlock x:Uid="Globals_VisualStyleHeader"
+                       Style="{StaticResource TextBlockSubHeaderStyle}" />
+            <StackPanel Spacing="2"
+                        Style="{StaticResource PivotStackStyle}">
 
-        <!--  Always show tabs  -->
-        <local:SettingsCard x:Name="AlwaysShowTabs"
-                            x:Uid="Globals_AlwaysShowTabs"
-                            IsEnabled="{x:Bind mtu:Converters.InvertBoolean(ViewModel.ShowTabsInTitlebar), Mode=OneWay}">
-            <ToggleSwitch IsOn="{x:Bind ViewModel.AlwaysShowTabs, Mode=TwoWay}"
-                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-        </local:SettingsCard>
+                <!--
+                    Theme, and the two materials that follow from it. Both acrylic
+                    settings are about how the chrome is painted, which is the
+                    theme's business, so they sit under it rather than beside it.
+                -->
+                <local:SettingsExpander x:Name="Theme"
+                                        x:Uid="Globals_Theme">
+                    <local:SettingsExpander.HeaderIcon>
+                        <FontIcon Glyph="&#xE790;" />
+                    </local:SettingsExpander.HeaderIcon>
+                    <local:SettingsExpander.Content>
+                        <ComboBox AutomationProperties.AccessibilityView="Content"
+                                  ItemsSource="{x:Bind ViewModel.ThemeList, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.CurrentTheme, Mode=TwoWay}"
+                                  Style="{StaticResource ComboBoxSettingStyle}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="model:Theme">
+                                    <TextBlock Text="{x:Bind local:GlobalAppearanceViewModel.ThemeNameConverter((model:Theme)), Mode=OneWay}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </local:SettingsExpander.Content>
+                    <local:SettingsExpander.Items>
 
-        <!--  Show tabs in full screen  -->
-        <local:SettingsCard x:Name="ShowTabsFullscreen"
-                            x:Uid="Globals_ShowTabsFullscreen">
-            <ToggleSwitch IsOn="{x:Bind ViewModel.ShowTabsFullscreen, Mode=TwoWay}"
-                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-        </local:SettingsCard>
+                        <!--  Show Acrylic in Tab Row  -->
+                        <local:SettingsCard x:Name="AcrylicTabRow"
+                                            x:Uid="Globals_AcrylicTabRow">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.UseAcrylicInTabRow, Mode=TwoWay}"
+                                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                        </local:SettingsCard>
 
-        <!--
-            Tab icon and close button. Both exist upstream as theme.tab.iconStyle
-            and theme.tab.showCloseButton and are settable there only by hand, so
-            these carry the hollow mark rather than the filled one. They are
-            overrides: until one is touched, whatever the active theme says still
-            wins. See doc/json-only-settings.md.
-        -->
-        <local:SettingsCard x:Name="TabIconStyle"
-                            x:Uid="Globals_TabIconStyle"
-                            IsJsonOnlyUpstream="True">
-            <ComboBox AutomationProperties.AccessibilityView="Content"
-                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
-                      ItemsSource="{x:Bind ViewModel.TabIconStyleList, Mode=OneWay}"
-                      SelectedItem="{x:Bind ViewModel.CurrentTabIconStyle, Mode=TwoWay}"
-                      Style="{StaticResource ComboBoxSettingStyle}" />
-        </local:SettingsCard>
+                        <!--  Enable Unfocused Acrylic  -->
+                        <local:SettingsCard x:Name="EnableUnfocusedAcrylic"
+                                            x:Uid="Globals_EnableUnfocusedAcrylic">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.EnableUnfocusedAcrylic, Mode=TwoWay}"
+                                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                        </local:SettingsCard>
+                    </local:SettingsExpander.Items>
+                </local:SettingsExpander>
 
-        <local:SettingsCard x:Name="TabCloseButton"
-                            x:Uid="Globals_TabCloseButton"
-                            IsJsonOnlyUpstream="True">
-            <ComboBox AutomationProperties.AccessibilityView="Content"
-                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
-                      ItemsSource="{x:Bind ViewModel.TabCloseButtonList, Mode=OneWay}"
-                      SelectedItem="{x:Bind ViewModel.CurrentTabCloseButton, Mode=TwoWay}"
-                      Style="{StaticResource ComboBoxSettingStyle}" />
-        </local:SettingsCard>
+                <!--  Pane Title Bars  -->
+                <local:SettingsCard x:Name="PaneTitlebarVisibility"
+                                    x:Uid="Globals_PaneTitlebarVisibility"
+                                    IsForkFeature="True">
+                    <ComboBox AutomationProperties.AccessibilityView="Content"
+                              ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                              ItemsSource="{x:Bind ViewModel.PaneTitlebarVisibilityList, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.CurrentPaneTitlebarVisibility, Mode=TwoWay}"
+                              Style="{StaticResource ComboBoxSettingStyle}" />
+                </local:SettingsCard>
 
-        <!--  Show tab index  -->
-        <local:SettingsCard x:Name="ShowTabIndex"
-                            x:Uid="Globals_ShowTabIndex"
-                            IsForkFeature="True">
-            <ToggleSwitch IsOn="{x:Bind ViewModel.ShowTabIndex, Mode=TwoWay}"
-                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-        </local:SettingsCard>
+                <!--  Disable Animations  -->
+                <!--  NOTE: the UID is "DisablePaneAnimationsReversed" not "DisablePaneAnimations". See GH#9124 for more details.  -->
+                <local:SettingsCard x:Name="DisableAnimations"
+                                    x:Uid="Globals_DisableAnimationsReversed">
+                    <ToggleSwitch IsOn="{x:Bind ViewModel.InvertedDisableAnimations, Mode=TwoWay}"
+                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                </local:SettingsCard>
+            </StackPanel>
+        </StackPanel>
 
-        <!--  Close the window after closing the last tab  -->
-        <local:SettingsCard x:Name="CloseWindowOnLastTab"
-                            x:Uid="Globals_CloseWindowOnLastTab"
-                            IsForkFeature="True">
-            <ToggleSwitch IsOn="{x:Bind ViewModel.CloseWindowOnLastTab, Mode=TwoWay}"
-                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-        </local:SettingsCard>
+        <!--  Grouping: Tabs and layout  -->
+        <StackPanel Style="{StaticResource SettingsStackStyle}">
+            <TextBlock x:Uid="Globals_TabsAndLayoutHeader"
+                       Style="{StaticResource TextBlockSubHeaderStyle}" />
+            <StackPanel Spacing="2"
+                        Style="{StaticResource PivotStackStyle}">
 
-        <!--  Show Acrylic in Tab Row  -->
-        <local:SettingsCard x:Name="AcrylicTabRow"
-                            x:Uid="Globals_AcrylicTabRow">
-            <ToggleSwitch IsOn="{x:Bind ViewModel.UseAcrylicInTabRow, Mode=TwoWay}"
-                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-        </local:SettingsCard>
+                <!--
+                    Everything about how the strip of tabs itself is drawn. Marked as
+                    a fork group rather than marking each row: the expander forwards
+                    IsForkFeature to the card that draws its header, and the two rows
+                    upstream only exposes in JSON keep their own hollow marks, which
+                    a group cannot carry.
+                -->
+                <local:SettingsExpander x:Name="TabStrip"
+                                        x:Uid="Globals_TabStripGroup"
+                                        IsForkFeature="True">
+                    <local:SettingsExpander.HeaderIcon>
+                        <FontIcon Glyph="&#xE7C4;" />
+                    </local:SettingsExpander.HeaderIcon>
+                    <local:SettingsExpander.Items>
 
-        <!--  Show Title in Titlebar  -->
-        <local:SettingsCard x:Name="ShowTitleInTitlebar"
-                            x:Uid="Globals_ShowTitleInTitlebar">
-            <ToggleSwitch IsOn="{x:Bind ViewModel.ShowTitleInTitlebar, Mode=TwoWay}"
-                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-        </local:SettingsCard>
+                        <!--  Tab Position  -->
+                        <local:SettingsCard x:Name="TabPosition"
+                                            x:Uid="Globals_TabPosition"
+                                            IsForkFeature="True">
+                            <ComboBox AutomationProperties.AccessibilityView="Content"
+                                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                                      ItemsSource="{x:Bind ViewModel.TabPositionList, Mode=OneWay}"
+                                      SelectedItem="{x:Bind ViewModel.CurrentTabPosition, Mode=TwoWay}"
+                                      SelectionChanged="{x:Bind ViewModel.TabPositionChanged}"
+                                      Style="{StaticResource ComboBoxSettingStyle}" />
+                        </local:SettingsCard>
 
-        <!--  Always on Top  -->
-        <local:SettingsCard x:Name="AlwaysOnTop"
-                            x:Uid="Globals_AlwaysOnTop">
-            <ToggleSwitch IsOn="{x:Bind ViewModel.AlwaysOnTop, Mode=TwoWay}"
-                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-        </local:SettingsCard>
+                        <!--
+                            Tab Width Mode. Disabled for a left or right strip: those
+                            modes divide the strip's width among the tabs, which means
+                            nothing when the strip is a column, so TerminalPage pins
+                            SizeToContent there. Greying it out says so, rather than
+                            leaving a live-looking control whose value is quietly
+                            ignored.
+                        -->
+                        <local:SettingsCard x:Name="TabWidthMode"
+                                            x:Uid="Globals_TabWidthMode"
+                                            IsEnabled="{x:Bind ViewModel.TabWidthModeEnabled, Mode=OneWay}">
+                            <ComboBox AutomationProperties.AccessibilityView="Content"
+                                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                                      ItemsSource="{x:Bind ViewModel.TabWidthModeList, Mode=OneWay}"
+                                      SelectedItem="{x:Bind ViewModel.CurrentTabWidthMode, Mode=TwoWay}"
+                                      Style="{StaticResource ComboBoxSettingStyle}" />
+                        </local:SettingsCard>
 
-        <!--
-            Docking. Pins the window to a screen edge at a fixed fraction of the
-            screen, and stops it being moved or resized off that edge. Quake mode
-            is the same mechanism fixed at top / 50%, and still wins over this.
-        -->
-        <local:SettingsCard x:Name="DockWindow"
-                            x:Uid="Globals_DockWindow"
-                            IsForkFeature="True">
-            <ComboBox AutomationProperties.AccessibilityView="Content"
-                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
-                      ItemsSource="{x:Bind ViewModel.DockWindowList, Mode=OneWay}"
-                      SelectedItem="{x:Bind ViewModel.CurrentDockWindow, Mode=TwoWay}"
-                      Style="{StaticResource ComboBoxSettingStyle}" />
-        </local:SettingsCard>
+                        <!--
+                            New tab button position. The mirror of Tab Width Mode
+                            above: that one is dead in a vertical strip, this one is
+                            dead in a horizontal one, so each is greyed out exactly
+                            when it has nothing to say.
+                        -->
+                        <local:SettingsCard x:Name="NewTabButtonPosition"
+                                            x:Uid="Globals_NewTabButtonPosition"
+                                            IsEnabled="{x:Bind ViewModel.NewTabButtonPositionEnabled, Mode=OneWay}"
+                                            IsForkFeature="True">
+                            <ComboBox AutomationProperties.AccessibilityView="Content"
+                                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                                      ItemsSource="{x:Bind ViewModel.NewTabButtonPositionList, Mode=OneWay}"
+                                      SelectedItem="{x:Bind ViewModel.CurrentNewTabButtonPosition, Mode=TwoWay}"
+                                      Style="{StaticResource ComboBoxSettingStyle}" />
+                        </local:SettingsCard>
 
-        <local:SettingsCard x:Name="DockSize"
-                            x:Uid="Globals_DockSize"
-                            IsForkFeature="True">
-            <Grid MinWidth="200">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <Slider x:Name="DockSizeSlider"
-                        Grid.Column="0"
-                        Maximum="90"
-                        Minimum="10"
-                        Value="{x:Bind ViewModel.DockSize, Mode=TwoWay}" />
-                <TextBlock Grid.Column="1"
-                           Style="{StaticResource SliderValueLabelStyle}"
-                           Text="{Binding ElementName=DockSizeSlider, Path=Value, Mode=OneWay}" />
-            </Grid>
-        </local:SettingsCard>
+                        <!--
+                            Tab icon and close button. Both exist upstream as
+                            theme.tab.iconStyle and theme.tab.showCloseButton and are
+                            settable there only by hand, so these carry the hollow
+                            mark rather than the filled one. They are overrides:
+                            until one is touched, whatever the active theme says
+                            still wins. See doc/json-only-settings.md.
+                        -->
+                        <local:SettingsCard x:Name="TabIconStyle"
+                                            x:Uid="Globals_TabIconStyle"
+                                            IsJsonOnlyUpstream="True">
+                            <ComboBox AutomationProperties.AccessibilityView="Content"
+                                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                                      ItemsSource="{x:Bind ViewModel.TabIconStyleList, Mode=OneWay}"
+                                      SelectedItem="{x:Bind ViewModel.CurrentTabIconStyle, Mode=TwoWay}"
+                                      Style="{StaticResource ComboBoxSettingStyle}" />
+                        </local:SettingsCard>
 
-        <!--  Tab Position  -->
-        <local:SettingsCard x:Name="TabPosition"
-                            x:Uid="Globals_TabPosition"
-                            IsForkFeature="True">
-            <ComboBox AutomationProperties.AccessibilityView="Content"
-                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
-                      ItemsSource="{x:Bind ViewModel.TabPositionList, Mode=OneWay}"
-                      SelectedItem="{x:Bind ViewModel.CurrentTabPosition, Mode=TwoWay}"
-                      SelectionChanged="{x:Bind ViewModel.TabPositionChanged}"
-                      Style="{StaticResource ComboBoxSettingStyle}" />
-        </local:SettingsCard>
+                        <local:SettingsCard x:Name="TabCloseButton"
+                                            x:Uid="Globals_TabCloseButton"
+                                            IsJsonOnlyUpstream="True">
+                            <ComboBox AutomationProperties.AccessibilityView="Content"
+                                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                                      ItemsSource="{x:Bind ViewModel.TabCloseButtonList, Mode=OneWay}"
+                                      SelectedItem="{x:Bind ViewModel.CurrentTabCloseButton, Mode=TwoWay}"
+                                      Style="{StaticResource ComboBoxSettingStyle}" />
+                        </local:SettingsCard>
 
-        <!--
-            New tab button position. The mirror of Tab Width Mode below: that one
-            is dead in a vertical strip, this one is dead in a horizontal one, so
-            each is greyed out exactly when it has nothing to say.
-        -->
-        <local:SettingsCard x:Name="NewTabButtonPosition"
-                            x:Uid="Globals_NewTabButtonPosition"
-                            IsEnabled="{x:Bind ViewModel.NewTabButtonPositionEnabled, Mode=OneWay}"
-                            IsForkFeature="True">
-            <ComboBox AutomationProperties.AccessibilityView="Content"
-                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
-                      ItemsSource="{x:Bind ViewModel.NewTabButtonPositionList, Mode=OneWay}"
-                      SelectedItem="{x:Bind ViewModel.CurrentNewTabButtonPosition, Mode=TwoWay}"
-                      Style="{StaticResource ComboBoxSettingStyle}" />
-        </local:SettingsCard>
+                        <!--  Show tab index  -->
+                        <local:SettingsCard x:Name="ShowTabIndex"
+                                            x:Uid="Globals_ShowTabIndex"
+                                            IsForkFeature="True">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.ShowTabIndex, Mode=TwoWay}"
+                                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                        </local:SettingsCard>
+                    </local:SettingsExpander.Items>
+                </local:SettingsExpander>
 
-        <!--
-            Tab Width Mode. Disabled for a left or right strip: those modes
-            divide the strip's width among the tabs, which means nothing when
-            the strip is a column, so TerminalPage pins SizeToContent there.
-            Greying it out says so, rather than leaving a live-looking control
-            whose value is quietly ignored.
-        -->
-        <local:SettingsCard x:Name="TabWidthMode"
-                            x:Uid="Globals_TabWidthMode"
-                            IsEnabled="{x:Bind ViewModel.TabWidthModeEnabled, Mode=OneWay}">
-            <ComboBox AutomationProperties.AccessibilityView="Content"
-                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
-                      ItemsSource="{x:Bind ViewModel.TabWidthModeList, Mode=OneWay}"
-                      SelectedItem="{x:Bind ViewModel.CurrentTabWidthMode, Mode=TwoWay}"
-                      Style="{StaticResource ComboBoxSettingStyle}" />
-        </local:SettingsCard>
+                <!--  Position of new tab  -->
+                <local:SettingsCard x:Name="NewTabPosition"
+                                    x:Uid="Globals_NewTabPosition">
+                    <ComboBox AutomationProperties.AccessibilityView="Content"
+                              ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                              ItemsSource="{x:Bind ViewModel.NewTabPositionList, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.CurrentNewTabPosition, Mode=TwoWay}"
+                              Style="{StaticResource ComboBoxSettingStyle}" />
+                </local:SettingsCard>
 
-        <!--  Pane Title Bars  -->
-        <local:SettingsCard x:Name="PaneTitlebarVisibility"
-                            x:Uid="Globals_PaneTitlebarVisibility"
-                            IsForkFeature="True">
-            <ComboBox AutomationProperties.AccessibilityView="Content"
-                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
-                      ItemsSource="{x:Bind ViewModel.PaneTitlebarVisibilityList, Mode=OneWay}"
-                      SelectedItem="{x:Bind ViewModel.CurrentPaneTitlebarVisibility, Mode=TwoWay}"
-                      Style="{StaticResource ComboBoxSettingStyle}" />
-        </local:SettingsCard>
+                <!--
+                    The title bar, and what it is allowed to say. "Hide the title bar"
+                    is the master here - Always show tabs cannot be turned off while
+                    the tabs ARE the title bar - so the two stay together, with the
+                    gating on the child card. Never put IsEnabled on the expander
+                    itself: it disables the header, and the master goes with it.
+                -->
+                <local:SettingsExpander x:Name="TitlebarProperties"
+                                        x:Uid="Globals_TitlebarGroup">
+                    <local:SettingsExpander.HeaderIcon>
+                        <FontIcon Glyph="&#xE737;" />
+                    </local:SettingsExpander.HeaderIcon>
+                    <local:SettingsExpander.Items>
 
-        <!--  Disable Animations  -->
-        <!--  NOTE: the UID is "DisablePaneAnimationsReversed" not "DisablePaneAnimations". See GH#9124 for more details.  -->
-        <local:SettingsCard x:Name="DisableAnimations"
-                            x:Uid="Globals_DisableAnimationsReversed">
-            <ToggleSwitch IsOn="{x:Bind ViewModel.InvertedDisableAnimations, Mode=TwoWay}"
-                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-        </local:SettingsCard>
+                        <!--  Show Titlebar  -->
+                        <local:SettingsCard x:Name="ShowTitlebar"
+                                            x:Uid="Globals_ShowTitlebar">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.ShowTabsInTitlebar, Mode=TwoWay}"
+                                          Style="{StaticResource ToggleSwitchInExpanderStyle}"
+                                          Toggled="{x:Bind ViewModel.ShowTitlebarToggled}" />
+                        </local:SettingsCard>
 
-        <!--  Always Show Notification Icon  -->
-        <local:SettingsCard x:Name="AlwaysShowNotificationIcon"
-                            x:Uid="Globals_AlwaysShowNotificationIcon">
-            <ToggleSwitch IsOn="{x:Bind ViewModel.AlwaysShowNotificationIcon, Mode=TwoWay}"
-                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-        </local:SettingsCard>
+                        <!--  Always show tabs  -->
+                        <local:SettingsCard x:Name="AlwaysShowTabs"
+                                            x:Uid="Globals_AlwaysShowTabs"
+                                            IsEnabled="{x:Bind mtu:Converters.InvertBoolean(ViewModel.ShowTabsInTitlebar), Mode=OneWay}">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.AlwaysShowTabs, Mode=TwoWay}"
+                                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                        </local:SettingsCard>
 
-        <!--  Minimize To Notification Area  -->
-        <local:SettingsCard x:Name="MinimizeToNotificationArea"
-                            x:Uid="Globals_MinimizeToNotificationArea">
-            <ToggleSwitch IsOn="{x:Bind ViewModel.MinimizeToNotificationArea, Mode=TwoWay}"
-                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-        </local:SettingsCard>
+                        <!--  Show tabs in full screen  -->
+                        <local:SettingsCard x:Name="ShowTabsFullscreen"
+                                            x:Uid="Globals_ShowTabsFullscreen">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.ShowTabsFullscreen, Mode=TwoWay}"
+                                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                        </local:SettingsCard>
 
-        <!--  Automatically hide window  -->
-        <local:SettingsCard x:Name="AutoHideWindow"
-                            x:Uid="Globals_AutoHideWindow">
-            <ToggleSwitch IsOn="{x:Bind ViewModel.AutoHideWindow, Mode=TwoWay}"
-                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-        </local:SettingsCard>
+                        <!--  Show Title in Titlebar  -->
+                        <local:SettingsCard x:Name="ShowTitleInTitlebar"
+                                            x:Uid="Globals_ShowTitleInTitlebar">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.ShowTitleInTitlebar, Mode=TwoWay}"
+                                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                        </local:SettingsCard>
 
-        <!--  Show Admin Shield  -->
-        <local:SettingsCard x:Name="ShowAdminShield"
-                            x:Uid="Globals_ShowAdminShield">
-            <ToggleSwitch IsOn="{x:Bind ViewModel.ShowAdminShield, Mode=TwoWay}"
-                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-        </local:SettingsCard>
+                        <!--  Show Admin Shield  -->
+                        <local:SettingsCard x:Name="ShowAdminShield"
+                                            x:Uid="Globals_ShowAdminShield">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.ShowAdminShield, Mode=TwoWay}"
+                                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                        </local:SettingsCard>
+                    </local:SettingsExpander.Items>
+                </local:SettingsExpander>
+            </StackPanel>
+        </StackPanel>
 
-        <!--  Enable Unfocused Acrylic  -->
-        <local:SettingsCard x:Name="EnableUnfocusedAcrylic"
-                            x:Uid="Globals_EnableUnfocusedAcrylic">
-            <ToggleSwitch IsOn="{x:Bind ViewModel.EnableUnfocusedAcrylic, Mode=TwoWay}"
-                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
-        </local:SettingsCard>
+        <!--  Grouping: Window behaviour  -->
+        <StackPanel Style="{StaticResource SettingsStackStyle}">
+            <TextBlock x:Uid="Globals_WindowBehaviourHeader"
+                       Style="{StaticResource TextBlockSubHeaderStyle}" />
+            <StackPanel Spacing="2"
+                        Style="{StaticResource PivotStackStyle}">
 
-        <!--
-            The provenance mark. This row is itself one of ours, so it carries the
-            mark it controls - which doubles as the preview of what turning it on
-            does.
-        -->
-        <local:SettingsCard x:Name="AylithImprint"
-                            x:Uid="Globals_AylithImprint"
-                            IsForkFeature="True">
-            <ToggleSwitch IsOn="{x:Bind ViewModel.AylithImprint, Mode=TwoWay}"
-                          Style="{StaticResource ToggleSwitchInExpanderStyle}"
-                          Toggled="{x:Bind ViewModel.AylithImprintToggled}" />
-        </local:SettingsCard>
+                <!--  Always on Top  -->
+                <local:SettingsCard x:Name="AlwaysOnTop"
+                                    x:Uid="Globals_AlwaysOnTop">
+                    <ToggleSwitch IsOn="{x:Bind ViewModel.AlwaysOnTop, Mode=TwoWay}"
+                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                </local:SettingsCard>
 
-        <!--
-            The companion mark, for settings upstream has but hides in
-            settings.json. This row is itself a fork addition, so it carries the
-            filled mark rather than the hollow one it controls.
-        -->
-        <local:SettingsCard x:Name="AylithImprintJsonOnly"
-                            x:Uid="Globals_AylithImprintJsonOnly"
-                            IsForkFeature="True">
-            <ToggleSwitch IsOn="{x:Bind ViewModel.AylithImprintJsonOnly, Mode=TwoWay}"
-                          Style="{StaticResource ToggleSwitchInExpanderStyle}"
-                          Toggled="{x:Bind ViewModel.AylithImprintJsonOnlyToggled}" />
-        </local:SettingsCard>
+                <!--  Automatically hide window  -->
+                <local:SettingsCard x:Name="AutoHideWindow"
+                                    x:Uid="Globals_AutoHideWindow">
+                    <ToggleSwitch IsOn="{x:Bind ViewModel.AutoHideWindow, Mode=TwoWay}"
+                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                </local:SettingsCard>
+
+                <!--  Close the window after closing the last tab  -->
+                <local:SettingsCard x:Name="CloseWindowOnLastTab"
+                                    x:Uid="Globals_CloseWindowOnLastTab"
+                                    IsForkFeature="True">
+                    <ToggleSwitch IsOn="{x:Bind ViewModel.CloseWindowOnLastTab, Mode=TwoWay}"
+                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                </local:SettingsCard>
+
+                <!--
+                    Docking. Pins the window to a screen edge at a fixed fraction of
+                    the screen, and stops it being moved or resized off that edge.
+                    Quake mode is the same mechanism fixed at top / 50%, and still
+                    wins over this. The size only means anything once an edge is
+                    chosen, so it is the one row inside and it greys out with the
+                    dropdown - which is also why the dropdown raises
+                    DockWindowChanged: the bindable-enum setter raises no
+                    PropertyChanged of its own.
+                -->
+                <local:SettingsExpander x:Name="DockWindow"
+                                        x:Uid="Globals_DockWindow"
+                                        IsForkFeature="True">
+                    <local:SettingsExpander.HeaderIcon>
+                        <FontIcon Glyph="&#xE90C;" />
+                    </local:SettingsExpander.HeaderIcon>
+                    <local:SettingsExpander.Content>
+                        <ComboBox AutomationProperties.AccessibilityView="Content"
+                                  ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                                  ItemsSource="{x:Bind ViewModel.DockWindowList, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.CurrentDockWindow, Mode=TwoWay}"
+                                  SelectionChanged="{x:Bind ViewModel.DockWindowChanged}"
+                                  Style="{StaticResource ComboBoxSettingStyle}" />
+                    </local:SettingsExpander.Content>
+                    <local:SettingsExpander.Items>
+                        <local:SettingsCard x:Name="DockSize"
+                                            x:Uid="Globals_DockSize"
+                                            IsEnabled="{x:Bind ViewModel.DockSizeEnabled, Mode=OneWay}"
+                                            IsForkFeature="True">
+                            <Grid MinWidth="200">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Slider x:Name="DockSizeSlider"
+                                        Grid.Column="0"
+                                        Maximum="90"
+                                        Minimum="10"
+                                        Value="{x:Bind ViewModel.DockSize, Mode=TwoWay}" />
+                                <TextBlock Grid.Column="1"
+                                           Style="{StaticResource SliderValueLabelStyle}"
+                                           Text="{Binding ElementName=DockSizeSlider, Path=Value, Mode=OneWay}" />
+                            </Grid>
+                        </local:SettingsCard>
+                    </local:SettingsExpander.Items>
+                </local:SettingsExpander>
+            </StackPanel>
+        </StackPanel>
+
+        <!--  Grouping: System integration  -->
+        <StackPanel Style="{StaticResource SettingsStackStyle}">
+            <TextBlock x:Uid="Globals_SystemIntegrationHeader"
+                       Style="{StaticResource TextBlockSubHeaderStyle}" />
+            <StackPanel Spacing="2"
+                        Style="{StaticResource PivotStackStyle}">
+
+                <!--
+                    The notification-area icon, and the one setting that only means
+                    anything once it exists. Master in the header, dependant inside.
+                -->
+                <local:SettingsExpander x:Name="AlwaysShowNotificationIcon"
+                                        x:Uid="Globals_AlwaysShowNotificationIcon">
+                    <local:SettingsExpander.HeaderIcon>
+                        <FontIcon Glyph="&#xEA8F;" />
+                    </local:SettingsExpander.HeaderIcon>
+                    <local:SettingsExpander.Content>
+                        <ToggleSwitch IsOn="{x:Bind ViewModel.AlwaysShowNotificationIcon, Mode=TwoWay}"
+                                      Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                    </local:SettingsExpander.Content>
+                    <local:SettingsExpander.Items>
+
+                        <!--  Minimize To Notification Area  -->
+                        <local:SettingsCard x:Name="MinimizeToNotificationArea"
+                                            x:Uid="Globals_MinimizeToNotificationArea">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.MinimizeToNotificationArea, Mode=TwoWay}"
+                                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                        </local:SettingsCard>
+                    </local:SettingsExpander.Items>
+                </local:SettingsExpander>
+            </StackPanel>
+        </StackPanel>
     </StackPanel>
 </Page>
