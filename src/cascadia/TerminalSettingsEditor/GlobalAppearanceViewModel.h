@@ -21,6 +21,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         GETSET_BINDABLE_ENUM_SETTING(NewTabPosition, Model::NewTabPosition, _WindowSettings.NewTabPosition);
         GETSET_BINDABLE_ENUM_SETTING(TabWidthMode, winrt::Microsoft::UI::Xaml::Controls::TabViewWidthMode, _WindowSettings.TabWidthMode);
         GETSET_BINDABLE_ENUM_SETTING(TabPosition, Model::TabPosition, _WindowSettings.TabPosition);
+        GETSET_BINDABLE_ENUM_SETTING(NewTabButtonPosition, Model::NewTabButtonPosition, _WindowSettings.NewTabButtonPosition);
         GETSET_BINDABLE_ENUM_SETTING(TabIconStyle, Model::IconStyle, _WindowSettings.TabIconStyle);
         GETSET_BINDABLE_ENUM_SETTING(TabCloseButton, Model::TabCloseButtonVisibility, _WindowSettings.TabCloseButton);
         GETSET_BINDABLE_ENUM_SETTING(DockWindow, Model::WindowDock, _WindowSettings.DockWindow);
@@ -41,6 +42,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         // the dropdown's IsEnabled so the setting reads as inert rather than
         // looking like it was ignored.
         bool TabWidthModeEnabled();
+        bool NewTabButtonPositionEnabled();
         void TabPositionChanged(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::Controls::SelectionChangedEventArgs& args);
 
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, AlwaysShowTabs);

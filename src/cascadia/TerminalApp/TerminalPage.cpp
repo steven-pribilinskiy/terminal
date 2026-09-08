@@ -502,6 +502,7 @@ namespace winrt::TerminalApp::implementation
     {
         _ResetRootGridLayout();
         _SyncTabViewTemplate(_TabStripIsVertical());
+        _ApplyNewTabButtonPosition(windowSettings);
 
         const auto root = this->Root();
         const auto infoBars = this->InfoBarPanel();
@@ -733,6 +734,97 @@ namespace winrt::TerminalApp::implementation
     }
 
     // Method Description:
+    // - Puts the new tab button either at the foot of a vertical strip or
+    //   directly under the last tab, per newTabButtonPosition.
+    // - The template's rows are header / tab list / add button / footer. Which
+    //   one carries the Star is what decides where the slack goes, and so where
+    //   the button ends up:
+    //     bottom    - list Star, footer Auto: the list fills the column and the
+    //                 footer is pinned under it.
+    //     afterTabs - list Auto, footer Star: the list is only as tall as its
+    //                 tabs, the button sits immediately beneath them, and the
+    //                 empty space falls below.
+    // - An Auto row is measured against infinity, so afterTabs on its own would
+    //   let a long tab list grow straight past the bottom of the window and take
+    //   the button with it. _ClampVerticalTabList caps the list instead, which
+    //   is what keeps it scrolling rather than overflowing.
+    void TerminalPage::_ApplyNewTabButtonPosition(const Microsoft::Terminal::Settings::Model::WindowSettings& windowSettings)
+    {
+        if (!_tabViewIsVertical)
+        {
+            return;
+        }
+
+        const auto& templated{ _tabView.try_as<Windows::UI::Xaml::Controls::IControlProtected>() };
+        if (!templated)
+        {
+            return;
+        }
+
+        // Named "Column" because the vertical template reuses MUX's part names
+        // on RowDefinitions - TabView looks them up as ColumnDefinitions, gets
+        // nothing, and skips width arithmetic that a vertical strip does not
+        // want anyway.
+        const auto& listRow{ templated.GetTemplateChild(L"TabColumn").try_as<Controls::RowDefinition>() };
+        const auto& footerRow{ templated.GetTemplateChild(L"RightContentColumn").try_as<Controls::RowDefinition>() };
+        if (!listRow || !footerRow)
+        {
+            return;
+        }
+
+        const auto afterTabs{ windowSettings.NewTabButtonPosition() == NewTabButtonPosition::AfterTabs };
+
+        listRow.Height(GridLengthHelper::FromValueAndType(1, afterTabs ? GridUnitType::Auto : GridUnitType::Star));
+        footerRow.Height(GridLengthHelper::FromValueAndType(1, afterTabs ? GridUnitType::Star : GridUnitType::Auto));
+
+        if (const auto& footer{ templated.GetTemplateChild(L"RightContentPresenter").try_as<FrameworkElement>() })
+        {
+            // Top, so the footer hugs the tabs rather than floating in the
+            // middle of the slack its Star row now owns.
+            footer.VerticalAlignment(afterTabs ? VerticalAlignment::Top : VerticalAlignment::Stretch);
+        }
+
+        _ClampVerticalTabList();
+    }
+
+    // Method Description:
+    // - Caps the tab list's height at what is actually left in the strip, so an
+    //   Auto row cannot push the new tab button off the bottom of the window.
+    // - Harmless in the Star layout, where the row already does this - one code
+    //   path is worth more here than skipping an assignment.
+    void TerminalPage::_ClampVerticalTabList()
+    {
+        if (!_tabViewIsVertical || !_verticalTabList)
+        {
+            return;
+        }
+
+        const auto available{ _tabView.ActualHeight() };
+        if (available <= 0)
+        {
+            return;
+        }
+
+        auto reserved{ 0.0 };
+        if (const auto& templated{ _tabView.try_as<Windows::UI::Xaml::Controls::IControlProtected>() })
+        {
+            for (const auto& part : { L"RightContentPresenter", L"LeftContentPresenter" })
+            {
+                if (const auto& e{ templated.GetTemplateChild(part).try_as<FrameworkElement>() })
+                {
+                    // DesiredSize, not ActualHeight: in the afterTabs layout the
+                    // footer's row owns the Star, so its ActualHeight can be the
+                    // whole slack. DesiredSize is what its content measured to,
+                    // whichever row it happens to be sitting in.
+                    reserved += e.DesiredSize().Height;
+                }
+            }
+        }
+
+        _verticalTabList.MaxHeight(std::max(0.0, available - reserved));
+    }
+
+    // Method Description:
     // - Applies or removes the vertical TabView template, and does NOTHING when
     //   the orientation has not changed.
     // - That last part is the whole reason this exists. _ApplyTabPosition runs
@@ -758,6 +850,8 @@ namespace winrt::TerminalApp::implementation
             // FrameworkElement, not Control: Control inherits the Style property
             // but the static accessor is declared on the base.
             _tabView.ClearValue(winrt::Windows::UI::Xaml::FrameworkElement::StyleProperty());
+            _verticalTabViewSizeChangedRevoker.revoke();
+            _verticalTabList = nullptr;
             _tabViewIsVertical = false;
             return;
         }
@@ -800,6 +894,8 @@ namespace winrt::TerminalApp::implementation
             // comes up looking like a horizontal one, which is a bad afternoon
             // rather than a lost one.
             _tabView.ClearValue(winrt::Windows::UI::Xaml::FrameworkElement::StyleProperty());
+            _verticalTabViewSizeChangedRevoker.revoke();
+            _verticalTabList = nullptr;
             _tabViewIsVertical = false;
         }
     }
@@ -982,6 +1078,20 @@ namespace winrt::TerminalApp::implementation
         ScrollViewer::SetHorizontalScrollMode(tabList, ScrollMode::Disabled);
         ScrollViewer::SetVerticalScrollBarVisibility(tabList, ScrollBarVisibility::Auto);
         ScrollViewer::SetVerticalScrollMode(tabList, ScrollMode::Enabled);
+
+        // Kept so _ClampVerticalTabList can reach it without walking the
+        // template again on every resize.
+        _verticalTabList = tabList;
+
+        // auto_revoke because the list this closes over is replaced whenever the
+        // template is, and a handler left pointing at the old one would clamp a
+        // ListView that is no longer in the tree.
+        _verticalTabViewSizeChangedRevoker = _tabView.SizeChanged(winrt::auto_revoke, [weakThis = get_weak()](auto&&, auto&&) {
+            if (const auto page{ weakThis.get() })
+            {
+                page->_ClampVerticalTabList();
+            }
+        });
     }
 
     // Method Description:

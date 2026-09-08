@@ -993,6 +993,22 @@
     <value>Right</value>
     <comment>An option to choose from for the "tab position" setting. When selected, the tabs are stacked in a vertical column on the right of the window, beside the terminal.</comment>
   </data>
+  <data name="Globals_NewTabButtonPosition.Header" xml:space="preserve">
+    <value>New tab button position</value>
+    <comment>Header for a control to choose where the button that opens a new tab sits within a vertical row of tabs.</comment>
+  </data>
+  <data name="Globals_NewTabButtonPosition.Description" xml:space="preserve">
+    <value>Only applies when the tab position is Left or Right. A horizontal row of tabs always puts the button beside them.</value>
+    <comment>A description for what the "new tab button position" setting does. Presented near "Globals_NewTabButtonPosition.Header". 'Left' and 'Right' must match the values for &lt;Globals_TabPositionLeft.Content&gt; and &lt;Globals_TabPositionRight.Content&gt;.</comment>
+  </data>
+  <data name="Globals_NewTabButtonPositionBottom.Content" xml:space="preserve">
+    <value>Bottom of the sidebar</value>
+    <comment>An option to choose from for the "new tab button position" setting. When selected, the button stays at the foot of the column of tabs, however many tabs there are.</comment>
+  </data>
+  <data name="Globals_NewTabButtonPositionAfterTabs.Content" xml:space="preserve">
+    <value>Under the last tab</value>
+    <comment>An option to choose from for the "new tab button position" setting. When selected, the button sits immediately below the last tab, and moves down as tabs are opened.</comment>
+  </data>
   <data name="Globals_TabWidthMode.Header" xml:space="preserve">
     <value>Tab width mode</value>
     <comment>Header for a control to choose how wide the tabs are.</comment>

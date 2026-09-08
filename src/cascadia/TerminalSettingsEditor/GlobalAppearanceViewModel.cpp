@@ -31,6 +31,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         INITIALIZE_BINDABLE_ENUM_SETTING(NewTabPosition, NewTabPosition, NewTabPosition, L"Globals_NewTabPosition", L"Content");
         INITIALIZE_BINDABLE_ENUM_SETTING(TabWidthMode, TabViewWidthMode, winrt::Microsoft::UI::Xaml::Controls::TabViewWidthMode, L"Globals_TabWidthMode", L"Content");
         INITIALIZE_BINDABLE_ENUM_SETTING(TabPosition, TabPosition, Model::TabPosition, L"Globals_TabPosition", L"Content");
+        INITIALIZE_BINDABLE_ENUM_SETTING(NewTabButtonPosition, NewTabButtonPosition, Model::NewTabButtonPosition, L"Globals_NewTabButtonPosition", L"Content");
         INITIALIZE_BINDABLE_ENUM_SETTING(TabIconStyle, IconStyle, Model::IconStyle, L"Globals_TabIconStyle", L"Content");
         INITIALIZE_BINDABLE_ENUM_SETTING(TabCloseButton, TabCloseButtonVisibility, Model::TabCloseButtonVisibility, L"Globals_TabCloseButton", L"Content");
         INITIALIZE_BINDABLE_ENUM_SETTING(DockWindow, WindowDock, Model::WindowDock, L"Globals_DockWindow", L"Content");
@@ -124,13 +125,22 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         return position != Model::TabPosition::Left && position != Model::TabPosition::Right;
     }
 
-    // The tab width dropdown's IsEnabled depends on the tab position dropdown,
-    // and nothing else would tell it that the position moved -- the bindable
-    // enum setter writes straight through to the settings without raising
-    // anything. So say so here.
+    // The exact mirror of TabWidthModeEnabled: the new tab button only has
+    // somewhere to move to when the strip is a column. A horizontal strip puts
+    // the button beside the tabs whatever this says.
+    bool GlobalAppearanceViewModel::NewTabButtonPositionEnabled()
+    {
+        const auto position = _WindowSettings.TabPosition();
+        return position == Model::TabPosition::Left || position == Model::TabPosition::Right;
+    }
+
+    // Both dropdowns' IsEnabled depend on the tab position dropdown, and nothing
+    // else would tell them that the position moved -- the bindable enum setter
+    // writes straight through to the settings without raising anything. So say
+    // so here.
     void GlobalAppearanceViewModel::TabPositionChanged(const winrt::Windows::Foundation::IInspectable& /* sender */, const Controls::SelectionChangedEventArgs& /* args */)
     {
-        _NotifyChanges(L"TabWidthModeEnabled");
+        _NotifyChanges(L"TabWidthModeEnabled", L"NewTabButtonPositionEnabled");
     }
 
     void GlobalAppearanceViewModel::ShowTitlebarToggled(const winrt::Windows::Foundation::IInspectable& /* sender */, const RoutedEventArgs& /* args */)

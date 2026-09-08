@@ -24,6 +24,9 @@ namespace Microsoft.Terminal.Settings.Editor
         IInspectable CurrentTabPosition;
         Windows.Foundation.Collections.IObservableVector<Microsoft.Terminal.Settings.Editor.EnumEntry> TabPositionList { get; };
 
+        IInspectable CurrentNewTabButtonPosition;
+        Windows.Foundation.Collections.IObservableVector<Microsoft.Terminal.Settings.Editor.EnumEntry> NewTabButtonPositionList { get; };
+
         IInspectable CurrentTabIconStyle;
         Windows.Foundation.Collections.IObservableVector<Microsoft.Terminal.Settings.Editor.EnumEntry> TabIconStyleList { get; };
 
@@ -35,6 +38,7 @@ namespace Microsoft.Terminal.Settings.Editor
 
         // False while the strip is vertical, where tab width has no meaning.
         Boolean TabWidthModeEnabled { get; };
+        Boolean NewTabButtonPositionEnabled { get; };
         void TabPositionChanged(IInspectable sender, Windows.UI.Xaml.Controls.SelectionChangedEventArgs args);
 
         IInspectable CurrentPaneTitlebarVisibility;

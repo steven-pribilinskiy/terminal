@@ -712,6 +712,14 @@ JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::TabPosition)
     };
 };
 
+JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::NewTabButtonPosition)
+{
+    JSON_MAPPINGS(2) = {
+        pair_type{ "bottom", ValueType::Bottom },
+        pair_type{ "afterTabs", ValueType::AfterTabs },
+    };
+};
+
 JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::WindowDock)
 {
     JSON_MAPPINGS(5) = {

@@ -81,6 +81,17 @@ namespace Microsoft.Terminal.Settings.Model
         Right,
     };
 
+    // Where the new tab button sits in a vertical tab strip. Bottom keeps it
+    // pinned to the foot of the column, which is where it has always been;
+    // AfterTabs puts it directly under the last tab, the way Tabby does it, so
+    // it does not travel as the tab count changes. No effect on Top or Bottom
+    // strips, where the button is beside the tabs either way.
+    enum NewTabButtonPosition
+    {
+        Bottom,
+        AfterTabs,
+    };
+
     // How resuming a recognized agent or multiplexer session announces itself
     // on the next startup that finds one to resume. Independent of which
     // programs are eligible: this only matters once something is.
@@ -159,6 +170,7 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(Boolean, ShowTitleInTitlebar);
         INHERITABLE_SETTING(Microsoft.UI.Xaml.Controls.TabViewWidthMode, TabWidthMode);
         INHERITABLE_SETTING(TabPosition, TabPosition);
+        INHERITABLE_SETTING(NewTabButtonPosition, NewTabButtonPosition);
         INHERITABLE_SETTING(UInt32, PaneResizeStep);
         INHERITABLE_SETTING(Boolean, CloseWindowOnLastTab);
         INHERITABLE_SETTING(Boolean, ShowTabIndex);

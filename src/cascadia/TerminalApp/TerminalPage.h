@@ -333,6 +333,12 @@ namespace winrt::TerminalApp::implementation
         // is what emptied the strip on every settings reload.
         bool _tabViewIsVertical{ false };
 
+        // The tab list inside the vertical template, and the resize hook that
+        // caps its height. Both belong to whichever template is applied right
+        // now, so both are dropped the moment the strip goes horizontal again.
+        Windows::UI::Xaml::Controls::ListView _verticalTabList{ nullptr };
+        Windows::UI::Xaml::FrameworkElement::SizeChanged_revoker _verticalTabViewSizeChangedRevoker;
+
 
         // Set while the tab row is parented to the titlebar, so the reset knows
         // to ask for it back. _currentWindowSettings().ShowTabsInTitlebar() is
@@ -522,6 +528,8 @@ namespace winrt::TerminalApp::implementation
         void _BuildTabStripSplitter();
         void _MakeTabListVertical();
         void _SyncTabViewTemplate(const bool vertical);
+        void _ApplyNewTabButtonPosition(const Microsoft::Terminal::Settings::Model::WindowSettings& windowSettings);
+        void _ClampVerticalTabList();
         void _BuildTitlebarStrip(const bool borrowTabStripHeader);
         void _TeardownTitlebarStrip();
         void _UpdateTitlebarStripTitle();

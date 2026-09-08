@@ -21,6 +21,7 @@
     "showTerminalTitleInTitlebar": true,
     "tabWidthMode": "equal",
     "tabPosition": "top",
+    "newTabButtonPosition": "bottom",
     "showTabIndex": false,
     "closeWindowOnLastTab": true,
     "tabSwitcherMode": "inOrder",

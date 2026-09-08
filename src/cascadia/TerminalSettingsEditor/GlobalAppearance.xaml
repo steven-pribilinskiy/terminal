@@ -187,6 +187,22 @@
         </local:SettingsCard>
 
         <!--
+            New tab button position. The mirror of Tab Width Mode below: that one
+            is dead in a vertical strip, this one is dead in a horizontal one, so
+            each is greyed out exactly when it has nothing to say.
+        -->
+        <local:SettingsCard x:Name="NewTabButtonPosition"
+                            x:Uid="Globals_NewTabButtonPosition"
+                            IsEnabled="{x:Bind ViewModel.NewTabButtonPositionEnabled, Mode=OneWay}"
+                            IsForkFeature="True">
+            <ComboBox AutomationProperties.AccessibilityView="Content"
+                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                      ItemsSource="{x:Bind ViewModel.NewTabButtonPositionList, Mode=OneWay}"
+                      SelectedItem="{x:Bind ViewModel.CurrentNewTabButtonPosition, Mode=TwoWay}"
+                      Style="{StaticResource ComboBoxSettingStyle}" />
+        </local:SettingsCard>
+
+        <!--
             Tab Width Mode. Disabled for a left or right strip: those modes
             divide the strip's width among the tabs, which means nothing when
             the strip is a column, so TerminalPage pins SizeToContent there.
