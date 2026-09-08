@@ -335,6 +335,11 @@ namespace winrt::TerminalApp::implementation
             _tabRowInTitlebar = false;
         }
 
+        // Same idea for the strip the other positions put there instead. This
+        // also hands the workspace button back to the tab row, so it has to run
+        // before anything re-reads TabStripHeader.
+        _TeardownTitlebarStrip();
+
         const auto detach = [](const auto& panel, const auto& child) {
             if (panel && child)
             {
@@ -398,14 +403,18 @@ namespace winrt::TerminalApp::implementation
             }
         }
 
-        // Drop the vertical re-template and fall back to the stock TabView
-        // style. Leaving it applied to a horizontal strip would stretch every
-        // tab across the window. The per-item style rides along inside that
-        // template as the tab list's ItemContainerStyle, so this one call is
-        // enough to undo both halves.
-        // FrameworkElement, not Control: Control inherits the Style property but
-        // the static dependency-property accessor is declared on FrameworkElement.
-        _tabView.ClearValue(winrt::Windows::UI::Xaml::FrameworkElement::StyleProperty());
+        // The TabView's template is deliberately NOT touched here. It used to be
+        // cleared on every reset and re-applied by the Left/Right branch, and
+        // that cost the window its tabs: _ApplyTabPosition runs on every
+        // settings reload, so saving any setting at all re-templated the TabView
+        // twice. The tab items are live TabViewItem elements - TabManagement.cpp
+        // inserts them straight into TabItems - so each re-template hands the
+        // same elements to a brand new TabViewListView, and they do not survive
+        // it. Measured: one tab before a reload, zero after, and no later reload
+        // brings it back.
+        //
+        // _SyncTabViewTemplate owns that decision now and only acts on a real
+        // change of orientation.
 
         // TabRowControl.xaml sets VerticalAlignment="Bottom" directly on the
         // TabView. That is a local value, and a local value outranks a Style
@@ -492,6 +501,7 @@ namespace winrt::TerminalApp::implementation
     void TerminalPage::_ApplyTabPositionCore(const Microsoft::Terminal::Settings::Model::WindowSettings& windowSettings)
     {
         _ResetRootGridLayout();
+        _SyncTabViewTemplate(_TabStripIsVertical());
 
         const auto root = this->Root();
         const auto infoBars = this->InfoBarPanel();
@@ -692,54 +702,209 @@ namespace winrt::TerminalApp::implementation
             _tabRow.VerticalAlignment(VerticalAlignment::Stretch);
             _tabView.VerticalAlignment(VerticalAlignment::Stretch);
 
-            // Lookup, not HasKey-then-Lookup. ResourceDictionary::HasKey only
-            // inspects the dictionary it is called on and does NOT walk
-            // MergedDictionaries, while Lookup does - and VerticalTabViewStyle
-            // arrives through App.xaml's merged dictionaries. Guarding with
-            // HasKey therefore answered "no" for a key that is perfectly
-            // resolvable, and silently skipped the re-template: a vertical strip
-            // would come up with the horizontal template squeezed into a 200px
-            // column. Lookup throws when the key really is absent, hence the
-            // try/catch rather than a guard.
-            try
-            {
-                if (const auto& res{ Application::Current().Resources() })
-                {
-                    if (const auto& style{ res.Lookup(box_value(winrt::hstring{ L"VerticalTabViewStyle" })).try_as<Windows::UI::Xaml::Style>() })
-                    {
-                        _tabView.Style(style);
-                        _MakeTabListVertical();
-                    }
-                }
-            }
-            catch (...)
-            {
-                LOG_CAUGHT_EXCEPTION();
-
-                // Put the stock template back, and note why logging alone is not
-                // enough. A ControlTemplate that throws part-way through
-                // expansion leaves the TabView with a half-built visual tree.
-                // XAML does not fail at that moment - it fails on the next
-                // measure pass, inside CCoreServices::NWDrawTree, as an E_FAIL
-                // fail-fast with none of our frames on the stack and nothing
-                // anywhere that can catch it.
-                //
-                // That is precisely how one unresolvable resource key in
-                // VerticalTabViewStyle.xaml turned into a Terminal that could not
-                // be opened: the throw WAS caught here and logged, and the broken
-                // template was left applied anyway. Clearing it costs a vertical
-                // strip that comes up looking like a horizontal one, which is a
-                // bad afternoon rather than a lost one.
-                _tabView.ClearValue(winrt::Windows::UI::Xaml::FrameworkElement::StyleProperty());
-            }
+            // The re-template itself is _SyncTabViewTemplate's job, and it ran
+            // before this switch. It is not done here because doing it here
+            // meant doing it on every settings reload.
             break;
         }
+        }
+
+        // Every position but Top leaves the titlebar empty, because the tab row
+        // that normally fills it is down in the window body. Put the active
+        // tab's title there, and for a vertical strip take the workspace button
+        // with it - stacked at the top of a 200px column it reads as a stray
+        // toolbar, and the titlebar is where it belongs anyway.
+        //
+        // Gated on ShowTabsInTitlebar because that is what decided the window
+        // class: with it off there is no XAML titlebar to put anything in, and
+        // moving the button there would simply lose it. AppHost reads the
+        // setting once, at window creation, so this can disagree with reality if
+        // the setting is toggled live - the button comes back on the next reset
+        // either way.
+        if (_tabPosition != TabPosition::Top && windowSettings.ShowTabsInTitlebar())
+        {
+            _BuildTitlebarStrip(_TabStripIsVertical());
         }
 
         // TabWidthMode is width arithmetic that MUX performs against the strip's
         // TabWidthMode is applied by the caller, once the position has actually
         // settled - including when a failure here has knocked it back to Top,
         // where the user's real tabWidthMode has to come back.
+    }
+
+    // Method Description:
+    // - Applies or removes the vertical TabView template, and does NOTHING when
+    //   the orientation has not changed.
+    // - That last part is the whole reason this exists. _ApplyTabPosition runs
+    //   on every settings reload, and it used to clear the template and put it
+    //   back each time. The tab items are live TabViewItem elements, not data -
+    //   TabManagement.cpp inserts them straight into TabItems - so every
+    //   re-template handed the same elements to a freshly built
+    //   TabViewListView, and they did not survive the trip. Saving any setting
+    //   at all, from any settings page, emptied a vertical tab strip: measured
+    //   one tab before the reload and zero after, with no later reload bringing
+    //   it back, and the new-tab button then faulting on a list in that state.
+    void TerminalPage::_SyncTabViewTemplate(const bool vertical)
+    {
+        if (!_tabView || vertical == _tabViewIsVertical)
+        {
+            return;
+        }
+
+        if (!vertical)
+        {
+            // Back to the stock TabView style. Leaving the vertical one applied
+            // to a horizontal strip would stretch every tab across the window.
+            // FrameworkElement, not Control: Control inherits the Style property
+            // but the static accessor is declared on the base.
+            _tabView.ClearValue(winrt::Windows::UI::Xaml::FrameworkElement::StyleProperty());
+            _tabViewIsVertical = false;
+            return;
+        }
+
+        // Lookup, not HasKey-then-Lookup. ResourceDictionary::HasKey only
+        // inspects the dictionary it is called on and does NOT walk
+        // MergedDictionaries, while Lookup does - and VerticalTabViewStyle
+        // arrives through App.xaml's merged dictionaries. Guarding with HasKey
+        // therefore answered "no" for a key that is perfectly resolvable, and
+        // silently skipped the re-template: a vertical strip would come up with
+        // the horizontal template squeezed into a 200px column. Lookup throws
+        // when the key really is absent, hence the try/catch rather than a guard.
+        try
+        {
+            if (const auto& res{ Application::Current().Resources() })
+            {
+                if (const auto& style{ res.Lookup(box_value(winrt::hstring{ L"VerticalTabViewStyle" })).try_as<Windows::UI::Xaml::Style>() })
+                {
+                    _tabView.Style(style);
+                    _MakeTabListVertical();
+                    _tabViewIsVertical = true;
+                }
+            }
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+
+            // Put the stock template back, and note why logging alone is not
+            // enough. A ControlTemplate that throws part-way through expansion
+            // leaves the TabView with a half-built visual tree. XAML does not
+            // fail at that moment - it fails on the next measure pass, inside
+            // CCoreServices::NWDrawTree, as an E_FAIL fail-fast with none of our
+            // frames on the stack and nothing anywhere that can catch it.
+            //
+            // That is precisely how one unresolvable resource key in
+            // VerticalTabViewStyle.xaml turned into a Terminal that could not be
+            // opened: the throw WAS caught, and logged, and the broken template
+            // was left applied anyway. Clearing it costs a vertical strip that
+            // comes up looking like a horizontal one, which is a bad afternoon
+            // rather than a lost one.
+            _tabView.ClearValue(winrt::Windows::UI::Xaml::FrameworkElement::StyleProperty());
+            _tabViewIsVertical = false;
+        }
+    }
+
+    // Method Description:
+    // - Fills the titlebar for the positions that do not put the tab row in it.
+    // Arguments:
+    // - borrowTabStripHeader: also lift the TabView's TabStripHeader - the
+    //   elevation shield and the workspace button - out of the strip and into
+    //   the titlebar. Only wanted when the strip is vertical.
+    void TerminalPage::_BuildTitlebarStrip(const bool borrowTabStripHeader)
+    {
+        Controls::Grid strip;
+        strip.VerticalAlignment(VerticalAlignment::Stretch);
+
+        // Two Auto columns rather than one Auto and one Star: TitlebarControl
+        // gives its content presenter an Auto column and keeps the rest for the
+        // drag bar, so a Star here would measure to zero and the title would
+        // never appear. Auto also keeps the draggable area as large as possible,
+        // which matters more than centring the text.
+        for (auto i = 0; i < 2; ++i)
+        {
+            Controls::ColumnDefinition col;
+            col.Width(GridLengthHelper::FromValueAndType(1, GridUnitType::Auto));
+            strip.ColumnDefinitions().Append(col);
+        }
+
+        if (borrowTabStripHeader && _tabRow)
+        {
+            if (const auto& tabView{ _tabRow.TabView() })
+            {
+                if (const auto& header{ tabView.TabStripHeader() })
+                {
+                    // Detach first. The TabView's template holds this in a
+                    // ContentPresenter, and XAML refuses to give an element a
+                    // second parent - it throws rather than reparenting.
+                    tabView.TabStripHeader(nullptr);
+                    if (const auto& element{ header.try_as<UIElement>() })
+                    {
+                        Controls::Grid::SetColumn(element, 0);
+                        strip.Children().Append(element);
+                        _borrowedTabStripHeader = header;
+                    }
+                    else
+                    {
+                        // Not a UIElement, so it cannot go in a Grid. Put it
+                        // back rather than leaving the strip without a header.
+                        tabView.TabStripHeader(header);
+                    }
+                }
+            }
+        }
+
+        Controls::TextBlock title;
+        title.VerticalAlignment(VerticalAlignment::Center);
+        title.Margin(Thickness{ 12, 0, 12, 0 });
+        title.TextTrimming(TextTrimming::CharacterEllipsis);
+        // Title() already honours showTitleInTitlebar, so this says the same
+        // thing the window caption does rather than inventing a second policy.
+        title.Text(Title());
+        Controls::Grid::SetColumn(title, 1);
+        strip.Children().Append(title);
+
+        _titlebarTitle = title;
+        _titlebarStrip = strip;
+        SetTitleBarContent.raise(*this, strip);
+    }
+
+    // Method Description:
+    // - Empties the titlebar again, and gives the workspace button back.
+    void TerminalPage::_TeardownTitlebarStrip()
+    {
+        if (!_titlebarStrip)
+        {
+            return;
+        }
+
+        _titlebarStrip.Children().Clear();
+
+        if (_borrowedTabStripHeader)
+        {
+            if (_tabRow)
+            {
+                if (const auto& tabView{ _tabRow.TabView() })
+                {
+                    tabView.TabStripHeader(_borrowedTabStripHeader);
+                }
+            }
+            _borrowedTabStripHeader = nullptr;
+        }
+
+        _titlebarStrip = nullptr;
+        _titlebarTitle = nullptr;
+        SetTitleBarContent.raise(*this, nullptr);
+    }
+
+    // Method Description:
+    // - Keeps the titlebar's copy of the title in step with the window caption.
+    //   A no-op unless a non-Top position built the strip.
+    void TerminalPage::_UpdateTitlebarStripTitle()
+    {
+        if (_titlebarTitle)
+        {
+            _titlebarTitle.Text(Title());
+        }
     }
 
     // Method Description:
@@ -2623,6 +2788,7 @@ namespace winrt::TerminalApp::implementation
         if (tab == _GetFocusedTab())
         {
             TitleChanged.raise(*this, nullptr);
+            _UpdateTitlebarStripTitle();
         }
     }
 
@@ -5097,6 +5263,7 @@ namespace winrt::TerminalApp::implementation
 
         // The user may have changed the "show title in titlebar" setting.
         TitleChanged.raise(*this, nullptr);
+        _UpdateTitlebarStripTitle();
     }
 
     void TerminalPage::_updateAllTabCloseButtons()

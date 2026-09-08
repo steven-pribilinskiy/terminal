@@ -328,12 +328,29 @@ namespace winrt::TerminalApp::implementation
         Microsoft::Terminal::Settings::Model::TabPosition _tabPosition{ Microsoft::Terminal::Settings::Model::TabPosition::Top };
         Windows::UI::Xaml::Controls::Border _tabStripSplitter{ nullptr };
 
+        // Whether the vertical re-template is currently on the TabView. Guards
+        // _SyncTabViewTemplate against re-templating when nothing changed, which
+        // is what emptied the strip on every settings reload.
+        bool _tabViewIsVertical{ false };
+
 
         // Set while the tab row is parented to the titlebar, so the reset knows
         // to ask for it back. _currentWindowSettings().ShowTabsInTitlebar() is
         // not enough on its own: it stays true while the position is Left, when
         // the row is in the page body regardless.
         bool _tabRowInTitlebar{ false };
+
+        // What goes in the titlebar for every position BUT Top, where the tab
+        // row itself is not there to fill it: the active tab's title, and - when
+        // the strip is vertical - the workspace button borrowed out of it.
+        //
+        // _borrowedTabStripHeader is the TabView's TabStripHeader while the
+        // titlebar is holding it. A XAML element has exactly one parent, so it
+        // has to be handed back before this grid is dropped or the workspace
+        // button vanishes from every layout.
+        Windows::UI::Xaml::Controls::Grid _titlebarStrip{ nullptr };
+        Windows::UI::Xaml::Controls::TextBlock _titlebarTitle{ nullptr };
+        Windows::Foundation::IInspectable _borrowedTabStripHeader{ nullptr };
 
         // Splitter drag state, only meaningful for Left/Right.
         bool _splitterDragging{ false };
@@ -504,6 +521,10 @@ namespace winrt::TerminalApp::implementation
         void _ResetRootGridLayout();
         void _BuildTabStripSplitter();
         void _MakeTabListVertical();
+        void _SyncTabViewTemplate(const bool vertical);
+        void _BuildTitlebarStrip(const bool borrowTabStripHeader);
+        void _TeardownTitlebarStrip();
+        void _UpdateTitlebarStripTitle();
         bool _TabStripIsVertical() const noexcept;
         void _SetBackgroundImage(const winrt::Microsoft::Terminal::Settings::Model::IAppearanceConfig& newAppearance);
 
