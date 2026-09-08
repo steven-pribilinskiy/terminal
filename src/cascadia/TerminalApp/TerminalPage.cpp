@@ -843,6 +843,35 @@ namespace winrt::TerminalApp::implementation
             return;
         }
 
+        // Take the tabs out of the TabView before its template changes, and put
+        // them back afterwards.
+        //
+        // TabItems holds live TabViewItem ELEMENTS, not data - TabManagement.cpp
+        // inserts them directly - so they are visual children of the
+        // TabViewListView that the current template built. Re-templating builds
+        // a new list, and elements that still have a parent do not arrive in it:
+        // the strip comes up empty and stays empty for the rest of the session.
+        // Measured on a live window: one tab before a top->left change, zero
+        // after, and zero for every position changed to after that.
+        //
+        // Skipping the redundant re-templates was not enough on its own. This is
+        // the one re-template that has to happen, and it is the one that hurt.
+        const auto items{ _tabView.TabItems() };
+        std::vector<winrt::Windows::Foundation::IInspectable> saved;
+        saved.reserve(items.Size());
+        for (const auto& item : items)
+        {
+            saved.emplace_back(item);
+        }
+        const auto selectedIndex{ _tabView.SelectedIndex() };
+
+        // _removing is the existing suppression for "the collection is being
+        // rewritten, ignore what the selection does" - without it the selection
+        // collapsing to -1 walks into _UpdatedSelectedTab with nothing selected.
+        _removing = true;
+        items.Clear();
+        _removing = false;
+
         if (!vertical)
         {
             // Back to the stock TabView style. Leaving the vertical one applied
@@ -850,9 +879,11 @@ namespace winrt::TerminalApp::implementation
             // FrameworkElement, not Control: Control inherits the Style property
             // but the static accessor is declared on the base.
             _tabView.ClearValue(winrt::Windows::UI::Xaml::FrameworkElement::StyleProperty());
+            _tabView.ApplyTemplate();
             _verticalTabViewSizeChangedRevoker.revoke();
             _verticalTabList = nullptr;
             _tabViewIsVertical = false;
+            _RestoreTabItems(saved, selectedIndex);
             return;
         }
 
@@ -894,10 +925,44 @@ namespace winrt::TerminalApp::implementation
             // comes up looking like a horizontal one, which is a bad afternoon
             // rather than a lost one.
             _tabView.ClearValue(winrt::Windows::UI::Xaml::FrameworkElement::StyleProperty());
+            _tabView.ApplyTemplate();
             _verticalTabViewSizeChangedRevoker.revoke();
             _verticalTabList = nullptr;
             _tabViewIsVertical = false;
         }
+
+        _RestoreTabItems(saved, selectedIndex);
+    }
+
+    // Method Description:
+    // - Puts the tab items back after a re-template, and re-selects whichever
+    //   one was selected. Split out only because both halves of
+    //   _SyncTabViewTemplate need it and the early return would otherwise skip it.
+    void TerminalPage::_RestoreTabItems(const std::vector<winrt::Windows::Foundation::IInspectable>& saved,
+                                        const int32_t selectedIndex)
+    {
+        if (saved.empty())
+        {
+            return;
+        }
+
+        const auto items{ _tabView.TabItems() };
+
+        // Suppressed the same way the removal was: the tab Terminal considers
+        // focused has not changed, so _UpdatedSelectedTab has nothing to do and
+        // would only run against a half-filled collection on the way past.
+        _removing = true;
+        for (const auto& item : saved)
+        {
+            items.Append(item);
+        }
+        if (selectedIndex >= 0 && selectedIndex < gsl::narrow_cast<int32_t>(saved.size()))
+        {
+            _tabView.SelectedIndex(selectedIndex);
+        }
+        _removing = false;
+
+        _ClampVerticalTabList();
     }
 
     // Method Description:

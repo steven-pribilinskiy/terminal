@@ -1819,18 +1819,40 @@ til::rect IslandWindow::_getDockedSize(HMONITOR hmon, WindowDockEdge edge, uint3
     const auto partWidth = static_cast<til::CoordType>((static_cast<int64_t>(fullWidth) * percent) / 100);
     const auto partHeight = static_cast<til::CoordType>((static_cast<int64_t>(fullHeight) * percent) / 100);
 
+    // The height a window needs for its VISIBLE bottom edge to land on the work
+    // area's bottom edge - which is to say, on top of the taskbar rather than
+    // under it.
+    //
+    // fullHeight is no good for that, and this is the bug a left or right dock
+    // had: NonClientIslandWindow::GetTotalNonClientExclusiveSize folds the
+    // TITLEBAR into ncSize.height, so a window given fullHeight hangs a whole
+    // titlebar's worth below the work area and covers the taskbar. Quake never
+    // showed it because its height is a fraction of that number rather than the
+    // number itself.
+    //
+    // The invisible resize border is the same thickness on every side, and the
+    // horizontal one is already halved to compute `left`, so borrow it for the
+    // bottom instead of the titlebar-inclusive figure.
+    const auto borderThickness = ncSize.width / 2;
+    const auto workHeight = desktopDimensions.height + borderThickness;
+    const auto workPartHeight = static_cast<til::CoordType>((static_cast<int64_t>(workHeight) * percent) / 100);
+
     switch (edge)
     {
     case WindowDockEdge::Bottom:
         // rcWork.top is where the usable area starts, so the bottom edge is that
-        // plus the full height - the window's own height.
-        return { til::point{ left, top + (fullHeight - partHeight) }, til::size{ fullWidth, partHeight } };
+        // plus the usable height - the window's own height.
+        return { til::point{ left, top + (workHeight - workPartHeight) }, til::size{ fullWidth, workPartHeight } };
     case WindowDockEdge::Left:
-        return { til::point{ left, top }, til::size{ partWidth, fullHeight } };
+        return { til::point{ left, top }, til::size{ partWidth, workHeight } };
     case WindowDockEdge::Right:
-        return { til::point{ left + (fullWidth - partWidth), top }, til::size{ partWidth, fullHeight } };
+        return { til::point{ left + (fullWidth - partWidth), top }, til::size{ partWidth, workHeight } };
     case WindowDockEdge::Top:
     default:
+        // Deliberately still fullHeight/partHeight. Quake mode is this case with
+        // Top and 50%, and it has to stay bit-for-bit what it was: its height is
+        // meant to be half of the space a window can occupy, titlebar included,
+        // not half of the work area.
         return { til::point{ left, top }, til::size{ fullWidth, partHeight } };
     }
 }

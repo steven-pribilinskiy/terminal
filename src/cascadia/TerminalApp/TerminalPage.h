@@ -528,6 +528,7 @@ namespace winrt::TerminalApp::implementation
         void _BuildTabStripSplitter();
         void _MakeTabListVertical();
         void _SyncTabViewTemplate(const bool vertical);
+        void _RestoreTabItems(const std::vector<winrt::Windows::Foundation::IInspectable>& saved, const int32_t selectedIndex);
         void _ApplyNewTabButtonPosition(const Microsoft::Terminal::Settings::Model::WindowSettings& windowSettings);
         void _ClampVerticalTabList();
         void _BuildTitlebarStrip(const bool borrowTabStripHeader);
