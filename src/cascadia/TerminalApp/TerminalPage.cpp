@@ -973,6 +973,39 @@ namespace winrt::TerminalApp::implementation
         auto restored{ 0u };
         for (const auto& item : saved)
         {
+            // Take the item off whatever is still holding it before offering it
+            // to the new list.
+            //
+            // This is the fourth attempt at this bug and the first one that
+            // stopped asking XAML nicely. Clear() does not unparent a
+            // TabViewItem, and neither does UpdateLayout() after it - measured,
+            // both times, as "restored 0 of 1 tabs" with IVector::Append
+            // returning 8000FFFF, which is what UWP raises for an element that
+            // already has a parent. The old panel is gone by then, so nothing is
+            // ever going to come along and let go on its own; the only thing
+            // left holding the item is a dead ItemsStackPanel, and Panel's
+            // Children collection can be told to drop it directly.
+            if (const auto& element{ item.try_as<FrameworkElement>() })
+            {
+                if (const auto& parent{ Media::VisualTreeHelper::GetParent(element).try_as<Controls::Panel>() })
+                {
+                    uint32_t idx{};
+                    if (parent.Children().IndexOf(element, idx))
+                    {
+                        parent.Children().RemoveAt(idx);
+                    }
+                }
+
+                // If something still owns it, say what. Guessing at the owner is
+                // what cost the previous three attempts.
+                if (const auto& stillParented{ Media::VisualTreeHelper::GetParent(element) })
+                {
+                    OutputDebugStringW(fmt::format(FMT_COMPILE(L"[TerminalApp] tab item still parented to {} before re-add\n"),
+                                                   std::wstring_view{ winrt::get_class_name(stillParented) })
+                                           .c_str());
+                }
+            }
+
             // Individually guarded, and it logs. A failure here empties the tab
             // strip, and the whole reason this bug survived two attempts is that
             // it did so silently - the throw was swallowed by the catch around
