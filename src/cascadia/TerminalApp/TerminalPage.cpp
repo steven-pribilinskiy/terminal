@@ -872,6 +872,20 @@ namespace winrt::TerminalApp::implementation
         items.Clear();
         _removing = false;
 
+        // Clear() alone is not enough, and this is the second thing that caught
+        // me out here. ListView tears its containers down on the next layout
+        // pass, not inside the collection change - so immediately after Clear()
+        // the TabViewItems are still parented to the old panel, and re-adding
+        // them threw:
+        //
+        //   Windows.Foundation.Collections.h(685) [IVector::Append]
+        //   LogHr 8000FFFF Catastrophic failure
+        //
+        // which _ApplyTabPosition caught and logged, leaving a strip with no
+        // tabs and no crash to point at it. Forcing the pass here completes the
+        // removal while the old template is still the live one.
+        _tabView.UpdateLayout();
+
         if (!vertical)
         {
             // Back to the stock TabView style. Leaving the vertical one applied
@@ -879,7 +893,6 @@ namespace winrt::TerminalApp::implementation
             // FrameworkElement, not Control: Control inherits the Style property
             // but the static accessor is declared on the base.
             _tabView.ClearValue(winrt::Windows::UI::Xaml::FrameworkElement::StyleProperty());
-            _tabView.ApplyTemplate();
             _verticalTabViewSizeChangedRevoker.revoke();
             _verticalTabList = nullptr;
             _tabViewIsVertical = false;
@@ -946,21 +959,45 @@ namespace winrt::TerminalApp::implementation
             return;
         }
 
+        // The new template has to be realized before anything is handed to it,
+        // for the same reason the old one had to finish letting go.
+        _tabView.ApplyTemplate();
+        _tabView.UpdateLayout();
+
         const auto items{ _tabView.TabItems() };
 
         // Suppressed the same way the removal was: the tab Terminal considers
         // focused has not changed, so _UpdatedSelectedTab has nothing to do and
         // would only run against a half-filled collection on the way past.
         _removing = true;
+        auto restored{ 0u };
         for (const auto& item : saved)
         {
-            items.Append(item);
+            // Individually guarded, and it logs. A failure here empties the tab
+            // strip, and the whole reason this bug survived two attempts is that
+            // it did so silently - the throw was swallowed by the catch around
+            // _ApplyTabPositionCore and all anyone saw was tabs going missing.
+            // If it ever comes back, the log says which item and why.
+            try
+            {
+                items.Append(item);
+                ++restored;
+            }
+            CATCH_LOG();
         }
-        if (selectedIndex >= 0 && selectedIndex < gsl::narrow_cast<int32_t>(saved.size()))
+        if (selectedIndex >= 0 && selectedIndex < gsl::narrow_cast<int32_t>(restored))
         {
             _tabView.SelectedIndex(selectedIndex);
         }
         _removing = false;
+
+        if (restored != saved.size())
+        {
+            OutputDebugStringW(fmt::format(FMT_COMPILE(L"[TerminalApp] tab strip re-template restored {} of {} tabs\n"),
+                                           restored,
+                                           saved.size())
+                                   .c_str());
+        }
 
         _ClampVerticalTabList();
     }
