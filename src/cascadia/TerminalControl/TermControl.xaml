@@ -1537,9 +1537,21 @@
                                                   IsTabStop="False"
                                                   VerticalScrollBarVisibility="Auto"
                                                   Visibility="Collapsed">
-                                        <TextBlock x:Name="HyperlinkCardBody"
-                                                   IsTextSelectionEnabled="True"
-                                                   TextWrapping="Wrap" />
+                                        <!--
+                                            Two presenters, one shown at a time: the TextBlock for a
+                                            plain body, and a host for the RichTextBlock that
+                                            Markdown::Builder produces for a markdown one. A markdown
+                                            body used to be shown as its own source here, so a Jira
+                                            description or a Stith summary arrived as a wall of
+                                            asterisks and backticks.
+                                        -->
+                                        <StackPanel>
+                                            <TextBlock x:Name="HyperlinkCardBody"
+                                                       IsTextSelectionEnabled="True"
+                                                       TextWrapping="Wrap" />
+                                            <ContentPresenter x:Name="HyperlinkCardBodyMarkdown"
+                                                              Visibility="Collapsed" />
+                                        </StackPanel>
                                     </ScrollViewer>
 
                                     <!--  A Comments tab's entries, populated per-hover like the fields.  -->

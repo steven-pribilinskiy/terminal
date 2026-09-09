@@ -5733,9 +5733,34 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         if (showBody)
         {
-            // The card is small, so a markdown body is shown as the text it is. The
-            // detail pane is where it gets rendered properly.
-            HyperlinkCardBody().Text(tab.Body());
+            // A markdown body is rendered, not printed. It used to be shown as its
+            // own source on the grounds that the card is small - but small is an
+            // argument for rendering it, not against: "**Blocked** on `AT-158`"
+            // costs more characters than it does formatting, and a Jira
+            // description arrived as a wall of punctuation.
+            //
+            // Converted ADF lands here as markdown too, so Jira and GitHub bodies
+            // now go through the same renderer as everything else.
+            auto rendered = false;
+            if (tab.Format() == L"markdown" && !tab.Body().empty())
+            {
+                try
+                {
+                    HyperlinkCardBodyMarkdown().Content(
+                        winrt::Microsoft::Terminal::UI::Markdown::Builder::Convert(tab.Body(), L""));
+                    rendered = true;
+                }
+                CATCH_LOG(); // a body that will not parse is still worth reading as text
+            }
+
+            if (!rendered)
+            {
+                HyperlinkCardBodyMarkdown().Content(nullptr);
+                HyperlinkCardBody().Text(tab.Body());
+            }
+
+            HyperlinkCardBody().Visibility(rendered ? Visibility::Collapsed : Visibility::Visible);
+            HyperlinkCardBodyMarkdown().Visibility(rendered ? Visibility::Visible : Visibility::Collapsed);
         }
         if (showComments)
         {

@@ -1386,7 +1386,76 @@ namespace
 
         if (type == L"text")
         {
-            AppendText(out, object.GetNamedString(L"text", L""));
+            // ADF puts styling in a "marks" array beside the text rather than in
+            // the text itself, so this is where bold, italic, code and links turn
+            // back into the markdown that says the same thing.
+            //
+            // Order matters on the way out: the wrappers have to close in the
+            // reverse of the order they opened, or the emphasis markers nest
+            // wrongly and the renderer shows them as literal asterisks.
+            auto text = std::wstring{ object.GetNamedString(L"text", L"") };
+            if (text.empty())
+            {
+                return;
+            }
+
+            std::wstring href;
+            std::wstring prefix;
+            std::wstring suffix;
+
+            if (const auto marks = object.GetNamedArray(L"marks", nullptr))
+            {
+                for (uint32_t i = 0; i < marks.Size(); ++i)
+                {
+                    const auto entry = marks.GetAt(i);
+                    if (!entry || entry.ValueType() != JsonValueType::Object)
+                    {
+                        continue;
+                    }
+                    const auto mark = entry.GetObject();
+                    const std::wstring markType{ mark.GetNamedString(L"type", L"") };
+
+                    // Code wins outright: markdown has no way to bold something
+                    // inside a code span, and asterisks within one are literal.
+                    if (markType == L"code")
+                    {
+                        prefix = L"`";
+                        suffix = L"`";
+                        href.clear();
+                        break;
+                    }
+                    if (markType == L"strong")
+                    {
+                        prefix += L"**";
+                        suffix.insert(0, L"**");
+                    }
+                    else if (markType == L"em")
+                    {
+                        prefix += L"*";
+                        suffix.insert(0, L"*");
+                    }
+                    else if (markType == L"strike")
+                    {
+                        prefix += L"~~";
+                        suffix.insert(0, L"~~");
+                    }
+                    else if (markType == L"link")
+                    {
+                        if (const auto attrs = mark.GetNamedObject(L"attrs", nullptr))
+                        {
+                            href = attrs.GetNamedString(L"href", L"");
+                        }
+                    }
+                }
+            }
+
+            if (!href.empty())
+            {
+                AppendText(out, winrt::hstring{ fmt::format(L"[{}{}{}]({})", prefix, text, suffix, href) });
+                return;
+            }
+
+            AppendText(out, winrt::hstring{ prefix + text + suffix });
             return;
         }
         if (type == L"hardBreak")
@@ -1439,11 +1508,38 @@ namespace
             return;
         }
 
+        // Blocks that markdown marks with a prefix rather than a wrapper. The
+        // prefix goes on before the children write, and only once, because ADF
+        // nests the inline content one level down inside a paragraph.
+        if (type == L"heading")
+        {
+            endLine();
+            auto level = 2;
+            if (const auto attrs = object.GetNamedObject(L"attrs", nullptr))
+            {
+                level = static_cast<int>(attrs.GetNamedNumber(L"level", 2));
+                level = level < 1 ? 1 : (level > 6 ? 6 : level);
+            }
+            out.append(static_cast<size_t>(level), L'#');
+            out.push_back(L' ');
+            FlattenAdfChildren(object, out, depth);
+            endLine();
+            return;
+        }
+        if (type == L"blockquote")
+        {
+            endLine();
+            out.append(L"> ");
+            FlattenAdfChildren(object, out, depth);
+            endLine();
+            return;
+        }
+
         FlattenAdfChildren(object, out, depth);
 
         // Everything ADF calls a block ends the line it wrote.
-        if (type == L"paragraph" || type == L"heading" || type == L"listItem" ||
-            type == L"blockquote" || type == L"panel" || type == L"tableRow")
+        if (type == L"paragraph" || type == L"listItem" ||
+            type == L"panel" || type == L"tableRow")
         {
             endLine();
         }
@@ -1475,13 +1571,21 @@ namespace
             row.Key(winrt::hstring{ tab.Key });
             row.Label(winrt::hstring{ tab.Label });
 
-            // ADF is flattened here, so what leaves this function is only ever
+            // ADF is converted here, so what leaves this function is only ever
             // "text" or "markdown" -- never a format the control would have to
             // know how to parse. The format is stamped on a Comments tab too:
-            // GitHub's comment bodies are markdown and Jira's are flattened
+            // GitHub's comment bodies are markdown and Jira's are converted
             // ADF, and nothing downstream could tell them apart otherwise.
+            //
+            // Converted ADF is stamped "markdown", not "text". It always came
+            // out as markdown - fenced code, "- " bullets, "1. " ordered lists -
+            // but calling it text meant every surface printed those markers
+            // literally instead of rendering them, so a Jira description read as
+            // a wall of punctuation. Headings, bold, italic, strike and links
+            // come across too now.
             const auto flatten = tab.Format == L"adf";
-            row.Format(winrt::hstring{ flatten || tab.Format.empty() ? std::wstring{ L"text" } : tab.Format });
+            row.Format(winrt::hstring{ flatten ? std::wstring{ L"markdown" } :
+                                                 (tab.Format.empty() ? std::wstring{ L"text" } : tab.Format) });
 
             if (!tab.IsList)
             {

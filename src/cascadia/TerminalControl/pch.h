@@ -60,6 +60,7 @@
 #include <winrt/Microsoft.Terminal.Core.h>
 
 #include <winrt/Microsoft.Terminal.UI.h>
+#include <winrt/Microsoft.Terminal.UI.Markdown.h>
 
 #include <windows.ui.xaml.media.dxinterop.h>
 

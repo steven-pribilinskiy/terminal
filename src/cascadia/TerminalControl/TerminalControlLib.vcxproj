@@ -183,6 +183,16 @@
       <Project>{6515F03F-E56D-4DB4-B23D-AC4FB80DB36F}</Project>
       <Private>false</Private>
     </ProjectReference>
+    <!--
+      The link tooltip renders a markdown body rather than printing its source,
+      and this is the renderer TerminalApp's detail pane already uses. No cycle:
+      UIMarkdown depends only on UIHelpers, WinRTUtils and types, two of which
+      are already referenced right here.
+    -->
+    <ProjectReference Include="$(OpenConsoleDir)src\cascadia\UIMarkdown\UIMarkdown.vcxproj">
+      <Project>{7615F03F-E56D-4DB4-B23D-BD4FB80DB36F}</Project>
+      <Private>false</Private>
+    </ProjectReference>
   </ItemGroup>
   <!-- ====================== Compiler & Linker Flags ===================== -->
   <ItemDefinitionGroup>
