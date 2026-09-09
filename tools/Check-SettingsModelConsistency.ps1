@@ -219,10 +219,37 @@ foreach ($m in [regex]::Matches($enumCpp, '(?s)EnumMappings::(\w+)\(\)\s*\{(.*?)
 
 $checkedValues = 0
 $uncheckedMaps = [System.Collections.Generic.List[string]]::new()
-$initPattern = 'INITIALIZE_BINDABLE_ENUM_SETTING(?:_REVERSE_ORDER)?\(\s*\w+\s*,\s*(\w+)\s*,[^,]+,\s*L"([^"]+)"\s*,\s*L"([^"]+)"\s*\)'
+# Two ways the editor builds a dropdown out of an enum, and both look a value's
+# label up the same way, so both have to be checked.
+#
+# The second one was missed until 2026-09-09, when adding a value to
+# SettingsTarget without its Actions_ string shipped a build whose Settings UI
+# died on open. The checker reported "no inconsistencies" because the Actions
+# editor does not use the macro - it calls a template directly, and the pattern
+# below never saw it.
+$initPatterns = @(
+    @{
+        Pattern = 'INITIALIZE_BINDABLE_ENUM_SETTING(?:_REVERSE_ORDER)?\(\s*\w+\s*,\s*(\w+)\s*,[^,]+,\s*L"([^"]+)"\s*,\s*L"([^"]+)"\s*\)'
+        SkipKeys = @()
+    }
+    @{
+        # _InitializeEnumListAndValue<Model::Foo>(…EnumMappings::Foo().GetView(), L"Actions_Foo", L"Content", …)
+        Pattern = '(?s)_InitializeEnumListAndValue<[^>]+>\s*\([^)]*?EnumMappings::(\w+)\(\)[^,]*,\s*L"([^"]+)"\s*,\s*L"([^"]+)"'
+        SkipKeys = @()
+    }
+    @{
+        # The flag variant skips the "all" and "none" aggregates outright
+        # (ActionsViewModel.cpp: `flagKey != L"all" && flagKey != L"none"`), so
+        # neither needs a label and demanding one is a false alarm.
+        Pattern = '(?s)_InitializeFlagListAndValue<[^>]+>\s*\([^)]*?EnumMappings::(\w+)\(\)[^,]*,\s*L"([^"]+)"\s*,\s*L"([^"]+)"'
+        SkipKeys = @('all', 'none')
+    }
+)
 
 foreach ($file in Get-ChildItem $EditorDir -Recurse -Include *.cpp -File | Where-Object { $_.FullName -notmatch '\\Generated Files\\' }) {
-    foreach ($m in [regex]::Matches((Get-Content -Raw -LiteralPath $file.FullName), $initPattern)) {
+  $content = Get-Content -Raw -LiteralPath $file.FullName
+  foreach ($spec in $initPatterns) {
+    foreach ($m in [regex]::Matches($content, $spec.Pattern)) {
         $mapName, $prefix, $property = $m.Groups[1].Value, $m.Groups[2].Value, $m.Groups[3].Value
         $src = $mapSource[$mapName]
         if (-not $src -or -not $keysForType.ContainsKey($src.Type)) {
@@ -230,15 +257,16 @@ foreach ($file in Get-ChildItem $EditorDir -Recurse -Include *.cpp -File | Where
             continue
         }
         foreach ($key in $keysForType[$src.Type]) {
-            if ($src.Skip -contains $key) { continue }
+            if ($src.Skip -contains $key -or $spec.SkipKeys -contains $key) { continue }
             # Utils.cpp uppercases the first letter; '/' in the lookup is the '.' in the resw.
             $expected = "$prefix$($key.Substring(0,1).ToUpperInvariant())$($key.Substring(1)).$property"
             $checkedValues++
             if ($editorStrings -notcontains $expected) {
-                $problems.Add("enum dropdown '$mapName' ($($file.Name)) needs '$expected' in the editor's Resources.resw for value '$key' -- opening the page that owns it crashes the Settings Editor")
+                $problems.Add("enum dropdown '$mapName' ($($file.Name)) needs '$expected' in the editor's Resources.resw for value '$key' -- the value shows as its raw enum name instead of a label")
             }
         }
     }
+  }
 }
 
 if ($uncheckedMaps.Count -gt 0) {

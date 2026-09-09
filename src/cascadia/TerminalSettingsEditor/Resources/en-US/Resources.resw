@@ -2573,6 +2573,10 @@
     <value>Directory</value>
     <comment>An option to choose from for the "settings target". Targets the directory.</comment>
   </data>
+  <data name="Actions_SettingsTargetSettingsUITab.Content" xml:space="preserve">
+    <value>Settings UI, as a tab</value>
+    <comment>An option to choose from for the "settings target". Targets the settings UI, always as a tab in the current window, ignoring the "open settings in" setting.</comment>
+  </data>
   <data name="Actions_MoveTabDirectionNone.Content" xml:space="preserve">
     <value>None</value>
     <comment>An option to choose from for the "move tab direction". No movement.</comment>

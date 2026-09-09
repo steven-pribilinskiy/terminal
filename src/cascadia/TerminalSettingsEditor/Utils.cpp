@@ -134,6 +134,25 @@ namespace winrt::Microsoft::Terminal::Settings
     {
         // Uppercase the first letter to conform to our current Resource keys
         auto fmtKey = fmt::format(FMT_COMPILE(L"{}{}{}/{}"), sectionAndEnumType, static_cast<wchar_t>(std::towupper(enumValue[0])), enumValue.substr(1), propertyType);
+
+        // Degrade to the enum's own name rather than taking the window with us.
+        //
+        // Adding a value to an enum that the Settings UI builds a dropdown from
+        // means adding a string for it too, and forgetting is not a blank row -
+        // the lookup is fatal, so the whole Settings UI dies the moment it is
+        // opened, in a build that compiled, packaged and passed its tests. That
+        // happened here on 2026-09-09 with SettingsTarget::SettingsUITab, in the
+        // Dev slot, where the crash lands on the app I actually work in.
+        //
+        // A missing label is a cosmetic defect and should read as one. The
+        // dropdown shows "SettingsUITab" instead of "Settings UI, as a tab",
+        // which is ugly, obvious, and reported by
+        // tools\Check-SettingsModelConsistency.ps1 before it can ship.
+        if (!HasLibraryResourceWithName(fmtKey))
+        {
+            return hstring{ enumValue };
+        }
+
         return GetLibraryResourceString(fmtKey);
     }
 
