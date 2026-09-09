@@ -26,7 +26,7 @@
         },
         {
             "kind": "text",
-            "pattern": "\b(?<pane>w[123456789ABCDEFGHJKMNPQRSTVWXYZ0]+:p[123456789ABCDEFGHJKMNPQRSTVWXYZ0]+)\b",
+            "pattern": "\\b(?<pane>w[123456789ABCDEFGHJKMNPQRSTVWXYZ0]+:p[123456789ABCDEFGHJKMNPQRSTVWXYZ0]+)\\b",
             "open": "focus",
             "suggested": true,
             "description": "Multiplexer pane ids printed bare, like w1N:p39"
