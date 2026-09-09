@@ -782,6 +782,36 @@ namespace winrt::TerminalApp::implementation
             _tabStripPanel = panel;
         }
 
+        // Paint the sidebar, because in the afterTabs layout nothing else does.
+        //
+        // With the new tab button at the bottom, the tab row owns the Star row
+        // and its own TabViewBackground covers the column. With the button under
+        // the last tab, the tab row is only as tall as its tabs and the slack
+        // below it belongs to this Grid - which, left bare, is transparent, so
+        // whatever window is behind the Terminal shows straight through the
+        // sidebar. Verified as exactly that: another terminal's output was
+        // legible through the strip.
+        //
+        // ThemeLookup rather than a plain Lookup, so this follows the light and
+        // dark variants the way every other themed brush here does.
+        // Guarded rather than assumed: a throw here would be caught by
+        // _ApplyTabPosition and quietly demote the window to a top strip, which
+        // is a confusing way to find out a brush was missing.
+        try
+        {
+            if (const auto& res{ Application::Current().Resources() })
+            {
+                if (const auto& theme{ _settings.GlobalSettings().CurrentTheme(_currentWindowSettings()) })
+                {
+                    if (const auto& brush{ ThemeLookup(res, theme.RequestedTheme(), winrt::box_value(L"TabViewBackground")).try_as<Media::Brush>() })
+                    {
+                        _tabStripPanel.Background(brush);
+                    }
+                }
+            }
+        }
+        CATCH_LOG();
+
         // A XAML element has exactly one parent, so the footer has to be taken
         // off the TabView before it can be added here - the same two-step the
         // titlebar strip uses for TabStripHeader.
