@@ -1651,28 +1651,44 @@
                                                    TextTrimming="CharacterEllipsis" />
                                     </HyperlinkButton>
 
+                                    <!--
+                                        Margin per button rather than Spacing on the panel.
+
+                                        Most of these buttons are collapsed most of the time - Copy path
+                                        and Reveal only appear for a file, Show in pane only when the rule
+                                        asks for it - and StackPanel.Spacing still reserves its gap for a
+                                        collapsed child. With Copy path and Reveal hidden, the two of them
+                                        put 8px of nothing between Copy link and Show in pane, so the row
+                                        read as unevenly spaced. A Margin is not rendered for a collapsed
+                                        element, so the visible buttons stay evenly spaced however many of
+                                        their neighbours are hidden.
+                                    -->
                                     <StackPanel x:Name="HyperlinkCardActions"
                                                 Grid.Column="0"
-                                                Orientation="Horizontal"
-                                                Spacing="4">
+                                                Orientation="Horizontal">
                                         <Button x:Name="HyperlinkOpenButton"
                                                 x:Uid="HyperlinkOpenButton"
+                                                Margin="0,0,4,0"
                                                 AllowFocusOnInteraction="False"
                                                 Click="_HyperlinkOpenClick" />
                                         <Button x:Name="HyperlinkCopyLinkButton"
                                                 x:Uid="HyperlinkCopyLinkButton"
+                                                Margin="0,0,4,0"
                                                 AllowFocusOnInteraction="False"
                                                 Click="_HyperlinkCopyLinkClick" />
                                         <Button x:Name="HyperlinkCopyPathButton"
                                                 x:Uid="HyperlinkCopyPathButton"
+                                                Margin="0,0,4,0"
                                                 AllowFocusOnInteraction="False"
                                                 Click="_HyperlinkCopyPathClick" />
                                         <Button x:Name="HyperlinkRevealButton"
                                                 x:Uid="HyperlinkRevealButton"
+                                                Margin="0,0,4,0"
                                                 AllowFocusOnInteraction="False"
                                                 Click="_HyperlinkRevealClick" />
                                         <Button x:Name="HyperlinkShowInPaneButton"
                                                 x:Uid="HyperlinkShowInPaneButton"
+                                                Margin="0,0,4,0"
                                                 AllowFocusOnInteraction="False"
                                                 Click="_HyperlinkShowInPaneClick" />
 

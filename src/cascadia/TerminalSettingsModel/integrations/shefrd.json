@@ -1,7 +1,7 @@
 {
     "id": "shefrd",
     "name": "shefrd",
-    "icon": "",
+    "icon": "ms-appx:///IntegrationIcons/shefrd.png",
     "version": 1,
     "cacheSeconds": 10,
     "settings": [
