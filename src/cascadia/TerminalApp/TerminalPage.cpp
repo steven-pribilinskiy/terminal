@@ -3293,6 +3293,10 @@ namespace winrt::TerminalApp::implementation
         // sense beyond what closing that one window already means, so it
         // doesn't warrant the CloseAll phrasing. Always keeps warning
         // regardless of window count, same as it already does for panes/tabs.
+        // Under the threshold there is nothing worth warning about, and that
+        // holds whether one window is closing or all of them.
+        const auto skipForThreshold = setting == ConfirmOnClose::MoreThanTabs && !_ShouldWarnOnClose();
+
         auto skipForSingleWindow = false;
         if (setting == ConfirmOnClose::Automatic)
         {
@@ -3308,7 +3312,7 @@ namespace winrt::TerminalApp::implementation
             skipForSingleWindow = windowCount <= 1;
         }
 
-        if (setting != ConfirmOnClose::Never && !skipForSingleWindow && !_displayingCloseDialog)
+        if (setting != ConfirmOnClose::Never && !skipForSingleWindow && !skipForThreshold && !_displayingCloseDialog)
         {
             _displayingCloseDialog = true;
 
@@ -3463,8 +3467,19 @@ namespace winrt::TerminalApp::implementation
             return true;
         case ConfirmOnClose::Automatic:
         {
-            // Warn if there's more than one tab, or the one tab has more than one pane.
-            return _HasMultipleTabs() || _GetTabImpl(_tabs.GetAt(0))->GetLeafPaneCount() > 1;
+            // Warn if there's more than one tab worth losing, or the one tab has
+            // more than one pane. The Settings tab is not one worth losing, so a
+            // terminal plus the settings page closes as quietly as the terminal
+            // alone would.
+            return _TabCountWorthWarningAbout() > 1 || _GetTabImpl(_tabs.GetAt(0))->GetLeafPaneCount() > 1;
+        }
+        case ConfirmOnClose::MoreThanTabs:
+        {
+            // Purely a count: someone who picked this asked to be left alone
+            // below the threshold, so a split pane under it does not override
+            // that the way Automatic's pane check would.
+            const auto threshold{ _settings.GlobalSettings().ConfirmOnCloseTabThreshold() };
+            return static_cast<int32_t>(_TabCountWorthWarningAbout()) > std::max(0, threshold);
         }
         case ConfirmOnClose::Never:
         default:
@@ -3487,7 +3502,11 @@ namespace winrt::TerminalApp::implementation
         case ConfirmOnClose::Always:
             return true;
         case ConfirmOnClose::Automatic:
-            // Warn if this tab has more than one pane.
+        case ConfirmOnClose::MoreThanTabs:
+            // Warn if this tab has more than one pane. The threshold is about
+            // closing a window full of work, not about one tab - but a tab
+            // holding several panes is still several things at once, so it keeps
+            // the same protection Automatic gives it.
             return tab->GetLeafPaneCount() > 1;
         case ConfirmOnClose::Never:
         default:

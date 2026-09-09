@@ -90,10 +90,11 @@ JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Core::MatchMode)
 
 JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::ConfirmOnClose)
 {
-    JSON_MAPPINGS(3) = {
+    JSON_MAPPINGS(4) = {
         pair_type{ "never", ValueType::Never },
         pair_type{ "automatic", ValueType::Automatic },
         pair_type{ "always", ValueType::Always },
+        pair_type{ "moreThanTabs", ValueType::MoreThanTabs },
     };
 
     auto FromJson(const Json::Value& json)

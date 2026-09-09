@@ -2793,6 +2793,22 @@
     <value>Always</value>
     <comment>Option associated with Globals_ConfirmOnClose. "Always" means that the system will always display a warning when closing.</comment>
   </data>
+  <data name="Globals_ConfirmOnCloseMoreThanTabs.Content" xml:space="preserve">
+    <value>More tabs than a threshold</value>
+    <comment>Option associated with Globals_ConfirmOnClose. The system warns only once more than a chosen number of tabs are open.</comment>
+  </data>
+  <data name="Globals_ConfirmOnCloseTabThreshold.Header" xml:space="preserve">
+    <value>Warn above this many tabs</value>
+    <comment>Header for a control choosing how many tabs may be open before closing the window asks for confirmation.</comment>
+  </data>
+  <data name="Globals_ConfirmOnCloseTabThreshold.Description" xml:space="preserve">
+    <value>The Settings tab is not counted, since closing it loses nothing.</value>
+    <comment>A description for the "warn above this many tabs" setting. "Settings" is the name of this settings page.</comment>
+  </data>
+  <data name="Globals_ConfirmOnCloseTabThresholdBox.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Warn above this many tabs</value>
+    <comment>Name for a control choosing how many tabs may be open before closing asks for confirmation.</comment>
+  </data>
   <data name="Globals_ConfirmOnCloseAutomatic.Content" xml:space="preserve">
     <value>Multiple tabs or panes</value>
     <comment>Option associated with Globals_ConfirmOnClose. The system will display a warning when multiple tabs or panes are present.</comment>

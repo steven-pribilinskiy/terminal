@@ -163,7 +163,21 @@
                           ItemTemplate="{StaticResource EnumComboBoxTemplate}"
                           ItemsSource="{x:Bind ViewModel.ConfirmOnCloseList}"
                           SelectedItem="{x:Bind ViewModel.CurrentConfirmOnClose, Mode=TwoWay}"
+                          SelectionChanged="{x:Bind ViewModel.ConfirmOnCloseChanged}"
                           Style="{StaticResource ComboBoxSettingStyle}" />
+            </local:SettingsCard>
+
+            <!--  How many tabs before the warning applies. Only meaningful for the threshold option.  -->
+            <local:SettingsCard x:Name="ConfirmOnCloseTabThreshold"
+                                x:Uid="Globals_ConfirmOnCloseTabThreshold"
+                                IsEnabled="{x:Bind ViewModel.ConfirmOnCloseThresholdEnabled, Mode=OneWay}"
+                                IsForkFeature="True">
+                <muxc:NumberBox x:Uid="Globals_ConfirmOnCloseTabThresholdBox"
+                                Maximum="50"
+                                Minimum="1"
+                                SpinButtonPlacementMode="Compact"
+                                Style="{StaticResource NumberBoxSettingStyle}"
+                                Value="{x:Bind ViewModel.ConfirmOnCloseTabThreshold, Mode=TwoWay}" />
             </local:SettingsCard>
 
             <!--  Large Paste Warning  -->

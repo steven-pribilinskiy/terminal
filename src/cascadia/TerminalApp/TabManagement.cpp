@@ -1381,6 +1381,23 @@ namespace winrt::TerminalApp::implementation
     }
 
     // Method Description:
+    // - How many tabs are worth warning about losing - which is every tab except
+    //   the Settings tab.
+    // - Settings holds no session and no scrollback. Closing it loses nothing,
+    //   so a window showing one terminal and the settings page should be as
+    //   quiet to close as a window showing one terminal, and a threshold of 3
+    //   should mean three terminals rather than two and a settings page.
+    uint32_t TerminalPage::_TabCountWorthWarningAbout() const
+    {
+        auto count{ _tabs.Size() };
+        if (_settingsTab && count > 0)
+        {
+            --count;
+        }
+        return count;
+    }
+
+    // Method Description:
     // - Attempts to find and focus the given tab in this window.
     // Arguments:
     // - tab: The tab to focus.

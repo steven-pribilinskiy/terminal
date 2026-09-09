@@ -22,4 +22,23 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         INITIALIZE_BINDABLE_ENUM_SETTING(SettingsUIHost, SettingsUIHost, Model::SettingsUIHost, L"Globals_SettingsUIHost", L"Content");
     }
 
+    // The threshold only means anything for the option that reads it.
+    bool InteractionViewModel::ConfirmOnCloseThresholdEnabled()
+    {
+        return _GlobalSettings.ConfirmOnClose() == Model::ConfirmOnClose::MoreThanTabs;
+    }
+
+    // The threshold box's IsEnabled depends on the dropdown beside it, and
+    // nothing else would tell it that the choice moved:
+    // GETSET_BINDABLE_ENUM_SETTING's setter writes straight through to the
+    // settings without raising PropertyChanged. Same reason as
+    // GlobalAppearanceViewModel::TabPositionChanged.
+    //
+    // Notifying only the derived property, never the one the binding just wrote
+    // - that way round is what sends the Settings UI into a loop.
+    void InteractionViewModel::ConfirmOnCloseChanged(const winrt::Windows::Foundation::IInspectable& /* sender */, const winrt::Windows::UI::Xaml::Controls::SelectionChangedEventArgs& /* args */)
+    {
+        _NotifyChanges(L"ConfirmOnCloseThresholdEnabled");
+    }
+
 }

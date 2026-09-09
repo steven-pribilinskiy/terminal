@@ -36,5 +36,9 @@ namespace Microsoft.Terminal.Settings.Editor
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, WarnAboutLargePaste);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Microsoft.Terminal.Control.WarnAboutMultiLinePaste, WarnAboutMultiLinePaste);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, EnableColorSelection);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, ConfirmOnCloseTabThreshold);
+
+        Boolean ConfirmOnCloseThresholdEnabled { get; };
+        void ConfirmOnCloseChanged(IInspectable sender, Windows.UI.Xaml.Controls.SelectionChangedEventArgs args);
     }
 }

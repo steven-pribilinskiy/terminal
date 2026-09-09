@@ -92,6 +92,7 @@ Author(s):
     X(Model::NewTabPosition, NewTabPosition, "newTabPosition", Model::NewTabPosition::AfterLastTab)                                                                                                   \
     X(bool, ShowTitleInTitlebar, "showTerminalTitleInTitlebar", true)                                                                                                                                 \
     X(Model::ConfirmOnClose, ConfirmOnClose, "warning.confirmOnClose", Model::ConfirmOnClose::Automatic)                                                                                              \
+    X(int32_t, ConfirmOnCloseTabThreshold, "warning.confirmOnCloseTabThreshold", 3)                                                                                                                   \
     X(Model::ThemePair, Theme, "theme")                                                                                                                                                               \
     X(winrt::Microsoft::UI::Xaml::Controls::TabViewWidthMode, TabWidthMode, "tabWidthMode", winrt::Microsoft::UI::Xaml::Controls::TabViewWidthMode::Equal)                                            \
     X(Model::TabPosition, TabPosition, "tabPosition", Model::TabPosition::Top)                                                                                                                        \

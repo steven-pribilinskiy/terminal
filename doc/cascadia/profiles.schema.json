@@ -3048,13 +3048,21 @@
         },
         "warning.confirmOnClose": {
           "default": "automatic",
-          "description": "Controls when a confirmation dialog appears before closing tabs or windows.",
+          "description": "Controls when a confirmation dialog appears before closing tabs or windows. \"moreThanTabs\" warns only once more than \"warning.confirmOnCloseTabThreshold\" tabs are open; the Settings tab is never counted.",
           "enum": [
             "never",
             "automatic",
-            "always"
+            "always",
+            "moreThanTabs"
           ],
           "type": "string"
+        },
+        "warning.confirmOnCloseTabThreshold": {
+          "default": 3,
+          "description": "How many tabs may be open before closing the window asks for confirmation. Only used when \"warning.confirmOnClose\" is \"moreThanTabs\". The Settings tab is not counted, since closing it loses nothing.",
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer"
         },
         "useTabSwitcher": {
           "description": "[Deprecated] Replaced with the \"tabSwitcherMode\" setting.",

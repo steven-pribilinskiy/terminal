@@ -118,6 +118,10 @@ namespace Microsoft.Terminal.Settings.Model
         Never = 0,
         Automatic = 1,
         Always = 2,
+        // Warn only once there are more than confirmOnCloseTabThreshold tabs
+        // open. For people who close a two-tab window all day and only want
+        // stopping when there is real work in front of them.
+        MoreThanTabs = 3,
     };
 
     [default_interface] runtimeclass GlobalAppSettings {
@@ -147,6 +151,7 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(Int32, BufferPersistIntervalSeconds);
         INHERITABLE_SETTING(ResumeSessionNotification, ResumeSessionNotification);
         INHERITABLE_SETTING(ConfirmOnClose, ConfirmOnClose);
+        INHERITABLE_SETTING(Int32, ConfirmOnCloseTabThreshold);
 
         // ---- Color schemes ----
         Windows.Foundation.Collections.IMapView<String, ColorScheme> ColorSchemes();

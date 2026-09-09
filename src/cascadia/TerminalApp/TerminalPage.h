@@ -576,6 +576,7 @@ namespace winrt::TerminalApp::implementation
         void _DismissTabContextMenus();
         void _FocusCurrentTab(const bool focusAlways);
         bool _HasMultipleTabs() const;
+        uint32_t _TabCountWorthWarningAbout() const;
 
         void _SelectNextTab(const bool bMoveRight, const Windows::Foundation::IReference<Microsoft::Terminal::Settings::Model::TabSwitcherMode>& customTabSwitcherMode);
         bool _SelectTab(uint32_t tabIndex);
