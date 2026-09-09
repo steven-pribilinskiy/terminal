@@ -1461,6 +1461,15 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         {
             return L"stith";
         }
+        // Before the "git" test below, which would otherwise claim anything
+        // whose name merely starts with those three letters.
+        if (integration.find(L"shefrd") != std::wstring::npos ||
+            name.find(L"shefrd") != std::wstring::npos ||
+            name.find(L"herdr") != std::wstring::npos ||
+            name.find(L"pane") != std::wstring::npos)
+        {
+            return L"shefrd";
+        }
         if (name.find(L"git") != std::wstring::npos ||
             name.find(L"commit") != std::wstring::npos ||
             pattern.find(L"commit") != std::wstring::npos ||
@@ -1487,6 +1496,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         L"jira",
         L"slack",
         L"stith",
+        L"shefrd",
         L"git",
         L"files",
         L"custom",
@@ -1689,6 +1699,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             { L"jira", L"Jira", L"\uE943", {} },
             { L"slack", L"Slack", L"\uE8BD", {} },
             { L"stith", L"Stith", L"\uE774", {} },
+            { L"shefrd", L"shefrd", L"\uF0E2", {} },
             { L"git", L"Git", L"\uE81D", {} },
             { L"files", L"Files & Media", L"\uE8A5", {} },
             { L"custom", L"Custom Rules", L"\uE713", {} }

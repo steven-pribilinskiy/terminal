@@ -4,12 +4,16 @@ Hovering a link (or a piece of plain text that a rule recognizes) in the termina
 card with live information pulled from an external tool — a GitHub pull request's state and
 checks, a Jira issue's summary and status, a Slack message's author and text, a Stith session's
 name and state. This is driven by **integration plugins**: small JSON manifests that describe how
-to recognize a match, how to fetch data for it, and how to display the result. Four ship built in:
-**GitHub**, **Jira**, **Slack**, and **Stith**.
+to recognize a match, how to fetch data for it, and how to display the result. Five ship built in:
+**GitHub**, **Jira**, **Slack**, **Stith**, and **shefrd**.
 
 This document covers the feature end to end: what ships out of the box, the Integrations
 settings page, text-pattern matching, the plugin manifest format for anyone writing their own,
 and the security rules that keep credentials from leaking.
+
+The manifest format is **Lintel**, shared with the Tabby fork and specified at
+[`lintel.aylith.com`](https://lintel.aylith.com). A manifest that works here works there; the
+canonical copies of the built-ins live in the `lintel` repo and are synced into this one.
 
 ## What a link preview is
 
@@ -43,7 +47,8 @@ preview.
 | **GitHub** | `https://github.com/<owner>/<repo>/pull/<n>`, `/issues/<n>` and `/commit/<sha>` links | Nothing, if the [GitHub CLI](https://cli.github.com) is signed in. Otherwise a personal access token (credential) | Tries `gh auth token` first and falls back to a stored token — see [Authenticating from a local CLI](#authenticating-from-a-local-cli-the-gh-then-token-pattern). Tabs for the description and comments; Details / Activity / Commit field groups. |
 | **Jira** | `https://<host>/browse/<KEY>` links, and (opt-in) issue keys like `CAB-8209` in plain text | Site host (setting) + account email and API token (credentials) | Credentials are only ever sent to the configured host — see [Host guarding](#host-guarding). Create an API token at `id.atlassian.com` → Security → API tokens. Carries the transition [action](#actions), a Development [field group](#field-groups) fed by Jira's `dev-status` API, and Description / Comments [tabs](#tabs). |
 | **Slack** | `https://<workspace>.slack.com/archives/<channel>/p<ts>` permalinks, including thread replies (`?thread_ts=`) | A bot token (credential) | The token needs the `channels:history`, `groups:history`, and `users:read` scopes, and the bot must be a member of the channel it's reading. |
-| **Stith** | `stith://session/<id>`, `stith://focus/<id>`, and `https://<server>/(s\|agent\|sessions\|embed/s)/<id>` links | Server URL (setting) | No credentials. The fetch allows an untrusted certificate, so a self-signed `lvh.me` cert doesn't block the preview. A [`detectPatterns`](#detectpatterns) entry makes a bare `stith://…` in plain output hoverable without OSC 8. |
+| **Stith** | `stith://session/<id>`, `stith://focus/<id>`, `stith://copy/<id>`, `https://<server>/(s\|agent\|sessions\|embed/s)/<id>` links, and a **bare session id** printed with no scheme around it | Server URL (setting) | No credentials. The fetch allows an untrusted certificate, so a self-signed `lvh.me` cert doesn't block the preview. A [`detectPatterns`](#detectpatterns) entry makes a bare `stith://…` in plain output hoverable without OSC 8. Each verb is matched separately so a `focus` link is never read as a `session` one, and `focus` carries an [`open` action](#open-actions) that raises the terminal the session runs in. |
+| **shefrd** | Multiplexer pane addresses like `w1N:p39`, and `shefrd://pane/<id>` links | Stith server URL (setting) | Reads and focuses through stith, which already holds a socket to every multiplexer server — so the same manifest works from Windows, from WSL, and from inside a pane, with no binary invoked directly. Clicking a pane id focuses that pane ([`open`](#open-actions)); the card shows its tab, space, agent and status. |
 
 Each plugin's fields (which pieces of data show on the card, and in what order) can be trimmed on
 the Integrations settings page — see below.
@@ -353,9 +358,29 @@ Top-level keys:
 | `kind` | `"link"` \| `"text"` | Whether `pattern` runs against a hovered link's URI, or is scanned over terminal text. |
 | `pattern` | ICU regex | Named capture groups (`(?<name>…)`) become template variables. |
 | `hostSetting` | string | **Link matchers only.** The URI's host must equal the named setting's current value, or this matcher does not fire. See [Host guarding](#host-guarding). |
-| `link` | template string | **Text matchers only.** How a text match turns into a URL for Open / Copy link / click. |
+| `link` | template string | How a match turns into a URL for Open / Copy link / click. Text matchers need one to be clickable at all; a link matcher uses one to say what the *openable* form of a scheme it owns is. |
+| `open` | string | What a click should **do**, when following a URL is the wrong answer. Names an `actions` entry of this manifest, or a built-in button id. See [open actions](#open-actions). |
 | `suggested` | boolean | **Text matchers only.** Offered on the Integrations page's "Add as rule" list. |
 | `description` | string | Shown next to a suggested text matcher. |
+
+##### Open actions
+
+Some things are not usefully "opened". A multiplexer pane id names a pane to bring to the front; a
+web page describing that pane is a consolation prize. `open` says so:
+
+```jsonc
+{ "kind": "text", "pattern": "\\b(?<pane>w[0-9A-Z]+:p[0-9A-Z]+)\\b", "open": "focus" }
+```
+
+Clicking a match runs that action instead of following a URL. Copy link is unaffected — it still
+copies what `link` resolves to — and if the action fails, the click falls back to opening `link`
+rather than doing nothing.
+
+This is also how a manifest owns a **scheme** without an OS protocol handler. `stith://focus/<id>`
+handed to `ShellExecute` needs something registered for `stith:` that implements *that verb*; when
+one is registered and answers only some of the verbs, the rest come back `SE_ERR_NOASSOC` and the
+user is told the link is invalid. With `open`, the terminal runs the manifest's own request and
+never consults the shell.
 
 #### Fetch steps
 

@@ -63,6 +63,15 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         std::vector<const LinkTooltipPreset*> presets;
     };
 
+    // Which menu section a preset appears under.
+    //
+    // The integration a preset names is the answer wherever it has one -- it is
+    // the thing the preset exists to configure, and it cannot fall out of step
+    // with the id the way a prefix test does. Only the three subjects no
+    // integration covers are routed by id, and "file" is not one of them:
+    // `media-preview` and `source-code-files` both start with neither "file"
+    // nor "git", so the old prefix test filed both under General, which is why
+    // "Files & Media" was an empty heading that never drew.
     static std::vector<PresetCategory> _categorizedPresets()
     {
         std::vector<PresetCategory> categories = {
@@ -70,42 +79,42 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             { L"Jira", {} },
             { L"Slack", {} },
             { L"Stith", {} },
+            { L"shefrd", {} },
             { L"Git", {} },
             { L"Files & Media", {} },
             { L"General", {} }
         };
 
+        static constexpr std::wstring_view integrationOrder[]{
+            L"github", L"jira", L"slack", L"stith", L"shefrd"
+        };
+
         for (const auto& preset : GetLinkTooltipPresets())
         {
-            const std::wstring_view id{ preset.id };
-            if (id.rfind(L"github", 0) == 0)
+            size_t index = std::size(categories) - 1;
+
+            for (size_t i = 0; i < std::size(integrationOrder); ++i)
             {
-                categories[0].presets.push_back(&preset);
+                if (preset.integration == integrationOrder[i])
+                {
+                    index = i;
+                    break;
+                }
             }
-            else if (id.rfind(L"jira", 0) == 0)
+
+            if (preset.integration.empty())
             {
-                categories[1].presets.push_back(&preset);
+                if (preset.fileTypeGroup != Model::HyperlinkFileTypeGroup::None)
+                {
+                    index = 6;
+                }
+                else if (std::wstring_view{ preset.id }.rfind(L"git", 0) == 0)
+                {
+                    index = 5;
+                }
             }
-            else if (id.rfind(L"slack", 0) == 0)
-            {
-                categories[2].presets.push_back(&preset);
-            }
-            else if (id.rfind(L"stith", 0) == 0)
-            {
-                categories[3].presets.push_back(&preset);
-            }
-            else if (id.rfind(L"git", 0) == 0)
-            {
-                categories[4].presets.push_back(&preset);
-            }
-            else if (id.rfind(L"file", 0) == 0)
-            {
-                categories[5].presets.push_back(&preset);
-            }
-            else
-            {
-                categories[6].presets.push_back(&preset);
-            }
+
+            categories[index].presets.push_back(&preset);
         }
         return categories;
     }

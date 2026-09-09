@@ -145,8 +145,20 @@ namespace Microsoft.Terminal.Control
     // handed to TermControl, which only knows how to render the result.
     interface IHyperlinkPreviewProvider
     {
-        // Text match -> URL, or "" when the text is not a known text match.
-        String ResolveLink(String text);
+        // Match -> URL, or "" when nothing claims the text.
+        //
+        // Both matcher kinds are consulted. Text matchers are the obvious case
+        // ("CAB-8209" is not a URI and only an integration knows what it
+        // stands for), but a LINK matcher's `link` template matters just as
+        // much: a scheme the manifest owns, like stith://, is not something
+        // ShellExecute can open unless an OS protocol handler happens to be
+        // registered and happens to implement that verb. Resolving it here
+        // means the terminal follows the http(s) form the manifest declares.
+        String ResolveLink(String text, String integrationHint);
+        // The action the matched matcher binds to opening, or "" to follow
+        // ResolveLink's URL instead. Names an `actions` entry of the owning
+        // manifest, or a built-in button id.
+        String ResolveOpenAction(String text, String integrationHint);
         // integrationHint: "" = automatic, "none" = never, else an integration id.
         Boolean CanPreview(String text, String integrationHint);
         Windows.Foundation.IAsyncOperation<HyperlinkPreview> GetPreviewAsync(String text, String integrationHint);

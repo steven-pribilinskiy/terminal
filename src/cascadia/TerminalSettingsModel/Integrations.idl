@@ -145,6 +145,17 @@ namespace Microsoft.Terminal.Settings.Model
         String HostSetting;
         // For Text matchers: how a match becomes a URL (Open / Copy link / click).
         String LinkTemplate;
+        // What opening a match should DO, when following a URL is the wrong
+        // answer. Names either one of this manifest's own "actions" entries or
+        // a built-in button id, and it takes precedence over LinkTemplate on
+        // the click path only -- Copy link still copies the URL.
+        //
+        // This is what lets a scheme the manifest owns act without an OS
+        // protocol handler: `stith://focus/<id>` runs the plugin's focus
+        // request instead of reaching ShellExecute, which on this machine
+        // hands it to a handler that implements only some of the verbs and
+        // silently drops the rest.
+        String OpenAction;
         // Text matchers only: offered on the Integrations page as "Add as rule".
         Boolean Suggested;
         String Description;

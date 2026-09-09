@@ -534,6 +534,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // The one place that decides what an action id means, so a card button and
         // a click chord bound to the same id behave identically.
         void _invokeHyperlinkActionById(const winrt::hstring& actionId);
+        safe_void_coroutine _invokeHyperlinkOpenAction(winrt::hstring text, winrt::hstring integration, winrt::hstring openAction, winrt::hstring fallbackUri);
         winrt::hstring _followLinkHintText(const Control::IControlSettings& settings) const;
         void _HyperlinkOpenClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
         void _HyperlinkCopyLinkClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);

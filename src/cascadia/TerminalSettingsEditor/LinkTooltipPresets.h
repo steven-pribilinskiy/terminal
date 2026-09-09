@@ -94,7 +94,12 @@ namespace winrt::Microsoft::Terminal::Settings::Editor
                 L"Matches 7-40 character hexadecimal commit hashes in terminal text",
                 Model::HyperlinkMatchKind::Text,
                 {},
-                LR"(\b[0-9a-f]{7,40}\b)",
+                // The lookahead demands a letter somewhere in the run. Without
+                // it every seven-digit number in the output is a commit -- PIDs,
+                // ports, byte counts, epoch seconds -- and a rule that decorates
+                // everything is a rule people turn off. The cost is an all-digit
+                // hash, which is a one-in-a-billion object at forty characters.
+                LR"(\b(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b)",
                 Model::HyperlinkFileTypeGroup::None,
                 {},
                 L"",
@@ -148,6 +153,38 @@ namespace winrt::Microsoft::Terminal::Settings::Editor
                 L"stith",
                 true,
             },
+            {
+                L"stith-session-ids",
+                L"Stith: Agent session ids (Text)",
+                L"Matches a bare agent session id printed with no scheme and no link around it",
+                Model::HyperlinkMatchKind::Text,
+                {},
+                // The full 8-4-4-4-12 shape, not a loose hex-and-dash run. A
+                // pattern like [0-9a-f-]{10,40} also claims every commit hash
+                // and every truncated digest in the output, and the manifest
+                // matcher that has to resolve it then refuses them one by one.
+                LR"(\b(?<id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b)",
+                Model::HyperlinkFileTypeGroup::None,
+                {},
+                L"stith",
+                true,
+            },
+            {
+                L"shefrd-pane-ids",
+                L"shefrd: Pane ids in output (Text)",
+                L"Matches a multiplexer pane address like w1N:p39; opening one focuses that pane",
+                Model::HyperlinkMatchKind::Text,
+                {},
+                // shefrd's ids are bijective base-32 over a Crockford-ish
+                // alphabet -- no I, L, O or U, and "0" is the last digit rather
+                // than the first. Spelling the alphabet out rather than using
+                // [A-Z0-9] keeps the rule from claiming things like "w1I:pO".
+                LR"(\b(?<pane>w[123456789ABCDEFGHJKMNPQRSTVWXYZ0]+:p[123456789ABCDEFGHJKMNPQRSTVWXYZ0]+)\b)",
+                Model::HyperlinkFileTypeGroup::None,
+                {},
+                L"shefrd",
+                true,
+            },
         };
         return presets;
     }
@@ -190,6 +227,8 @@ namespace winrt::Microsoft::Terminal::Settings::Editor
             { L"git-commit-hashes", L"46100068 Record what the Settings crash actually was" },
             { L"slack-messages", L"https://acme.slack.com/archives/C01ABCD2EFG/p1717171717123456" },
             { L"stith-sessions", L"stith://session/9f3c1b2a-4d5e" },
+            { L"stith-session-ids", L"Resuming ce786f3f-6fdc-4165-b9bd-20ff858844db" },
+            { L"shefrd-pane-ids", L"the lookup landed in w1N:p39" },
         };
 
         for (const auto& sample : samples)

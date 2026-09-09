@@ -50,6 +50,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         WINRT_PROPERTY(hstring, Pattern);
         WINRT_PROPERTY(hstring, HostSetting);
         WINRT_PROPERTY(hstring, LinkTemplate);
+        WINRT_PROPERTY(hstring, OpenAction);
         WINRT_PROPERTY(bool, Suggested, false);
         WINRT_PROPERTY(hstring, Description);
     };

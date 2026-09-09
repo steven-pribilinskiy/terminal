@@ -3442,20 +3442,107 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // URI. An ordinary link resolves to nothing here and passes through untouched.
         if (_hyperlinkPreviewProvider)
         {
+            // Before asking what the match means, ask what opening it should DO.
+            // Some things are not usefully "opened" at all: a multiplexer pane id
+            // names a pane to bring to the front, and a page describing that pane
+            // is a consolation prize. A matcher says so with `open`, and the
+            // manifest's own action does the work -- no OS protocol handler, and
+            // the same behaviour on every platform the manifest is read on.
+            hstring openAction;
+            try
+            {
+                openAction = _hyperlinkPreviewProvider.ResolveOpenAction(args.Uri(), effective.integration);
+            }
+            CATCH_LOG();
+
             hstring resolved;
             try
             {
-                resolved = _hyperlinkPreviewProvider.ResolveLink(args.Uri());
+                resolved = _hyperlinkPreviewProvider.ResolveLink(args.Uri(), effective.integration);
             }
             CATCH_LOG();
+
+            if (!openAction.empty())
+            {
+                // The link goes along as the fallback. An action that cannot
+                // reach its far end -- the server is down, the pane is gone --
+                // should not leave the click having done nothing at all, and
+                // the page about the thing is a worse answer than focusing it
+                // but a much better one than silence.
+                _invokeHyperlinkOpenAction(args.Uri(), effective.integration, openAction, resolved);
+                _hideHyperlinkCard();
+                co_return;
+            }
 
             if (!resolved.empty())
             {
                 args = winrt::make<OpenHyperlinkEventArgs>(resolved);
             }
+            else if (effective.isTextMatch)
+            {
+                // Nothing claimed it. Handing the raw run on means
+                // Uri("ce786f3f-6fdc-4165-b9bd-20ff858844db") throws in
+                // TerminalPage and the reader is told "This link is invalid",
+                // which blames the text for a rule that matched more than any
+                // integration knows how to resolve. Do nothing instead; the
+                // card's own buttons are still there.
+                _hideHyperlinkCard();
+                co_return;
+            }
         }
 
         OpenHyperlink.raise(*strongThis, args);
+    }
+
+    // Runs the action a matcher bound to opening. `openAction` is either one of
+    // the card's built-in button ids, in which case it means exactly what
+    // pressing that button means, or the key of an `actions` entry in the owning
+    // manifest, which is invoked the same way the card invokes it.
+    //
+    // Nothing is refreshed afterwards, unlike the card's own action buttons: the
+    // card is dismissed by the click that got here, so there is no preview left
+    // on screen for a refresh to correct. A hover after the action fetches
+    // again anyway, and these actions are the ones whose effect is somewhere
+    // else -- a pane comes forward, a window is raised -- rather than a status
+    // badge on the card itself.
+    safe_void_coroutine TermControl::_invokeHyperlinkOpenAction(hstring text, hstring integration, hstring openAction, hstring fallbackUri)
+    {
+        auto strongThis{ get_strong() };
+
+        const std::wstring_view id{ openAction };
+        if (til::equals_insensitive_ascii(id, L"open") ||
+            til::equals_insensitive_ascii(id, L"copyLink") ||
+            til::equals_insensitive_ascii(id, L"copyPath") ||
+            til::equals_insensitive_ascii(id, L"reveal") ||
+            til::equals_insensitive_ascii(id, L"showInPane"))
+        {
+            _invokeHyperlinkActionById(openAction);
+            co_return;
+        }
+
+        Control::HyperlinkActionResult result{ nullptr };
+        if (_hyperlinkPreviewProvider)
+        {
+            try
+            {
+                const auto fields = winrt::single_threaded_map<hstring, hstring>();
+                result = co_await _hyperlinkPreviewProvider.InvokeActionAsync(text, integration, openAction, {}, fields);
+            }
+            CATCH_LOG();
+        }
+
+        if (result && result.Ok())
+        {
+            co_return;
+        }
+
+        if (fallbackUri.empty())
+        {
+            co_return;
+        }
+
+        co_await wil::resume_foreground(Dispatcher());
+        OpenHyperlink.raise(*strongThis, winrt::make<OpenHyperlinkEventArgs>(fallbackUri));
     }
 
     // Method Description:
@@ -4185,11 +4272,6 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             return {};
         }
 
-        if (!_currentHyperlinkTooltipSettings.isTextMatch)
-        {
-            return _hoveredUri;
-        }
-
         if (_currentHyperlinkPreview)
         {
             if (const auto resolved = _currentHyperlinkPreview.ResolvedUri(); !resolved.empty())
@@ -4198,16 +4280,29 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             }
         }
 
+        // Asked for a link match too, not only a text one. A manifest that owns
+        // a scheme declares the http(s) form of it, and that form is what Open
+        // and Copy link should act on -- stith://session/<id> is not something
+        // the shell can be handed. A matcher that declares no `link` resolves
+        // to nothing and the hovered URI is used unchanged, which is every
+        // ordinary http link.
         if (_hyperlinkPreviewProvider)
         {
             try
             {
-                return _hyperlinkPreviewProvider.ResolveLink(_hoveredUri);
+                if (auto resolved = _hyperlinkPreviewProvider.ResolveLink(_hoveredUri, _currentHyperlinkTooltipSettings.integration);
+                    !resolved.empty())
+                {
+                    return resolved;
+                }
             }
             CATCH_LOG();
         }
 
-        return {};
+        // A text match nothing claims has no target at all. Returning the raw
+        // run would put "CAB-8209" where a URL belongs, and everything
+        // downstream would go on to treat it as one.
+        return _currentHyperlinkTooltipSettings.isTextMatch ? winrt::hstring{} : _hoveredUri;
     }
 
     // The preview section exists only while it has something to say: a fetch in flight (the
@@ -4331,6 +4426,12 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             else if (containsSub(name, L"stith") || containsSub(id, L"stith"))
             {
                 iconStr = L"\uE774";
+            }
+            // GridView -- panes in a layout, which is what a multiplexer address names.
+            else if (containsSub(name, L"shefrd") || containsSub(id, L"shefrd") ||
+                     containsSub(name, L"herdr") || containsSub(id, L"herdr"))
+            {
+                iconStr = L"\uF0E2";
             }
         }
 

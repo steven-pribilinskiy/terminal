@@ -1,0 +1,137 @@
+{
+    "id": "shefrd",
+    "name": "shefrd",
+    "icon": "",
+    "version": 1,
+    "cacheSeconds": 10,
+    "settings": [
+        {
+            "key": "baseUrl",
+            "label": "Stith server",
+            "placeholder": "https://stith.lvh.me",
+            "default": "https://stith.lvh.me",
+            "description": "Pane addresses are read and focused through stith, which already holds a socket to every multiplexer server. Nothing here invokes a binary directly, so the same manifest works from Windows, from WSL and from inside a pane.",
+            "required": true
+        }
+    ],
+    "credentials": [],
+    "detectPatterns": [
+        "shefrd://(?:pane|tab|space)/w[123456789ABCDEFGHJKMNPQRSTVWXYZ0]+(?::[pt][123456789ABCDEFGHJKMNPQRSTVWXYZ0]+)?"
+    ],
+    "matchers": [
+        {
+            "kind": "link",
+            "pattern": "^shefrd://pane/(?<pane>w[123456789ABCDEFGHJKMNPQRSTVWXYZ0]+:p[123456789ABCDEFGHJKMNPQRSTVWXYZ0]+)$",
+            "open": "focus"
+        },
+        {
+            "kind": "text",
+            "pattern": "\b(?<pane>w[123456789ABCDEFGHJKMNPQRSTVWXYZ0]+:p[123456789ABCDEFGHJKMNPQRSTVWXYZ0]+)\b",
+            "open": "focus",
+            "suggested": true,
+            "description": "Multiplexer pane ids printed bare, like w1N:p39"
+        }
+    ],
+    "fetch": [
+        {
+            "id": "pane",
+            "type": "http",
+            "method": "GET",
+            "url": "{{settings.baseUrl}}/api/herdr/panes/{{pane}}",
+            "headers": {
+                "Accept": "application/json"
+            },
+            "allowUntrustedCertificate": true,
+            "timeoutMs": 5000
+        }
+    ],
+    "fields": [
+        {
+            "key": "title",
+            "label": "Pane",
+            "path": "/label",
+            "kind": "title",
+            "default": true
+        },
+        {
+            "key": "agentStatus",
+            "label": "Status",
+            "path": "/agentStatus",
+            "kind": "badge",
+            "default": true
+        },
+        {
+            "key": "agent",
+            "label": "Agent",
+            "path": "/agent",
+            "kind": "text",
+            "default": true
+        },
+        {
+            "key": "tab",
+            "label": "Tab",
+            "path": "/tabLabel",
+            "kind": "text",
+            "default": true
+        },
+        {
+            "key": "space",
+            "label": "Space",
+            "path": "/workspaceLabel",
+            "kind": "text",
+            "default": true
+        },
+        {
+            "key": "cwd",
+            "label": "Directory",
+            "path": "/cwd",
+            "kind": "text",
+            "default": false
+        },
+        {
+            "key": "product",
+            "label": "Multiplexer",
+            "path": "/productLabel",
+            "kind": "text",
+            "default": false
+        },
+        {
+            "key": "terminalTitle",
+            "label": "Title",
+            "path": "/terminalTitle",
+            "kind": "text",
+            "default": false
+        },
+        {
+            "key": "session",
+            "label": "Session",
+            "path": "/sessionId",
+            "kind": "text",
+            "default": false
+        },
+        {
+            "key": "error",
+            "label": "shefrd",
+            "path": "/reason",
+            "kind": "badge",
+            "color": "#c0392b",
+            "default": true
+        }
+    ],
+    "actions": [
+        {
+            "key": "focus",
+            "label": "Focus",
+            "kind": "button",
+            "method": "POST",
+            "url": "{{settings.baseUrl}}/api/herdr/focus",
+            "body": "{\"kind\":\"pane\",\"id\":\"{{pane}}\"}",
+            "headers": {
+                "Accept": "application/json",
+                "Content-Type": "application/json"
+            },
+            "allowUntrustedCertificate": true,
+            "timeoutMs": 5000
+        }
+    ]
+}

@@ -59,6 +59,7 @@ namespace winrt::TerminalApp::implementation
             std::vector<std::wstring> GroupNames;
             std::wstring HostSetting;
             std::wstring LinkTemplate;
+            std::wstring OpenAction;
         };
 
         struct Step
@@ -2407,6 +2408,7 @@ namespace winrt::TerminalApp::implementation
                         entryMatcher.GroupNames = GroupNamesIn(pattern);
                         entryMatcher.HostSetting = std::wstring{ matcher.HostSetting() };
                         entryMatcher.LinkTemplate = std::wstring{ matcher.LinkTemplate() };
+                        entryMatcher.OpenAction = std::wstring{ matcher.OpenAction() };
                         plugin->Matchers.push_back(std::move(entryMatcher));
                     }
                 }
@@ -2684,13 +2686,22 @@ namespace winrt::TerminalApp::implementation
         _cache[key] = CacheEntry{ preview, std::chrono::steady_clock::now() + std::chrono::seconds{ seconds } };
     }
 
-    // Text match -> the URL it stands for. A real URI is already its own link
-    // and is left alone, so only text matchers are consulted here.
-    hstring HyperlinkPreviewService::ResolveLink(const hstring& text)
+    // A match -> the URL it stands for.
+    //
+    // Both matcher kinds are consulted, and the second one is not an
+    // afterthought: this used to pass textMatchersOnly, on the reasoning that
+    // "a real URI is already its own link". That is true of http(s), and false
+    // of every scheme a manifest owns. `stith://session/<id>` went out
+    // unresolved to ShellExecute, which needs a registered protocol handler
+    // that implements that particular verb -- and when one is registered but
+    // answers only some of the verbs, the rest come back SE_ERR_NOASSOC and
+    // the user is told their link is invalid. Asking the matcher first means
+    // the manifest's own https form is what gets opened.
+    hstring HyperlinkPreviewService::ResolveLink(const hstring& text, const hstring& integrationHint)
     try
     {
         const std::wstring value{ text };
-        const auto found = FindMatch(_currentSnapshot(), value, {}, true);
+        const auto found = FindMatch(_currentSnapshot(), value, std::wstring{ integrationHint }, false);
         if (!found || !found->Matcher || found->Matcher->LinkTemplate.empty())
         {
             if (found && found->Owner && found->Owner->Id == L"github")
@@ -2717,6 +2728,34 @@ namespace winrt::TerminalApp::implementation
         context.Settings = &found->Owner->Settings;
         context.Credentials = &found->Owner->Credentials;
         return hstring{ Expand(found->Matcher->LinkTemplate, context, Escape::None) };
+    }
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION();
+        return {};
+    }
+
+    // What opening this match should DO, when following a URL is the wrong
+    // answer -- focusing the pane a session runs in, rather than opening a page
+    // about it. Empty means "follow ResolveLink", which stays the default.
+    hstring HyperlinkPreviewService::ResolveOpenAction(const hstring& text, const hstring& integrationHint)
+    try
+    {
+        const auto found = FindMatch(_currentSnapshot(), std::wstring{ text }, std::wstring{ integrationHint }, false);
+        if (!found || !found->Matcher)
+        {
+            return {};
+        }
+        // An action a manifest declares is only worth offering once the
+        // manifest is configured enough to run it; an unconfigured plugin
+        // would fire a request with an empty base URL and report a failure the
+        // reader can do nothing about. Falling back to the link is the better
+        // answer, and the card already says the plugin is not configured.
+        if (!found->Matcher->OpenAction.empty() && !found->Owner->Configured)
+        {
+            return {};
+        }
+        return hstring{ found->Matcher->OpenAction };
     }
     catch (...)
     {

@@ -16,13 +16,27 @@
     ],
     "credentials": [],
     "detectPatterns": [
-        "stith://(?:session|focus)/[A-Za-z0-9-]{4,64}"
+        "stith://(?:session|focus|copy)/[A-Za-z0-9-]{4,64}",
+        "stith://focus-pane/[A-Za-z0-9:_-]{2,64}",
+        "stith://rule/[1-9][0-9]{0,5}"
     ],
     "matchers": [
         {
             "kind": "link",
-            "pattern": "^stith://(?:session|focus)/(?<id>[A-Za-z0-9-]{4,64})",
+            "pattern": "^stith://session/(?<id>[A-Za-z0-9-]{4,64})",
             "link": "{{settings.baseUrl}}/agent/{{id}}"
+        },
+        {
+            "kind": "link",
+            "pattern": "^stith://focus/(?<id>[A-Za-z0-9-]{4,64})",
+            "link": "{{settings.baseUrl}}/agent/{{id}}",
+            "open": "focus"
+        },
+        {
+            "kind": "link",
+            "pattern": "^stith://copy/(?<id>[A-Za-z0-9-]{4,64})",
+            "link": "{{settings.baseUrl}}/agent/{{id}}",
+            "open": "copyLink"
         },
         {
             "kind": "link",
@@ -31,10 +45,17 @@
         },
         {
             "kind": "text",
-            "pattern": "^stith://(?:session|focus)/(?<id>[A-Za-z0-9-]{4,64})",
+            "pattern": "^stith://(?:session|focus|copy)/(?<id>[A-Za-z0-9-]{4,64})",
             "link": "{{settings.baseUrl}}/agent/{{id}}",
             "suggested": true,
             "description": "Stith session links"
+        },
+        {
+            "kind": "text",
+            "pattern": "\\b(?<id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\\b",
+            "link": "{{settings.baseUrl}}/agent/{{id}}",
+            "suggested": true,
+            "description": "Agent session ids printed bare, with no scheme and no link around them"
         }
     ],
     "fetch": [
@@ -43,30 +64,140 @@
             "type": "http",
             "method": "GET",
             "url": "{{settings.baseUrl}}/api/agents/{{id}}",
-            "headers": { "Accept": "application/json" },
+            "headers": {
+                "Accept": "application/json"
+            },
+            "allowUntrustedCertificate": true,
+            "timeoutMs": 5000
+        },
+        {
+            "id": "placement",
+            "type": "http",
+            "method": "GET",
+            "optional": true,
+            "url": "{{settings.baseUrl}}/api/herdr/panes/for-session/{{id}}",
+            "headers": {
+                "Accept": "application/json"
+            },
             "allowUntrustedCertificate": true,
             "timeoutMs": 5000
         }
     ],
     "fields": [
-        { "key": "name", "label": "Session", "path": "/name", "kind": "title", "default": true },
-        { "key": "status", "label": "Status", "path": "/status", "kind": "badge", "default": true },
-        { "key": "liveness", "label": "Liveness", "path": "/liveness", "kind": "badge", "default": false },
-        { "key": "project", "label": "Project", "path": "/projectName", "kind": "text", "default": true },
-        { "key": "cwd", "label": "Directory", "path": "/cwd", "kind": "text", "default": false },
-        { "key": "machine", "label": "Machine", "path": "/machine", "kind": "text", "default": true },
-        { "key": "branch", "label": "Branch", "path": "/gitBranch", "kind": "text", "default": false },
-        { "key": "jira", "label": "Jira", "path": "/jira", "kind": "text", "default": false },
-        { "key": "model", "label": "Model", "path": "/model", "kind": "text", "default": false },
-        { "key": "lastActivity", "label": "Last activity", "path": "/lastActivityAt", "kind": "text", "format": "relativeTime", "default": true },
-        { "key": "error", "label": "Stith", "path": "/error", "kind": "badge", "color": "#c0392b", "default": true }
+        {
+            "key": "name",
+            "label": "Session",
+            "path": "agent:/name",
+            "kind": "title",
+            "default": true
+        },
+        {
+            "key": "status",
+            "label": "Status",
+            "path": "agent:/status",
+            "kind": "badge",
+            "default": true
+        },
+        {
+            "key": "liveness",
+            "label": "Liveness",
+            "path": "agent:/liveness",
+            "kind": "badge",
+            "default": false
+        },
+        {
+            "key": "project",
+            "label": "Project",
+            "path": "agent:/projectName",
+            "kind": "text",
+            "default": true
+        },
+        {
+            "key": "cwd",
+            "label": "Directory",
+            "path": "agent:/cwd",
+            "kind": "text",
+            "default": false
+        },
+        {
+            "key": "machine",
+            "label": "Machine",
+            "path": "agent:/machine",
+            "kind": "text",
+            "default": true
+        },
+        {
+            "key": "branch",
+            "label": "Branch",
+            "path": "agent:/gitBranch",
+            "kind": "text",
+            "default": false
+        },
+        {
+            "key": "jira",
+            "label": "Jira",
+            "path": "agent:/jira",
+            "kind": "text",
+            "default": false
+        },
+        {
+            "key": "model",
+            "label": "Model",
+            "path": "agent:/model",
+            "kind": "text",
+            "default": false
+        },
+        {
+            "key": "pane",
+            "label": "Pane",
+            "path": "placement:/placements/0/paneId",
+            "kind": "text",
+            "default": true
+        },
+        {
+            "key": "space",
+            "label": "Space",
+            "path": "placement:/placements/0/workspaceLabel",
+            "kind": "text",
+            "default": false
+        },
+        {
+            "key": "lastActivity",
+            "label": "Last activity",
+            "path": "agent:/lastActivityAt",
+            "kind": "text",
+            "format": "relativeTime",
+            "default": true
+        },
+        {
+            "key": "error",
+            "label": "Stith",
+            "path": "agent:/error",
+            "kind": "badge",
+            "color": "#c0392b",
+            "default": true
+        }
+    ],
+    "actions": [
+        {
+            "key": "focus",
+            "label": "Focus",
+            "kind": "button",
+            "method": "POST",
+            "url": "{{settings.baseUrl}}/api/controls/{{id}}/focus",
+            "headers": {
+                "Accept": "application/json"
+            },
+            "allowUntrustedCertificate": true,
+            "timeoutMs": 5000
+        }
     ],
     "tabs": [
         {
             "key": "description",
             "label": "Summary",
             "kind": "body",
-            "path": "/docket/description",
+            "path": "agent:/docket/description",
             "format": "markdown",
             "default": true
         }

@@ -31,6 +31,7 @@ namespace
     constexpr std::string_view PatternKey{ "pattern" };
     constexpr std::string_view HostSettingKey{ "hostSetting" };
     constexpr std::string_view LinkKey{ "link" };
+    constexpr std::string_view OpenKey{ "open" };
     constexpr std::string_view SuggestedKey{ "suggested" };
 
     constexpr std::string_view IdKey{ "id" };
@@ -145,6 +146,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         JsonUtils::GetValueForKey(json, PatternKey, matcher->_Pattern);
         JsonUtils::GetValueForKey(json, HostSettingKey, matcher->_HostSetting);
         JsonUtils::GetValueForKey(json, LinkKey, matcher->_LinkTemplate);
+        JsonUtils::GetValueForKey(json, OpenKey, matcher->_OpenAction);
         JsonUtils::GetValueForKey(json, SuggestedKey, matcher->_Suggested);
         JsonUtils::GetValueForKey(json, DescriptionKey, matcher->_Description);
         return matcher;
