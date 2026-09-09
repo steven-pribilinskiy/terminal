@@ -186,6 +186,49 @@ If the headers are absent (a fresh clone that has never built), the same answers
 are in the Windows SDK metadata - but do not guess, and do not "just try it" when
 trying it costs a CI cycle.
 
+## Preventing a crash beats diagnosing one
+
+Three layers, and they do different jobs. Reach for the first that applies.
+
+**1. Make the failure non-fatal, where the failure is a leaf.** A missing label for
+one dropdown value should not kill a window. `LocalizedNameForEnumName`
+(`TerminalSettingsEditor/Utils.cpp`) now falls back to the enum's own name when the
+resource is absent, so the row reads `SettingsUITab` instead of the Settings UI
+dying on open. `_ApplyTabPosition`'s try/catch is the same idea one level up: a
+layout that throws degrades to a top strip rather than taking the process.
+
+Degrade a **leaf** - one label, one icon, one optional pane. Never degrade
+something structural, because a swallowed structural failure is a bug you now
+cannot see. And know the limit: **this cannot catch the crashes that hurt most
+here.** A half-expanded template fails on the next measure inside
+`CCoreServices::NWDrawTree`, and a stowed `0xc000027b` fail-fasts with none of our
+frames on the stack. There is no XAML equivalent of a React ErrorBoundary for
+those; for them, prevention is the only lever.
+
+**2. Gate it, so it cannot ship.** `Check-SettingsModelConsistency.ps1` exists for
+exactly the missing-resource class and **missed one on 2026-09-09**, because it
+only recognised `INITIALIZE_BINDABLE_ENUM_SETTING` while the Actions editor calls
+`_InitializeEnumListAndValue` directly. Settings died on open in the Dev slot.
+
+The lesson is not "run the gate" - it was run, and it said "No inconsistencies
+found". It is that **a gate only covers the shapes it was taught**, so when you add
+a new way of doing an old thing, the gate needs teaching too.
+
+**3. Prove the gate bites.** An intermediate version of that same fix matched
+nothing and reported success - a check that checks nothing, which is strictly worse
+than no check, because it buys false confidence. Whenever you extend one, break the
+thing on purpose and confirm it fails:
+
+```bash
+# remove the string you just added, run the checker, expect FAIL, restore
+cp "$R" "$S/resw.bak" && node -e "…strip the entry…"
+pwsh -NoProfile ./tools/Check-SettingsModelConsistency.ps1   # must FAIL
+cp "$S/resw.bak" "$R"
+```
+
+Watch the count it prints, too (`206 enum dropdown labels`, not `0`) - that number
+falling to zero is what a silently-dead check looks like.
+
 ## Gates that cost seconds and save a round trip
 
 Run these before pushing anything:
