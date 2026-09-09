@@ -2476,11 +2476,11 @@
           "description": "When set to true, each pane's contents are saved on a timer rather than only when the Terminal is closed normally, so a crash or a forced termination doesn't lose the scrollback. Only applies when firstWindowPreference is persistedLayoutAndContent.",
           "type": "boolean"
         },
-        "bufferPersistIntervalMinutes": {
-          "default": 5,
-          "description": "How often, in minutes, to save the window layout and pane contents.",
-          "maximum": 240,
-          "minimum": 1,
+        "bufferPersistIntervalSeconds": {
+          "default": 300,
+          "description": "How often, in seconds, to save the window layout and pane contents. Replaces \"bufferPersistIntervalMinutes\"; a value still written under that key is carried across as minutes x 60.",
+          "maximum": 14400,
+          "minimum": 5,
           "type": "integer"
         },
         "hyperlink.clickable": {

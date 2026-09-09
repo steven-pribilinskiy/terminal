@@ -663,16 +663,16 @@
     <value>Writing each pane's scrollback to disk so it can come back. Only applies under "Restore window layout and content".</value>
     <comment>Additional text presented near "SessionRestore_SavePaneContents.Header".</comment>
   </data>
-  <data name="Globals_BufferPersistIntervalMinutes.Header" xml:space="preserve">
+  <data name="Globals_BufferPersistIntervalSeconds.Header" xml:space="preserve">
     <value>Save pane contents every</value>
-    <comment>Header for a control to choose how often, in minutes, to save pane contents and window layout.</comment>
+    <comment>Header for a control to choose how often, in seconds, to save pane contents and window layout.</comment>
   </data>
-  <data name="Globals_BufferPersistIntervalMinutes.Description" xml:space="preserve">
-    <value>Minutes between saves. Shorter loses less in a crash; longer writes less to disk.</value>
+  <data name="Globals_BufferPersistIntervalSeconds.Description" xml:space="preserve">
+    <value>Seconds between saves. Shorter loses less in a crash; longer writes less to disk.</value>
   </data>
-  <data name="Globals_BufferPersistIntervalMinutesBox.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
-    <value>Save pane contents every, in minutes</value>
-    <comment>Name for a control to choose how often, in minutes, to save pane contents.</comment>
+  <data name="Globals_BufferPersistIntervalSecondsBox.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Save pane contents every, in seconds</value>
+    <comment>Name for a control to choose how often, in seconds, to save pane contents.</comment>
   </data>
   <data name="Globals_PersistCost.Header" xml:space="preserve">
     <value>What saving has been costing</value>

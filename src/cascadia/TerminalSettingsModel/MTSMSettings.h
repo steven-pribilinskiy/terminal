@@ -43,7 +43,7 @@ Author(s):
     X(winrt::Windows::Foundation::Collections::IVector<winrt::hstring>, ResumeExtraPrograms, "resumeExtraPrograms", nullptr)       \
     X(winrt::Windows::Foundation::Collections::IVector<winrt::hstring>, ResumeExcludedPrograms, "resumeExcludedPrograms", nullptr) \
     X(bool, PersistBufferPeriodically, "persistBufferPeriodically", true)                                                          \
-    X(int32_t, BufferPersistIntervalMinutes, "bufferPersistIntervalMinutes", 5)                                                    \
+    X(int32_t, BufferPersistIntervalSeconds, "bufferPersistIntervalSeconds", 300)                                                  \
     X(Model::ResumeSessionNotification, ResumeSessionNotification, "resumeSessionNotification", Model::ResumeSessionNotification::Toast) \
     X(IntegrationSettingsMap, Integrations, "integrations", MakeIntegrationSettingsMap())                                          \
     X(bool, AylithImprint, "aylith.imprint", false)                                                                                \

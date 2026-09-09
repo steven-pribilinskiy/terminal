@@ -30,7 +30,7 @@ namespace Microsoft.Terminal.Settings.Editor
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, ResumeAgents);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, ResumeMultiplexers);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, PersistBufferPeriodically);
-        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, BufferPersistIntervalMinutes);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, BufferPersistIntervalSeconds);
 
         String ResumeExtraProgramsText;
         String ResumeExcludedProgramsText;

@@ -120,15 +120,15 @@
                                       Style="{StaticResource ToggleSwitchInExpanderStyle}" />
                     </local:SettingsCard>
 
-                    <local:SettingsCard x:Name="BufferPersistIntervalMinutes"
-                                        x:Uid="Globals_BufferPersistIntervalMinutes"
+                    <local:SettingsCard x:Name="BufferPersistIntervalSeconds"
+                                        x:Uid="Globals_BufferPersistIntervalSeconds"
                                         IsEnabled="{x:Bind ViewModel.PersistIntervalEnabled, Mode=OneWay}">
-                        <muxc:NumberBox x:Uid="Globals_BufferPersistIntervalMinutesBox"
-                                        Maximum="240"
-                                        Minimum="1"
+                        <muxc:NumberBox x:Uid="Globals_BufferPersistIntervalSecondsBox"
+                                        Maximum="14400"
+                                        Minimum="5"
                                         SpinButtonPlacementMode="Compact"
                                         Style="{StaticResource NumberBoxSettingStyle}"
-                                        Value="{x:Bind ViewModel.BufferPersistIntervalMinutes, Mode=TwoWay}" />
+                                        Value="{x:Bind ViewModel.BufferPersistIntervalSeconds, Mode=TwoWay}" />
                     </local:SettingsCard>
 
                     <!--
@@ -136,16 +136,32 @@
                         already cost stays worth reading after you turn saving
                         off, and is often exactly why you did.
                     -->
+                    <!--
+                        The chart is a week wide and goes on its own line, because
+                        in the right-hand content column it took the row's width
+                        and left the header a word wide - "What sa..." over a
+                        description reading one word per line.
+
+                        HorizontalContentAlignment="Left" is required, not
+                        decorative: ContentAlignment="Vertical" only stretches the
+                        presenter across the row, and SettingsCard then propagates
+                        the card's own HorizontalContentAlignment to it, which the
+                        style defaults to Right.
+                    -->
                     <local:SettingsCard x:Name="PersistCost"
                                         x:Uid="Globals_PersistCost"
+                                        ContentAlignment="Vertical"
+                                        HorizontalContentAlignment="Left"
                                         IsEnabled="{x:Bind ViewModel.ContentEnabled, Mode=OneWay}">
                         <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Left"
                                     Spacing="12">
                             <TextBlock VerticalAlignment="Center"
                                        FontFamily="Cascadia Mono, Consolas, monospace"
                                        FontSize="16"
                                        Text="{x:Bind ViewModel.PersistCostSparkline, Mode=OneWay}" />
                             <TextBlock VerticalAlignment="Center"
+                                       TextWrapping="Wrap"
                                        Text="{x:Bind ViewModel.PersistCostSummary, Mode=OneWay}" />
                         </StackPanel>
                     </local:SettingsCard>

@@ -92,12 +92,10 @@ namespace Microsoft.Terminal.Settings.Model
         AfterTabs,
     };
 
-    // Where the Settings UI opens.
-    //
-    // Window is declared but NOT implemented: it needs a second top-level
-    // window, and nothing in the app creates one for Settings today. It is
-    // rejected at load with a warning rather than quietly treated as Tab, so
-    // the value never looks supported before it is.
+    // Where the Settings UI opens: beside the terminals as a tab, over the
+    // window as a modal dialog, or in a window of its own. The window is an
+    // ordinary Terminal window carrying a single startup action, which is what
+    // makes it resizable and give it a taskbar entry for free.
     enum SettingsUIHost
     {
         Tab,
@@ -146,7 +144,7 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(IVector<String>, ResumeExtraPrograms);
         INHERITABLE_SETTING(IVector<String>, ResumeExcludedPrograms);
         INHERITABLE_SETTING(Boolean, PersistBufferPeriodically);
-        INHERITABLE_SETTING(Int32, BufferPersistIntervalMinutes);
+        INHERITABLE_SETTING(Int32, BufferPersistIntervalSeconds);
         INHERITABLE_SETTING(ResumeSessionNotification, ResumeSessionNotification);
         INHERITABLE_SETTING(ConfirmOnClose, ConfirmOnClose);
 

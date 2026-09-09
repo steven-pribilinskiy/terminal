@@ -1583,10 +1583,15 @@ void WindowEmperor::_setupSessionPersistence(bool enabled)
     // Configurable, because what this costs depends entirely on how much
     // scrollback the panes are holding: the buffer capture below writes the
     // whole of it, uncapped.
-    auto minutes = _app.Logic().Settings().GlobalSettings().BufferPersistIntervalMinutes();
-    minutes = std::clamp(minutes, 1, 240);
+    // Seconds, because a minute of lost scrollback is a lot when the whole point
+    // of the setting is choosing how much you are prepared to lose. The floor is
+    // 5s rather than 1s: a pass costs a fraction of a millisecond at median but
+    // walks every pane, and a once-a-second walk is a cost with no matching
+    // benefit. The ceiling is the old 240 minutes.
+    auto seconds = _app.Logic().Settings().GlobalSettings().BufferPersistIntervalSeconds();
+    seconds = std::clamp(seconds, 5, 240 * 60);
 
-    _persistStateTimer.Interval(std::chrono::minutes(minutes));
+    _persistStateTimer.Interval(std::chrono::seconds(seconds));
     _persistStateTimer.Tick([&](auto&&, auto&&) {
         // Kicked off first and deliberately not waited on. Each window hands
         // the process walking to a background thread and updates its panes

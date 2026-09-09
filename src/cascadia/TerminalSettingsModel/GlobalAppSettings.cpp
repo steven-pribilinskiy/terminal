@@ -28,6 +28,10 @@ static constexpr std::string_view LegacyForceVTInputKey{ "experimental.input.for
 static constexpr std::string_view LegacyWarnAboutLargePasteKey{ "largePasteWarning" };
 static constexpr std::string_view LegacyWarnAboutMultiLinePasteKey{ "multiLinePasteWarning" };
 static constexpr std::string_view LegacyConfirmCloseAllTabsKey{ "confirmCloseAllTabs" };
+// The pane-save interval was minutes before it was seconds. A minute is a long
+// time to lose in a crash, and the whole point of the setting is choosing how
+// much you are willing to lose.
+static constexpr std::string_view LegacyBufferPersistIntervalMinutesKey{ "bufferPersistIntervalMinutes" };
 static constexpr std::string_view LegacyPersistedWindowLayout{ "persistedWindowLayout" };
 
 // Method Description:
@@ -213,6 +217,20 @@ void GlobalAppSettings::LayerJson(const Json::Value& json, const OriginTag origi
         if (JsonUtils::GetValueForKey(json, LegacyConfirmCloseAllTabsKey, legacyConfirmClose))
         {
             _ConfirmOnClose = legacyConfirmClose.value() ? ConfirmOnClose::Automatic : ConfirmOnClose::Never;
+            _fixupsAppliedDuringLoad = true;
+        }
+    }
+
+    // The pane-save interval used to be minutes. Carry a value written under the
+    // old key across rather than dropping it: the setting exists to choose how
+    // much work you are willing to lose, so silently resetting it to the default
+    // is the one outcome nobody asked for. Read before the macro block, so an
+    // explicit seconds value in the same file still wins.
+    {
+        std::optional<int32_t> legacyMinutes;
+        if (JsonUtils::GetValueForKey(json, LegacyBufferPersistIntervalMinutesKey, legacyMinutes) && legacyMinutes)
+        {
+            _BufferPersistIntervalSeconds = *legacyMinutes * 60;
             _fixupsAppliedDuringLoad = true;
         }
     }

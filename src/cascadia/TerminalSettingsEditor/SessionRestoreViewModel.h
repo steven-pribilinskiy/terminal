@@ -35,7 +35,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_Settings.GlobalSettings(), ResumeAgents);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_Settings.GlobalSettings(), ResumeMultiplexers);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_Settings.GlobalSettings(), PersistBufferPeriodically);
-        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_Settings.GlobalSettings(), BufferPersistIntervalMinutes);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_Settings.GlobalSettings(), BufferPersistIntervalSeconds);
 
         // The two program lists are edited as one comma-separated line each.
         // A settings page has no list editor to reuse, and a program name has
