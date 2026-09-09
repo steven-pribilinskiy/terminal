@@ -1216,12 +1216,14 @@
             "target": {
               "type": "string",
               "default": "settingsUI",
-              "description": "Opens Settings UI or settings file.",
+              "description": "Opens the Settings UI or a settings file. \"settingsUI\" honors the \"settingsUIHost\" setting (a tab, a dialog, or its own window); \"settingsUITab\" always opens a tab in the current window regardless of it.",
               "enum": [
                 "settingsFile",
                 "defaultsFile",
                 "allFiles",
-                "settingsUI"
+                "settingsUI",
+                "settingsUITab",
+                "directory"
               ]
             }
           }
@@ -3015,7 +3017,7 @@
         },
         "settingsUIHost": {
           "default": "tab",
-          "description": "Where the Settings UI opens. Possible values include:\n -\"tab\" as a tab in the current window, alongside the terminals\n -\"dialog\" as a modal dialog over the current window, which dims the terminal and closes on Esc\n -\"window\" in a window of its own. NOT YET IMPLEMENTED: this value is rejected at load with a warning rather than silently behaving like \"tab\".",
+          "description": "Where the Settings UI opens. Possible values include:\n -\"tab\" as a tab in the current window, alongside the terminals\n -\"dialog\" as a modal dialog over the current window, which dims the terminal and closes on Esc. Not resizable.\n -\"window\" in a window of its own: resizable, minimizable, and with its own taskbar entry.",
           "enum": [
             "tab",
             "dialog",

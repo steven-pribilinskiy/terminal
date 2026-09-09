@@ -1026,8 +1026,8 @@
     <comment>An option to choose from for the "open settings in" setting. When selected, settings open centred over the current window, dimming the terminal behind them.</comment>
   </data>
   <data name="Globals_SettingsUIHostWindow.Content" xml:space="preserve">
-    <value>Its own window (not yet available)</value>
-    <comment>An option to choose from for the "open settings in" setting. Listed but not implemented yet: choosing it falls back to a tab and reports a settings warning. Keep the parenthetical, it is what tells the user why nothing changes.</comment>
+    <value>Its own window</value>
+    <comment>An option to choose from for the "open settings in" setting. When selected, settings open in a separate resizable window with its own taskbar entry.</comment>
   </data>
   <data name="Globals_TabWidthMode.Header" xml:space="preserve">
     <value>Tab width mode</value>

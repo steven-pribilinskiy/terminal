@@ -462,23 +462,6 @@ void CascadiaSettings::_validateSettings()
     _validateThemeExists();
     _validateProfileEnvironmentVariables();
     _validateRegexes();
-    _validateSettingsUIHost();
-}
-
-// Method Description:
-// - Turns settingsUIHost "window" back into "tab", with a warning.
-// - The value is in the enum and the schema because it is the form factor this
-//   is heading for, but nothing in the app creates a second top-level window for
-//   Settings yet. Saying so is the point: silently behaving like "tab" would
-//   leave the value looking supported, and the next person to set it would file
-//   a bug about a window that never appears.
-void CascadiaSettings::_validateSettingsUIHost()
-{
-    if (_windowSettings && _windowSettings->SettingsUIHost() == Model::SettingsUIHost::Window)
-    {
-        _warnings.Append(SettingsLoadWarnings::SettingsUIHostNotImplemented);
-        _windowSettings->SettingsUIHost(Model::SettingsUIHost::Tab);
-    }
 }
 
 // Method Description:

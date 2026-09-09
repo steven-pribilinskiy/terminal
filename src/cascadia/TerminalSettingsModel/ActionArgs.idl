@@ -89,7 +89,14 @@ namespace Microsoft.Terminal.Settings.Model
         DefaultsFile,
         AllFiles,
         SettingsUI,
-        Directory
+        Directory,
+        // The settings UI, always as a tab in this window, whatever
+        // settingsUIHost says. SettingsUI honours the setting; this does not.
+        //
+        // It exists so the "window" host can ask a NEW window to show the
+        // settings without that window reading the same setting and asking for
+        // another window, and another, forever.
+        SettingsUITab
     };
 
     enum MoveTabDirection

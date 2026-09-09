@@ -225,7 +225,6 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         bool _hasInvalidColorScheme(const Model::Command& command) const;
         void _validateThemeExists();
         void _validateRegexes();
-        void _validateSettingsUIHost();
 
         void _researchOnLoad();
 

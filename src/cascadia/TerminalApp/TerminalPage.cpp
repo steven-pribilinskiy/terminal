@@ -4915,6 +4915,13 @@ namespace winrt::TerminalApp::implementation
         {
             OpenSettingsUI();
         }
+        else if (target == SettingsTarget::SettingsUITab)
+        {
+            // Deliberately not OpenSettingsUI: this target means "a tab, here",
+            // and is what the settings window is started with so it does not
+            // ask for a window of its own.
+            OpenSettingsUITab();
+        }
         else
         {
             // This will switch the execution of the function to a background (not
@@ -5979,12 +5986,28 @@ namespace winrt::TerminalApp::implementation
     // - <none>
     void TerminalPage::OpenSettingsUI()
     {
-        if (_currentWindowSettings().SettingsUIHost() == SettingsUIHost::Dialog)
+        switch (_currentWindowSettings().SettingsUIHost())
         {
+        case SettingsUIHost::Dialog:
             _OpenSettingsDialog();
             return;
+        case SettingsUIHost::Window:
+            _OpenSettingsWindow();
+            return;
+        default:
+            break;
         }
 
+        OpenSettingsUITab();
+    }
+
+    // Method Description:
+    // - Puts the settings UI in a tab in THIS window, whatever settingsUIHost
+    //   says. OpenSettingsUI honours the setting and routes here for "tab";
+    //   the window host also routes here, in the new window, so that window
+    //   does not read the setting again and ask for another one forever.
+    void TerminalPage::OpenSettingsUITab()
+    {
         // If we're holding the settings tab's switch command, don't create a new one, switch to the existing one.
         if (!_settingsTab)
         {
@@ -5996,6 +6019,34 @@ namespace winrt::TerminalApp::implementation
         {
             _tabView.SelectedItem(_settingsTab.TabViewItem());
         }
+    }
+
+    // Method Description:
+    // - Opens the Settings UI in a window of its own, for settingsUIHost
+    //   "window". Resizable, minimisable, and in the taskbar, because it is an
+    //   ordinary Terminal window rather than anything special.
+    // - Nothing here builds a window type. The window is requested through the
+    //   same path _OpenNewWindow uses, carrying one startup action; startup
+    //   actions REPLACE the default new tab (TerminalPage::_CompleteInitialization
+    //   takes them instead of creating one), so the new window comes up showing
+    //   settings and nothing else.
+    // - The action is SettingsUITab rather than SettingsUI on purpose. The new
+    //   window reads the same settingsUIHost we did, so asking it for
+    //   "the settings UI" would have it ask for another window, forever.
+    void TerminalPage::_OpenSettingsWindow()
+    {
+        OpenSettingsArgs settingsArgs{ SettingsTarget::SettingsUITab };
+
+        ActionAndArgs action{};
+        action.Action(ShortcutAction::OpenSettings);
+        action.Args(settingsArgs);
+
+        auto actions = winrt::single_threaded_vector<ActionAndArgs>({ std::move(action) });
+
+        // Id 0: this lands in WindowEmperor::CreateNewWindow, which allocates one.
+        winrt::TerminalApp::WindowRequestedArgs request{ 0, winrt::TerminalApp::CommandlineArgs{} };
+        request.StartupActions(std::move(actions));
+        RequestNewWindow.raise(*this, request);
     }
 
     // Method Description:
@@ -6023,18 +6074,46 @@ namespace winrt::TerminalApp::implementation
             co_return;
         }
 
-        // Sized against the window rather than left to the content. The settings
-        // page is a two-pane navigation view and will happily measure to
-        // something far larger than the window it is sitting over.
+        Controls::ContentDialog dialog{};
+
+        // Size the DIALOG, not the content.
+        //
+        // ContentDialog clamps itself to the ContentDialogMaxWidth and
+        // ContentDialogMaxHeight theme resources - 548x756 by default, sized for
+        // a confirmation prompt rather than a settings app. Setting Width on the
+        // content does not lift that clamp; it just makes the content wider than
+        // the dialog and lets the dialog cut it off, which is what the first
+        // version of this did. The right pane was sliced through the middle of
+        // its cards.
+        //
+        // These are looked up off the dialog's own resource dictionary, so
+        // overriding them here affects this dialog and nothing else.
         const auto available{ this->Root() };
         if (available && available.ActualWidth() > 0 && available.ActualHeight() > 0)
         {
             static constexpr auto fraction{ 0.85 };
-            root.Width(std::max(480.0, available.ActualWidth() * fraction));
-            root.Height(std::max(360.0, available.ActualHeight() * fraction));
+
+            // The floor is what keeps the two-pane layout usable: below roughly
+            // this the navigation list and the content pane cannot both fit, and
+            // the page becomes a horizontal scroll.
+            static constexpr auto minWidth{ 720.0 };
+            static constexpr auto minHeight{ 480.0 };
+
+            const auto w{ std::max(minWidth, available.ActualWidth() * fraction) };
+            const auto h{ std::max(minHeight, available.ActualHeight() * fraction) };
+
+            const auto res{ dialog.Resources() };
+            res.Insert(winrt::box_value(L"ContentDialogMaxWidth"), winrt::box_value(w));
+            res.Insert(winrt::box_value(L"ContentDialogMinWidth"), winrt::box_value(std::min(w, minWidth)));
+            res.Insert(winrt::box_value(L"ContentDialogMaxHeight"), winrt::box_value(h));
+            res.Insert(winrt::box_value(L"ContentDialogMinHeight"), winrt::box_value(std::min(h, minHeight)));
         }
 
-        Controls::ContentDialog dialog{};
+        // Let the page fill whatever the dialog ends up being, rather than
+        // pinning it to a size of its own.
+        root.HorizontalAlignment(HorizontalAlignment::Stretch);
+        root.VerticalAlignment(VerticalAlignment::Stretch);
+
         dialog.Content(root);
 
         // No primary button: there is nothing to confirm, the page saves itself.
