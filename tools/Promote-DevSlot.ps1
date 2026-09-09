@@ -79,6 +79,38 @@ function Say {
 
 Write-Log "promotion requested (waitForPid=$WaitForPid relaunch=$($Relaunch.IsPresent) payload=$Payload)"
 
+# One promotion at a time, across processes.
+#
+# Every press of the promote button arms a fresh helper, and each one waits on
+# the same Terminal pid - so pressing it twice because nothing seemed to happen
+# arms two, and they wake together the moment that pid exits. On 2026-09-09
+# three of them woke at once and destroyed each other's work: two logged
+# "Removing the old registration" in the same second, one died because the log
+# file was locked by a sibling, one swapped the payload and then failed to
+# register with "Cannot create a file when that file already exists", and the
+# last found nothing left to remove ("Package was not found"). The Dev slot was
+# left half-swapped, and because the relaunch is the last statement in the try,
+# every one of them threw before reaching it - so the window closed, the build
+# changed, and nothing came back.
+#
+# A named mutex rather than a lock file: it is released by the OS if a helper is
+# killed, where a stale file would block every future promotion until deleted by
+# hand.
+$promotionMutex = New-Object System.Threading.Mutex($false, 'Global\AylithTerminalPromoteDevSlot')
+$holdsMutex = $false
+try { $holdsMutex = $promotionMutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] {
+    # A previous helper was killed mid-promotion. The mutex is ours now, and the
+    # swap below is written to be safe to repeat.
+    $holdsMutex = $true
+    Write-Log 'took over an abandoned promotion mutex'
+}
+
+if (-not $holdsMutex) {
+    Write-Log 'another promotion is already running; leaving it to that one'
+    Say 'Another promotion is already in progress.' ([ConsoleColor]::DarkGray) -NoLog
+    exit 0
+}
+
 # Purely so the banner can name the build being promoted. A missing or broken
 # marker is not a reason to refuse -- the payload on disk is what gets swapped,
 # and the marker only describes it.
@@ -337,7 +369,26 @@ catch {
     Write-Log "FAILED: $($_.Exception.Message)"
     Write-Host ''
     Write-Host "Promotion failed: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host "Nothing was swapped. See $LogPath" -ForegroundColor Red
+    Write-Host "See $LogPath" -ForegroundColor Red
     Write-Host ''
+
+    # Bring the Terminal back even though this failed.
+    #
+    # -Relaunch means the user chose "update and restart", so their windows are
+    # already gone by the time we get here - we waited for them to close. Exiting
+    # quietly then leaves them with no terminal at all and no idea why, which is
+    # strictly worse than a failed promotion they can read about. Whatever state
+    # the slot is in, a registered package still starts something.
+    if ($Relaunch) {
+        Write-Log 'relaunching after a failed promotion so the user is not left without a terminal'
+        try { Start-Process 'wtd.exe' } catch { Write-Log "relaunch after failure also failed: $($_.Exception.Message)" }
+    }
+
     exit 1
+}
+finally {
+    if ($holdsMutex) {
+        $promotionMutex.ReleaseMutex()
+        $promotionMutex.Dispose()
+    }
 }
