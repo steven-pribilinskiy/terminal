@@ -21,6 +21,12 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         GETSET_BINDABLE_ENUM_SETTING(CopyFormat, winrt::Microsoft::Terminal::Control::CopyFormat, _WindowSettings.CopyFormatting);
         GETSET_BINDABLE_ENUM_SETTING(ConfirmOnClose, Model::ConfirmOnClose, _GlobalSettings.ConfirmOnClose);
 
+        // public: because GETSET_BINDABLE_ENUM_SETTING ends in private:, and
+        // both of these are reached from the projection - x:Bind in
+        // Interaction.xaml. Declaring them straight after the macro puts them in
+        // whatever scope it left behind, which is how this failed to compile
+        // with "cannot access private member" from a generated header.
+    public:
         bool ConfirmOnCloseThresholdEnabled();
         void ConfirmOnCloseChanged(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::Controls::SelectionChangedEventArgs& args);
         GETSET_BINDABLE_ENUM_SETTING(SettingsUIHost, Model::SettingsUIHost, _WindowSettings.SettingsUIHost);

@@ -502,6 +502,14 @@ does not fail at all.
   anything on the page derives from that value, hand-write the setter and notify
   the derived properties — but never the property the binding just wrote (see
   `doc/troubleshooting.md`, "The whole Terminal vanishes while you are in Settings").
+- **The view-model macros leave the class in `private:`.** `GETSET_BINDABLE_ENUM_SETTING`
+  and `VIEW_MODEL_OBSERVABLE_PROPERTY` both end there, so anything declared straight
+  after one lands private. A method the projection needs — an `x:Bind` target, or
+  something reached through `get_self` — then fails to compile from a *generated*
+  header (`error C2248: cannot access private member`, pointing at
+  `Generated Files\winrt\...h`), which reads as a problem with the generated code
+  rather than with where you put the declaration. Write `public:` before it. Cost
+  a CI round twice on 2026-09-09, once for each macro.
 
 Green means it compiles, packages and passes two unit suites. It says nothing
 about whether a page draws, an icon resolves, or a setting takes effect — see
