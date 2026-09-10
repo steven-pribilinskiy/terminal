@@ -3,6 +3,7 @@
 #pragma once
 #include <msopc.h>
 #include <xmllite.h>
+#include <algorithm>
 #include <map>
 #include <memory>
 #include <optional>

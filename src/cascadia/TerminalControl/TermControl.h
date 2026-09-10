@@ -410,6 +410,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // discards a fetch that finishes after the pointer has moved on.
         uint32_t _hyperlinkPreviewGeneration{ 0 };
         Control::HyperlinkPreview _currentHyperlinkPreview{ nullptr };
+        Windows::Foundation::IAsyncOperation<Control::HyperlinkPreview> _filePreviewOperation{ nullptr };
         winrt::hstring _hoveredLinkTarget() const;
         void _setHyperlinkPreviewLoading(bool loading);
         safe_void_coroutine _requestHyperlinkPreview(uint32_t generation, winrt::hstring text, winrt::hstring integration);

@@ -23,6 +23,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor
         std::vector<std::wstring_view> customExtensions{};
         std::wstring_view integration{};
         bool showPreview{ true };
+        std::vector<std::wstring_view> legacyNames{};
     };
 
     #include "LinkTooltipPresets.g.h"

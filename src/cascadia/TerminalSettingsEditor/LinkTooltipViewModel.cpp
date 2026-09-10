@@ -2023,7 +2023,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             // matches \b(?<repo>[A-Za-z0-9_.-]+)#\d+\b while a rule added earlier
             // still stores (?<repo>[a-z-]+)#\d+, so a pattern-only test offered it
             // again as though it were missing.
-            if (std::wstring_view{ rule.Name() } == presetName)
+            if (std::wstring_view{ rule.Name() } == presetName || std::find(preset->legacyNames.begin(), preset->legacyNames.end(), std::wstring_view{ rule.Name() }) != preset->legacyNames.end())
             {
                 return true;
             }

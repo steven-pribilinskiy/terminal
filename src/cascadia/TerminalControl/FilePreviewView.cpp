@@ -67,6 +67,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         fire_and_forget LoadImage(std::shared_ptr<FileImageState> state, hstring path, bool pdf)
         {
+            const auto generation = ++state->generation;
             const apartment_context ui;
             hstring failure;
             try
@@ -79,7 +80,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 {
                     auto document = co_await PdfDocument::LoadFromStreamAsync(stream);
                     co_await ui;
-                    if (state->closed) co_return;
+                    if (state->closed || state->generation != generation) co_return;
                     state->document = document;
                     if (const auto pages = state->pages.get(); pages && !state->compact)
                     {
@@ -97,12 +98,12 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                     if (static_cast<uint64_t>(decoder.PixelWidth()) * decoder.PixelHeight() > 16000000)
                         throw hresult_error(E_FAIL, L"Image exceeds the 16 megapixel preview limit.");
                     co_await ui;
-                    if (state->closed) co_return;
+                    if (state->closed || state->generation != generation) co_return;
                     Media::Imaging::BitmapImage bitmap;
                     bitmap.DecodePixelWidth(state->compact ? 640 : std::min(decoder.PixelWidth(), 4096u));
                     stream.Seek(0);
                     co_await bitmap.SetSourceAsync(stream);
-                    if (state->closed) co_return;
+                    if (state->closed || state->generation != generation) co_return;
                     if (const auto image = state->image.get()) image.Source(bitmap);
                     if (const auto status = state->status.get()) status.Text(to_hstring(decoder.PixelWidth()) + L" × " + to_hstring(decoder.PixelHeight()));
                 }
@@ -113,7 +114,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             }
             catch (...) { failure = L"File could not be rendered."; }
             co_await ui;
-            if (!failure.empty() && !state->closed)
+            if (!failure.empty() && !state->closed && state->generation == generation)
                 if (const auto status = state->status.get()) status.Text(failure);
         }
     }
@@ -171,7 +172,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             }
             root.Children().Append(status);
             root.Unloaded([state](auto&&, auto&&) { state->closed = true; ++state->generation; state->document = nullptr; });
-            LoadImage(state, preview.FilePath(), preview.FileKind() == L"pdf");
+            root.Loaded([state, path = preview.FilePath(), pdf = preview.FileKind() == L"pdf"](auto&&, auto&&) {
+                state->closed = false;
+                LoadImage(state, path, pdf);
+            });
         }
         else
         {

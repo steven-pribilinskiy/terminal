@@ -83,7 +83,9 @@ namespace winrt::TerminalApp::implementation
         {
             if (hint.empty() && !filePath.empty())
             {
-                preview = co_await provider.GetFilePreviewAsync(filePath);
+                const auto operation = provider.GetFilePreviewAsync(filePath);
+                _filePreviewOperation = operation;
+                preview = co_await operation;
             }
             else
             {
@@ -107,7 +109,19 @@ namespace winrt::TerminalApp::implementation
 
     void LinkPreviewPaneContent::_setLoading(bool loading)
     {
-        if (loading) FilePreviewHost().Content(nullptr);
+        if (loading)
+        {
+            if (_filePreviewOperation) { _filePreviewOperation.Cancel(); _filePreviewOperation = nullptr; }
+            FilePreviewHost().Content(nullptr);
+            HeaderIcon().Content(nullptr);
+            IntegrationName().Text(winrt::hstring{});
+            FieldsHost().Children().Clear();
+            BodyHost().Children().Clear();
+            CommentsHost().Children().Clear();
+            _rebuildTabStrip(nullptr);
+            _rebuildActions(nullptr);
+            _setError(winrt::hstring{});
+        }
         LoadingRing().IsActive(loading);
         LoadingRing().Visibility(loading ? Visibility::Visible : Visibility::Collapsed);
         RefreshButton().IsEnabled(!loading);
@@ -921,6 +935,7 @@ namespace winrt::TerminalApp::implementation
 
     void LinkPreviewPaneContent::Close()
     {
+        if (_filePreviewOperation) { _filePreviewOperation.Cancel(); _filePreviewOperation = nullptr; }
         ++_generation;
         _preview = nullptr;
         FilePreviewHost().Content(nullptr);

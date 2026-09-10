@@ -4040,6 +4040,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         if (_hoveredUri == uriText && HyperlinkCard().Visibility() == Visibility::Visible)
         {
             _hyperlinkHideTimer.Stop();
+            _showHyperlinkCard();
             return;
         }
 
@@ -4321,6 +4322,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     // the next thing to arrive belongs to a different link than whatever is on screen.
     void TermControl::_setHyperlinkPreviewLoading(bool loading)
     {
+        if (_filePreviewOperation) { _filePreviewOperation.Cancel(); _filePreviewOperation = nullptr; }
         HyperlinkCardPreviewName().Text(winrt::hstring{});
         HyperlinkCardPreviewIcon().Content(nullptr);
         HyperlinkCardLeftIcon().Content(nullptr);
@@ -4380,8 +4382,16 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         try
         {
             const auto path = integration.empty() ? winrt::hstring{ _resolvedHyperlinkTarget() } : winrt::hstring{};
-            preview = path.empty() ? co_await provider.GetPreviewAsync(text, integration) :
-                                     co_await provider.GetFilePreviewAsync(path);
+            if (path.empty())
+            {
+                preview = co_await provider.GetPreviewAsync(text, integration);
+            }
+            else
+            {
+                const auto operation = provider.GetFilePreviewAsync(path);
+                _filePreviewOperation = operation;
+                preview = co_await operation;
+            }
         }
         CATCH_LOG();
 
@@ -4775,6 +4785,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
     void TermControl::_hideHyperlinkCard()
     {
+        if (_filePreviewOperation) { _filePreviewOperation.Cancel(); _filePreviewOperation = nullptr; }
         _hyperlinkShowTimer.Stop();
         _hyperlinkHideTimer.Stop();
         _pointerInHyperlinkCard = false;

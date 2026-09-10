@@ -52,7 +52,9 @@ namespace ControlUnitTests
 
     class FilePreviewTests
     {
-        TEST_CLASS(FilePreviewTests);
+        BEGIN_TEST_CLASS(FilePreviewTests)
+            TEST_CLASS_PROPERTY(L"ThreadingModel", L"MTA")
+        END_TEST_CLASS()
         TEST_METHOD(TextEncodings);
         TEST_METHOD(BoundedUtf8);
         TEST_METHOD(OfficeParagraphs);

@@ -46,6 +46,7 @@ namespace winrt::TerminalApp::implementation
 
         winrt::Microsoft::Terminal::Control::IHyperlinkPreviewProvider _provider{ nullptr };
         winrt::Microsoft::Terminal::Control::HyperlinkPreview _preview{ nullptr };
+        winrt::Windows::Foundation::IAsyncOperation<winrt::Microsoft::Terminal::Control::HyperlinkPreview> _filePreviewOperation{ nullptr };
 
         // What this pane is showing, echoed back into every refresh and action so
         // they run against the same thing the first fetch did.

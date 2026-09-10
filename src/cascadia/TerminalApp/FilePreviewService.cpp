@@ -14,7 +14,9 @@ namespace winrt::TerminalApp::implementation
 
     Windows::Foundation::IAsyncOperation<Control::HyperlinkPreview> HyperlinkPreviewService::GetFilePreviewAsync(hstring resolvedFilePath)
     {
+        const auto cancellation = co_await get_cancellation_token();
         co_await resume_background();
+        if (cancellation()) throw hresult_canceled();
         Control::HyperlinkPreview preview;
         preview.IntegrationName(L"File");
         preview.IntegrationIcon(L"\uE8A5");
@@ -70,6 +72,7 @@ namespace winrt::TerminalApp::implementation
         }
         catch (const hresult_error& error) { preview.Error(error.message()); }
         catch (...) { preview.Error(L"File could not be read. It may be missing, inaccessible, or damaged."); }
+        if (cancellation()) throw hresult_canceled();
         co_return preview;
     }
 }
