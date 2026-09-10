@@ -59,8 +59,10 @@ namespace winrt::TerminalApp::implementation
             else
             {
                 std::ifstream file{ path, std::ios::binary };
+                if (!file) throw hresult_error(E_ACCESSDENIED, L"File could not be opened for preview.");
                 std::string bytes(std::min(static_cast<size_t>(size), TextLimit), '\0');
                 file.read(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+                if (file.bad()) throw hresult_error(E_FAIL, L"File could not be read completely.");
                 bytes.resize(static_cast<size_t>(file.gcount()));
                 auto decoded = DecodeText(bytes, size > TextLimit);
                 if (!decoded) throw hresult_error(E_FAIL, L"No built-in preview for this binary format or text encoding.");

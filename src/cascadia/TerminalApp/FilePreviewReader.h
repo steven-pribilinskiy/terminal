@@ -125,6 +125,9 @@ namespace Microsoft::Terminal::FilePreview
         check_hresult(CoCreateInstance(__uuidof(OpcFactory), nullptr, CLSCTX_INPROC_SERVER, __uuidof(IOpcFactory), factory.put_void()));
         com_ptr<IStream> input;
         check_hresult(factory->CreateStreamOnFile(path.c_str(), OPC_STREAM_IO_READ, nullptr, FILE_ATTRIBUTE_NORMAL, input.put()));
+        STATSTG inputStat{};
+        check_hresult(input->Stat(&inputStat, STATFLAG_NONAME));
+        if (inputStat.cbSize.QuadPart > 50 * 1024 * 1024) throw hresult_error(E_FAIL, L"File exceeds the 50 MiB preview limit.");
         com_ptr<IOpcPackage> package;
         check_hresult(factory->ReadPackageFromStream(input.get(), OPC_READ_DEFAULT, package.put()));
         com_ptr<IOpcPartSet> parts;
