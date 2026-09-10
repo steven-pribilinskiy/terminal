@@ -17,6 +17,8 @@ namespace winrt::TerminalApp::implementation
         const auto cancellation = co_await get_cancellation_token();
         co_await resume_background();
         if (cancellation()) throw hresult_canceled();
+        check_hresult(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
+        const auto apartment = wil::scope_exit([] { CoUninitialize(); });
         Control::HyperlinkPreview preview;
         preview.IntegrationName(L"File");
         preview.IntegrationIcon(L"\uE8A5");
