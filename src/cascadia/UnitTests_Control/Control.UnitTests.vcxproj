@@ -29,6 +29,7 @@
   <!-- ========================= Cpp Files ======================== -->
   <ItemGroup>
     <ClCompile Include="ControlCoreTests.cpp" />
+    <ClCompile Include="FilePreviewTests.cpp" />
     <ClCompile Include="ControlInteractivityTests.cpp" />
     <ClCompile Include="ControlPipeProtocolTests.cpp" />
     <ClCompile Include="pch.cpp">
@@ -71,7 +72,7 @@
       <DisableSpecificWarnings>4702;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>onecoreuap.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>xmllite.lib;urlmon.lib;onecoreuap.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <!--
       ControlLib contains a DllMain that we need to force the use of.
       If you don't have this, then you'll see an error like

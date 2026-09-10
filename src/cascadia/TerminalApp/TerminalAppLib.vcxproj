@@ -96,6 +96,7 @@
     <ClInclude Include="PaneSessionCapture.h" />
     <ClInclude Include="ProcessCapture.h" />
     <ClInclude Include="HyperlinkPreviewService.h" />
+    <ClInclude Include="FilePreviewReader.h" />
     <ClInclude Include="MinMaxCloseControl.h">
       <DependentUpon>MinMaxCloseControl.xaml</DependentUpon>
     </ClInclude>
