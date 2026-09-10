@@ -29,7 +29,10 @@
   <!-- ========================= Cpp Files ======================== -->
   <ItemGroup>
     <ClCompile Include="ControlCoreTests.cpp" />
-    <ClCompile Include="FilePreviewTests.cpp" />
+    <!-- Shared with the standalone preflight; its conditional includes cannot use /Yu. -->
+    <ClCompile Include="FilePreviewTests.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="ControlInteractivityTests.cpp" />
     <ClCompile Include="ControlPipeProtocolTests.cpp" />
     <ClCompile Include="pch.cpp">
