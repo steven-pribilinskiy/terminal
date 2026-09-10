@@ -14,7 +14,7 @@ namespace winrt::TerminalApp::implementation
         LinkPreviewPaneContent();
 
         void SetPreviewProvider(const winrt::Microsoft::Terminal::Control::IHyperlinkPreviewProvider& provider);
-        void ShowLink(const winrt::hstring& text, const winrt::hstring& integrationHint);
+        void ShowLink(const winrt::hstring& text, const winrt::hstring& integrationHint, const winrt::hstring& resolvedFilePath);
 
         bool HideTooltips() const noexcept { return _hideTooltips; }
         til::typed_event<winrt::Windows::Foundation::IInspectable, winrt::Windows::Foundation::IInspectable> HideTooltipsChanged;
@@ -50,6 +50,7 @@ namespace winrt::TerminalApp::implementation
         // What this pane is showing, echoed back into every refresh and action so
         // they run against the same thing the first fetch did.
         winrt::hstring _sourceText;
+        winrt::hstring _resolvedFilePath;
         winrt::hstring _integrationHint;
         winrt::hstring _title;
 

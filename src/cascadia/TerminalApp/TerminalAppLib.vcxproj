@@ -239,6 +239,7 @@
     <ClCompile Include="PaneSessionCapture.cpp" />
     <ClCompile Include="ProcessCapture.cpp" />
     <ClCompile Include="HyperlinkPreviewService.cpp" />
+    <ClCompile Include="FilePreviewService.cpp" />
     <ClCompile Include="TabManagement.cpp">
       <DependentUpon>TerminalPage.xaml</DependentUpon>
       <SubType>Code</SubType>
@@ -525,7 +526,7 @@
       <DisableSpecificWarnings>4702;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>WindowsApp.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>WindowsApp.lib;shell32.lib;xmllite.lib;urlmon.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <!-- ========================= Globals ======================== -->

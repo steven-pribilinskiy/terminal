@@ -104,7 +104,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
             if (preset.integration.empty())
             {
-                if (preset.fileTypeGroup != Model::HyperlinkFileTypeGroup::None)
+                if (preset.fileTypeGroup != Model::HyperlinkFileTypeGroup::None || !preset.customExtensions.empty())
                 {
                     index = 6;
                 }

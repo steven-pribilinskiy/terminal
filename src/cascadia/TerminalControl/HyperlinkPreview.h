@@ -152,12 +152,16 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         WINRT_PROPERTY(Windows::Foundation::Collections::IVector<Control::HyperlinkPreviewTab>, Tabs);
         WINRT_PROPERTY(Windows::Foundation::Collections::IVector<Control::HyperlinkPreviewAction>, Actions);
         WINRT_PROPERTY(hstring, SourceText);
+        WINRT_PROPERTY(hstring, FilePath);
+        WINRT_PROPERTY(hstring, FileKind);
+        WINRT_PROPERTY(Windows::Foundation::Collections::IVector<Control::HyperlinkPreviewTab>, FileSections);
     };
 
     struct HyperlinkPreviewHelpers
     {
         HyperlinkPreviewHelpers() = default;
 
+        static Windows::UI::Xaml::FrameworkElement CreateFileView(const Control::HyperlinkPreview& preview, bool compact);
         static Windows::UI::Xaml::Media::Brush BadgeBrush(const hstring& color);
         static Windows::UI::Xaml::Media::ImageSource ImageFromUri(const hstring& uri);
     };

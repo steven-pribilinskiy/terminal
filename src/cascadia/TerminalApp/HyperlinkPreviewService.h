@@ -50,6 +50,7 @@ namespace winrt::TerminalApp::implementation
         // IHyperlinkPreviewProvider
         winrt::hstring ResolveLink(const winrt::hstring& text, const winrt::hstring& integrationHint);
         winrt::hstring ResolveOpenAction(const winrt::hstring& text, const winrt::hstring& integrationHint);
+        winrt::Windows::Foundation::IAsyncOperation<winrt::Microsoft::Terminal::Control::HyperlinkPreview> GetFilePreviewAsync(winrt::hstring resolvedFilePath);
         bool CanPreview(const winrt::hstring& text, const winrt::hstring& integrationHint);
         winrt::Windows::Foundation::IAsyncOperation<winrt::Microsoft::Terminal::Control::HyperlinkPreview> GetPreviewAsync(winrt::hstring text, winrt::hstring integrationHint);
         winrt::Windows::Foundation::IAsyncOperation<winrt::Microsoft::Terminal::Control::HyperlinkPreview> RefreshAsync(winrt::hstring text, winrt::hstring integrationHint);

@@ -2039,7 +2039,13 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
             // A preset with no pattern of its own (the file-type ones) is only
             // distinguishable by its file-type group once the name has not matched.
-            if (rule.FileTypeGroup() == preset->fileTypeGroup)
+            const auto extensions = rule.CustomExtensions();
+            const auto schemes = rule.Schemes();
+            const auto sameExtensions = (!extensions && preset->customExtensions.empty()) ||
+                (extensions && std::equal(extensions.begin(), extensions.end(), preset->customExtensions.begin(), preset->customExtensions.end()));
+            const auto sameSchemes = (!schemes && preset->schemes.empty()) ||
+                (schemes && std::equal(schemes.begin(), schemes.end(), preset->schemes.begin(), preset->schemes.end()));
+            if (rule.Pattern().empty() && rule.Kind() == preset->kind && rule.FileTypeGroup() == preset->fileTypeGroup && sameExtensions && sameSchemes)
             {
                 return true;
             }

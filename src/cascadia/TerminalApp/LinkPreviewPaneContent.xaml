@@ -123,6 +123,7 @@
                       IsTabStop="False"
                       VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="10">
+                <ContentControl x:Name="FilePreviewHost" HorizontalContentAlignment="Stretch" IsTabStop="False" />
                 <StackPanel x:Name="FieldsHost"
                             Spacing="10" />
                 <StackPanel x:Name="BodyHost"

@@ -139,6 +139,9 @@ namespace Microsoft.Terminal.Control
         // Echoed back so a refresh or an action can be run against the same
         // thing without the caller having to remember what produced it.
         String SourceText;
+        String FilePath;
+        String FileKind;
+        Windows.Foundation.Collections.IVector<HyperlinkPreviewTab> FileSections;
     }
 
     // Implemented by the app (which owns integrations and credentials) and
@@ -161,6 +164,7 @@ namespace Microsoft.Terminal.Control
         String ResolveOpenAction(String text, String integrationHint);
         // integrationHint: "" = automatic, "none" = never, else an integration id.
         Boolean CanPreview(String text, String integrationHint);
+        Windows.Foundation.IAsyncOperation<HyperlinkPreview> GetFilePreviewAsync(String resolvedFilePath);
         Windows.Foundation.IAsyncOperation<HyperlinkPreview> GetPreviewAsync(String text, String integrationHint);
         // Same, but ignores (and replaces) anything cached -- what to call
         // after an action has changed the thing being previewed.
@@ -178,6 +182,7 @@ namespace Microsoft.Terminal.Control
     // x:Bind helpers for the card's preview template.
     static runtimeclass HyperlinkPreviewHelpers
     {
+        static Windows.UI.Xaml.FrameworkElement CreateFileView(HyperlinkPreview preview, Boolean compact);
         static Windows.UI.Xaml.Media.Brush BadgeBrush(String color);
         static Windows.UI.Xaml.Media.ImageSource ImageFromUri(String uri);
     }

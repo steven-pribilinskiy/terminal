@@ -4467,7 +4467,7 @@ namespace winrt::TerminalApp::implementation
 
         if (existing)
         {
-            existing->ShowLink(eventArgs.Uri(), eventArgs.IntegrationHint());
+            existing->ShowLink(eventArgs.Uri(), eventArgs.IntegrationHint(), eventArgs.ResolvedFilePath());
             return;
         }
 
@@ -4476,7 +4476,7 @@ namespace winrt::TerminalApp::implementation
         previewContent->GetRoot().KeyDown({ this, &TerminalPage::_KeyDownHandler });
         previewContent->SetPreviewProvider(*_hyperlinkPreviewService);
         previewContent->HideTooltipsChanged({ get_weak(), &TerminalPage::_LinkPreviewHideTooltipsChanged });
-        previewContent->ShowLink(eventArgs.Uri(), eventArgs.IntegrationHint());
+        previewContent->ShowLink(eventArgs.Uri(), eventArgs.IntegrationHint(), eventArgs.ResolvedFilePath());
 
         // Built directly rather than through INewContentArgs, which today can only
         // carry a type string and so has nowhere to put the link.

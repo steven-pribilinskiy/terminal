@@ -1375,6 +1375,7 @@
                                 <StackPanel x:Name="HyperlinkCardPreview"
                                             Spacing="4"
                                             Visibility="Collapsed">
+                                    <ContentControl x:Name="HyperlinkCardFilePreview" HorizontalContentAlignment="Stretch" IsTabStop="False" />
                                     <StackPanel x:Name="HyperlinkCardPreviewHeader"
                                                 Orientation="Horizontal"
                                                 Spacing="6">

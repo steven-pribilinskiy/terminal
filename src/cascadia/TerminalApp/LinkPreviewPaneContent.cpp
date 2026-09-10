@@ -37,14 +37,14 @@ namespace winrt::TerminalApp::implementation
     // Safe to call on a pane that is already open, because that is the whole point
     // of reusing one: pressing "Show in pane" on a second link retargets the pane
     // that is already there rather than splitting again.
-    void LinkPreviewPaneContent::ShowLink(const winrt::hstring& text, const winrt::hstring& integrationHint)
+    void LinkPreviewPaneContent::ShowLink(const winrt::hstring& text, const winrt::hstring& integrationHint, const winrt::hstring& resolvedFilePath)
     {
         if (text.empty())
         {
             return;
         }
 
-        if (_preview && text == _sourceText && integrationHint == _integrationHint)
+        if (_preview && text == _sourceText && integrationHint == _integrationHint && resolvedFilePath == _resolvedFilePath)
         {
             // Already showing exactly this. Re-fetching would only make the pane
             // flicker through its loading state for no new information.
@@ -52,6 +52,7 @@ namespace winrt::TerminalApp::implementation
         }
 
         _sourceText = text;
+        _resolvedFilePath = resolvedFilePath;
         _integrationHint = integrationHint;
         _undoChoiceId = {};
 
@@ -69,6 +70,7 @@ namespace winrt::TerminalApp::implementation
         const auto dispatcher{ Dispatcher() };
         const auto text{ _sourceText };
         const auto hint{ _integrationHint };
+        const auto filePath{ _resolvedFilePath };
         if (!provider || !dispatcher || text.empty())
         {
             co_return;
@@ -79,8 +81,15 @@ namespace winrt::TerminalApp::implementation
         Control::HyperlinkPreview preview{ nullptr };
         try
         {
-            preview = refresh ? co_await provider.RefreshAsync(text, hint) :
-                                co_await provider.GetPreviewAsync(text, hint);
+            if (hint.empty() && !filePath.empty())
+            {
+                preview = co_await provider.GetFilePreviewAsync(filePath);
+            }
+            else
+            {
+                preview = refresh ? co_await provider.RefreshAsync(text, hint) :
+                                    co_await provider.GetPreviewAsync(text, hint);
+            }
         }
         CATCH_LOG();
 
@@ -98,6 +107,7 @@ namespace winrt::TerminalApp::implementation
 
     void LinkPreviewPaneContent::_setLoading(bool loading)
     {
+        if (loading) FilePreviewHost().Content(nullptr);
         LoadingRing().IsActive(loading);
         LoadingRing().Visibility(loading ? Visibility::Visible : Visibility::Collapsed);
         RefreshButton().IsEnabled(!loading);
@@ -112,6 +122,7 @@ namespace winrt::TerminalApp::implementation
     void LinkPreviewPaneContent::_render(const Control::HyperlinkPreview& preview)
     {
         _preview = preview;
+        FilePreviewHost().Content(Control::HyperlinkPreviewHelpers::CreateFileView(preview, false));
 
         if (!preview)
         {
@@ -910,6 +921,9 @@ namespace winrt::TerminalApp::implementation
 
     void LinkPreviewPaneContent::Close()
     {
+        ++_generation;
+        _preview = nullptr;
+        FilePreviewHost().Content(nullptr);
         // Whoever closed the pane also meant to stop silencing the terminals, so the
         // switch reports itself off on the way out rather than leaving every control
         // mute with nothing on screen to explain why.

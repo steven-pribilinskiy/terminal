@@ -136,8 +136,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     struct ShowHyperlinkPreviewRequestedEventArgs : public ShowHyperlinkPreviewRequestedEventArgsT<ShowHyperlinkPreviewRequestedEventArgs>
     {
     public:
-        ShowHyperlinkPreviewRequestedEventArgs(hstring uri, hstring integrationHint) :
-            _uri(uri), _integrationHint(integrationHint) {}
+        ShowHyperlinkPreviewRequestedEventArgs(hstring uri, hstring integrationHint, hstring resolvedFilePath) :
+            _uri(uri), _integrationHint(integrationHint), _resolvedFilePath(resolvedFilePath) {}
+
+        hstring ResolvedFilePath() { return _resolvedFilePath; };
 
         hstring Uri() { return _uri; };
         hstring IntegrationHint() { return _integrationHint; };
@@ -145,6 +147,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     private:
         hstring _uri;
         hstring _integrationHint;
+        hstring _resolvedFilePath;
     };
 
     struct EditHyperlinkRuleRequestedEventArgs : public EditHyperlinkRuleRequestedEventArgsT<EditHyperlinkRuleRequestedEventArgs>

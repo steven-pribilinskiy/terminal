@@ -89,6 +89,7 @@
     <ClCompile Include="EventArgs.cpp">
       <DependentUpon>EventArgs.idl</DependentUpon>
     </ClCompile>
+    <ClCompile Include="FilePreviewView.cpp" />
     <ClCompile Include="HyperlinkPreview.cpp">
       <DependentUpon>HyperlinkPreview.idl</DependentUpon>
     </ClCompile>

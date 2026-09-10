@@ -4037,6 +4037,12 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             return;
         }
 
+        if (_hoveredUri == uriText && HyperlinkCard().Visibility() == Visibility::Visible)
+        {
+            _hyperlinkHideTimer.Stop();
+            return;
+        }
+
         // Keep the URI as the buffer holds it. The text below may gain a punycode
         // annotation, which is there to be read, not to be opened or copied.
         _hoveredUri = uriText;
@@ -4079,7 +4085,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // same way it already resolves file:// links, so it skips the homoglyph/
         // punycode handling entirely rather than hitting the catch below and
         // being shown as "Invalid URI".
-        const auto looksLikeBarePosixPath = !uriText.empty() && uriText[0] == L'/';
+        const auto looksLikeBarePosixPath = !target.empty();
 
         // Attackers abuse Unicode characters that happen to look similar to ASCII characters. Cyrillic for instance has
         // its own glyphs for а, с, е, о, р, х, and у that look practically identical to their ASCII counterparts.
@@ -4179,7 +4185,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         {
             try
             {
-                wantPreview = _hyperlinkPreviewProvider.CanPreview(_hoveredUri, _currentHyperlinkTooltipSettings.integration);
+                wantPreview = (!target.empty() && _currentHyperlinkTooltipSettings.integration.empty()) ||
+                              _hyperlinkPreviewProvider.CanPreview(_hoveredUri, _currentHyperlinkTooltipSettings.integration);
             }
             CATCH_LOG();
         }
@@ -4233,6 +4240,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
 
         const std::wstring_view hovered{ _hoveredUri };
+        if (hovered.starts_with(L"\\\\") || (hovered.size() > 2 && hovered[1] == L':' && (hovered[2] == L'\\' || hovered[2] == L'/')))
+        {
+            return std::wstring{ hovered };
+        }
         const auto isFileUri = til::starts_with_insensitive_ascii(hovered, L"file:");
         const auto isBarePosixPath = hovered[0] == L'/';
         if (!isFileUri && !isBarePosixPath)
@@ -4312,6 +4323,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     {
         HyperlinkCardPreviewName().Text(winrt::hstring{});
         HyperlinkCardPreviewIcon().Content(nullptr);
+        HyperlinkCardLeftIcon().Content(nullptr);
+        HyperlinkCardFilePreview().Content(nullptr);
         HyperlinkCardPreviewError().Text(winrt::hstring{});
         HyperlinkCardPreviewError().Visibility(Visibility::Collapsed);
         HyperlinkCardPreviewFields().Children().Clear();
@@ -4366,7 +4379,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         Control::HyperlinkPreview preview{ nullptr };
         try
         {
-            preview = co_await provider.GetPreviewAsync(text, integration);
+            const auto path = integration.empty() ? winrt::hstring{ _resolvedHyperlinkTarget() } : winrt::hstring{};
+            preview = path.empty() ? co_await provider.GetPreviewAsync(text, integration) :
+                                     co_await provider.GetFilePreviewAsync(path);
         }
         CATCH_LOG();
 
@@ -4389,6 +4404,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         if (!preview)
         {
+            HyperlinkCardLeftIcon().Content(nullptr);
+            HyperlinkCardPreviewIcon().Content(nullptr);
+            HyperlinkCardFilePreview().Content(nullptr);
             // Collapsing the section is not enough for the HTML host: its WebView2 is a
             // child of the top-level window, so it outlives the XAML that reserved its space
             // unless it is told to go away.
@@ -4397,6 +4415,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             return;
         }
 
+        HyperlinkCardFilePreview().Content(Control::HyperlinkPreviewHelpers::CreateFileView(preview, true));
         HyperlinkCardPreviewName().Text(preview.IntegrationName());
         auto iconStr = preview.IntegrationIcon();
         if (iconStr.empty())
@@ -4764,6 +4783,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // is what sends its result to the bin instead of into a card shown for something else.
         ++_hyperlinkPreviewGeneration;
         _currentHyperlinkPreview = nullptr;
+        HyperlinkCardFilePreview().Content(nullptr);
+        HyperlinkCardLeftIcon().Content(nullptr);
+        HyperlinkCardPreviewIcon().Content(nullptr);
         _hideHyperlinkHtml();
         HyperlinkCard().Visibility(Visibility::Collapsed);
     }
@@ -5270,7 +5292,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         ShowHyperlinkPreviewRequested.raise(*this,
                                             winrt::make<ShowHyperlinkPreviewRequestedEventArgs>(_hoveredUri,
-                                                                                                _currentHyperlinkTooltipSettings.integration));
+                                                                                                _currentHyperlinkTooltipSettings.showPreview ? _currentHyperlinkTooltipSettings.integration : winrt::hstring{ L"none" },
+                                                                                                winrt::hstring{ _resolvedHyperlinkTarget() }));
     }
 
     void TermControl::_HyperlinkShowInPaneClick(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)

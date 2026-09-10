@@ -21,7 +21,7 @@ namespace winrt::Microsoft::Terminal::Control::HyperlinkFileTypeGroups
     inline constexpr std::wstring_view ImageExtensions[]{ L"png", L"jpg", L"jpeg", L"gif", L"bmp", L"webp", L"svg", L"ico" };
     inline constexpr std::wstring_view VideoExtensions[]{ L"mp4", L"mkv", L"webm", L"mov", L"avi" };
     inline constexpr std::wstring_view AudioExtensions[]{ L"mp3", L"wav", L"flac", L"ogg", L"m4a" };
-    inline constexpr std::wstring_view SourceCodeExtensions[]{ L"cs", L"cpp", L"h", L"hpp", L"c", L"py", L"js", L"ts", L"rs", L"go", L"java", L"rb", L"ps1", L"sh" };
+    inline constexpr std::wstring_view SourceCodeExtensions[]{ L"cs", L"cpp", L"h", L"hpp", L"c", L"py", L"js", L"jsx", L"ts", L"tsx", L"rs", L"go", L"java", L"rb", L"ps1", L"sh" };
     inline constexpr std::wstring_view DocumentExtensions[]{ L"pdf", L"docx", L"xlsx", L"pptx", L"txt", L"md" };
     inline constexpr std::wstring_view ArchiveExtensions[]{ L"zip", L"7z", L"rar", L"tar", L"gz" };
     inline constexpr std::wstring_view ExecutableExtensions[]{ L"exe", L"msi", L"bat", L"cmd", L"ps1" };

@@ -812,3 +812,34 @@ one fetch step, and a small `fields` list is the whole surface area — `fieldGr
 `actions` and `detectPatterns` are all optional additions on top of that. Giving a user plugin the
 same `id` as `github`, `jira`, `slack`, or `stith` replaces that built-in outright — useful for
 forking a shipped plugin or handing ownership of it to another project's own repo.
+
+## Built-in local file previews
+
+Local Windows, UNC and WSL file links preview without an integration or tooltip rule.
+The card shows up to 30 text lines or a first image/PDF page; **Show in pane** provides
+selectable text, line numbers, image/PDF zoom, PDF pages, and Office sheet/slide selectors.
+Existing preview switches and explicit integration selections still apply. File previews
+do not change the “No rule matched” attribution: built-in capability is independent of rules.
+
+Supported content: UTF-8 and BOM-marked UTF-16 text; PNG/JPEG/GIF/BMP/TIFF (first frame);
+PDF pages; DOCX paragraphs and tables; XLSX cells with cached formula values; PPTX slide text.
+Office content is extracted locally without Office, macros, recalculation or external relationships.
+Legacy Office formats and other binary formats show metadata and an explanation.
+
+Limits: 1 MiB of extracted text, 50 MiB input, 32 MiB of Office XML, 16 megapixels per image,
+200 rows × 50 columns per sheet. PDF navigation is capped at 10,000 pages. Truncation is labeled.
+New hovers and pane Refresh reread files; preview content is not cached on disk.
+
+### Shared preset catalog
+
+Lintel owns the ordered catalog and examples. `LinkTooltipPresets.g.h` is generated from
+Lintel's `presets.json` and canonical integration matchers. From a Lintel checkout, run:
+
+```sh
+node conformance/sync-presets.mjs --terminal <terminal-checkout> --torbie <torbie-checkout>
+node conformance/sync-presets.mjs --check --terminal <terminal-checkout> --torbie <torbie-checkout>
+```
+
+Commit generated artifacts with the consumer changes; normal builds require no network or
+Lintel checkout. Saved custom rules are retained. New presets include Text files, PDF files,
+and Office documents; file presets have separate extension criteria.

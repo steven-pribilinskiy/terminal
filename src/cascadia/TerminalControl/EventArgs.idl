@@ -96,7 +96,8 @@ namespace Microsoft.Terminal.Control
     // so the pane fetches exactly what the card would have shown.
     runtimeclass ShowHyperlinkPreviewRequestedEventArgs
     {
-        ShowHyperlinkPreviewRequestedEventArgs(String uri, String integrationHint);
+        ShowHyperlinkPreviewRequestedEventArgs(String uri, String integrationHint, String resolvedFilePath);
+        String ResolvedFilePath { get; };
         String Uri { get; };
         String IntegrationHint { get; };
     }
