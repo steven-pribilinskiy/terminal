@@ -215,7 +215,7 @@ namespace Microsoft::Terminal::FilePreview
                 com_ptr<IOpcPartUri> resolved;
                 check_hresult(source->CombinePartUri(relative.get(), resolved.put()));
                 wil::unique_bstr resolvedName;
-                check_hresult(resolved->GetAbsoluteUri(resolvedName.put()));
+                check_hresult(resolved->GetRawUri(resolvedName.put()));
                 auto xml = readPart(resolvedName.get());
                 std::wstring text;
                 bool truncated = false;
