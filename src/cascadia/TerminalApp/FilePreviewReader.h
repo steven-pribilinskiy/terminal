@@ -12,6 +12,10 @@
 #include <winrt/base.h>
 #include <wil/resource.h>
 
+// This reader is linked through a static library as well as directly by tests.
+#pragma comment(lib, "xmllite.lib")
+#pragma comment(lib, "urlmon.lib")
+
 namespace Microsoft::Terminal::FilePreview
 {
     using winrt::check_hresult;
