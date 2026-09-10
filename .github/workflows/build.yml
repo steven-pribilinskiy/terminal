@@ -84,7 +84,9 @@ jobs:
           # The same reader tests as Control.Unit.Tests, before the two full builds.
           $wilPackage = Get-ChildItem .\packages -Directory -Filter 'Microsoft.Windows.ImplementationLibrary.*' | Select-Object -First 1
           if (-not $wilPackage) { throw 'WIL package was not restored' }
-          $wilInclude = Join-Path $wilPackage.FullName 'include'
+          $wilHeader = Get-ChildItem $wilPackage.FullName -Recurse -File -Filter resource.h | Where-Object { $_.Directory.Name -eq 'wil' } | Select-Object -First 1
+          if (-not $wilHeader) { throw 'WIL headers were not found in the package' }
+          $wilInclude = $wilHeader.Directory.Parent.FullName
           $previewTestExe = Join-Path $env:RUNNER_TEMP 'FilePreviewTests.exe'
           $previewTestObj = Join-Path $env:RUNNER_TEMP 'FilePreviewTests.obj'
           & cl /nologo /EHsc /std:c++20 /DFILE_PREVIEW_STANDALONE /DNOMINMAX /DWIN32_LEAN_AND_MEAN /DUNICODE /D_UNICODE "/I$wilInclude" .\src\cascadia\UnitTests_Control\FilePreviewTests.cpp "/Fe:$previewTestExe" "/Fo:$previewTestObj" /link WindowsApp.lib ole32.lib oleaut32.lib
