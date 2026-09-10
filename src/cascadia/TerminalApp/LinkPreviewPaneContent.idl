@@ -20,7 +20,7 @@ namespace TerminalApp
         void SetPreviewProvider(Microsoft.Terminal.Control.IHyperlinkPreviewProvider provider);
         // Show this link. Safe to call again on a pane that is already open: the
         // pane is reused rather than replaced.
-        void ShowLink(String text, String integrationHint);
+        void ShowLink(String text, String integrationHint, String resolvedFilePath);
 
         // The "Pane only" switch. True means the page should stop the terminals
         // showing hover cards at all while this pane is open.

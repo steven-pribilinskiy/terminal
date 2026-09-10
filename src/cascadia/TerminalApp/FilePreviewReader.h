@@ -79,7 +79,7 @@ namespace Microsoft::Terminal::FilePreview
             {
                 if (stack.size() > 1) stack.pop_back();
             }
-            else if (type == XmlNodeType_Text || type == XmlNodeType_CDATA || type == XmlNodeType_SignificantWhitespace)
+            else if (type == XmlNodeType_Text || type == XmlNodeType_CDATA || type == XmlNodeType_Whitespace)
             {
                 check_hresult(reader->GetValue(&value, &length));
                 stack.back()->text.append(value, length);
