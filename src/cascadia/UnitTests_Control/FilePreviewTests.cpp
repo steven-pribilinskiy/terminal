@@ -1,10 +1,25 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
+#ifdef FILE_PREVIEW_STANDALONE
+#include <windows.h>
+#include <cassert>
+#include <iostream>
+#define BEGIN_TEST_CLASS(...)
+#define TEST_CLASS_PROPERTY(...)
+#define END_TEST_CLASS()
+#define TEST_METHOD(name) public: void name()
+#define VERIFY_ARE_EQUAL(expected, actual) assert((expected) == (actual))
+#define VERIFY_IS_TRUE(value) assert(value)
+#define VERIFY_IS_FALSE(value) assert(!(value))
+#else
 #include "pch.h"
+#endif
 #include "../TerminalApp/FilePreviewReader.h"
 #include <filesystem>
 
+#ifndef FILE_PREVIEW_STANDALONE
 using namespace WEX::TestExecution;
+#endif
 using namespace Microsoft::Terminal::FilePreview;
 
 namespace ControlUnitTests
@@ -130,3 +145,25 @@ namespace ControlUnitTests
         VERIFY_IS_TRUE(rejected);
     }
 }
+
+#ifdef FILE_PREVIEW_STANDALONE
+int main()
+{
+    try
+    {
+        ControlUnitTests::FilePreviewTests tests;
+        tests.TextEncodings();
+        tests.BoundedUtf8();
+        tests.OfficeParagraphs();
+        tests.OfficeSheets();
+        tests.RejectDtd();
+        std::cout << "All 5 native file preview tests passed.\n";
+        return 0;
+    }
+    catch (const std::exception& error)
+    {
+        std::cerr << error.what() << '\n';
+        return 1;
+    }
+}
+#endif
