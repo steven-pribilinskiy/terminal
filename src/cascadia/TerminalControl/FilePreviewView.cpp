@@ -142,7 +142,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             {
                 Controls::ComboBox pages;
                 state->pages = make_weak(pages);
-                pages.SelectionChanged([state](const IInspectable& sender, const Controls::SelectionChangedEventArgs&) {
+                pages.SelectionChanged([state](const Windows::Foundation::IInspectable& sender, const Controls::SelectionChangedEventArgs&) {
                     const auto index = sender.as<Controls::ComboBox>().SelectedIndex();
                     if (!state->closed && index >= 0) RenderPage(state, static_cast<uint32_t>(index));
                 });
@@ -244,7 +244,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             {
                 Controls::ComboBox selector;
                 for (const auto& section : sections) selector.Items().Append(box_value(section.Label()));
-                selector.SelectionChanged([show](const IInspectable& sender, const Controls::SelectionChangedEventArgs&) {
+                selector.SelectionChanged([show](const Windows::Foundation::IInspectable& sender, const Controls::SelectionChangedEventArgs&) {
                     const auto index = sender.as<Controls::ComboBox>().SelectedIndex();
                     if (index >= 0) show(static_cast<uint32_t>(index));
                 });
