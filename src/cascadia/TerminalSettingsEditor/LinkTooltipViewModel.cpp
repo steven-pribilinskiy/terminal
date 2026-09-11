@@ -1438,6 +1438,8 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         const auto integration = _toLower(vm.Integration());
         const auto schemes = _toLower(vm.Schemes());
 
+        if (integration == L"unblocked") return L"unblocked";
+
         if (integration.find(L"github") != std::wstring::npos ||
             name.find(L"github") != std::wstring::npos ||
             pattern.find(L"github") != std::wstring::npos)
@@ -1494,6 +1496,8 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     // sit below the grouped ones -- and, since order is precedence, lose to them.
     static constexpr std::wstring_view GroupOrder[]{
         L"github",
+        // Specific task IDs must precede Jira's broad PROJECT-number matcher.
+        L"unblocked",
         L"jira",
         L"slack",
         L"stith",
@@ -1697,6 +1701,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         std::vector<GroupInfo> groups = {
             { L"github", L"GitHub", L"\uE82D", {} },
+            { L"unblocked", L"Unblocked Code", L"\uE943", {} },
             { L"jira", L"Jira", L"\uE943", {} },
             { L"slack", L"Slack", L"\uE8BD", {} },
             { L"stith", L"Stith", L"\uE774", {} },
