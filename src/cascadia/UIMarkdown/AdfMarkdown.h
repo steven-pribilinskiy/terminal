@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 #pragma once
 #include <winrt/Windows.Data.Json.h>
+#include <winrt/Windows.Foundation.Collections.h>
 #include <string>
 #include <algorithm>
 
