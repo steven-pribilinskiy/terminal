@@ -48,6 +48,8 @@
     X(winrt::hstring, HyperlinkPrimaryAction)                                                                     \
     X(winrt::hstring, HyperlinkAlternativeAction)                                                                 \
     X(int32_t, HyperlinkTooltipMaxWidth, 640)                                                                     \
+    X(int32_t, HyperlinkTooltipMaxHeight, 720)                                                                     \
+    X(bool, HyperlinkTooltipNested, false)                                                                     \
     X(int32_t, HyperlinkTooltipShowDelay, 250)                                                                    \
     X(int32_t, HyperlinkTooltipHideDelay, 400)                                                                    \
     X(bool, HyperlinkTooltipActions, true)                                                                        \

@@ -394,8 +394,8 @@ private:
     size_t _hyperlinkPatternId = 0;
     size_t _delimitedLinkPatternId = 1;
     // User text patterns (ICoreSettings::TextPatterns) follow the built-ins, so
-    // pattern id 2 + i is _textPatterns[i].
-    size_t _firstTextPatternId = 2;
+    // pattern id 4 + i is _textPatterns[i].
+    size_t _firstTextPatternId = 4;
     std::vector<std::wstring> _textPatterns;
 
     std::wstring _answerbackMessage;

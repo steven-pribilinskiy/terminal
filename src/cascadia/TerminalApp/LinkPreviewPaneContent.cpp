@@ -4,6 +4,7 @@
 #include "pch.h"
 #include <winrt/Windows.UI.Xaml.Shapes.h>
 #include "LinkPreviewPaneContent.h"
+#include "../TerminalSettingsAppAdapterLib/TerminalSettings.h"
 #include "LinkPreviewPaneContent.g.cpp"
 
 using namespace winrt::Microsoft::Terminal;
@@ -28,6 +29,28 @@ namespace winrt::TerminalApp::implementation
     LinkPreviewPaneContent::LinkPreviewPaneContent()
     {
         InitializeComponent();
+    }
+
+    void LinkPreviewPaneContent::SetLinkSettings(const Control::IControlSettings& settings, bool compact, int32_t depth)
+    {
+        _linkSettings = settings; _compact = compact; _depth = depth;
+        CloseButton().Visibility(compact ? Visibility::Collapsed : Visibility::Visible);
+        HideTooltipsSwitch().Visibility(compact ? Visibility::Collapsed : Visibility::Visible);
+        TitleText().FontSize(compact ? 15 : 18);
+    }
+
+    void LinkPreviewPaneContent::UpdateSettings(const Model::CascadiaSettings& settings, const Model::WindowSettings& windowSettings)
+    {
+        const auto profile = settings.FindProfile(settings.GlobalSettings().DefaultProfile());
+        if (!profile) return;
+        const auto adapted = Settings::TerminalSettings::CreateForPreview(settings, windowSettings, profile);
+        if (_linkSettings)
+        {
+            adapted->Commandline(_linkSettings.Commandline());
+            adapted->PathTranslationStyle(_linkSettings.PathTranslationStyle());
+        }
+        _linkSettings = adapted.as<Control::IControlSettings>();
+        if (_preview) _render(_preview);
     }
 
     void LinkPreviewPaneContent::SetPreviewProvider(const Control::IHyperlinkPreviewProvider& provider)
@@ -116,6 +139,9 @@ namespace winrt::TerminalApp::implementation
             FilePreviewHost().Content(nullptr);
             HeaderIcon().Content(nullptr);
             IntegrationName().Text(winrt::hstring{});
+            TicketStatusHost().Children().Clear();
+            TicketMetadataHost().Children().Clear();
+            TitleText().Text(_sourceText);
             FieldsHost().Children().Clear();
             BodyHost().Children().Clear();
             CommentsHost().Children().Clear();
@@ -137,12 +163,15 @@ namespace winrt::TerminalApp::implementation
     void LinkPreviewPaneContent::_render(const Control::HyperlinkPreview& preview)
     {
         _preview = preview;
-        FilePreviewHost().Content(Control::HyperlinkPreviewHelpers::CreateFileView(preview, false));
+        FilePreviewHost().Content(Control::HyperlinkPreviewHelpers::CreateFileView(preview, _compact));
 
         if (!preview)
         {
             HeaderIcon().Content(nullptr);
             IntegrationName().Text(winrt::hstring{});
+            TicketStatusHost().Children().Clear();
+            TicketMetadataHost().Children().Clear();
+            TitleText().Text(_sourceText);
             FieldsHost().Children().Clear();
             BodyHost().Children().Clear();
             CommentsHost().Children().Clear();
@@ -179,6 +208,45 @@ namespace winrt::TerminalApp::implementation
             }
         }
         TitleText().Text(title);
+        TicketStatusHost().Children().Clear();
+        TicketMetadataHost().Children().Clear();
+        if (const auto fields = preview.Fields()) for (const auto& field : fields)
+        {
+            if (!field || (field.Placement() != L"status" && field.Placement() != L"header")) continue;
+            if (field.Placement() == L"status")
+            {
+                Controls::TextBlock text;
+                text.Text(field.Value());
+                Controls::Border badge;
+                badge.Child(text);
+                badge.Padding(Thickness{ 6, 2, 6, 2 });
+                badge.CornerRadius(CornerRadius{ 4 });
+                badge.Background(Control::HyperlinkPreviewHelpers::BadgeBrush(field.Color()));
+                TicketStatusHost().Children().Append(badge);
+            }
+            else
+            {
+                Controls::HyperlinkButton link;
+                Controls::StackPanel content;
+                content.Orientation(Controls::Orientation::Horizontal);
+                content.Spacing(4);
+                if (!field.IconUri().empty())
+                {
+                    Controls::Image icon;
+                    icon.Width(16); icon.Height(16);
+                    icon.Source(Control::HyperlinkPreviewHelpers::ImageFromUri(field.IconUri()));
+                    content.Children().Append(icon);
+                }
+                Controls::TextBlock value; value.Text(field.Value());
+                content.Children().Append(value);
+                if (field.LinkUri().empty()) { TicketMetadataHost().Children().Append(content); continue; }
+                link.Content(content);
+                link.Padding(Thickness{ 0 });
+                try { link.NavigateUri(Windows::Foundation::Uri{ field.LinkUri() }); } CATCH_LOG();
+                Control::HyperlinkPreviewHelpers::AttachLinkTooltips(link, _provider, _linkSettings, _compact, _depth);
+                TicketMetadataHost().Children().Append(link);
+            }
+        }
         if (title != _title)
         {
             _title = title;
@@ -267,7 +335,7 @@ namespace winrt::TerminalApp::implementation
         {
             // The title already has its own place at the top of the pane, so it is
             // skipped here rather than repeated inside the field list.
-            if (field.IsTitle())
+            if (field.IsTitle() || field.Placement() == L"header" || field.Placement() == L"status")
             {
                 continue;
             }
@@ -291,7 +359,7 @@ namespace winrt::TerminalApp::implementation
             cell.ColumnSpacing(6);
             {
                 Controls::ColumnDefinition iconColumn;
-                iconColumn.Width(GridLength{ 0, GridUnitType::Auto });
+                iconColumn.Width(GridLength{ 16, GridUnitType::Pixel });
                 cell.ColumnDefinitions().Append(iconColumn);
 
                 Controls::ColumnDefinition valueColumn;
@@ -356,7 +424,9 @@ namespace winrt::TerminalApp::implementation
             try
             {
                 const auto baseUrl = _preview ? _preview.ResolvedUri() : winrt::hstring{};
-                return winrt::Microsoft::Terminal::UI::Markdown::Builder::Convert(body, baseUrl);
+                auto element = winrt::Microsoft::Terminal::UI::Markdown::Builder::Convert(body, baseUrl);
+                Control::HyperlinkPreviewHelpers::AttachLinkTooltips(element, _provider, _linkSettings, _compact, _depth);
+                return element;
             }
             CATCH_LOG();
         }
@@ -414,8 +484,8 @@ namespace winrt::TerminalApp::implementation
             if (const auto avatar = comment.AvatarUri(); !avatar.empty())
             {
                 Windows::UI::Xaml::Shapes::Ellipse image;
-                image.Width(40);
-                image.Height(40);
+                image.Width(_compact ? 20 : 40);
+                image.Height(_compact ? 20 : 40);
                 image.VerticalAlignment(VerticalAlignment::Top);
                 Media::ImageBrush brush;
                 brush.ImageSource(Control::HyperlinkPreviewHelpers::ImageFromUri(avatar));
@@ -429,12 +499,12 @@ namespace winrt::TerminalApp::implementation
             text.Spacing(2);
 
             Controls::TextBlock heading;
-            heading.Text(comment.Author());
-            heading.FontSize(16);
+            heading.Text(_compact ? winrt::hstring{ std::wstring{ comment.Author() } + L" · " + std::wstring{ comment.Time() } } : comment.Author());
+            heading.FontSize(_compact ? 12 : 16);
             heading.FontWeight(Windows::UI::Text::FontWeights::SemiBold());
             heading.TextWrapping(TextWrapping::Wrap);
             text.Children().Append(heading);
-            if (!comment.Time().empty())
+            if (!_compact && !comment.Time().empty())
             {
                 Controls::TextBlock time;
                 time.Text(comment.Time());

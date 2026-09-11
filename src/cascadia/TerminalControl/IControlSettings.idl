@@ -175,6 +175,8 @@ namespace Microsoft.Terminal.Control
         HyperlinkClickGesture HyperlinkAlternativeClickGesture { get; };
         String HyperlinkAlternativeAction { get; };
         Int32 HyperlinkTooltipMaxWidth { get; };
+        Int32 HyperlinkTooltipMaxHeight { get; };
+        Boolean HyperlinkTooltipNested { get; };
         Int32 HyperlinkTooltipShowDelay { get; };
         Int32 HyperlinkTooltipHideDelay { get; };
         Boolean HyperlinkTooltipActions { get; };

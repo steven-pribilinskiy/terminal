@@ -94,17 +94,17 @@
             12dips. This is harder for folks to hit with the mouse, and isn't
             consistent with the rest of the scrollbars on the platform (as much
             as they can be).
-            
+
             To work around this, we have to entirely copy the template for the
             ScrollBar into our XAML file. We're then also re-defining
             ScrollBarSize here to 16, so that the new template will pick up on
             the new value.
-            
+
             This is kinda a pain, and we have to be careful to be sure to ingest
             an updated version of the template any time we update MUX. The
             latest ControlsV2 version of the template can be found at:
             https://github.com/microsoft/microsoft-ui-xaml/blob/main/dev/CommonStyles/ScrollBar_themeresources.xaml#L218
-            
+
             Additionally we have:
             * removed the corner radius, because that should be flush
             with the top of the window above the TermControl.
@@ -113,7 +113,7 @@
             the Win11-style WinUI ScrollView. If you also have the "Always show scrollbars" setting enabled in
             the settings app (do it if you haven't already), it avoids any and all animations during startup which
             makes the app start feel noticeably better and also shaves off another ~167ms of our "busy time".
-            
+
             We're also planning on making this adjustable in the future
             (GH#9218), where we might need this anyways.
         -->
@@ -1300,6 +1300,7 @@
                                 PointerReleased="_HyperlinkCardPointerReleased"
                                 SizeChanged="_HyperlinkCardSizeChanged"
                                 Visibility="Collapsed">
+                            <ScrollViewer x:Name="HyperlinkCardScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
                             <StackPanel Spacing="6">
                                 <!--
                                     The URI and the "how to open it" hint are two TextBlocks
@@ -1355,6 +1356,62 @@
                                     the matched-rule line can end up sharing an edge - buttons left,
                                     rule right.
                                 -->
+                                <StackPanel x:Name="HyperlinkCardTicketHeader" Spacing="6">
+                                    <StackPanel x:Name="HyperlinkCardTitleHost" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <StackPanel x:Name="HyperlinkCardStatusHost" VerticalAlignment="Center" />
+<StackPanel x:Name="HyperlinkCardActionRow"
+                                                Spacing="4"
+                                                Visibility="Collapsed">
+                                        <StackPanel Orientation="Horizontal"
+                                                    Spacing="4">
+                                            <!--
+                                                The dropdown opens in a popup of its own, outside the
+                                                card, so the pointer moving onto the list leaves the
+                                                card and would otherwise start the hide timer. The
+                                                two DropDown handlers are what hold the card open.
+                                            -->
+                                            <ComboBox x:Name="HyperlinkActionOptions"
+                                                      x:Uid="HyperlinkActionOptions"
+                                                      MinWidth="150"
+                                                      DropDownClosed="_HyperlinkActionDropDownClosed"
+                                                      DropDownOpened="_HyperlinkActionDropDownOpened"
+                                                      SelectionChanged="_HyperlinkActionOptionChanged" />
+                                            <Button x:Name="HyperlinkActionApplyButton"
+                                                    x:Uid="HyperlinkActionApplyButton"
+                                                    VerticalAlignment="Bottom"
+                                                    AllowFocusOnInteraction="False"
+                                                    Click="_HyperlinkActionApplyClick" />
+                                            <Button x:Name="HyperlinkActionUndoButton"
+                                                    x:Uid="HyperlinkActionUndoButton"
+                                                    VerticalAlignment="Bottom"
+                                                    AllowFocusOnInteraction="False"
+                                                    Click="_HyperlinkActionUndoClick"
+                                                    Visibility="Collapsed" />
+                                            <mux:ProgressRing x:Name="HyperlinkActionProgress"
+                                                              Width="16"
+                                                              Height="16"
+                                                              MinWidth="0"
+                                                              MinHeight="0"
+                                                              VerticalAlignment="Bottom"
+                                                              IsActive="False"
+                                                              Visibility="Collapsed" />
+                                        </StackPanel>
+
+                                        <!--  One control per field the chosen option said it required.  -->
+                                        <StackPanel x:Name="HyperlinkActionFields"
+                                                    Spacing="4"
+                                                    Visibility="Collapsed" />
+
+                                        <TextBlock x:Name="HyperlinkActionError"
+                                                   Opacity="0.8"
+                                                   TextWrapping="Wrap"
+                                                   Visibility="Collapsed" />
+                                    </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel x:Name="HyperlinkCardMetadataHost" Orientation="Horizontal" Spacing="8" />
+                                </StackPanel>
+
                                 <Grid x:Name="HyperlinkCardHeaderActionsHost"
                                       ColumnSpacing="8"
                                       Visibility="Collapsed">
@@ -1514,7 +1571,7 @@
                                         wrap instead of dragging the card out to MaxWidth.
                                     -->
                                     <ScrollViewer x:Name="HyperlinkCardFieldsScroll"
-                                                  MaxHeight="260"
+
                                                   HorizontalScrollMode="Disabled"
                                                   HorizontalScrollBarVisibility="Disabled"
                                                   IsTabStop="False"
@@ -1532,7 +1589,7 @@
 
                                     <!--  A Body tab's text. Markdown is shown as-is here; the pane renders it properly.  -->
                                     <ScrollViewer x:Name="HyperlinkCardBodyScroll"
-                                                  MaxHeight="260"
+
                                                   HorizontalScrollMode="Disabled"
                                                   HorizontalScrollBarVisibility="Disabled"
                                                   IsTabStop="False"
@@ -1557,7 +1614,7 @@
 
                                     <!--  A Comments tab's entries, populated per-hover like the fields.  -->
                                     <ScrollViewer x:Name="HyperlinkCardCommentsScroll"
-                                                  MaxHeight="260"
+
                                                   HorizontalScrollMode="Disabled"
                                                   HorizontalScrollBarVisibility="Disabled"
                                                   IsTabStop="False"
@@ -1572,55 +1629,6 @@
                                         option, fill in whatever the far end insists on, apply, and
                                         put it back again if it offered a way.
                                     -->
-                                    <StackPanel x:Name="HyperlinkCardActionRow"
-                                                Spacing="4"
-                                                Visibility="Collapsed">
-                                        <StackPanel Orientation="Horizontal"
-                                                    Spacing="4">
-                                            <!--
-                                                The dropdown opens in a popup of its own, outside the
-                                                card, so the pointer moving onto the list leaves the
-                                                card and would otherwise start the hide timer. The
-                                                two DropDown handlers are what hold the card open.
-                                            -->
-                                            <ComboBox x:Name="HyperlinkActionOptions"
-                                                      x:Uid="HyperlinkActionOptions"
-                                                      MinWidth="150"
-                                                      DropDownClosed="_HyperlinkActionDropDownClosed"
-                                                      DropDownOpened="_HyperlinkActionDropDownOpened"
-                                                      SelectionChanged="_HyperlinkActionOptionChanged" />
-                                            <Button x:Name="HyperlinkActionApplyButton"
-                                                    x:Uid="HyperlinkActionApplyButton"
-                                                    VerticalAlignment="Bottom"
-                                                    AllowFocusOnInteraction="False"
-                                                    Click="_HyperlinkActionApplyClick" />
-                                            <Button x:Name="HyperlinkActionUndoButton"
-                                                    x:Uid="HyperlinkActionUndoButton"
-                                                    VerticalAlignment="Bottom"
-                                                    AllowFocusOnInteraction="False"
-                                                    Click="_HyperlinkActionUndoClick"
-                                                    Visibility="Collapsed" />
-                                            <mux:ProgressRing x:Name="HyperlinkActionProgress"
-                                                              Width="16"
-                                                              Height="16"
-                                                              MinWidth="0"
-                                                              MinHeight="0"
-                                                              VerticalAlignment="Bottom"
-                                                              IsActive="False"
-                                                              Visibility="Collapsed" />
-                                        </StackPanel>
-
-                                        <!--  One control per field the chosen option said it required.  -->
-                                        <StackPanel x:Name="HyperlinkActionFields"
-                                                    Spacing="4"
-                                                    Visibility="Collapsed" />
-
-                                        <TextBlock x:Name="HyperlinkActionError"
-                                                   Opacity="0.8"
-                                                   TextWrapping="Wrap"
-                                                   Visibility="Collapsed" />
-                                    </StackPanel>
-
                                     <!--
                                         A plugin's own HTML representation, when it sent one and the
                                         WebView2 host is available. The Border draws nothing: it exists
@@ -1733,6 +1741,7 @@
                                     </StackPanel>
                                 </Grid>
                             </StackPanel>
+                            </ScrollViewer>
                         </Border>
 
                         <Button x:Name="QuickFixButton"

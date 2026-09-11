@@ -649,8 +649,8 @@ void UtilsTests::TestResolveFileUriTarget()
     VERIFY_ARE_EQUAL(LR"(\\wsl.localhost\Ubuntu\home\stevenp\my plan.md)", ResolveFileUriTarget(LR"(file:///home/stevenp/my%20plan.md)", L"Ubuntu"));
     VERIFY_ARE_EQUAL(LR"(\\wsl.localhost\Ubuntu\home\stevenp\test.md)", ResolveFileUriTarget(LR"(file://localhost/home/stevenp/test.md)", L"Ubuntu"));
 
-    // POSIX paths without distro return local path representation
-    VERIFY_ARE_EQUAL(LR"(\home\stevenp\test.md)", ResolveFileUriTarget(LR"(file:///home/stevenp/test.md)", L""));
+    // Unknown WSL context stays POSIX for asynchronous distribution resolution.
+    VERIFY_ARE_EQUAL(LR"(/home/stevenp/test.md)", ResolveFileUriTarget(LR"(file:///home/stevenp/test.md)", L""));
 
     // Fragments are dropped. The shell cannot act on one, and PathCreateFromUrl leaves it
     // sitting in the path, which turns a good target into a file that does not exist.

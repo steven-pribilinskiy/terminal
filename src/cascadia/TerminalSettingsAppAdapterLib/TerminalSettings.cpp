@@ -459,6 +459,8 @@ namespace winrt::Microsoft::Terminal::Settings
         _HyperlinkAlternativeClickGesture = static_cast<Control::HyperlinkClickGesture>(windowSettings.HyperlinkAlternativeClickGesture());
         _HyperlinkAlternativeAction = windowSettings.HyperlinkAlternativeAction();
         _HyperlinkTooltipMaxWidth = windowSettings.HyperlinkTooltipMaxWidth();
+        _HyperlinkTooltipMaxHeight = windowSettings.HyperlinkTooltipMaxHeight();
+        _HyperlinkTooltipNested = windowSettings.HyperlinkTooltipNested();
         _HyperlinkTooltipShowDelay = windowSettings.HyperlinkTooltipShowDelay();
         _HyperlinkTooltipHideDelay = windowSettings.HyperlinkTooltipHideDelay();
         _HyperlinkTooltipActions = windowSettings.HyperlinkTooltipActions();

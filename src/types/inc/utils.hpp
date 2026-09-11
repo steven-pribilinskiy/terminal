@@ -135,6 +135,7 @@ namespace Microsoft::Console::Utils
 
     // Used in TerminalPage::_OpenHyperlinkHandler to resolve file:// URIs (such as POSIX
     // /home/... or /mnt/... paths emitted from WSL) to launchable Windows/UNC targets.
+    std::wstring FilePathToUri(std::wstring_view path);
     std::wstring ResolveFileUriTarget(std::wstring_view uriString, std::wstring_view profileDistro);
 
     // Drops a URI's #fragment. Also used in TerminalPage::_OpenHyperlinkHandler, before
@@ -148,6 +149,7 @@ namespace Microsoft::Console::Utils
     std::wstring WslDistroForCommandline(std::wstring_view commandline, const bool declaresWslPathTranslation);
     std::wstring WslDistroById(const std::wstring& distroId);
     std::wstring DefaultWslDistro();
+    std::vector<std::wstring> RegisteredWslDistros();
 
     bool IsWindows11() noexcept;
 

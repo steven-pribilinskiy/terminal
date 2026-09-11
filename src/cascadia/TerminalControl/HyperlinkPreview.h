@@ -32,6 +32,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         WINRT_PROPERTY(hstring, Value);
         WINRT_PROPERTY(HyperlinkPreviewFieldKind, Kind, HyperlinkPreviewFieldKind::Text);
         WINRT_PROPERTY(hstring, IconUri);
+        WINRT_PROPERTY(hstring, Placement);
+        WINRT_PROPERTY(hstring, LinkUri);
         WINRT_PROPERTY(hstring, Color);
         WINRT_PROPERTY(hstring, Group);
         WINRT_PROPERTY(hstring, GroupLabel);
@@ -160,6 +162,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     struct HyperlinkPreviewHelpers
     {
         HyperlinkPreviewHelpers() = default;
+
+        static bool HasNestedPreview();
+        static void AttachLinkTooltips(const Windows::UI::Xaml::FrameworkElement& root, const Control::IHyperlinkPreviewProvider& provider, const Control::IControlSettings& settings, bool compact, int32_t depth);
 
         static Windows::UI::Xaml::FrameworkElement CreateFileView(const Control::HyperlinkPreview& preview, bool compact);
         static Windows::UI::Xaml::Media::Brush BadgeBrush(const hstring& color);

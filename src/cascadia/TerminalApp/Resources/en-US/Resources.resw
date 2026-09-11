@@ -1110,7 +1110,7 @@ Applying on next launch closes nothing now: the swap happens once you have close
     <comment>Tooltip of the button that closes the link preview pane.</comment>
   </data>
   <data name="LinkPreviewActionOptions.PlaceholderText" xml:space="preserve">
-    <value>Choose an action</value>
+    <value>Change status</value>
     <comment>Placeholder of the dropdown in the link preview pane that lists what the user can do to the linked item, such as moving an issue to another status.</comment>
   </data>
   <data name="LinkPreviewApplyButton.Content" xml:space="preserve">

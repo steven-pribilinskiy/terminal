@@ -206,6 +206,8 @@ namespace Microsoft.Terminal.Settings.Model
         String Path;
         IntegrationFieldKind Kind;
         String IconPath;
+        String Placement;
+        String LinkTemplate;
         String ColorPath;
         String Color;
         String Format;        // "relativeTime" | "date" | ""

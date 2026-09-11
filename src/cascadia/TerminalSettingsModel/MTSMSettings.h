@@ -66,6 +66,8 @@ Author(s):
     X(Model::HyperlinkClickGesture, HyperlinkAlternativeClickGesture, "hyperlink.alternativeClickGesture", Model::HyperlinkClickGesture::LeftClick)                                                   \
     X(hstring, HyperlinkAlternativeAction, "hyperlink.alternativeAction", L"open")                                                                                                                    \
     X(int32_t, HyperlinkTooltipMaxWidth, "hyperlink.tooltipMaxWidth", 640)                                                                                                                            \
+    X(int32_t, HyperlinkTooltipMaxHeight, "hyperlink.tooltipMaxHeight", 720)                                                                                                                            \
+    X(bool, HyperlinkTooltipNested, "hyperlink.tooltipNested", false)                                                                                                                            \
     X(int32_t, HyperlinkTooltipShowDelay, "hyperlink.tooltipShowDelay", 250)                                                                                                                          \
     X(int32_t, HyperlinkTooltipHideDelay, "hyperlink.tooltipHideDelay", 400)                                                                                                                          \
     X(bool, HyperlinkTooltipActions, "hyperlink.tooltipActions", true)                                                                                                                                \

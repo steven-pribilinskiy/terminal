@@ -2542,6 +2542,17 @@
           "minimum": 0,
           "type": "integer"
         },
+        "hyperlink.tooltipMaxHeight": {
+          "default": 720,
+          "description": "Maximum height of the complete link popover in device-independent pixels. Content scrolls within this limit. Set to 0 to use the available window height.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "hyperlink.tooltipNested": {
+          "default": false,
+          "description": "Show link previews when hovering links and recognized identifiers inside another link popover. Preview panes support embedded previews independently. Nesting is limited to four levels.",
+          "type": "boolean"
+        },
         "hyperlink.tooltipShowDelay": {
           "default": 250,
           "description": "How long, in milliseconds, the pointer must rest on a link before its tooltip appears.",

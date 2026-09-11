@@ -21,6 +21,7 @@
 #include "../UIMarkdown/MarkdownBlocks.h"
 #include "../UIMarkdown/AdfMarkdown.h"
 #include "../inc/LintelFileTypes.g.h"
+#include "../../inc/LintelPaths.h"
 #ifndef FILE_PREVIEW_STANDALONE
 #include "../UIMarkdown/Frontmatter.h"
 #endif
@@ -88,6 +89,7 @@ namespace ControlUnitTests
         TEST_METHOD(SyntaxTokenWinRTText);
         TEST_METHOD(RichMarkdownBlocks);
         TEST_METHOD(JiraAdfBlocks);
+        TEST_METHOD(SharedPathResolution);
 #ifndef FILE_PREVIEW_STANDALONE
         TEST_METHOD(YamlFrontmatter);
 #endif
@@ -277,6 +279,23 @@ namespace ControlUnitTests
     }
 }
 
+void ControlUnitTests::FilePreviewTests::SharedPathResolution()
+{
+    const auto windows = Lintel::PathCandidates(LR"(Z:\home\stevenp\x.png)", true, L"Ubuntu", { L"Debian" });
+    VERIFY_ARE_EQUAL(std::wstring{ LR"(Z:\home\stevenp\x.png)" }, windows.front().path);
+    const auto source = Lintel::PathCandidates(L"/tmp/shefrd-e05e0c5b-handoff.md", true, L"Ubuntu", { L"Debian" });
+    VERIFY_ARE_EQUAL(std::wstring{ LR"(\\wsl.localhost\Ubuntu\tmp\shefrd-e05e0c5b-handoff.md)" }, source.front().path);
+    const auto unknown = Lintel::PathCandidates(L"/tmp/a.md", true, {}, { L"Ubuntu", L"Debian", L"Ubuntu" });
+    VERIFY_ARE_EQUAL(size_t{ 2 }, unknown.size());
+    VERIFY_IS_FALSE(Lintel::SelectPathCandidate(unknown, { true, true }).has_value());
+    VERIFY_IS_FALSE(Lintel::SelectPathCandidate(unknown, { false, false }).has_value());
+    VERIFY_ARE_EQUAL(std::wstring{ L"Debian" }, Lintel::SelectPathCandidate(unknown, { false, true })->distro);
+    const auto mount = Lintel::PathCandidates(L"/mnt/c/Users/steve/a.md", true, L"Ubuntu");
+    VERIFY_ARE_EQUAL(std::wstring{ LR"(C:\Users\steve\a.md)" }, mount.front().path);
+    const auto literal = Lintel::PathCandidates(L"/tmp/a%23b#c.md", false, {});
+    VERIFY_ARE_EQUAL(std::wstring{ L"/tmp/a%23b#c.md" }, literal.front().path);
+}
+
 #ifdef FILE_PREVIEW_STANDALONE
 int main()
 {
@@ -296,7 +315,8 @@ int main()
         tests.RichMarkdownBlocks();
         std::cerr << "JiraAdfBlocks\n";
         tests.JiraAdfBlocks();
-        std::cout << "All 10 native file preview tests passed.\n";
+        tests.SharedPathResolution();
+        std::cout << "All 11 native file preview tests passed.\n";
         return 0;
     }
     catch (const winrt::hresult_error& error)

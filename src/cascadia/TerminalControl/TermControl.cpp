@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 #include "pch.h"
+#include "../../inc/LintelPaths.h"
 #include "TermControl.h"
 
 #include <inputpaneinterop.h>
@@ -3709,288 +3710,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     // Turns a list of button ids into the five bools the card actually reads. An
     // unknown id is ignored rather than rejected: the settings model is free to grow
     // a sixth button without this becoming the place that refuses to show it.
-    void TermControl::_applyHyperlinkButtonList(EffectiveHyperlinkTooltipSettings& effective,
-                                                const Windows::Foundation::Collections::IVector<winrt::hstring>& buttons)
+    EffectiveHyperlinkTooltipSettings TermControl::_effectiveHyperlinkTooltipSettings(std::wstring_view uri, bool isFileLink) const
     {
-        effective.showOpen = false;
-        effective.showCopyLink = false;
-        effective.showCopyPath = false;
-        effective.showReveal = false;
-        effective.showInPane = false;
-
-        for (const auto& button : buttons)
-        {
-            const std::wstring_view id{ button };
-            if (til::equals_insensitive_ascii(id, L"open"))
-            {
-                effective.showOpen = true;
-            }
-            else if (til::equals_insensitive_ascii(id, L"copyLink"))
-            {
-                effective.showCopyLink = true;
-            }
-            else if (til::equals_insensitive_ascii(id, L"copyPath"))
-            {
-                effective.showCopyPath = true;
-            }
-            else if (til::equals_insensitive_ascii(id, L"reveal"))
-            {
-                effective.showReveal = true;
-            }
-            else if (til::equals_insensitive_ascii(id, L"showInPane"))
-            {
-                effective.showInPane = true;
-            }
-        }
-    }
-
-    // Matches one user-authored rule pattern against `text`.
-    //
-    // This uses ICU, not std::wregex, and that is the whole point. Rule patterns are
-    // written against ICU's syntax because that is what compiles them everywhere else
-    // that matters: Terminal::_getPatterns() scans the buffer with ICU, and
-    // HyperlinkPreviewService reads their named captures back with
-    // uregex_groupNumberFromName(). std::regex only implements the ECMAScript grammar
-    // from ECMA-262 3rd edition, which has no named groups at all -- so `(?<key>...)`
-    // threw std::regex_error here and the catch below quietly turned it into "no
-    // match". Every shipped preset (Jira, GitHub, Slack, Stith) uses named groups, so
-    // all of them were detected and highlighted by the scanner and then silently
-    // refused by this function: no card, no preview, no per-rule action.
-    static bool _ruleTextMatches(const std::wstring_view pattern, const std::wstring_view text, const bool requireFullMatch) noexcept
-    {
-        if (pattern.empty() || text.empty())
-        {
-            return false;
-        }
-
-        UErrorCode status = U_ZERO_ERROR;
-        const auto re = til::ICU::CreateRegex(pattern, UREGEX_CASE_INSENSITIVE, &status);
-        if (U_FAILURE(status) || !re)
-        {
-            // An uncompilable pattern never matches, rather than crashing or matching
-            // everything. CreateRegex also caps the match time and stack, so a
-            // pathological pattern cannot hang the hover either.
-            return false;
-        }
-
-#pragma warning(suppress : 26490) // Don't use reinterpret_cast (type.1).
-        uregex_setText(re.get(), reinterpret_cast<const UChar*>(text.data()), gsl::narrow_cast<int32_t>(text.size()), &status);
-        if (U_FAILURE(status))
-        {
-            return false;
-        }
-
-        const auto matched = requireFullMatch ? uregex_matches(re.get(), 0, &status) : uregex_find(re.get(), 0, &status);
-        return U_SUCCESS(status) && matched;
-    }
-
-    // Walks HyperlinkTooltipRules in order and returns the show/hide delay, max width,
-    // built-in button visibility and custom action list that should actually be used for
-    // the given hovered link -- the global settings, overridden by the first enabled rule
-    // (if any) whose match criteria are all satisfied. isFileLink should be the same
-    // file-vs-not-file test _resolvedHyperlinkTarget() already performs, since a file-type
-    // criterion can only ever be satisfied by a link that resolves to a path.
-    TermControl::EffectiveHyperlinkTooltipSettings TermControl::_effectiveHyperlinkTooltipSettings(std::wstring_view uri, bool isFileLink) const
-    {
-        const auto settings = _core.Settings();
-        const auto actionsEnabled = settings.HyperlinkTooltipActions();
-        EffectiveHyperlinkTooltipSettings effective{
-            .showDelay = std::max(0, settings.HyperlinkTooltipShowDelay()),
-            .hideDelay = std::max(0, settings.HyperlinkTooltipHideDelay()),
-            .maxWidth = settings.HyperlinkTooltipMaxWidth(),
-            .preferPane = settings.HyperlinkPreviewInPane(),
-            // A "click to follow link" line would be a lie when clicking is off,
-            // so the master switch suppresses it regardless of the hint setting.
-            .showHint = settings.HyperlinkTooltipHint() && settings.HyperlinkClickable(),
-            .primaryAction = settings.HyperlinkPrimaryAction(),
-            .alternativeAction = settings.HyperlinkAlternativeAction(),
-            .integrationDisplayMode = settings.HyperlinkIntegrationDisplayMode(),
-            .actionPlacement = settings.HyperlinkActionPlacement(),
-            .showRule = settings.HyperlinkTooltipShowRule(),
-        };
-
-        // The global choice, which a matching rule may replace wholesale below. An
-        // unset list is the shipped default rather than "show nothing": a control
-        // whose settings never reached the adapter would otherwise lose every button.
-        if (actionsEnabled)
-        {
-            if (const auto globalButtons = settings.HyperlinkTooltipButtons(); globalButtons && globalButtons.Size() > 0)
-            {
-                _applyHyperlinkButtonList(effective, globalButtons);
-            }
-            else
-            {
-                effective.showCopyLink = true;
-                effective.showInPane = true;
-            }
-        }
-
-        const auto rules = settings.HyperlinkTooltipRules();
-        if (!rules || uri.empty())
-        {
-            return effective;
-        }
-
-        // Bare POSIX paths (see _hoveredHyperlinkChanged) have no scheme of their own;
-        // treat them as "file" so a rule can still target them by scheme.
-        std::wstring scheme;
-        if (uri.front() == L'/')
-        {
-            scheme = L"file";
-        }
-        else
-        {
-            try
-            {
-                scheme = Windows::Foundation::Uri{ winrt::hstring{ uri } }.SchemeName().c_str();
-            }
-            catch (...)
-            {
-            }
-        }
-
-        // A source location such as file:///Program.cs#L194 still has extension cs.
-        const auto extension = isFileLink ? Lintel::ExtensionOf(uri) : std::wstring{};
-
-        // Counted rather than taken from the iterator, because the index is how the
-        // settings page is later told which rule this was: the list here is a faithful
-        // 1:1 mirror of hyperlink.tooltipRules, and a rule has nothing else to identify
-        // it by -- no id, and a name that is user-editable, optional and not unique.
-        int32_t ruleIndex = -1;
-        for (const auto& rule : rules)
-        {
-            ++ruleIndex;
-            if (!rule || !rule.Enabled())
-            {
-                continue;
-            }
-
-            // A text-kind rule is not about links at all: its pattern is what the buffer
-            // scanner used to find this run of plain text in the first place, so the rule
-            // applies exactly when that pattern accounts for the whole of it. Anything less
-            // than a full match would attach the rule to text it never selected. A text rule
-            // with no pattern has nothing to match against and can never apply.
-            const auto isTextRule = rule.Kind() == Control::HyperlinkMatchKind::Text;
-            if (isTextRule)
-            {
-                const auto pattern = rule.Pattern();
-                if (pattern.empty())
-                {
-                    continue;
-                }
-
-                if (!_ruleTextMatches(pattern, uri, true))
-                {
-                    continue;
-                }
-            }
-
-            // The scheme, pattern and file-type criteria below all describe a URI, so a text
-            // rule skips them: the hovered run has no scheme, its pattern was already applied
-            // in full above, and "the extension of a Jira issue key" means nothing.
-            if (const auto schemes = rule.Schemes(); !isTextRule && schemes && schemes.Size() > 0)
-            {
-                const auto found = std::any_of(begin(schemes), end(schemes), [&](const auto& s) {
-                    return til::equals_insensitive_ascii(std::wstring_view{ scheme }, std::wstring_view{ s });
-                });
-                if (!found)
-                {
-                    continue;
-                }
-            }
-
-            if (const auto pattern = rule.Pattern(); !isTextRule && !pattern.empty())
-            {
-                if (!_ruleTextMatches(pattern, uri, false))
-                {
-                    continue;
-                }
-            }
-
-            const auto group = rule.FileTypeGroup();
-            const auto customExtensions = rule.CustomExtensions();
-            const auto hasExtensionCriteria = group != Control::HyperlinkFileTypeGroup::None || (customExtensions && customExtensions.Size() > 0);
-            if (!isTextRule && hasExtensionCriteria)
-            {
-                if (!isFileLink)
-                {
-                    continue;
-                }
-
-                auto matches = HyperlinkFileTypeGroups::PathInGroup(group, uri);
-                if (!matches && !extension.empty() && customExtensions)
-                {
-                    matches = std::any_of(begin(customExtensions), end(customExtensions), [&](const auto& e) {
-                        return til::equals_insensitive_ascii(std::wstring_view{ extension }, std::wstring_view{ e });
-                    });
-                }
-                if (!matches)
-                {
-                    continue;
-                }
-            }
-
-            // All configured criteria matched (or none were configured, which is also a match).
-            if (const auto showDelay = rule.TooltipShowDelay())
-            {
-                effective.showDelay = std::max(0, showDelay.Value());
-            }
-            if (const auto hideDelay = rule.TooltipHideDelay())
-            {
-                effective.hideDelay = std::max(0, hideDelay.Value());
-            }
-            if (const auto maxWidth = rule.TooltipMaxWidth())
-            {
-                effective.maxWidth = maxWidth.Value();
-            }
-            // A rule's own button list replaces the global one outright; an empty
-            // list means "inherit", which is why it is tested before being applied.
-            if (actionsEnabled)
-            {
-                if (const auto ruleButtons = rule.Buttons(); ruleButtons && ruleButtons.Size() > 0)
-                {
-                    _applyHyperlinkButtonList(effective, ruleButtons);
-                }
-            }
-            if (const auto showInPane = rule.ShowInPane())
-            {
-                effective.preferPane = showInPane.Value();
-            }
-
-            // An empty action id inherits the global chord action; "none" is a
-            // deliberate "this rule has no such click" and is kept as-is so the
-            // dispatcher can tell it apart from inheriting.
-            if (const auto primary = rule.PrimaryAction(); !primary.empty())
-            {
-                effective.primaryAction = primary;
-            }
-            if (const auto alternative = rule.AlternativeAction(); !alternative.empty())
-            {
-                effective.alternativeAction = alternative;
-            }
-
-            if (actionsEnabled)
-            {
-                if (const auto actions = rule.CustomActions())
-                {
-                    effective.customActions.assign(begin(actions), end(actions));
-                }
-            }
-
-            // Whether the hovered run is plain text rather than a URI is decided here and
-            // nowhere else, because only the rule that matched knows it. Everything
-            // downstream -- the punycode annotation, the target line, the two buttons that
-            // need a link -- keys off this.
-            effective.isTextMatch = isTextRule;
-            effective.integration = rule.Integration();
-            effective.showPreview = rule.ShowPreview();
-            effective.ruleIndex = ruleIndex;
-            effective.ruleName = rule.Name();
-
-            break;
-        }
-
-        return effective;
+        return ResolveHyperlinkRules(_core.Settings(), uri, isFileLink);
     }
 
     void TermControl::_hoveredHyperlinkChanged(const IInspectable& /*sender*/, const IInspectable& /*args*/)
@@ -4021,7 +3743,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // card's text, buttons, or position -- until the pointer actually leaves the card.
         // The options dropdown is the same case: its popup is not part of the card, so
         // the pointer being on the list reads as "not over the card" here too.
-        if ((_pointerInHyperlinkCard || _hyperlinkActionDropDownOpen) && HyperlinkCard().Visibility() == Visibility::Visible)
+        if ((_pointerInHyperlinkCard || _hyperlinkActionDropDownOpen || Control::HyperlinkPreviewHelpers::HasNestedPreview()) && HyperlinkCard().Visibility() == Visibility::Visible)
         {
             return;
         }
@@ -4229,6 +3951,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             return {};
         }
 
+        if (_currentHyperlinkPreview && _currentHyperlinkPreview.SourceText() == _hoveredUri && !_currentHyperlinkPreview.FilePath().empty())
+        {
+            return std::wstring{ _currentHyperlinkPreview.FilePath() };
+        }
         const std::wstring_view hovered{ _hoveredUri };
         if (hovered.starts_with(L"\\\\") || (hovered.size() > 2 && hovered[1] == L':' && (hovered[2] == L'\\' || hovered[2] == L'/')))
         {
@@ -4251,13 +3977,14 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             settings.Commandline(),
             settings.PathTranslationStyle() == PathTranslationStyle::WSL);
 
-        // ResolveFileUriTarget only recognizes an actual file:// prefix; a bare
-        // path gets one synthesized so it goes through the exact same
-        // percent-decoding and \\wsl.localhost\<distro> construction rather than
-        // a second, separately-maintained copy of that logic.
-        const auto uriForm = isFileUri ? winrt::hstring{ hovered } : winrt::hstring{ L"file://" + std::wstring{ hovered } };
+        if (!isFileUri)
+        {
+            const auto candidates = Lintel::PathCandidates(hovered, true, distro);
+            // An unknown distribution is resolved asynchronously by the file provider.
+            return candidates.empty() ? std::wstring{ hovered } : candidates.front().path;
+        }
         return ::Microsoft::Console::Utils::ResolveFileUriTarget(
-            ::Microsoft::Console::Utils::StripUriFragment(uriForm), distro);
+            ::Microsoft::Console::Utils::StripUriFragment(_hoveredUri), distro);
     }
 
     // What Open, Copy link and a click should actually act on. For an ordinary link that is
@@ -4271,6 +3998,13 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         if (_hoveredUri.empty())
         {
             return {};
+        }
+
+        if (Lintel::ClassifyPath(std::wstring_view{ _hoveredUri }) != Lintel::PathKind::None)
+        {
+            const auto path = _resolvedHyperlinkTarget();
+            if (Lintel::ClassifyPath(path) == Lintel::PathKind::Posix) return {}; // Still unresolved or ambiguous.
+            return winrt::hstring{ ::Microsoft::Console::Utils::FilePathToUri(path) };
         }
 
         if (_currentHyperlinkPreview)
@@ -4312,6 +4046,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     void TermControl::_setHyperlinkPreviewLoading(bool loading)
     {
         if (_filePreviewOperation) { _filePreviewOperation.Cancel(); _filePreviewOperation = nullptr; }
+        HyperlinkCardTitleHost().Children().Clear();
+        HyperlinkCardStatusHost().Children().Clear();
+        HyperlinkCardMetadataHost().Children().Clear();
         HyperlinkCardPreviewName().Text(winrt::hstring{});
         HyperlinkCardPreviewIcon().Content(nullptr);
         HyperlinkCardLeftIcon().Content(nullptr);
@@ -4390,7 +4127,15 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         {
             // A null preview means the fetch failed outright; _applyHyperlinkPreview reads
             // that as "nothing to show" and takes the section back down.
+            if (preview) preview.SourceText(text);
             self->_applyHyperlinkPreview(preview);
+            if (preview && !preview.FilePath().empty())
+            {
+                self->HyperlinkCardTarget().Text(winrt::hstring{ L"→ " + std::wstring{ preview.FilePath() } });
+                self->HyperlinkCardTarget().Visibility(Visibility::Visible);
+                self->HyperlinkOpenButton().Visibility(self->_currentHyperlinkTooltipSettings.showOpen ? Visibility::Visible : Visibility::Collapsed);
+                self->HyperlinkCopyLinkButton().Visibility(self->_currentHyperlinkTooltipSettings.showCopyLink ? Visibility::Visible : Visibility::Collapsed);
+            }
         }
     }
 
@@ -4689,6 +4434,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         const auto configuredMaxWidth = static_cast<double>(_currentHyperlinkTooltipSettings.maxWidth);
         card.MaxWidth(configuredMaxWidth > 0 ? std::min(configuredMaxWidth, viewportWidth) : viewportWidth);
         card.MinWidth(std::min(200.0, viewportWidth));
+        const auto maxHeight = _core.Settings().HyperlinkTooltipMaxHeight();
+        const auto heightLimit = maxHeight > 0 ? std::min(static_cast<double>(maxHeight), viewportHeight) : viewportHeight;
+        card.MaxHeight(heightLimit);
+        HyperlinkCardScroll().MaxHeight(std::max(1.0, heightLimit - 20));
 
         // A rule's custom actions, if any, alongside the (possibly individually
         // suppressed) built-in buttons above -- see _hoveredHyperlinkChanged.
@@ -4799,7 +4548,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             return;
         }
 
-        const auto delay = _currentHyperlinkTooltipSettings.hideDelay;
+        const auto delay = Control::HyperlinkPreviewHelpers::HasNestedPreview() ? std::max(150, _currentHyperlinkTooltipSettings.hideDelay) : _currentHyperlinkTooltipSettings.hideDelay;
         if (delay == 0)
         {
             _hideHyperlinkCard();
@@ -4811,9 +4560,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             _hyperlinkHideTimer.Tick([weakThis = get_weak()](auto&&, auto&&) {
                 if (const auto self = weakThis.get(); self && !self->_IsClosing())
                 {
+                    if (Control::HyperlinkPreviewHelpers::HasNestedPreview()) return;
                     self->_hyperlinkHideTimer.Stop();
                     // Re-check: the pointer may have arrived while the timer was running.
-                    if (!self->_pointerInHyperlinkCard)
+                    if (!self->_pointerInHyperlinkCard && !Control::HyperlinkPreviewHelpers::HasNestedPreview())
                     {
                         self->_hideHyperlinkCard();
                     }
@@ -5331,6 +5081,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     // no SharedSizeGroup with which to reach that across separate per-row Grids.
     void TermControl::_fillHyperlinkFields(const Control::HyperlinkPreview& preview)
     {
+        HyperlinkCardTitleHost().Children().Clear();
+        HyperlinkCardStatusHost().Children().Clear();
+        HyperlinkCardMetadataHost().Children().Clear();
         const auto grid = HyperlinkCardPreviewFields();
         grid.Children().Clear();
         grid.RowDefinitions().Clear();
@@ -5520,8 +5273,46 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 Controls::Grid::SetRow(title, row);
                 Controls::Grid::SetColumn(title, 0);
                 Controls::Grid::SetColumnSpan(title, 2);
-                grid.Children().Append(title);
+                HyperlinkCardTitleHost().Children().Append(title);
                 ++row;
+                continue;
+            }
+
+            if (field.Placement() == L"status" || field.Placement() == L"header")
+            {
+                Controls::StackPanel item;
+                item.Orientation(Controls::Orientation::Horizontal);
+                item.Spacing(4);
+                if (field.HasIcon())
+                {
+                    Controls::Image icon;
+                    icon.Width(16); icon.Height(16);
+                    icon.Source(HyperlinkPreviewHelpers::ImageFromUri(field.IconUri()));
+                    item.Children().Append(icon);
+                }
+                if (!field.LinkUri().empty())
+                {
+                    Controls::HyperlinkButton link;
+                    link.Content(box_value(field.Value()));
+                    link.Padding(Thickness{ 0, 0, 0, 0 });
+                    try { link.NavigateUri(Windows::Foundation::Uri{ field.LinkUri() }); } CATCH_LOG();
+                    Controls::ToolTipService::SetToolTip(link, box_value(field.Label()));
+                    Control::HyperlinkPreviewHelpers::AttachLinkTooltips(link, _hyperlinkPreviewProvider, _core.Settings(), true, 0);
+                    item.Children().Append(link);
+                }
+                else
+                {
+                    Controls::TextBlock text;
+                    text.Text(field.Value());
+                    Controls::Border badge;
+                    badge.Child(text);
+                    badge.Padding(Thickness{ 6, 2, 6, 2 });
+                    badge.CornerRadius(CornerRadius{ 4 });
+                    if (field.IsBadge()) badge.Background(HyperlinkPreviewHelpers::BadgeBrush(field.Color()));
+                    item.Children().Append(badge);
+                }
+                const auto host = field.Placement() == L"status" ? HyperlinkCardStatusHost() : HyperlinkCardMetadataHost();
+                host.Children().Append(item);
                 continue;
             }
 
@@ -5541,7 +5332,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             cell.ColumnSpacing(6);
             {
                 Controls::ColumnDefinition iconColumn;
-                iconColumn.Width(GridLength{ 0, GridUnitType::Auto });
+                iconColumn.Width(GridLength{ 16, GridUnitType::Pixel });
                 cell.ColumnDefinitions().Append(iconColumn);
 
                 Controls::ColumnDefinition valueColumn;
@@ -5663,6 +5454,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 try
                 {
                     auto body = winrt::Microsoft::Terminal::UI::Markdown::Builder::Convert(comment.Body(), L"");
+                    Control::HyperlinkPreviewHelpers::AttachLinkTooltips(body, _hyperlinkPreviewProvider, _core.Settings(), true, 0);
                     body.MaxHeight(180);
                     body.IsTextSelectionEnabled(true);
                     text.Children().Append(body);
@@ -5788,6 +5580,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 {
                     HyperlinkCardBodyMarkdown().Content(
                         winrt::Microsoft::Terminal::UI::Markdown::Builder::Convert(tab.Body(), L""));
+                    if (const auto body = HyperlinkCardBodyMarkdown().Content().try_as<FrameworkElement>())
+                        Control::HyperlinkPreviewHelpers::AttachLinkTooltips(body, _hyperlinkPreviewProvider, _core.Settings(), true, 0);
                     rendered = true;
                 }
                 CATCH_LOG(); // a body that will not parse is still worth reading as text

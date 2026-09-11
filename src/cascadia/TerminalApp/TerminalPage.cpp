@@ -3,6 +3,7 @@
 // Licensed under the MIT license.
 
 #include "pch.h"
+#include "../../inc/LintelPaths.h"
 #include "TerminalPage.h"
 
 #include <TerminalCore/ControlKeyStates.hpp>
@@ -283,6 +284,14 @@ namespace winrt::TerminalApp::implementation
         // Re-read the enabled integrations (and their credentials, once) so a
         // hover never has to touch the settings model or the credential vault.
         _hyperlinkPreviewService->Rebuild(_settings, _currentWindowSettings());
+        _hyperlinkPreviewService->LinkAction = [weak = get_weak()](hstring target, hstring action, hstring integration, hstring path) {
+            if (const auto self = weak.get())
+            {
+                if (action == L"open") self->_OpenHyperlinkHandler(nullptr, Microsoft::Terminal::Control::OpenHyperlinkEventArgs{ target });
+                else if (action == L"showInPane") self->_ShowHyperlinkPreviewRequestedHandler(nullptr, Microsoft::Terminal::Control::ShowHyperlinkPreviewRequestedEventArgs{ target, integration, path });
+                else self->_HyperlinkTooltipActionInvokedHandler(nullptr, Microsoft::Terminal::Control::HyperlinkTooltipActionInvokedEventArgs{ action, target });
+            }
+        };
 
         // Make sure to call SetCommands before _RefreshUIForSettingsReload.
         // SetCommands will make sure the KeyChordText of Commands is updated, which needs
@@ -1569,6 +1578,14 @@ namespace winrt::TerminalApp::implementation
         // This path creates panes without ever reaching SetSettings, so the
         // preview service would otherwise be handed to controls empty.
         _hyperlinkPreviewService->Rebuild(_settings, _currentWindowSettings());
+        _hyperlinkPreviewService->LinkAction = [weak = get_weak()](hstring target, hstring action, hstring integration, hstring path) {
+            if (const auto self = weak.get())
+            {
+                if (action == L"open") self->_OpenHyperlinkHandler(nullptr, Microsoft::Terminal::Control::OpenHyperlinkEventArgs{ target });
+                else if (action == L"showInPane") self->_ShowHyperlinkPreviewRequestedHandler(nullptr, Microsoft::Terminal::Control::ShowHyperlinkPreviewRequestedEventArgs{ target, integration, path });
+                else self->_HyperlinkTooltipActionInvokedHandler(nullptr, Microsoft::Terminal::Control::HyperlinkTooltipActionInvokedEventArgs{ action, target });
+            }
+        };
         _HookupKeyBindings(_settings.ActionMap());
         _RegisterActionCallbacks();
 
@@ -4307,9 +4324,32 @@ namespace winrt::TerminalApp::implementation
 
     safe_void_coroutine TerminalPage::_OpenHyperlinkHandler(const IInspectable sender, const Microsoft::Terminal::Control::OpenHyperlinkEventArgs eventArgs)
     {
+        const auto lifetime = get_strong();
         try
         {
             auto uriString{ eventArgs.Uri() };
+            if (til::starts_with_insensitive_ascii(std::wstring_view{ uriString }, L"file://"))
+                uriString = winrt::hstring{ Utils::ResolveFileUriTarget(std::wstring_view{ uriString }, _GetWslDistroForControl(sender)) };
+            if (Lintel::ClassifyPath(std::wstring_view{ uriString }) != Lintel::PathKind::None)
+            {
+                const auto candidates = Lintel::PathCandidates(std::wstring_view{ uriString }, true, _GetWslDistroForControl(sender), Utils::RegisteredWslDistros());
+                const auto dispatcher = Dispatcher();
+                co_await winrt::resume_background();
+                std::vector<bool> exists;
+                for (const auto& candidate : candidates)
+                {
+                    std::error_code error;
+                    exists.push_back(std::filesystem::exists(candidate.path, error));
+                }
+                const auto selected = Lintel::SelectPathCandidate(candidates, exists);
+                co_await wil::resume_foreground(dispatcher);
+                if (!selected)
+                {
+                    _ShowCouldNotOpenDialog(L"Path is missing or ambiguous across WSL distributions.", uriString);
+                    co_return;
+                }
+                uriString = winrt::hstring{ Utils::FilePathToUri(selected->path) };
+            }
             auto parsed = winrt::Windows::Foundation::Uri(uriString);
 
             // GH#14116. The shell cannot act on a fragment, and PathCreateFromUrl keeps one
@@ -4467,6 +4507,7 @@ namespace winrt::TerminalApp::implementation
 
         if (existing)
         {
+            if (const auto control = sender.try_as<Microsoft::Terminal::Control::TermControl>()) existing->SetLinkSettings(control.Settings());
             existing->ShowLink(eventArgs.Uri(), eventArgs.IntegrationHint(), eventArgs.ResolvedFilePath());
             return;
         }
@@ -4475,6 +4516,7 @@ namespace winrt::TerminalApp::implementation
         previewContent->UpdateSettings(_settings, _currentWindowSettings());
         previewContent->GetRoot().KeyDown({ this, &TerminalPage::_KeyDownHandler });
         previewContent->SetPreviewProvider(*_hyperlinkPreviewService);
+        if (const auto control = sender.try_as<Microsoft::Terminal::Control::TermControl>()) previewContent->SetLinkSettings(control.Settings());
         previewContent->HideTooltipsChanged({ get_weak(), &TerminalPage::_LinkPreviewHideTooltipsChanged });
         previewContent->ShowLink(eventArgs.Uri(), eventArgs.IntegrationHint(), eventArgs.ResolvedFilePath());
 

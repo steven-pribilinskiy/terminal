@@ -238,6 +238,8 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(HyperlinkClickGesture, HyperlinkAlternativeClickGesture);
         INHERITABLE_SETTING(String, HyperlinkAlternativeAction);
         INHERITABLE_SETTING(Int32, HyperlinkTooltipMaxWidth);
+        INHERITABLE_SETTING(Int32, HyperlinkTooltipMaxHeight);
+        INHERITABLE_SETTING(Boolean, HyperlinkTooltipNested);
         INHERITABLE_SETTING(Int32, HyperlinkTooltipShowDelay);
         INHERITABLE_SETTING(Int32, HyperlinkTooltipHideDelay);
         INHERITABLE_SETTING(Boolean, HyperlinkTooltipActions);

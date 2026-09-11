@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 #include "pch.h"
+#include "../../inc/LintelPathPatterns.h"
 #include "Terminal.hpp"
 #include "../../terminal/adapter/adaptDispatch.hpp"
 #include "../../terminal/parser/OutputStateMachineEngine.hpp"
@@ -623,6 +624,13 @@ std::wstring Terminal::GetHyperlinkAtBufferPosition(const til::point bufferPos, 
                 return found(HyperlinkSource::Detected, buffer.GetPlainText(result.start, result.stop));
             }
         }
+        for (const auto& result : results)
+        {
+            if (result.value == 2 || result.value == 3)
+            {
+                return found(HyperlinkSource::Detected, buffer.GetPlainText(result.start, result.stop));
+            }
+        }
         // A user text pattern: the match itself is the "link" text. Whoever
         // consumes it (the hyperlink card, an integration) resolves it further.
         for (const auto& result : results)
@@ -680,6 +688,13 @@ std::optional<PointTree::interval> Terminal::GetHyperlinkIntervalFromViewportPos
         for (const auto& result : results)
         {
             if (result.value == _hyperlinkPatternId)
+            {
+                return toViewport(result);
+            }
+        }
+        for (const auto& result : results)
+        {
+            if (result.value == 2 || result.value == 3)
             {
                 return toViewport(result);
             }
@@ -1517,7 +1532,7 @@ PointTree Terminal::_getPatterns(til::CoordType beg, til::CoordType end) const
 {
     // The index of each pattern here is the value stored in the interval tree, so it
     // has to stay in sync with _hyperlinkPatternId / _delimitedLinkPatternId.
-    static constexpr std::array<std::wstring_view, 2> patterns{
+    static constexpr std::array<std::wstring_view, 4> patterns{
         // A bare URI, as it appears in ordinary output.
         LR"(\b(?:https?|ftp|file)://[-A-Za-z0-9+&@#/%?=~_|$!:,.;]*[A-Za-z0-9+&@#/%=~_|$])",
         // An angle-bracketed URI, optionally carrying a "|label" suffix - the form
@@ -1525,6 +1540,8 @@ PointTree Terminal::_getPatterns(til::CoordType beg, til::CoordType end) const
         // construct is clickable, and the URI is the part before the pipe. Labels may
         // contain spaces but not a line break, so this can't run away past the row.
         LR"(<(?:https?|ftp|file)://[^\s<>|]+(?:\|[^<>\n]{0,256})?>)",
+        Lintel::windowsPathPattern,
+        Lintel::posixPathPattern,
     };
 
     // detectURLs governs the two built-in URL regexes above and nothing else.

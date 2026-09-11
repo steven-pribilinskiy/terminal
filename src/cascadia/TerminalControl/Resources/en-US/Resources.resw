@@ -231,7 +231,7 @@
     <comment>Shown on the link tooltip when no link tooltip rule applied to the hovered link, so it is using the defaults. Clicking it opens the list of rules.</comment>
   </data>
   <data name="HyperlinkActionOptions.PlaceholderText" xml:space="preserve">
-    <value>Choose an action</value>
+    <value>Change status</value>
     <comment>Placeholder of the dropdown on the link tooltip that lists what the user can do to the linked item, such as moving an issue to another status.</comment>
   </data>
   <data name="HyperlinkActionApplyButton.Content" xml:space="preserve">

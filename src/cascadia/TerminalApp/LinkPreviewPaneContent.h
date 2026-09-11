@@ -13,6 +13,7 @@ namespace winrt::TerminalApp::implementation
     public:
         LinkPreviewPaneContent();
 
+        void SetLinkSettings(const winrt::Microsoft::Terminal::Control::IControlSettings& settings, bool compact = false, int32_t depth = 0);
         void SetPreviewProvider(const winrt::Microsoft::Terminal::Control::IHyperlinkPreviewProvider& provider);
         void ShowLink(const winrt::hstring& text, const winrt::hstring& integrationHint, const winrt::hstring& resolvedFilePath);
 
@@ -23,7 +24,7 @@ namespace winrt::TerminalApp::implementation
         winrt::Windows::UI::Xaml::FrameworkElement GetRoot();
 
         void UpdateSettings(const winrt::Microsoft::Terminal::Settings::Model::CascadiaSettings&,
-                            const winrt::Microsoft::Terminal::Settings::Model::WindowSettings&) {};
+                            const winrt::Microsoft::Terminal::Settings::Model::WindowSettings&);
 
         winrt::Windows::Foundation::Size MinimumSize() { return { 1, 1 }; };
         void Focus(winrt::Windows::UI::Xaml::FocusState reason = winrt::Windows::UI::Xaml::FocusState::Programmatic);
@@ -44,6 +45,9 @@ namespace winrt::TerminalApp::implementation
     private:
         friend struct LinkPreviewPaneContentT<LinkPreviewPaneContent>; // for Xaml to bind events
 
+        winrt::Microsoft::Terminal::Control::IControlSettings _linkSettings{ nullptr };
+        bool _compact{ false };
+        int32_t _depth{ 0 };
         winrt::Microsoft::Terminal::Control::IHyperlinkPreviewProvider _provider{ nullptr };
         winrt::Microsoft::Terminal::Control::HyperlinkPreview _preview{ nullptr };
         winrt::Windows::Foundation::IAsyncOperation<winrt::Microsoft::Terminal::Control::HyperlinkPreview> _filePreviewOperation{ nullptr };

@@ -4,6 +4,7 @@
 #pragma once
 
 #include "SearchBoxControl.h"
+#include "HyperlinkRules.h"
 #include "TermControl.g.h"
 #include "../../buffer/out/search.h"
 #include "../../cascadia/TerminalCore/Terminal.hpp"
@@ -356,55 +357,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // unless a HyperlinkTooltipRule matched and overrode some of them. Recomputed once
         // per _hoveredHyperlinkChanged and read from everywhere the four globals used to be
         // read directly, so a rule's overrides apply consistently everywhere they're used.
-        struct EffectiveHyperlinkTooltipSettings
-        {
-            int32_t showDelay{ 0 };
-            int32_t hideDelay{ 0 };
-            int32_t maxWidth{ 0 };
-            // Which built-in buttons this particular link gets. They come from a
-            // list of ids -- "open", "copyLink", "copyPath", "reveal",
-            // "showInPane" -- taken from the matched rule when it names any and
-            // from hyperlink.tooltipButtons when it doesn't, so a rule replaces
-            // the global choice rather than subtracting from it.
-            bool showOpen{ false };
-            bool showCopyLink{ false };
-            bool showCopyPath{ false };
-            bool showReveal{ false };
-            bool showInPane{ false };
-            // The pane, not the card, is where this link's preview belongs.
-            bool preferPane{ false };
-            // The "Ctrl+Click to follow link" line.
-            bool showHint{ true };
-            std::vector<Control::HyperlinkTooltipAction> customActions;
-            // Preview: which integration ("" = automatic, "none" = off) and whether to
-            // show one at all, from the matched rule.
-            winrt::hstring integration;
-            bool showPreview{ true };
-            // The hovered text came from a text-kind rule's pattern, not from a URI.
-            bool isTextMatch{ false };
-            // The action id each click chord runs for this link: from the matched
-            // rule when it names one, otherwise the global hyperlink.primaryAction /
-            // hyperlink.alternativeAction. "none" means that chord does nothing here.
-            winrt::hstring primaryAction;
-            winrt::hstring alternativeAction;
-            Control::HyperlinkIntegrationDisplayMode integrationDisplayMode{ Control::HyperlinkIntegrationDisplayMode::Above };
-            Control::HyperlinkActionPlacement actionPlacement{ Control::HyperlinkActionPlacement::FarFromLink };
-            // Whether to name the rule that decided all of the above on the card.
-            bool showRule{ false };
-            // Which rule that was. The index, because a rule has no id of its own
-            // and its name is user-editable, may be empty and need not be unique --
-            // and because this list is a faithful 1:1 mirror of the model's, so the
-            // index is exact. The name comes along to display, and to check against
-            // before the settings page opens whatever is at that index now.
-            // -1 means no rule matched, which is worth saying out loud: it is the
-            // answer to "why is this link not being previewed the way I asked".
-            int32_t ruleIndex{ -1 };
-            winrt::hstring ruleName;
-        };
         EffectiveHyperlinkTooltipSettings _currentHyperlinkTooltipSettings;
         EffectiveHyperlinkTooltipSettings _effectiveHyperlinkTooltipSettings(std::wstring_view uri, bool isFileLink) const;
-        static void _applyHyperlinkButtonList(EffectiveHyperlinkTooltipSettings& effective,
-                                              const Windows::Foundation::Collections::IVector<winrt::hstring>& buttons);
 
         // The integration preview for the hovered link. The generation counter is what
         // discards a fetch that finishes after the pointer has moved on.

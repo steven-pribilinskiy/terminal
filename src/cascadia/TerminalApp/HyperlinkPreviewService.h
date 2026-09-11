@@ -27,6 +27,7 @@ Abstract:
 #pragma once
 
 #include <chrono>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -47,6 +48,9 @@ namespace winrt::TerminalApp::implementation
         void Rebuild(const winrt::Microsoft::Terminal::Settings::Model::CascadiaSettings& settings,
                      const winrt::Microsoft::Terminal::Settings::Model::WindowSettings& windowSettings);
 
+        std::function<void(winrt::hstring, winrt::hstring, winrt::hstring, winrt::hstring)> LinkAction;
+        safe_void_coroutine InvokeLinkAction(winrt::hstring text, winrt::Microsoft::Terminal::Control::IControlSettings settings, winrt::hstring actionId);
+        winrt::Windows::UI::Xaml::FrameworkElement CreatePreviewView(const winrt::hstring& text, const winrt::Microsoft::Terminal::Control::IControlSettings& settings, int32_t depth);
         // IHyperlinkPreviewProvider
         winrt::hstring ResolveLink(const winrt::hstring& text, const winrt::hstring& integrationHint);
         winrt::hstring ResolveOpenAction(const winrt::hstring& text, const winrt::hstring& integrationHint);

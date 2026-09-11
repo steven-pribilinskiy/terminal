@@ -92,6 +92,8 @@ namespace winrt::TerminalApp::implementation
             std::wstring Label;
             std::wstring Path;
             std::wstring IconPath;
+            std::wstring Placement;
+            std::wstring LinkTemplate;
             std::wstring ColorPath;
             std::wstring Color;
             std::wstring Format;
@@ -1779,6 +1781,8 @@ namespace
             Control::HyperlinkPreviewField row{};
             row.Label(winrt::hstring{ field.Label });
             row.Value(winrt::hstring{ value });
+            row.Placement(winrt::hstring{ field.Placement });
+            row.LinkUri(winrt::hstring{ Expand(field.LinkTemplate, context, Escape::Url) });
             // Model::IntegrationFieldKind and Control::HyperlinkPreviewFieldKind
             // declare the same members in the same order on purpose, so the two
             // sides can be cast rather than switched over.
@@ -2373,6 +2377,8 @@ namespace winrt::TerminalApp::implementation
                         entryField.Label = std::wstring{ field.Label() };
                         entryField.Path = std::wstring{ field.Path() };
                         entryField.IconPath = std::wstring{ field.IconPath() };
+                        entryField.Placement = std::wstring{ field.Placement() };
+                        entryField.LinkTemplate = std::wstring{ field.LinkTemplate() };
                         entryField.ColorPath = std::wstring{ field.ColorPath() };
                         entryField.Color = std::wstring{ field.Color() };
                         entryField.Format = std::wstring{ field.Format() };

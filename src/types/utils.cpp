@@ -1422,6 +1422,17 @@ static std::wstring _decodeNonAsciiEscapes(std::wstring_view uriString)
     return result;
 }
 
+std::wstring Utils::FilePathToUri(std::wstring_view path)
+{
+    const std::wstring input{ path };
+    DWORD length = 32768;
+    std::wstring uri(length, L'\0');
+    const auto result = UrlCreateFromPathW(input.c_str(), uri.data(), &length, 0);
+    if (FAILED(result)) return {};
+    uri.resize(length);
+    return uri;
+}
+
 std::wstring Utils::ResolveFileUriTarget(std::wstring_view uriString, std::wstring_view profileDistro)
 {
     if (!til::starts_with_insensitive_ascii(uriString, L"file://"))
@@ -1483,9 +1494,11 @@ std::wstring Utils::ResolveFileUriTarget(std::wstring_view uriString, std::wstri
     }
 
     // 4. POSIX / WSL path (starts with \)
-    if (!path.empty() && path[0] == L'\\' && !profileDistro.empty())
+    if (!path.empty() && path[0] == L'\\')
     {
-        return fmt::format(LR"(\\wsl.localhost\{}{})", profileDistro, path);
+        if (!profileDistro.empty()) return fmt::format(LR"(\\wsl.localhost\{}{})", profileDistro, path);
+        // Keep POSIX identity until the host resolves a unique WSL distribution.
+        std::replace(buffer.begin(), buffer.end(), L'\\', L'/');
     }
 
     return buffer;
@@ -1525,6 +1538,22 @@ std::wstring Utils::WslDistroById(const std::wstring& distroId)
     }
 
     return _readRegString(distroKey.get(), L"DistributionName");
+}
+
+std::vector<std::wstring> Utils::RegisteredWslDistros()
+{
+    std::vector<std::wstring> names;
+    wil::unique_hkey key;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, LxssKeyPath.data(), 0, KEY_READ, &key) != ERROR_SUCCESS) return names;
+    for (DWORD i = 0; i < 32; ++i)
+    {
+        wchar_t subKey[64]{};
+        DWORD size = static_cast<DWORD>(std::size(subKey));
+        if (RegEnumKeyExW(key.get(), i, subKey, &size, nullptr, nullptr, nullptr, nullptr) != ERROR_SUCCESS) break;
+        auto name = WslDistroById(subKey);
+        if (!name.empty()) names.push_back(std::move(name));
+    }
+    return names;
 }
 
 std::wstring Utils::DefaultWslDistro()

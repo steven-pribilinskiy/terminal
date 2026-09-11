@@ -319,6 +319,21 @@
                                             Style="{StaticResource NumberBoxSettingStyle}"
                                             Value="{x:Bind ViewModel.HyperlinkTooltipMaxWidth, Mode=TwoWay}" />
                         </local:SettingsCard>
+
+                        <local:SettingsCard x:Name="HyperlinkTooltipMaxHeight"
+                                            x:Uid="Globals_HyperlinkTooltipMaxHeight">
+                            <muxc:NumberBox x:Uid="Globals_HyperlinkTooltipMaxHeightBox"
+                                            LargeChange="100"
+                                            Maximum="4000"
+                                            Minimum="0"
+                                            SmallChange="20"
+                                            Style="{StaticResource NumberBoxSettingStyle}"
+                                            Value="{x:Bind ViewModel.HyperlinkTooltipMaxHeight, Mode=TwoWay}" />
+                        </local:SettingsCard>
+
+                        <local:SettingsCard x:Name="HyperlinkTooltipNested" x:Uid="Globals_HyperlinkTooltipNested">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.HyperlinkTooltipNested, Mode=TwoWay}" />
+                        </local:SettingsCard>
                     </local:SettingsExpander.Items>
                 </local:SettingsExpander>
 

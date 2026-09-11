@@ -140,6 +140,8 @@ namespace Microsoft.Terminal.Settings.Editor
         // The grouped view's Visibility, since XAML cannot negate a binding.
         Boolean IsAutomaticRuleOrder { get; };
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, HyperlinkTooltipMaxWidth);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, HyperlinkTooltipMaxHeight);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, HyperlinkTooltipNested);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, HyperlinkTooltipShowDelay);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, HyperlinkTooltipHideDelay);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, HyperlinkTooltipActions);

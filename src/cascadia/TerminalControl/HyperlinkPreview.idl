@@ -1,6 +1,8 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
+import "IControlSettings.idl";
+
 namespace Microsoft.Terminal.Control
 {
     enum HyperlinkPreviewFieldKind
@@ -23,6 +25,8 @@ namespace Microsoft.Terminal.Control
         String Value;
         HyperlinkPreviewFieldKind Kind;
         String IconUri;
+        String Placement;
+        String LinkUri;
         String Color;
         // The group this field belongs to, so a surface with room can show
         // them under headings. Empty means the integration declared no groups.
@@ -164,6 +168,8 @@ namespace Microsoft.Terminal.Control
         String ResolveOpenAction(String text, String integrationHint);
         // integrationHint: "" = automatic, "none" = never, else an integration id.
         Boolean CanPreview(String text, String integrationHint);
+        void InvokeLinkAction(String text, IControlSettings settings, String actionId);
+        Windows.UI.Xaml.FrameworkElement CreatePreviewView(String text, IControlSettings settings, Int32 depth);
         Windows.Foundation.IAsyncOperation<HyperlinkPreview> GetFilePreviewAsync(String resolvedFilePath);
         Windows.Foundation.IAsyncOperation<HyperlinkPreview> GetPreviewAsync(String text, String integrationHint);
         // Same, but ignores (and replaces) anything cached -- what to call
@@ -182,6 +188,8 @@ namespace Microsoft.Terminal.Control
     // x:Bind helpers for the card's preview template.
     static runtimeclass HyperlinkPreviewHelpers
     {
+        static void AttachLinkTooltips(Windows.UI.Xaml.FrameworkElement root, IHyperlinkPreviewProvider provider, IControlSettings settings, Boolean compact, Int32 depth);
+        static Boolean HasNestedPreview { get; };
         static Windows.UI.Xaml.FrameworkElement CreateFileView(HyperlinkPreview preview, Boolean compact);
         static Windows.UI.Xaml.Media.Brush BadgeBrush(String color);
         static Windows.UI.Xaml.Media.ImageSource ImageFromUri(String uri);

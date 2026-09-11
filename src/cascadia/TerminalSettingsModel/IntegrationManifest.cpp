@@ -190,6 +190,8 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         JsonUtils::GetValueForKey(json, PathKey, field->_Path);
         JsonUtils::GetValueForKey(json, KindKey, field->_Kind);
         JsonUtils::GetValueForKey(json, IconPathKey, field->_IconPath);
+        JsonUtils::GetValueForKey(json, "placement", field->_Placement);
+        JsonUtils::GetValueForKey(json, "link", field->_LinkTemplate);
         JsonUtils::GetValueForKey(json, ColorPathKey, field->_ColorPath);
         JsonUtils::GetValueForKey(json, ColorKey, field->_Color);
         JsonUtils::GetValueForKey(json, FormatKey, field->_Format);

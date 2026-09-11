@@ -313,6 +313,8 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         // The grouped view's Visibility, since XAML has no way to negate a binding.
         bool IsAutomaticRuleOrder() const { return !_WindowSettings.HyperlinkManualRuleOrder(); }
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkTooltipMaxWidth);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkTooltipMaxHeight);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkTooltipNested);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkTooltipShowDelay);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkTooltipHideDelay);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_WindowSettings, HyperlinkTooltipActions);

@@ -3918,4 +3918,9 @@
     <value>Go to Link Tooltip</value>
     <comment>Text for a button that navigates to the Link Tooltip page.</comment>
   </data>
+  <data name="Globals_HyperlinkTooltipMaxHeight.Header" xml:space="preserve"><value>Maximum popover height</value></data>
+  <data name="Globals_HyperlinkTooltipMaxHeight.Description" xml:space="preserve"><value>Maximum total height in pixels. Longer content scrolls. Set to 0 to fit the current pane.</value></data>
+  <data name="Globals_HyperlinkTooltipMaxHeightBox.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Maximum popover height</value></data>
+  <data name="Globals_HyperlinkTooltipNested.Header" xml:space="preserve"><value>Link tooltips inside popovers</value></data>
+  <data name="Globals_HyperlinkTooltipNested.Description" xml:space="preserve"><value>Preview links and recognized IDs inside a link popover using the same Link Tooltip rules. Off by default.</value></data>
 </root>

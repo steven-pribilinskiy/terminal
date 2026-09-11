@@ -88,6 +88,8 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         WINRT_PROPERTY(hstring, Path);
         WINRT_PROPERTY(Model::IntegrationFieldKind, Kind, Model::IntegrationFieldKind::Text);
         WINRT_PROPERTY(hstring, IconPath);
+        WINRT_PROPERTY(hstring, Placement);
+        WINRT_PROPERTY(hstring, LinkTemplate);
         WINRT_PROPERTY(hstring, ColorPath);
         WINRT_PROPERTY(hstring, Color);
         WINRT_PROPERTY(hstring, Format);
