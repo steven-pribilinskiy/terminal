@@ -53,6 +53,7 @@ Param(
     #
     # A payload is about 200 MB. Two of them is a rounding error against the cost
     # of not being able to open your terminal.
+    [ValidateRange(0, 20)]
     [int]$KeepRollbacks = 2
 )
 
@@ -278,37 +279,47 @@ try {
     $landed = (Get-AppxPackage -Name $PackageName).InstallLocation
     if ($landed -ne $Payload) { throw "registration landed at '$landed', expected '$Payload'" }
 
+    Write-Log "registration verified at $landed"
+
     # The swap is committed. Rotate the outgoing payload into the rollback ring
     # rather than deleting it: this is the copy you need when the build that just
     # registered cleanly turns out not to start.
-    if ($haveStaged -and (Test-Path $previous)) {
-        if ($KeepRollbacks -gt 0) {
-            # Oldest first, so nothing is overwritten before it has moved up.
-            $oldest = Join-Path (Split-Path -Parent $Payload) ("{0}.rollback.{1}" -f (Split-Path -Leaf $Payload), $KeepRollbacks)
-            if (Test-Path $oldest) { Remove-Item -Recurse -Force $oldest -ErrorAction SilentlyContinue }
-            for ($i = $KeepRollbacks - 1; $i -ge 1; $i--) {
-                $from = Join-Path (Split-Path -Parent $Payload) ("{0}.rollback.{1}" -f (Split-Path -Leaf $Payload), $i)
-                $to   = Join-Path (Split-Path -Parent $Payload) ("{0}.rollback.{1}" -f (Split-Path -Leaf $Payload), $i + 1)
-                if (Test-Path $from) { Move-Item -LiteralPath $from -Destination $to -Force }
-            }
-            $slot1 = Join-Path (Split-Path -Parent $Payload) ("{0}.rollback.1" -f (Split-Path -Leaf $Payload))
-            Move-Item -LiteralPath $previous -Destination $slot1 -Force
-            Write-Log "kept the outgoing payload as $slot1"
-
-            # Record what it was, so a rollback can say what it is going back to
-            # rather than leaving you to guess from a timestamp.
-            $outgoing = Join-Path $slot1 'build-info.json'
-            if (-not (Test-Path $outgoing)) {
-                try {
-                    @{ promotedAwayAt = (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss') + ' UTC' } |
-                        ConvertTo-Json | Set-Content -LiteralPath $outgoing -Encoding UTF8
+    try {
+        if ($haveStaged -and (Test-Path $previous)) {
+            if ($KeepRollbacks -gt 0) {
+                # Oldest first, so nothing is overwritten before it has moved up.
+                $oldest = Join-Path (Split-Path -Parent $Payload) ("{0}.rollback.{1}" -f (Split-Path -Leaf $Payload), $KeepRollbacks)
+                if (Test-Path $oldest) { Remove-Item -LiteralPath $oldest -Recurse -Force -ErrorAction Stop }
+                # Parenthesize arithmetic inside -f; otherwise 1 + 1 becomes the suffix "11".
+                for ($i = $KeepRollbacks - 1; $i -ge 1; $i--) {
+                    $from = Join-Path (Split-Path -Parent $Payload) ("{0}.rollback.{1}" -f (Split-Path -Leaf $Payload), $i)
+                    $to   = Join-Path (Split-Path -Parent $Payload) ("{0}.rollback.{1}" -f (Split-Path -Leaf $Payload), ($i + 1))
+                    if (Test-Path $from) { [System.IO.Directory]::Move($from, $to) }
                 }
-                catch {}
+                $slot1 = Join-Path (Split-Path -Parent $Payload) ("{0}.rollback.1" -f (Split-Path -Leaf $Payload))
+                [System.IO.Directory]::Move($previous, $slot1)
+                Write-Log "kept the outgoing payload as $slot1"
+
+                # Record what it was, so a rollback can say what it is going back to
+                # rather than leaving you to guess from a timestamp.
+                $outgoing = Join-Path $slot1 'build-info.json'
+                if (-not (Test-Path $outgoing)) {
+                    try {
+                        @{ promotedAwayAt = (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss') + ' UTC' } |
+                            ConvertTo-Json | Set-Content -LiteralPath $outgoing -Encoding UTF8
+                    }
+                    catch {}
+                }
+            }
+            else {
+                Remove-Item -Recurse -Force $previous -ErrorAction SilentlyContinue
             }
         }
-        else {
-            Remove-Item -Recurse -Force $previous -ErrorAction SilentlyContinue
-        }
+    }
+    catch {
+        # Registration already succeeded. Backup housekeeping must not prevent relaunch.
+        Say ("Rollback rotation failed; retained available backups: {0}" -f $_.Exception.Message) ([ConsoleColor]::DarkYellow)
+        Write-Log $_.InvocationInfo.PositionMessage
     }
     Say ("Promoted: {0} now runs from {1}" -f $PackageName, $Payload) ([ConsoleColor]::Green)
 
@@ -367,6 +378,7 @@ try {
 }
 catch {
     Write-Log "FAILED: $($_.Exception.Message)"
+    Write-Log $_.InvocationInfo.PositionMessage
     Write-Host ''
     Write-Host "Promotion failed: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "See $LogPath" -ForegroundColor Red

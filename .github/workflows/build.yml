@@ -44,6 +44,10 @@ jobs:
       # resource string: that compiles clean, packages clean, passes both test
       # suites, and then takes an access violation in the field the first time
       # the Settings UI asks an action for its name.
+      - name: Promotion helper regression tests
+        shell: powershell
+        run: .\tools\Test-SlotPromotion.ps1
+
       - name: Settings model consistency
         shell: pwsh
         run: .\tools\Check-SettingsModelConsistency.ps1
@@ -177,6 +181,11 @@ jobs:
             C:\TerminalSlots\dev-staged
             C:\TerminalSlots\test-staged
             C:\TerminalSlots\dev-pending.json
+            C:\TerminalSlots\Promote-DevSlot.ps1
+            C:\TerminalSlots\Refresh-TestSlot.ps1
+            C:\TerminalSlots\Invoke-Hidden.vbs
+            C:\TerminalSlots\Install-CIBuildPoller.ps1
+            C:\TerminalSlots\Fetch-CIBuild.ps1
           if-no-files-found: error
           retention-days: 14
 

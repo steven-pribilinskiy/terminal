@@ -94,6 +94,25 @@ function Invoke-HiddenGitHubCli {
     finally { $process.Dispose() }
 }
 
+# Helpers are part of the update, too. A once-installed copy otherwise stays stale forever.
+function Sync-SlotHelpers {
+    Param([string]$SourceDirectory)
+    foreach ($helperName in 'Promote-DevSlot.ps1', 'Refresh-TestSlot.ps1', 'Invoke-Hidden.vbs', 'Install-CIBuildPoller.ps1', 'Fetch-CIBuild.ps1') {
+        $source = Join-Path $SourceDirectory $helperName
+        $destination = Join-Path $SlotRoot $helperName
+        if (-not (Test-Path -LiteralPath $source)) { continue }
+        if ([IO.Path]::GetFullPath($source) -eq [IO.Path]::GetFullPath($destination)) { continue }
+        if ((Test-Path -LiteralPath $destination) -and (Get-FileHash -LiteralPath $source).Hash -eq (Get-FileHash -LiteralPath $destination).Hash) { continue }
+        New-Item -ItemType Directory -Force -Path $SlotRoot | Out-Null
+        $helperTemp = "$destination.$([guid]::NewGuid().ToString('N')).tmp"
+        try {
+            Copy-Item -LiteralPath $source -Destination $helperTemp -Force
+            Move-Item -LiteralPath $helperTemp -Destination $destination -Force
+        }
+        finally { if (Test-Path -LiteralPath $helperTemp) { Remove-Item -LiteralPath $helperTemp -Force } }
+    }
+}
+
 # Separate from the payload download so it can run on its own: asking for symbols
 # against a build that is already staged is the common case (you only want them
 # once a crash has happened), and the early "nothing to do" exit below would
@@ -223,6 +242,7 @@ if (-not $pinned -and -not $Force -and (Test-Path $MarkerPath)) {
     # learned to keep the Test half would otherwise look "already staged" forever
     # and the Test payload would never get backfilled.
     if ($existing -and $existing.commitFull -eq $run.headSha -and (Test-Path $StageDir) -and (Test-Path $TestStageDir)) {
+        Sync-SlotHelpers -SourceDirectory $PSScriptRoot
         Say "Already staged: $($run.headSha.Substring(0,9)). Nothing to do."
         if ($WithSymbols) { Get-CISymbols -RunDatabaseId $run.databaseId -Sha $run.headSha }
         return
@@ -286,15 +306,9 @@ try {
         Say 'Artifact has no test-staged payload (older CI run, or build.yml changed) -- Test half not updated.' ([ConsoleColor]::DarkYellow)
     }
 
-    # The Terminal looks for the promotion helper at exactly one fixed path, and
-    # a machine that has only ever fetched CI builds has never run the deploy
-    # that puts it there. Same reasoning for the on-demand Test-slot refresher.
-    foreach ($helperName in 'Promote-DevSlot.ps1', 'Refresh-TestSlot.ps1', 'Invoke-Hidden.vbs') {
-        $helper = Join-Path $SlotRoot $helperName
-        if (-not (Test-Path $helper)) {
-            Copy-Item (Join-Path $PSScriptRoot $helperName) $helper -Force
-        }
-    }
+    # New artifacts carry the matching helpers; old artifacts fall back to this checkout.
+    Sync-SlotHelpers -SourceDirectory $PSScriptRoot
+    Sync-SlotHelpers -SourceDirectory $temp
 
     if ($WithSymbols) { Get-CISymbols -RunDatabaseId $run.databaseId -Sha $run.headSha }
 
