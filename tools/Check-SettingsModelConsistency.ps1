@@ -23,11 +23,25 @@ pwsh -File tools\Check-SettingsModelConsistency.ps1
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $false)][string]$SourceDir = "$PSScriptRoot\..\src\cascadia\TerminalSettingsModel",
-    [Parameter(Mandatory = $false)][string]$EditorDir = "$PSScriptRoot\..\src\cascadia\TerminalSettingsEditor"
+    [Parameter(Mandatory = $false)][string]$SourceDir,
+    [Parameter(Mandatory = $false)][string]$EditorDir,
+    [Parameter(Mandatory = $false)][string]$SchemaPath
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Resolve the defaults HERE, not in the param block. Under Windows PowerShell 5.1
+# $PSScriptRoot is EMPTY while a parameter default is being evaluated -- it is only
+# populated once the body runs -- so "$PSScriptRoot\..\src\..." defaulted to
+# "\..\src\..." and this gate died with `missing \..\src\cascadia\...\MTSMSettings.h`
+# before checking anything. pwsh 7 populates it in both places, which is why the
+# failure only showed up when invoked as `powershell.exe -File`, and `powershell.exe`
+# is still what 5.1 resolves to. A mandated check that errors is a check that gets
+# skipped, so it must work under whichever shell happens to run it.
+$repoRoot = Split-Path -Parent $PSScriptRoot
+if (-not $SourceDir) { $SourceDir = Join-Path $repoRoot 'src\cascadia\TerminalSettingsModel' }
+if (-not $EditorDir) { $EditorDir = Join-Path $repoRoot 'src\cascadia\TerminalSettingsEditor' }
+if (-not $SchemaPath) { $SchemaPath = Join-Path $repoRoot 'doc\cascadia\profiles.schema.json' }
 $problems = [System.Collections.Generic.List[string]]::new()
 
 function Read-SourceFile([string]$name) {
@@ -269,11 +283,47 @@ foreach ($file in Get-ChildItem $EditorDir -Recurse -Include *.cpp -File | Where
   }
 }
 
+# ---- Every global/window setting is described in profiles.schema.json ----
+#
+# Nothing else checks this, and the failure is silent in the worst way: the build
+# is green, the setting works, and settings.json editors simply do not know it
+# exists -- no completion, and it may be flagged as an unknown property. It has
+# already happened twice.
+#
+# Textual, like the rest of this file: the schema is one big document and a key is
+# spelled the same in both places, so looking for the quoted key is honest here.
+$schemaChecked = 0
+if (-not (Test-Path $SchemaPath)) {
+    $problems.Add("could not find profiles.schema.json at '$SchemaPath' -- this checker needs updating")
+}
+else {
+    $schema = Get-Content -Raw -LiteralPath $SchemaPath
+
+    # Settings upstream itself leaves out of its schema. We inherit the omission
+    # rather than disagreeing with it: debug and experimental switches are
+    # deliberately undocumented, and documenting them here would be a permanent
+    # merge conflict for no gain. Verified absent from upstream/main's schema.
+    $schemaOmittedUpstream = @(
+        'debugFeatures',
+        'defaultInputScope',
+        'experimental.enableShellCompletionMenu'
+    )
+
+    foreach ($s in $settings) {
+        $key = $s.Groups[3].Value
+        if ($schemaOmittedUpstream -contains $key) { continue }
+        $schemaChecked++
+        if ($schema -notmatch ('"' + [regex]::Escape($key) + '"')) {
+            $problems.Add("MTSMSettings.h declares '$key' but doc/cascadia/profiles.schema.json does not describe it -- settings.json editors will not offer it, and may flag it as unknown")
+        }
+    }
+}
+
 if ($uncheckedMaps.Count -gt 0) {
     Write-Host ("Not checked (no json mapper found): {0}" -f (($uncheckedMaps | Sort-Object -Unique) -join ', ')) -ForegroundColor DarkYellow
 }
 
-Write-Host ("Checked {0} settings, {1} EnumMappings entries, {2} action arguments, {3} resource keys, {4} enum dropdown labels." -f $settings.Count, $declaredMaps.Count, $argNames.Count, $referencedKeys.Count, $checkedValues)
+Write-Host ("Checked {0} settings, {1} EnumMappings entries, {2} action arguments, {3} resource keys, {4} enum dropdown labels, {5} schema entries." -f $settings.Count, $declaredMaps.Count, $argNames.Count, $referencedKeys.Count, $checkedValues, $schemaChecked)
 
 if ($problems.Count -gt 0) {
     Write-Host ''
