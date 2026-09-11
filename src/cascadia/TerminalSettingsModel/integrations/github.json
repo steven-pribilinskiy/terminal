@@ -7,11 +7,12 @@
     "settings": [
         {
             "key": "candidateOwners",
-            "label": "Candidate owners",
-            "placeholder": "e.g. org1, org2",
+            "label": "Preferred organizations",
+            "placeholder": "Organization or account",
             "default": "",
-            "description": "Comma-separated GitHub accounts or organizations to search when resolving repository references without an explicit owner (e.g. repo#123).",
-            "required": false
+            "description": "Ordered GitHub organizations or accounts used to resolve repo#number. The first matching issue wins.",
+            "required": false,
+            "editor": "github-owners"
         }
     ],
     "credentials": [
@@ -38,8 +39,8 @@
         },
         {
             "kind": "text",
-            "pattern": "^(?<repo>[A-Za-z0-9_.-]+)#(?<number>\\d+)",
-            "description": "GitHub pull requests and issues (repo#number)",
+            "pattern": "(?<![\\w/.-])(?<repo>[A-Za-z0-9_.-]+)#(?<number>\\d+)\\b",
+            "description": "Pull requests and issues (repo#number)",
             "suggested": true
         }
     ],
@@ -48,7 +49,7 @@
             "id": "ghtoken",
             "type": "command",
             "optional": true,
-            "commandLine": "pwsh -NoProfile -NonInteractive -Command \"@{ token = (gh auth token 2>$null | Out-String).Trim() } | ConvertTo-Json -Compress\"",
+            "commandLine": "pwsh -NoProfile -NonInteractive -Command \"@{ token = (gh auth token --hostname github.com 2>$null | Out-String).Trim() } | ConvertTo-Json -Compress\"",
             "timeoutMs": 4000
         },
         {
@@ -257,5 +258,6 @@
             "itemTimePath": "/created_at",
             "default": false
         }
-    ]
+    ],
+    "account": { "provider": "github" }
 }

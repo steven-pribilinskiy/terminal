@@ -78,6 +78,17 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         JsonUtils::GetValueForKey(json, AlternativeActionKey, rule->_AlternativeAction);
         JsonUtils::GetValueForKey(json, CustomActionsKey, rule->_CustomActions);
 
+        // Upgrade only the untouched shipped preset; custom expressions stay intact.
+        if (rule->_Integration == L"github" && rule->_Kind == Model::HyperlinkMatchKind::Text &&
+            rule->_Pattern == LR"(^(?<repo>[A-Za-z0-9_.-]+)#(?<number>\d+))" &&
+            (rule->_Name == L"GitHub: GitHub pull requests and issues (repo#number)" ||
+             rule->_Name == L"GitHub: Pull requests & issues (repo#number)" ||
+             rule->_Name == L"GitHub: Pull requests and issues (repo#number)"))
+        {
+            rule->_Pattern = LR"((?<![\w/.-])(?<repo>[A-Za-z0-9_.-]+)#(?<number>\d+)\b)";
+            rule->_Name = L"GitHub: Pull requests and issues (repo#number)";
+        }
+
         return rule;
     }
 

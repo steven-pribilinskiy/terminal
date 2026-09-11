@@ -25,6 +25,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         void AddMatcherAsRule_Click(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::RoutedEventArgs& e);
         void GoToLinkTooltip_Click(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::RoutedEventArgs& e);
 
+        void IntegrationEnabled_Toggled(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::RoutedEventArgs& e);
+        void PreferredOwners_Loaded(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::RoutedEventArgs& e);
+        winrt::fire_and_forget _RefreshAccount(bool discover = false, winrt::Windows::UI::Xaml::Controls::MenuFlyout menu = nullptr);
+        void _RenderOwners();
+        bool _SaveOwners();
+        std::vector<std::wstring> _ownerValues;
+        winrt::weak_ref<winrt::Windows::UI::Xaml::Controls::StackPanel> _ownerHost;
+        Editor::IntegrationSettingViewModel _ownerSetting{ nullptr };
+        uint64_t _accountGeneration{};
+
         WINRT_CALLBACK(PropertyChanged, Windows::UI::Xaml::Data::PropertyChangedEventHandler);
         WINRT_OBSERVABLE_PROPERTY(Editor::IntegrationsViewModel, ViewModel, _PropertyChangedHandlers, nullptr);
     };

@@ -38,6 +38,11 @@ namespace winrt::TerminalApp::implementation
                 if (!bound.empty() && bound != L"open") actionId = bound;
             }
             hstring target = ResolveLink(text, effective.integration);
+            if (target.empty() && !isFile && (actionId == L"open" || actionId == L"copyLink"))
+            {
+                if (const auto preview = co_await GetPreviewAsync(text, effective.integration)) target = preview.ResolvedUri();
+                co_await ui;
+            }
             if (target.empty()) target = text;
             hstring path;
             if (isFile)

@@ -4,6 +4,9 @@
 #include "pch.h"
 #include "Integrations.h"
 #include "Integrations.g.cpp"
+#include "IntegrationAccount.h"
+#include <winrt/Windows.UI.Xaml.Media.Imaging.h>
+#include <winrt/Windows.UI.Xaml.Automation.h>
 
 using namespace winrt::Windows::UI::Xaml;
 using namespace winrt::Windows::UI::Xaml::Navigation;
@@ -75,6 +78,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         const auto args = e.Parameter().as<Editor::NavigateToPageArgs>();
         _ViewModel = args.ViewModel().as<Editor::IntegrationsViewModel>();
         BringIntoViewWhenLoaded(args.ElementToFocus());
+        if (_ViewModel.CurrentIntegration()) _RefreshAccount();
 
         TraceLoggingWrite(
             g_hTerminalSettingsEditorProvider,
@@ -90,10 +94,12 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         const auto integration = sender.as<FrameworkElement>().Tag().as<Editor::IntegrationViewModel>();
         _ViewModel.CurrentIntegration(integration);
         RuleAddedInfoBar().IsOpen(false);
+        _RefreshAccount();
     }
 
     void Integrations::CloseIntegrationEditor_Click(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
     {
+        ++_accountGeneration;
         _ViewModel.CurrentIntegration(nullptr);
         RuleAddedInfoBar().IsOpen(false);
     }
@@ -116,6 +122,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         // PendingValue is what the box last pushed in; read it before the box is emptied.
         credential.Save(credential.PendingValue());
         _clearCredentialBox(sender);
+        _RefreshAccount();
     }
 
     void Integrations::ClearCredential_Click(const IInspectable& sender, const RoutedEventArgs& /*e*/)
@@ -123,6 +130,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         const auto credential = sender.as<FrameworkElement>().Tag().as<Editor::IntegrationCredentialViewModel>();
         credential.Clear();
         _clearCredentialBox(sender);
+        _RefreshAccount();
     }
 
     void Integrations::AddMatcherAsRule_Click(const IInspectable& sender, const RoutedEventArgs& /*e*/)
@@ -139,5 +147,157 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     {
         RuleAddedInfoBar().IsOpen(false);
         _ViewModel.RequestNavigateToLinkTooltip();
+    }
+}
+
+namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
+{
+    void Integrations::PreferredOwners_Loaded(const IInspectable& sender, const RoutedEventArgs&)
+    {
+        const auto host = sender.as<Controls::StackPanel>();
+        const auto setting = host.Tag().as<Editor::IntegrationSettingViewModel>();
+        if (!setting.IsOwnerList()) return;
+        _ownerHost = make_weak(host); _ownerSetting = setting;
+        _ownerValues = IntegrationAccounts::Owners(std::wstring_view{ setting.Value() });
+        _RenderOwners();
+    }
+
+    bool Integrations::_SaveOwners()
+    {
+        std::wstring combined;
+        std::set<std::wstring> seen;
+        for (const auto& owner : _ownerValues)
+        {
+            if (owner.empty()) continue;
+            const auto parsed = IntegrationAccounts::Owners(owner);
+            if (parsed.size() != 1 || parsed.front() != owner) return false;
+            auto lower = owner; std::transform(lower.begin(), lower.end(), lower.begin(), towlower);
+            if (!seen.insert(lower).second) return false;
+            if (!combined.empty()) combined += L",";
+            combined += owner;
+        }
+        _ownerSetting.Value(combined);
+        return true;
+    }
+
+    void Integrations::_RenderOwners()
+    {
+        const auto host = _ownerHost.get(); if (!host) return;
+        host.Children().Clear(); host.Spacing(6);
+        const auto weak = get_weak();
+        Controls::TextBlock error; error.TextWrapping(TextWrapping::Wrap);
+        const auto weakError = make_weak(error);
+        for (size_t index = 0; index < _ownerValues.size(); ++index)
+        {
+            Controls::StackPanel row; row.Orientation(Controls::Orientation::Horizontal); row.Spacing(6);
+            Controls::TextBox input; input.Width(260); input.Text(_ownerValues[index]); input.PlaceholderText(L"Organization or account");
+            Automation::AutomationProperties::SetName(input, L"Preferred organization " + std::to_wstring(index + 1));
+            input.TextChanged([weak, index](const IInspectable& sender, auto&&) { if (const auto self = weak.get(); self && index < self->_ownerValues.size()) self->_ownerValues[index] = sender.as<Controls::TextBox>().Text(); });
+            input.LostFocus([weak, weakError](auto&&, auto&&) { if (const auto self = weak.get()) if (const auto message = weakError.get()) message.Text(self->_SaveOwners() ? L"" : L"Enter one unique GitHub organization or account per row."); });
+            row.Children().Append(input);
+            for (const auto delta : { -1, 1, 0 })
+            {
+                Controls::Button button; button.Content(box_value(delta < 0 ? L"↑" : delta > 0 ? L"↓" : L"×"));
+                Automation::AutomationProperties::SetName(button, delta < 0 ? L"Move organization up" : delta > 0 ? L"Move organization down" : L"Remove organization");
+                button.IsEnabled(delta == 0 || (delta < 0 ? index > 0 : index + 1 < _ownerValues.size()));
+                button.Click([weak, index, delta](auto&&, auto&&) {
+                    if (const auto self = weak.get(); self && index < self->_ownerValues.size())
+                    {
+                        if (delta == 0) self->_ownerValues.erase(self->_ownerValues.begin() + index);
+                        else { const auto next = static_cast<int64_t>(index) + delta; if (next >= 0 && next < static_cast<int64_t>(self->_ownerValues.size())) std::swap(self->_ownerValues[index], self->_ownerValues[static_cast<size_t>(next)]); }
+                        self->_SaveOwners(); self->_RenderOwners();
+                    }
+                });
+                row.Children().Append(button);
+            }
+            host.Children().Append(row);
+        }
+        host.Children().Append(error);
+        Controls::StackPanel buttons; buttons.Orientation(Controls::Orientation::Horizontal); buttons.Spacing(8);
+        Controls::Button add; add.Content(box_value(L"Add organization"));
+        add.Click([weak](auto&&, auto&&) { if (const auto self = weak.get()) { self->_ownerValues.emplace_back(); self->_RenderOwners(); } });
+        buttons.Children().Append(add);
+        Controls::Button discover; discover.Content(box_value(L"Add identified organization"));
+        Controls::MenuFlyout menu; discover.Flyout(menu);
+        discover.Click([weak, menu](auto&&, auto&&) { if (const auto self = weak.get()) self->_RefreshAccount(true, menu); });
+        buttons.Children().Append(discover); host.Children().Append(buttons);
+    }
+
+    winrt::fire_and_forget Integrations::_RefreshAccount(bool discover, Controls::MenuFlyout menu)
+    {
+        try
+        {
+        const auto lifetime = get_strong();
+        const auto generation = ++_accountGeneration;
+        const auto integration = _ViewModel.CurrentIntegration();
+        if (!integration) co_return;
+        const auto weak = get_weak();
+        const auto addText = [](const Controls::StackPanel& host, const std::wstring& value) {
+            Controls::TextBlock text; text.Text(value); text.TextWrapping(TextWrapping::Wrap); host.Children().Append(text);
+        };
+        AccountHost().Children().Clear();
+        if (!integration.Enabled()) { addText(AccountHost(), L"Integration disabled"); co_return; }
+        if (!integration.IsConfigured()) { addText(AccountHost(), L"Complete the required settings and credentials"); co_return; }
+        addText(AccountHost(), L"Checking connection…");
+        if (menu) { menu.Items().Clear(); Controls::MenuFlyoutItem loading; loading.Text(L"Finding organizations…"); loading.IsEnabled(false); menu.Items().Append(loading); }
+        IntegrationAccounts::Values settings, credentials;
+        const std::wstring provider{ integration.Manifest().AccountProvider() };
+        for (const auto& setting : integration.Settings()) settings[std::wstring{ setting.Key() }] = setting.Value();
+        for (const auto& credential : integration.Credentials()) credentials[std::wstring{ credential.Key() }] = Model::IntegrationCredentialStore::Get(integration.Id(), credential.Key());
+        const auto ui = winrt::apartment_context{};
+        IntegrationAccounts::Result result;
+        try
+        {
+            co_await winrt::resume_background();
+            result = IntegrationAccounts::Check(provider, std::move(settings), std::move(credentials), discover);
+        }
+        catch (...) { result.message = L"Could not verify the connection. Try again."; }
+        co_await ui;
+        if (generation != _accountGeneration || _ViewModel.CurrentIntegration() != integration) co_return;
+        try
+        {
+            AccountHost().Children().Clear();
+            Controls::StackPanel row; row.Orientation(Controls::Orientation::Horizontal); row.Spacing(12);
+            if (!result.avatar.empty())
+            {
+                Controls::PersonPicture picture; picture.Width(48); picture.Height(48);
+                picture.ProfilePicture(Media::Imaging::BitmapImage{ Windows::Foundation::Uri{ result.avatar } }); row.Children().Append(picture);
+            }
+            Controls::StackPanel identity; identity.Spacing(2);
+            if (!result.name.empty()) { Controls::TextBlock name; name.Text(result.name); name.FontSize(18); identity.Children().Append(name); }
+            if (!result.login.empty()) addText(identity, result.login);
+            addText(identity, result.message);
+            if (!result.source.empty()) addText(identity, result.source);
+            row.Children().Append(identity);
+            Controls::Button refresh; refresh.Content(box_value(L"Refresh")); refresh.Click([weak](auto&&, auto&&) { if (const auto self = weak.get()) self->_RefreshAccount(); }); row.Children().Append(refresh);
+            AccountHost().Children().Append(row);
+            if (!result.discoveryMessage.empty()) addText(AccountHost(), result.discoveryMessage);
+            if (menu)
+            {
+                menu.Items().Clear();
+                const auto chosen = IntegrationAccounts::Owners(std::wstring_view{ _ownerSetting.Value() });
+                for (const auto& org : result.organizations)
+                {
+                    if (std::any_of(chosen.begin(), chosen.end(), [&](const auto& item) { return _wcsicmp(item.c_str(), org.c_str()) == 0; })) continue;
+                    Controls::MenuFlyoutItem item; item.Text(org);
+                    item.Click([weak, org](auto&&, auto&&) { if (const auto self = weak.get()) { self->_ownerValues.push_back(org); self->_SaveOwners(); self->_RenderOwners(); } });
+                    menu.Items().Append(item);
+                }
+                if (!menu.Items().Size()) { Controls::MenuFlyoutItem item; item.Text(result.connected ? L"No additional organizations found" : L"Could not load organizations"); item.IsEnabled(false); menu.Items().Append(item); }
+            }
+        } CATCH_LOG();
+        } CATCH_LOG();
+    }
+}
+
+namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
+{
+    void Integrations::IntegrationEnabled_Toggled(const IInspectable& sender, const RoutedEventArgs&)
+    {
+        if (_ViewModel && _ViewModel.CurrentIntegration())
+        {
+            _ViewModel.CurrentIntegration().Enabled(sender.as<Controls::ToggleSwitch>().IsOn());
+            _RefreshAccount();
+        }
     }
 }

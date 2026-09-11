@@ -125,6 +125,7 @@ namespace Microsoft.Terminal.Settings.Model
         String Key;
         String Label;
         String Placeholder;
+        String Editor;
         String Description;
         Boolean Required;
         Boolean Secret;
@@ -230,6 +231,7 @@ namespace Microsoft.Terminal.Settings.Model
         Int32 CacheSeconds;
         // Optional HTML/CSS/JS representation; empty means "use Fields".
         String Html;
+        String AccountProvider;
 
         Windows.Foundation.Collections.IVector<IntegrationField> Settings;
         Windows.Foundation.Collections.IVector<IntegrationField> Credentials;

@@ -35,6 +35,8 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         hstring Description() const { return _Field.Description(); }
         bool HasDescription() const { return !_Field.Description().empty(); }
         bool Required() const { return _Field.Required(); }
+        bool IsOwnerList() const { return _Field.Editor() == L"github-owners" || (_IntegrationId == L"github" && Key() == L"candidateOwners"); }
+        bool IsPlainSetting() const { return !IsOwnerList(); }
 
         hstring Value() const;
         void Value(const hstring& value);

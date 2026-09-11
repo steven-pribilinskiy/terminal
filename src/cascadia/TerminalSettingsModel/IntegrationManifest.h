@@ -35,6 +35,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         WINRT_PROPERTY(hstring, Key);
         WINRT_PROPERTY(hstring, Label);
         WINRT_PROPERTY(hstring, Placeholder);
+        WINRT_PROPERTY(hstring, Editor);
         WINRT_PROPERTY(hstring, Description);
         WINRT_PROPERTY(bool, Required, false);
         WINRT_PROPERTY(bool, Secret, false);
@@ -168,6 +169,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         WINRT_PROPERTY(bool, IsBuiltIn, false);
         WINRT_PROPERTY(int32_t, CacheSeconds, 300);
         WINRT_PROPERTY(hstring, Html);
+        WINRT_PROPERTY(hstring, AccountProvider);
 
         WINRT_PROPERTY(Windows::Foundation::Collections::IVector<Model::IntegrationField>, Settings);
         WINRT_PROPERTY(Windows::Foundation::Collections::IVector<Model::IntegrationField>, Credentials);

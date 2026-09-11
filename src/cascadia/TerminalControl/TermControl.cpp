@@ -3460,6 +3460,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             try
             {
                 resolved = _hyperlinkPreviewProvider.ResolveLink(args.Uri(), effective.integration);
+                if (resolved.empty() && effective.isTextMatch && openAction.empty())
+                {
+                    if (const auto preview = co_await _hyperlinkPreviewProvider.GetPreviewAsync(args.Uri(), effective.integration)) resolved = preview.ResolvedUri();
+                }
             }
             CATCH_LOG();
 

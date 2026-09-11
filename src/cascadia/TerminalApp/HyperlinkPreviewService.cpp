@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 #include "pch.h"
+#include "../../inc/GitHubAuthentication.h"
 #include "HyperlinkPreviewService.h"
 #include "ProcessCapture.h"
 #include "../UIMarkdown/AdfMarkdown.h"
@@ -1589,8 +1590,6 @@ namespace
         std::wstring Owner;
         bool IsPull{ false };
     };
-    static std::map<std::wstring, RepoOwnerResolution> s_resolvedRepoOwners;
-    static std::mutex s_resolvedRepoOwnersMutex;
 
     // Runs the whole pipeline for one integration and renders the result.
     // Blocking; always called from a background thread.
@@ -1622,33 +1621,10 @@ namespace
 
                 RepoOwnerResolution resolution;
                 bool resolved = false;
-                {
-                    std::lock_guard lock{ s_resolvedRepoOwnersMutex };
-                    const auto cached = s_resolvedRepoOwners.find(repo);
-                    if (cached != s_resolvedRepoOwners.end())
-                    {
-                        resolution = cached->second;
-                        resolved = true;
-                    }
-                }
-
                 if (!resolved)
                 {
-                    std::wstring token;
                     const auto credIt = plugin.Credentials.find(L"token");
-                    if (credIt != plugin.Credentials.end() && !credIt->second.empty())
-                    {
-                        token = credIt->second;
-                    }
-                    else
-                    {
-                        const auto ghOutput = ::TerminalApp::RunProcessCapture(L"pwsh -NoProfile -NonInteractive -Command \"(gh auth token 2>$null | Out-String).Trim()\"", {}, 4000);
-                        token = til::u8u16(ghOutput);
-                        while (!token.empty() && (token.back() == L'\r' || token.back() == L'\n' || token.back() == L' '))
-                        {
-                            token.pop_back();
-                        }
-                    }
+                    const auto token = ::Microsoft::Terminal::GitHubToken(credIt == plugin.Credentials.end() ? std::wstring{} : credIt->second);
 
                     std::wstring candidates;
                     const auto settingIt = plugin.Settings.find(L"candidateOwners");
@@ -1657,33 +1633,13 @@ namespace
                         candidates = settingIt->second;
                     }
 
-                    std::vector<std::wstring> candidateList;
-                    std::wstring current;
-                    for (wchar_t ch : candidates)
-                    {
-                        if (ch == L',')
-                        {
-                            auto trimmed = std::wstring{ Trim(current) };
-                            if (!trimmed.empty())
-                            {
-                                candidateList.push_back(std::move(trimmed));
-                            }
-                            current.clear();
-                        }
-                        else
-                        {
-                            current.push_back(ch);
-                        }
-                    }
-                    auto lastTrimmed = std::wstring{ Trim(current) };
-                    if (!lastTrimmed.empty())
-                    {
-                        candidateList.push_back(std::move(lastTrimmed));
-                    }
-
+                    const auto candidateList = ::Microsoft::Terminal::GitHubOwners(candidates);
+                    if (candidateList.empty()) { preview.Error(L"Add preferred organizations in GitHub integration settings to resolve repo#number references."); return preview; }
+                    const auto deadline = GetTickCount64() + 8000;
                     ExpandContext probeContext;
                     for (const auto& candidate : candidateList)
                     {
+                        if (GetTickCount64() >= deadline) break;
                         HttpCall probeCall;
                         probeCall.Url = fmt::format(L"https://api.github.com/repos/{}/{}/issues/{}", candidate, repo, number);
                         probeCall.Method = L"GET";
@@ -1698,7 +1654,7 @@ namespace
                             probeCall.AuthType = L"bearer";
                             probeCall.AuthPassword = token;
                         }
-                        probeCall.TimeoutMs = 4000;
+                        probeCall.TimeoutMs = static_cast<int32_t>(std::max<int64_t>(1, static_cast<int64_t>(deadline) - static_cast<int64_t>(GetTickCount64())));
 
                         const auto outcome = RunHttpCall(probeCall, probeContext, plugin.Name, plainClient, lenientClient);
                         if (outcome.Error.empty() && !outcome.Body.empty())
@@ -1709,16 +1665,13 @@ namespace
                                 resolution.Owner = candidate;
                                 resolution.IsPull = parsedObj.HasKey(L"pull_request");
                                 resolved = true;
-                                {
-                                    std::lock_guard lock{ s_resolvedRepoOwnersMutex };
-                                    s_resolvedRepoOwners[repo] = resolution;
-                                }
                                 break;
                             }
                         }
                     }
                 }
 
+                if (!resolved) { preview.Error(L"Reference not found under the preferred organizations. Check the organization order and account access in GitHub integration settings."); return preview; }
                 if (resolved)
                 {
                     effectiveGroups[L"owner"] = resolution.Owner;
@@ -2604,19 +2557,7 @@ namespace winrt::TerminalApp::implementation
         {
             if (found && found->Owner && found->Owner->Id == L"github")
             {
-                const auto repoIt = found->Groups.find(L"repo");
-                const auto numberIt = found->Groups.find(L"number");
-                if (repoIt != found->Groups.end() && numberIt != found->Groups.end())
-                {
-                    std::lock_guard lock{ s_resolvedRepoOwnersMutex };
-                    const auto it = s_resolvedRepoOwners.find(repoIt->second);
-                    if (it != s_resolvedRepoOwners.end())
-                    {
-                        const auto& res = it->second;
-                        return winrt::hstring{ fmt::format(L"https://github.com/{}/{}/{}/{}",
-                            res.Owner, repoIt->second, res.IsPull ? L"pull" : L"issues", numberIt->second) };
-                    }
-                }
+                if (const auto cached = _cacheLookup(L"github|" + value)) return cached.ResolvedUri();
             }
             return {};
         }

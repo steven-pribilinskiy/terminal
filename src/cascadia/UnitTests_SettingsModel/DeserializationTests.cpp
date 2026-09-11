@@ -4,6 +4,8 @@
 #include "pch.h"
 
 #include "../TerminalSettingsModel/ColorScheme.h"
+#include "../TerminalSettingsModel/IntegrationManifest.h"
+#include "../TerminalSettingsModel/HyperlinkTooltipRule.h"
 #include "../TerminalSettingsModel/CascadiaSettings.h"
 #include "../TerminalSettingsModel/resource.h"
 #include "JsonTestClass.h"
@@ -24,6 +26,8 @@ namespace SettingsModelUnitTests
         TEST_CLASS(DeserializationTests);
 
         TEST_METHOD(ValidateProfilesExist);
+        TEST_METHOD(IntegrationAccountMetadata);
+        TEST_METHOD(MigrateGitHubReferencePreset);
         TEST_METHOD(ValidateDefaultProfileExists);
         TEST_METHOD(ValidateDuplicateProfiles);
         TEST_METHOD(ValidateManyWarnings);
@@ -2336,5 +2340,24 @@ namespace SettingsModelUnitTests
         Log::Comment(L"Ensure that the profile defaults have the new setting added");
         VERIFY_IS_TRUE(settings->ProfileDefaults().HasReloadEnvironmentVariables());
         VERIFY_IS_FALSE(settings->ProfileDefaults().ReloadEnvironmentVariables());
+    }
+
+    void DeserializationTests::IntegrationAccountMetadata()
+    {
+        const auto manifest = implementation::IntegrationManifest::FromJson(VerifyParseSucceeded(R"({"id":"github","name":"GitHub","account":{"provider":"github"}})"), L"test", true);
+        VERIFY_IS_NOT_NULL(manifest.get());
+        VERIFY_ARE_EQUAL(winrt::hstring{ L"github" }, manifest->AccountProvider());
+    }
+
+    void DeserializationTests::MigrateGitHubReferencePreset()
+    {
+        auto json = VerifyParseSucceeded(R"json({"name":"GitHub: GitHub pull requests and issues (repo#number)","match":"text","integration":"github","pattern":"^(?<repo>[A-Za-z0-9_.-]+)#(?<number>\\d+)"})json");
+        const auto migrated = implementation::HyperlinkTooltipRule::FromJson(json);
+        VERIFY_ARE_EQUAL(winrt::hstring{ L"GitHub: Pull requests and issues (repo#number)" }, migrated->Name());
+        VERIFY_ARE_EQUAL(winrt::hstring{ LR"((?<![\w/.-])(?<repo>[A-Za-z0-9_.-]+)#(?<number>\d+)\b)" }, migrated->Pattern());
+        json["pattern"] = "^custom#.*";
+        const auto custom = implementation::HyperlinkTooltipRule::FromJson(json);
+        VERIFY_ARE_EQUAL(winrt::hstring{ L"^custom#.*" }, custom->Pattern());
+        VERIFY_ARE_EQUAL(winrt::hstring{ L"GitHub: GitHub pull requests and issues (repo#number)" }, custom->Name());
     }
 }

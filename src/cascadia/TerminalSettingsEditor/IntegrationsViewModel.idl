@@ -12,6 +12,8 @@ namespace Microsoft.Terminal.Settings.Editor
         String Placeholder { get; };
         String Description { get; };
         Boolean HasDescription { get; };
+        Boolean IsOwnerList { get; };
+        Boolean IsPlainSetting { get; };
         Boolean Required { get; };
 
         String Value;

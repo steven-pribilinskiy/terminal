@@ -55,5 +55,6 @@
         { "key": "time", "label": "Sent", "path": "message:/messages/-1/ts", "kind": "text", "format": "relativeTime", "default": true },
         { "key": "replies", "label": "Replies", "path": "message:/messages/-1/reply_count", "kind": "text", "default": false },
         { "key": "error", "label": "Slack", "path": "message:/error", "kind": "badge", "color": "#c0392b", "default": true }
-    ]
+    ],
+    "account": { "provider": "slack" }
 }

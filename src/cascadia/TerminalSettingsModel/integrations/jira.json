@@ -161,5 +161,6 @@
             "headers": { "Accept": "application/json", "Content-Type": "application/json" },
             "timeoutMs": 8000
         }
-    ]
+    ],
+    "account": { "provider": "jira" }
 }

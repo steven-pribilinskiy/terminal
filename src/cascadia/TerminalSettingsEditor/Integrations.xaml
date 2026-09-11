@@ -125,6 +125,7 @@
                                       Margin="0"
                                       AutomationProperties.Name="{x:Bind ViewModel.CurrentIntegration.AccessibleName, Mode=OneWay}"
                                       IsOn="{x:Bind ViewModel.CurrentIntegration.Enabled, Mode=TwoWay}"
+                                      Toggled="IntegrationEnabled_Toggled"
                                       Style="{StaticResource ToggleSwitchInExpanderStyle}" />
                     </Grid>
                 </muxc:Expander.Header>
@@ -143,6 +144,8 @@
                           IsOpen="{x:Bind ViewModel.CurrentIntegration.IsNotConfigured, Mode=OneWay}"
                           Severity="Warning" />
 
+            <StackPanel x:Name="AccountHost" Margin="0,12" Spacing="6" />
+
             <!--  Settings: plain values, stored in settings.json  -->
             <TextBlock x:Uid="Integrations_SettingsHeader"
                        Style="{StaticResource TextBlockSubHeaderStyle}"
@@ -155,10 +158,13 @@
                                             Margin="0,2,0,0"
                                             Description="{x:Bind Description}"
                                             Header="{x:Bind Label}">
-                            <TextBox IsSpellCheckEnabled="False"
+                            <StackPanel>
+                            <StackPanel Loaded="PreferredOwners_Loaded" Tag="{x:Bind}" Visibility="{x:Bind IsOwnerList}" />
+                            <TextBox Visibility="{x:Bind IsPlainSetting}" IsSpellCheckEnabled="False"
                                      PlaceholderText="{x:Bind Placeholder}"
                                      Style="{StaticResource TextBoxSettingStyle}"
                                      Text="{x:Bind Value, Mode=TwoWay}" />
+                            </StackPanel>
                         </local:SettingsCard>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>

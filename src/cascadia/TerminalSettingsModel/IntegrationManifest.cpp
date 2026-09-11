@@ -128,6 +128,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         JsonUtils::GetValueForKey(json, KeyKey, field->_Key);
         JsonUtils::GetValueForKey(json, LabelKey, field->_Label);
         JsonUtils::GetValueForKey(json, PlaceholderKey, field->_Placeholder);
+        JsonUtils::GetValueForKey(json, std::string_view{ "editor" }, field->_Editor);
         JsonUtils::GetValueForKey(json, DescriptionKey, field->_Description);
         JsonUtils::GetValueForKey(json, RequiredKey, field->_Required);
         JsonUtils::GetValueForKey(json, SecretKey, field->_Secret);
@@ -303,6 +304,10 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         JsonUtils::GetValueForKey(json, VersionKey, manifest->_Version);
         JsonUtils::GetValueForKey(json, CacheSecondsKey, manifest->_CacheSeconds);
         JsonUtils::GetValueForKey(json, HtmlKey, manifest->_Html);
+        if (json.isMember("account") && json["account"].isObject() && json["account"]["provider"].isString())
+        {
+            manifest->_AccountProvider = to_hstring(json["account"]["provider"].asString());
+        }
         JsonUtils::GetValueForKey(json, SettingsKey, manifest->_Settings);
         JsonUtils::GetValueForKey(json, CredentialsKey, manifest->_Credentials);
         JsonUtils::GetValueForKey(json, MatchersKey, manifest->_Matchers);

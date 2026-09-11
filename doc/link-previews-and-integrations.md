@@ -882,3 +882,28 @@ node conformance/sync-presets.mjs --check --terminal <terminal-checkout> --torbi
 Commit generated artifacts with the consumer changes; normal builds require no network or
 Lintel checkout. Saved custom rules are retained. New presets include Text files, PDF files,
 and Office documents; file presets have separate extension criteria.
+
+### GitHub organizations and account status
+
+Open **Integrations → GitHub** to see the authenticated account name, login,
+avatar and connection status. **Refresh** checks it again. GitHub CLI credentials
+for github.com take precedence over the saved PAT, consistently for the account
+check and previews. Jira and Slack also expose account checks when enabled;
+other integrations explicitly report that an account check is unavailable.
+
+**Preferred organizations** replaces the comma-separated editor with editable
+rows. Add an organization or account manually, move it up/down, or remove it.
+**Add identified organization** discovers organizations visible to the active
+credentials, including organization owners of accessible repositories for
+fine-grained tokens. Discovery can be partial; manual additions are always
+available. The first matching issue under the ordered list wins.
+
+The repo#number preset now recognizes references inside prose, including
+`See terminal#18920 for the details`. Untouched older copies of the shipped
+preset migrate automatically; custom expressions remain unchanged. A click can
+resolve a reference even before the hover preview has loaded. Resolution no
+longer shares a repository-only cache across issue numbers or owner preferences.
+
+Lintel owns the preset and the `account.provider` / `editor: github-owners`
+metadata. Account checks use read-only endpoints and hidden CLI processes;
+tokens and raw authentication responses are never shown in settings.
