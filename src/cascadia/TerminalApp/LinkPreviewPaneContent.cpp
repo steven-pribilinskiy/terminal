@@ -47,7 +47,7 @@ namespace winrt::TerminalApp::implementation
 
     void LinkPreviewPaneContent::UpdateSettings(const Model::CascadiaSettings& settings, const Model::WindowSettings& windowSettings)
     {
-        const auto profile = settings.FindProfile(settings.GlobalSettings().DefaultProfile());
+        const auto profile = settings.FindProfile(windowSettings.DefaultProfile());
         if (!profile) return;
         const auto adapted = Settings::TerminalSettings::CreateForPreview(settings, windowSettings, profile);
         if (_linkSettings)
@@ -227,7 +227,7 @@ namespace winrt::TerminalApp::implementation
                 Controls::Border badge;
                 badge.Child(text);
                 badge.Padding(Thickness{ 6, 2, 6, 2 });
-                badge.CornerRadius(CornerRadius{ 4 });
+                badge.CornerRadius(Windows::UI::Xaml::CornerRadius{ 4 });
                 badge.Background(Control::HyperlinkPreviewHelpers::BadgeBrush(field.Color()));
                 TicketStatusHost().Children().Append(badge);
             }
