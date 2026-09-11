@@ -626,7 +626,7 @@ std::wstring Terminal::GetHyperlinkAtBufferPosition(const til::point bufferPos, 
         }
         for (const auto& result : results)
         {
-            if (result.value == 2 || result.value == 3)
+            if (result.value == _windowsPathPatternId || result.value == _posixPathPatternId)
             {
                 return found(HyperlinkSource::Detected, buffer.GetPlainText(result.start, result.stop));
             }
@@ -694,7 +694,7 @@ std::optional<PointTree::interval> Terminal::GetHyperlinkIntervalFromViewportPos
         }
         for (const auto& result : results)
         {
-            if (result.value == 2 || result.value == 3)
+            if (result.value == _windowsPathPatternId || result.value == _posixPathPatternId)
             {
                 return toViewport(result);
             }
@@ -1544,7 +1544,7 @@ PointTree Terminal::_getPatterns(til::CoordType beg, til::CoordType end) const
         Lintel::posixPathPattern,
     };
 
-    // detectURLs governs the two built-in URL regexes above and nothing else.
+    // detectURLs governs the built-in URL and absolute path patterns above.
     // The text patterns below come from hyperlink.tooltipRules and from
     // integration manifests -- things the user configured on purpose -- so
     // turning off URL guessing must not silently disable them too.

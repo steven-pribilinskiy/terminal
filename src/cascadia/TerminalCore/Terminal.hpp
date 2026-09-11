@@ -393,6 +393,8 @@ private:
     // Indices into the pattern list in Terminal::_getPatterns.
     size_t _hyperlinkPatternId = 0;
     size_t _delimitedLinkPatternId = 1;
+    size_t _windowsPathPatternId = 2;
+    size_t _posixPathPatternId = 3;
     // User text patterns (ICoreSettings::TextPatterns) follow the built-ins, so
     // pattern id 4 + i is _textPatterns[i].
     size_t _firstTextPatternId = 4;
