@@ -22,6 +22,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         {
             weak_ref<Controls::Image> image;
             weak_ref<Controls::ScrollViewer> scroll;
+            weak_ref<Controls::ScrollViewer> viewport;
+            weak_ref<Controls::StackPanel> toolbar;
+            FrameworkElement::SizeChanged_revoker viewportChanged;
             weak_ref<Controls::Primitives::ToggleButton> fitButton;
             double width = 0;
             double height = 0;
@@ -42,11 +45,19 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             double scale = 1;
             if (state->fit)
             {
-                // Leave room for scrollbar rounding. MaxHeight is the preview's
-                // available vertical budget even before the image has been laid out.
+                // Fit within the pane's visible body, not only the media scroller's
+                // maximum. A short pane must still show the entire image/page.
                 const auto width = scroll.ActualWidth() - 16;
-                if (width <= 0) return;
-                scale = std::min(width / state->width, (scroll.MaxHeight() - 16) / state->height);
+                auto height = scroll.MaxHeight() - 16;
+                if (const auto viewport = state->viewport.get(); viewport && viewport.ActualHeight() > 0)
+                {
+                    double chrome = 12;
+                    if (const auto toolbar = state->toolbar.get()) chrome += toolbar.ActualHeight();
+                    if (const auto status = state->status.get()) chrome += status.ActualHeight();
+                    height = std::min(height, viewport.ActualHeight() - chrome - 16);
+                }
+                if (width <= 0 || height <= 0) return;
+                scale = std::min(width / state->width, height / state->height);
             }
             image.Width(state->width * scale);
             image.Height(state->height * scale);
@@ -193,6 +204,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 scroll.MinZoomFactor(0.25f);
                 scroll.MaxZoomFactor(4.0f);
                 Controls::StackPanel zoom;
+                state->toolbar = make_weak(zoom);
                 zoom.Orientation(Controls::Orientation::Horizontal);
                 Controls::Primitives::ToggleButton fit;
                 fit.Content(box_value(L"Fit"));
@@ -220,9 +232,25 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 root.Children().Append(zoom);
             }
             root.Children().Append(status);
-            root.Unloaded([state](auto&&, auto&&) { state->closed = true; ++state->generation; state->document = nullptr; });
-            root.Loaded([state, path = preview.FilePath(), pdf = preview.FileKind() == L"pdf"](auto&&, auto&&) {
+            root.Unloaded([state](auto&&, auto&&) {
+                state->closed = true; ++state->generation; state->document = nullptr;
+                state->viewportChanged.revoke();
+            });
+            root.Loaded([state, path = preview.FilePath(), pdf = preview.FileKind() == L"pdf"](const Windows::Foundation::IInspectable& sender, auto&&) {
                 state->closed = false;
+                auto parent = Media::VisualTreeHelper::GetParent(sender.as<DependencyObject>());
+                while (parent)
+                {
+                    if (const auto viewport = parent.try_as<Controls::ScrollViewer>())
+                    {
+                        state->viewport = make_weak(viewport);
+                        state->viewportChanged = viewport.SizeChanged(auto_revoke, [weak = std::weak_ptr<FileImageState>{ state }](auto&&, auto&&) {
+                            if (const auto current = weak.lock(); current && !current->closed && current->fit) SizeImage(current);
+                        });
+                        break;
+                    }
+                    parent = Media::VisualTreeHelper::GetParent(parent);
+                }
                 LoadImage(state, path, pdf);
             });
         }
