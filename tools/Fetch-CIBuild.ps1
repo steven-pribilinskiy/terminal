@@ -149,11 +149,11 @@ $pinned = $RunId -or $Commit
 $errFile = [System.IO.Path]::GetTempFileName()
 if ($pinned) {
     $runJson = Invoke-HiddenGitHubCli run list --repo $Repo --workflow $Workflow --branch $Branch `
-        --status success --limit 60 --json databaseId,headSha,updatedAt 2>$errFile
+        --status success --limit 60 --json 'databaseId,headSha,updatedAt' 2>$errFile
 }
 else {
     $runJson = Invoke-HiddenGitHubCli run list --repo $Repo --workflow $Workflow --branch $Branch `
-        --status success --limit 1 --json databaseId,headSha,updatedAt 2>$errFile
+        --status success --limit 1 --json 'databaseId,headSha,updatedAt' 2>$errFile
 }
 $code = $LASTEXITCODE
 $errText = (Get-Content $errFile -Raw -ErrorAction SilentlyContinue)
