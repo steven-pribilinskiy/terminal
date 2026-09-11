@@ -5307,7 +5307,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                     Controls::Border badge;
                     badge.Child(text);
                     badge.Padding(Thickness{ 6, 2, 6, 2 });
-                    badge.CornerRadius(CornerRadius{ 4 });
+                    badge.CornerRadius(Windows::UI::Xaml::CornerRadius{ 4 });
                     if (field.IsBadge()) badge.Background(HyperlinkPreviewHelpers::BadgeBrush(field.Color()));
                     item.Children().Append(badge);
                 }
