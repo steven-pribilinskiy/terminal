@@ -6,6 +6,8 @@ namespace Microsoft.Terminal.UI.Markdown
     static runtimeclass Builder
     {
         static Windows.UI.Xaml.Controls.RichTextBlock Convert(String text, String baseUrl);
+        static Windows.UI.Xaml.FrameworkElement Preview(String text, String baseUrl, Boolean raw);
+        static Windows.UI.Xaml.Controls.TextBlock Highlight(String text, String language);
     };
 
 }

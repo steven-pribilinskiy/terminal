@@ -3,6 +3,8 @@
 #include "pch.h"
 #include "HyperlinkPreview.h"
 #include <cmath>
+#include <winrt/Windows.UI.Xaml.Controls.Primitives.h>
+#include "../inc/LintelFileTypes.g.h"
 #include <winrt/Windows.Data.Pdf.h>
 #include <winrt/Windows.Graphics.Imaging.h>
 #include <winrt/Windows.Storage.h>
@@ -177,6 +179,47 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 LoadImage(state, path, pdf);
             });
         }
+        else if (preview.FileKind() == L"markdown")
+        {
+            const auto sections = preview.FileSections();
+            if (!sections || sections.Size() == 0) return nullptr;
+            auto source = std::wstring{ sections.GetAt(0).Body() };
+            const size_t limit = compact ? 65536 : 262144;
+            const bool truncated = source.size() > limit;
+            if (truncated) source.resize(limit);
+            Controls::StackPanel buttons;
+            buttons.Orientation(Controls::Orientation::Horizontal);
+            buttons.Spacing(4);
+            Controls::Primitives::ToggleButton formatted;
+            Controls::Primitives::ToggleButton raw;
+            formatted.Content(box_value(L"Formatted"));
+            raw.Content(box_value(L"Raw"));
+            buttons.Children().Append(formatted);
+            buttons.Children().Append(raw);
+            const auto show = [view = make_weak(scroll), a = make_weak(formatted), b = make_weak(raw), source = hstring{ source }, path = preview.FilePath()](bool rawMode) {
+                if (const auto button = a.get()) button.IsChecked(!rawMode);
+                if (const auto button = b.get()) button.IsChecked(rawMode);
+                if (const auto viewControl = view.get())
+                {
+                    viewControl.HorizontalScrollMode(rawMode ? Controls::ScrollMode::Auto : Controls::ScrollMode::Disabled);
+                    viewControl.HorizontalScrollBarVisibility(rawMode ? Controls::ScrollBarVisibility::Auto : Controls::ScrollBarVisibility::Disabled);
+                    try { viewControl.Content(winrt::Microsoft::Terminal::UI::Markdown::Builder::Preview(source, path, rawMode)); }
+                    catch (...) { viewControl.Content(winrt::Microsoft::Terminal::UI::Markdown::Builder::Highlight(source, L"markdown")); }
+                    viewControl.ChangeView(0.0, 0.0, nullptr);
+                }
+            };
+            formatted.Click([show](auto&&, auto&&) { show(false); });
+            raw.Click([show](auto&&, auto&&) { show(true); });
+            root.Children().Append(buttons);
+            if (truncated)
+            {
+                Controls::TextBlock notice;
+                notice.Text(compact ? L"Preview shortened. Open in pane for more." : L"Preview shortened. Open the file for the complete document.");
+                notice.TextWrapping(TextWrapping::Wrap);
+                root.Children().Append(notice);
+            }
+            show(false);
+        }
         else
         {
             const auto sections = preview.FileSections();
@@ -184,7 +227,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             Controls::TextBlock text;
             text.FontFamily(Media::FontFamily{ L"Consolas" });
             text.IsTextSelectionEnabled(true);
-            auto show = [weak = make_weak(text), view = make_weak(scroll), sections, compact, sheet = preview.FileKind() == L"sheet", numbered = preview.FileKind() == L"text"](uint32_t index) {
+            auto show = [weak = make_weak(text), view = make_weak(scroll), sections, compact, sheet = preview.FileKind() == L"sheet", numbered = preview.FileKind() == L"text", language = std::wstring{ Lintel::FindFileType(preview.FilePath()).language }](uint32_t index) {
                 std::wstring body{ sections.GetAt(index).Body() };
                 std::wstring result;
                 size_t start = 0;
@@ -237,6 +280,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                         rowStart = rowEnd + 1;
                     }
                     if (const auto control = view.get()) control.Content(grid);
+                }
+                else if (!language.empty())
+                {
+                    if (const auto control = view.get()) control.Content(winrt::Microsoft::Terminal::UI::Markdown::Builder::Highlight(result, language));
                 }
                 else if (const auto control = weak.get()) control.Text(result);
             };

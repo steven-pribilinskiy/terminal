@@ -373,6 +373,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         void RequestDeleteRule(const Editor::HyperlinkTooltipRuleViewModel& vm);
         Editor::HyperlinkTooltipRuleViewModel RequestAddRule();
+        Editor::HyperlinkTooltipRuleViewModel RequestDuplicateRule(const Editor::HyperlinkTooltipRuleViewModel& source);
         Editor::HyperlinkTooltipRuleViewModel RequestAddRuleWithPreset(const winrt::hstring& presetId);
         bool IsPresetInUse(const winrt::hstring& presetId) const;
         // The same test, ignoring the rule currently open. Applying a preset to the

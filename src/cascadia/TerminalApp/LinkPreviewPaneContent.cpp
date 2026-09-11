@@ -338,7 +338,8 @@ namespace winrt::TerminalApp::implementation
             }
 
             Controls::Grid::SetRow(cell, row);
-            Controls::Grid::SetColumn(cell, 1);
+            Controls::Grid::SetColumn(cell, field.Label().empty() ? 0 : 1);
+            if (field.Label().empty()) Controls::Grid::SetColumnSpan(cell, 2);
             grid.Children().Append(cell);
             ++row;
         }

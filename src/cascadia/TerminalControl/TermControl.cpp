@@ -3849,19 +3849,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             }
         }
 
-        std::wstring extension;
-        if (isFileLink)
-        {
-            if (const auto dot = uri.find_last_of(L'.'); dot != std::wstring_view::npos)
-            {
-                const auto slash = uri.find_last_of(L"/\\");
-                if ((slash == std::wstring_view::npos || dot > slash) && dot + 1 < uri.size())
-                {
-                    extension.assign(uri.substr(dot + 1));
-                    std::transform(extension.begin(), extension.end(), extension.begin(), [](wchar_t c) { return static_cast<wchar_t>(std::towlower(c)); });
-                }
-            }
-        }
+        // A source location such as file:///Program.cs#L194 still has extension cs.
+        const auto extension = isFileLink ? Lintel::ExtensionOf(uri) : std::wstring{};
 
         // Counted rather than taken from the iterator, because the index is how the
         // settings page is later told which rule this was: the list here is a faithful
@@ -5601,7 +5590,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             }
 
             Controls::Grid::SetRow(cell, row);
-            Controls::Grid::SetColumn(cell, 1);
+            Controls::Grid::SetColumn(cell, field.Label().empty() ? 0 : 1);
+            if (field.Label().empty()) Controls::Grid::SetColumnSpan(cell, 2);
             grid.Children().Append(cell);
             ++row;
         }

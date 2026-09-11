@@ -1,0 +1,25 @@
+{
+    "id": "unblocked",
+    "name": "Unblocked Code",
+    "icon": "ms-appx:///IntegrationIcons/unblocked.png",
+    "version": 1,
+    "cacheSeconds": 300,
+    "settings": [],
+    "credentials": [],
+    "matchers": [
+        {
+            "kind": "text",
+            "pattern": "\\b(?<task>UNB-\\d+)\\b",
+            "link": "https://getunblocked.com/dashboard/team/current/coding-task/{{task}}",
+            "suggested": true,
+            "description": "Coding task IDs in output"
+        },
+        {
+            "kind": "link",
+            "pattern": "^https://getunblocked\\.com/dashboard/team/current/coding-task/(?<task>UNB-\\d+)(?:[?#].*)?$",
+            "description": "Coding task details links"
+        }
+    ],
+    "fetch": [],
+    "fields": []
+}

@@ -91,6 +91,7 @@ namespace
         LoadBuiltIn(manifests, IDR_INTEGRATION_STITH);
         LoadBuiltIn(manifests, IDR_INTEGRATION_GITHUB);
         LoadBuiltIn(manifests, IDR_INTEGRATION_SHEFRD);
+        LoadBuiltIn(manifests, IDR_INTEGRATION_UNBLOCKED);
 
         try
         {

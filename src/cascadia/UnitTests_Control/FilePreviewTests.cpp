@@ -16,6 +16,11 @@
 #endif
 #include "../TerminalApp/FilePreviewReader.h"
 #include <filesystem>
+#include "../UIMarkdown/SyntaxHighlight.h"
+#include "../inc/LintelFileTypes.g.h"
+#ifndef FILE_PREVIEW_STANDALONE
+#include "../UIMarkdown/Frontmatter.h"
+#endif
 
 #ifndef FILE_PREVIEW_STANDALONE
 using namespace WEX::TestExecution;
@@ -75,7 +80,65 @@ namespace ControlUnitTests
         TEST_METHOD(OfficeParagraphs);
         TEST_METHOD(OfficeSheets);
         TEST_METHOD(RejectDtd);
+        TEST_METHOD(SourceLocations);
+        TEST_METHOD(SyntaxTokens);
+#ifndef FILE_PREVIEW_STANDALONE
+        TEST_METHOD(YamlFrontmatter);
+#endif
     };
+
+    void FilePreviewTests::SourceLocations()
+    {
+        VERIFY_ARE_EQUAL(std::wstring{ L"cs" }, Lintel::ExtensionOf(L"file:///mnt/c/src/Program.cs#L194"));
+        VERIFY_ARE_EQUAL(std::wstring{ L"tsx" }, Lintel::ExtensionOf(L"file:///src/Component.TSX?view=raw#L10"));
+        VERIFY_IS_TRUE(Lintel::GroupContains(L"sourceCode", L"cs"));
+        VERIFY_ARE_EQUAL(std::wstring{ L"TypeScript" }, std::wstring{ Lintel::FindFileType(L"C:\\src\\App.tsx").name });
+        VERIFY_ARE_EQUAL(std::wstring{ L"C#" }, std::wstring{ Lintel::FindFileType(L"file:///src/Program.cs#L194").name });
+        VERIFY_ARE_EQUAL(std::wstring{ L"Markdown" }, std::wstring{ Lintel::FindFileType(L"README.MD").name });
+        VERIFY_ARE_EQUAL(std::wstring{ L"Dockerfile" }, std::wstring{ Lintel::FindFileType(L"/src/Dockerfile").name });
+        VERIFY_IS_TRUE(Lintel::ExtensionOf(L"/home/user.name/README").empty());
+    }
+
+    void FilePreviewTests::SyntaxTokens()
+    {
+        const std::wstring code{ L"public class Program { // note\n string value = \"hello\"; int n = 42; }" };
+        const auto tokens = MarkdownPreview::Highlight(code, L"cs");
+        std::wstring rebuilt;
+        bool keyword = false, comment = false, number = false, literal = false;
+        for (const auto& token : tokens)
+        {
+            rebuilt.append(code, token.start, token.length);
+            keyword |= token.kind == MarkdownPreview::TokenKind::Keyword;
+            comment |= token.kind == MarkdownPreview::TokenKind::Comment;
+            number |= token.kind == MarkdownPreview::TokenKind::Number;
+            literal |= token.kind == MarkdownPreview::TokenKind::String;
+        }
+        VERIFY_ARE_EQUAL(code, rebuilt);
+        VERIFY_IS_TRUE(keyword && comment && number && literal);
+        const auto unknown = MarkdownPreview::Highlight(code, L"unknown-language");
+        VERIFY_ARE_EQUAL(size_t{ 1 }, unknown.size());
+        VERIFY_IS_TRUE(unknown[0].kind == MarkdownPreview::TokenKind::Plain);
+        const auto yaml = MarkdownPreview::Highlight(L"title: 'hello'\n", L"yml");
+        VERIFY_IS_TRUE(yaml[0].kind == MarkdownPreview::TokenKind::Key);
+    }
+
+#ifndef FILE_PREVIEW_STANDALONE
+    void FilePreviewTests::YamlFrontmatter()
+    {
+        const auto parsed = MarkdownPreview::ParseFrontmatter("---\r\ntitle: Example\r\ntags: [one, two]\r\nauthor:\r\n  name: Ada\r\nsummary: |\r\n  First line\r\n  Second line\r\n---\r\n# Body\r\n");
+        VERIFY_IS_TRUE(parsed.present && parsed.error.empty());
+        VERIFY_ARE_EQUAL(std::string{ "# Body\r\n" }, std::string{ parsed.body });
+        VERIFY_IS_TRUE(std::any_of(parsed.rows.begin(), parsed.rows.end(), [](const auto& row) { return row.key == "title" && row.value == "Example"; }));
+        VERIFY_IS_TRUE(std::any_of(parsed.rows.begin(), parsed.rows.end(), [](const auto& row) { return row.key == "name" && row.value == "Ada"; }));
+        VERIFY_IS_TRUE(std::any_of(parsed.rows.begin(), parsed.rows.end(), [](const auto& row) { return row.value == "First line\nSecond line\n"; }));
+        VERIFY_IS_FALSE(MarkdownPreview::ParseFrontmatter("# Heading\n---\ntext").present);
+        VERIFY_IS_FALSE(MarkdownPreview::ParseFrontmatter("---\ntitle: unclosed\n").present);
+        VERIFY_IS_TRUE(!MarkdownPreview::ParseFrontmatter("---\nbad: [\n---\n# Body").error.empty());
+        const auto cycle = MarkdownPreview::ParseFrontmatter("---\na: &a\n  self: *a\n---\nBody");
+        VERIFY_IS_TRUE(cycle.rows.size() < 20);
+        VERIFY_IS_TRUE(MarkdownPreview::ParseFrontmatter("\xef\xbb\xbf---\ntitle: BOM\n...\nBody").present);
+    }
+#endif
 
     void FilePreviewTests::TextEncodings()
     {
@@ -157,7 +220,9 @@ int main()
         tests.OfficeParagraphs();
         tests.OfficeSheets();
         tests.RejectDtd();
-        std::cout << "All 5 native file preview tests passed.\n";
+        tests.SourceLocations();
+        tests.SyntaxTokens();
+        std::cout << "All 7 native file preview tests passed.\n";
         return 0;
     }
     catch (const std::exception& error)

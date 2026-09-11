@@ -199,6 +199,7 @@ namespace Microsoft.Terminal.Settings.Editor
 
         void RequestDeleteRule(HyperlinkTooltipRuleViewModel vm);
         HyperlinkTooltipRuleViewModel RequestAddRule();
+        HyperlinkTooltipRuleViewModel RequestDuplicateRule(HyperlinkTooltipRuleViewModel source);
         HyperlinkTooltipRuleViewModel RequestAddRuleWithPreset(String presetId);
         // True when a rule matching this preset is already in the list, so the
         // Add rule menu can grey the entry out rather than make a duplicate.

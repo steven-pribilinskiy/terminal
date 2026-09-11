@@ -32,6 +32,9 @@
       <DependentUpon>Builder.idl</DependentUpon>
     </ClInclude>
     <ClInclude Include="MarkdownToXaml.h" />
+    <ClInclude Include="MarkdownPresentation.h" />
+    <ClInclude Include="Frontmatter.h" />
+    <ClInclude Include="SyntaxHighlight.h" />
     <ClInclude Include="CodeBlock.h">
       <DependentUpon>CodeBlock.xaml</DependentUpon>
     </ClInclude>

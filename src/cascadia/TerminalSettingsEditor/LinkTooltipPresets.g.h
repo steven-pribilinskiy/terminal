@@ -19,6 +19,8 @@ inline std::span<const LinkTooltipPreset> GetLinkTooltipPresets() noexcept
         { L"text-files", L"Text files", L"Local text, Markdown, log and configuration files", Model::HyperlinkMatchKind::Link, { L"file" }, L"", Model::HyperlinkFileTypeGroup::None, { L"txt", L"md", L"log", L"json", L"yaml", L"yml", L"toml", L"ini", L"csv", L"tsv" }, L"", true, {  } },
         { L"pdf-files", L"PDF files", L"Local PDF documents", Model::HyperlinkMatchKind::Link, { L"file" }, L"", Model::HyperlinkFileTypeGroup::None, { L"pdf" }, L"", true, {  } },
         { L"office-document-files", L"Office documents", L"Local Word, Excel and PowerPoint content", Model::HyperlinkMatchKind::Link, { L"file" }, L"", Model::HyperlinkFileTypeGroup::None, { L"docx", L"xlsx", L"pptx" }, L"", true, {  } },
+        { L"unblocked-task-ids", L"Unblocked Code: Coding task IDs in output", L"Open Unblocked Code coding-task details", Model::HyperlinkMatchKind::Text, {  }, L"\\b(?<task>UNB-\\d+)\\b", Model::HyperlinkFileTypeGroup::None, {  }, L"unblocked", true, {  } },
+        { L"unblocked-task-links", L"Unblocked Code: Coding task details links", L"Open Unblocked Code coding-task details", Model::HyperlinkMatchKind::Link, {  }, L"^https://getunblocked\\.com/dashboard/team/current/coding-task/(?<task>UNB-\\d+)(?:[?#].*)?$", Model::HyperlinkFileTypeGroup::None, {  }, L"unblocked", true, {  } },
     };
     return presets;
 }
@@ -42,5 +44,7 @@ inline std::wstring_view GetLinkTooltipPresetSample(std::wstring_view id) noexce
     if (id == L"text-files") return L"/home/steve/notes.md";
     if (id == L"pdf-files") return L"/home/steve/report.pdf";
     if (id == L"office-document-files") return L"/home/steve/report.docx";
+    if (id == L"unblocked-task-ids") return L"UNB-123";
+    if (id == L"unblocked-task-links") return L"https://getunblocked.com/dashboard/team/current/coding-task/UNB-123";
     return {};
 }

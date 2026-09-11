@@ -13,7 +13,7 @@ namespace winrt::Microsoft::Terminal::UI::Markdown::implementation
 {
     struct CodeBlock : CodeBlockT<CodeBlock>
     {
-        CodeBlock(const winrt::hstring& initialCommandlines);
+        CodeBlock(const winrt::hstring& initialCommandlines, const winrt::hstring& language = L"");
 
         til::property<winrt::hstring> Commandlines;
 

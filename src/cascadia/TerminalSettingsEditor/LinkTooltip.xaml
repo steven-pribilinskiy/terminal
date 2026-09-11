@@ -426,7 +426,7 @@
                             <TextBlock x:Uid="LinkTooltip_AddRuleButtonText" />
                         </StackPanel>
                         <muxc:SplitButton.Flyout>
-                            <MenuFlyout Opening="AddRuleFlyout_Opening"
+                            <Flyout Opening="AddRuleFlyout_Opening"
                                         Placement="BottomEdgeAlignedLeft" />
                         </muxc:SplitButton.Flyout>
                     </muxc:SplitButton>
@@ -623,6 +623,8 @@
                 </StackPanel>
             </Border>
 
+            <Button Content="Duplicate rule" HorizontalAlignment="Left" Click="DuplicateRule_Click" />
+
             <!--  Preset  -->
             <local:SettingsCard x:Uid="LinkTooltip_RulePreset">
                 <muxc:DropDownButton x:Name="ApplyPresetButton">
@@ -635,7 +637,7 @@
                         </StackPanel>
                     </muxc:DropDownButton.Content>
                     <muxc:DropDownButton.Flyout>
-                        <MenuFlyout Opening="ApplyPresetFlyout_Opening"
+                        <Flyout Opening="ApplyPresetFlyout_Opening"
                                     Placement="BottomEdgeAlignedLeft" />
                     </muxc:DropDownButton.Flyout>
                 </muxc:DropDownButton>

@@ -11,6 +11,7 @@
 #include "ButtonChoiceViewModel.g.cpp"
 #include "EnumEntry.h"
 #include "LinkTooltipPresets.h"
+#include "../TerminalSettingsModel/HyperlinkTooltipRule.h"
 
 // Last, and deliberately: <icu.h> is a large C header full of macros, and the
 // rule preview has to compile patterns the way the control does at runtime --
@@ -1948,6 +1949,23 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 CurrentRule(nullptr);
             }
         }
+    }
+
+    Editor::HyperlinkTooltipRuleViewModel LinkTooltipViewModel::RequestDuplicateRule(const Editor::HyperlinkTooltipRuleViewModel& source)
+    {
+        if (!source) return nullptr;
+        const auto original = get_self<HyperlinkTooltipRuleViewModel>(source)->Rule();
+        const auto rule = get_self<Model::implementation::HyperlinkTooltipRule>(original)->Copy();
+        const std::wstring base = (original.Name().empty() ? std::wstring{ L"Rule" } : std::wstring{ original.Name() }) + L" (copy)";
+        std::wstring name = base;
+        size_t count = 2;
+        while (std::any_of(CurrentView().begin(), CurrentView().end(), [&](const auto& vm) { return vm.Name() == name; })) name = base + L" " + std::to_wstring(count++);
+        rule.Name(name);
+        const auto vm = make<HyperlinkTooltipRuleViewModel>(rule, _WindowSettings, _KindList, _KindMap, _FileTypeGroupList, _FileTypeGroupMap, _IntegrationChoices, _RuleActionChoices);
+        CurrentView().Append(vm);
+        _applyAutomaticOrder();
+        CurrentRule(vm);
+        return vm;
     }
 
     Editor::HyperlinkTooltipRuleViewModel LinkTooltipViewModel::RequestAddRule()

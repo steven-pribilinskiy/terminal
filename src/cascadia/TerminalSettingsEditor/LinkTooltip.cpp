@@ -74,203 +74,109 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     // "Files & Media" was an empty heading that never drew.
     static std::vector<PresetCategory> _categorizedPresets()
     {
-        std::vector<PresetCategory> categories = {
-            { L"GitHub", {} },
-            { L"Jira", {} },
-            { L"Slack", {} },
-            { L"Stith", {} },
-            { L"shefrd", {} },
-            { L"Git", {} },
-            { L"Files & Media", {} },
-            { L"General", {} }
-        };
-
-        static constexpr std::wstring_view integrationOrder[]{
-            L"github", L"jira", L"slack", L"stith", L"shefrd"
-        };
-
+        std::vector<PresetCategory> categories;
         for (const auto& preset : GetLinkTooltipPresets())
         {
-            size_t index = std::size(categories) - 1;
-
-            for (size_t i = 0; i < std::size(integrationOrder); ++i)
-            {
-                if (preset.integration == integrationOrder[i])
-                {
-                    index = i;
-                    break;
-                }
-            }
-
-            if (preset.integration.empty())
-            {
-                if (preset.fileTypeGroup != Model::HyperlinkFileTypeGroup::None || !preset.customExtensions.empty())
-                {
-                    index = 6;
-                }
-                else if (std::wstring_view{ preset.id }.rfind(L"git", 0) == 0)
-                {
-                    index = 5;
-                }
-            }
-
-            categories[index].presets.push_back(&preset);
+            std::wstring_view category = L"General";
+            if (!preset.integration.empty()) category = preset.name.substr(0, preset.name.find(L':'));
+            else if (preset.fileTypeGroup != Model::HyperlinkFileTypeGroup::None || !preset.customExtensions.empty()) category = L"Files & Media";
+            else if (preset.id.starts_with(L"git")) category = L"Git";
+            auto found = std::find_if(categories.begin(), categories.end(), [&](const auto& entry) { return entry.name == category; });
+            if (found == categories.end()) { categories.push_back({ category, {} }); found = categories.end() - 1; }
+            found->presets.push_back(&preset);
         }
         return categories;
     }
 
-    void LinkTooltip::AddRuleFlyout_Opening(const IInspectable& sender, const IInspectable& /*args*/)
+    void LinkTooltip::DuplicateRule_Click(const IInspectable&, const RoutedEventArgs&)
     {
-        const auto flyout = sender.try_as<Controls::MenuFlyout>();
-        if (!flyout)
-        {
-            return;
-        }
-
-        auto items = flyout.Items();
-        items.Clear();
-
-        // 1. New blank rule
-        {
-            Controls::MenuFlyoutItem blankItem;
-            blankItem.Text(RS_(L"LinkTooltip_AddRuleMenu_NewBlankRule/Text"));
-
-            Controls::FontIcon plusIcon;
-            plusIcon.FontFamily(Media::FontFamily{ L"Segoe Fluent Icons, Segoe MDL2 Assets" });
-            plusIcon.Glyph(L"\xE710");
-            blankItem.Icon(plusIcon);
-
-            blankItem.Click([this](const auto&, const auto&) {
-                const auto rule = _ViewModel.RequestAddRule();
-                Dispatcher().RunAsync(Windows::UI::Core::CoreDispatcherPriority::Normal, [weakThis{ get_weak() }, rule]() {
-                    if (const auto self{ weakThis.get() })
-                    {
-                        self->_ViewModel.CurrentRule(rule);
-                    }
-                });
-            });
-            items.Append(blankItem);
-        }
-
-        items.Append(Controls::MenuFlyoutSeparator{});
-
-        for (const auto& cat : _categorizedPresets())
-        {
-            if (cat.presets.empty())
-            {
-                continue;
-            }
-
-            Controls::MenuFlyoutSubItem subMenu;
-            subMenu.Text(winrt::hstring{ cat.name });
-
-            // A category with nothing left to add is disabled at the top level, so
-            // you can see there is no point opening it.
-            auto anyAvailable = false;
-
-            for (const auto* preset : cat.presets)
-            {
-                Controls::MenuFlyoutItem item;
-                item.Text(winrt::hstring{ preset->name });
-                if (!preset->description.empty())
-                {
-                    Controls::ToolTipService::SetToolTip(item, box_value(winrt::hstring{ preset->description }));
-                }
-
-                const winrt::hstring presetId{ preset->id };
-
-                // Adding a preset twice produces two rules matching the same links,
-                // where only the first can ever win. Disable rather than hide, so the
-                // menu keeps a stable shape and can say why.
-                if (_ViewModel.IsPresetInUse(presetId))
-                {
-                    item.IsEnabled(false);
-                    Controls::ToolTipService::SetToolTip(item, box_value(RS_(L"LinkTooltip_AddRuleMenu_AlreadyAdded")));
-                    subMenu.Items().Append(item);
-                    continue;
-                }
-                anyAvailable = true;
-
-                item.Click([this, presetId](const auto&, const auto&) {
-                    const auto rule = _ViewModel.RequestAddRuleWithPreset(presetId);
-                    Dispatcher().RunAsync(Windows::UI::Core::CoreDispatcherPriority::Normal, [weakThis{ get_weak() }, rule]() {
-                        if (const auto self{ weakThis.get() })
-                        {
-                            self->_ViewModel.CurrentRule(rule);
-                        }
-                    });
-                });
-                subMenu.Items().Append(item);
-            }
-            subMenu.IsEnabled(anyAvailable);
-            items.Append(subMenu);
-        }
+        _ViewModel.RequestDuplicateRule(_ViewModel.CurrentRule());
     }
 
-    // Same menu as Add rule, and for the same reason: filling this rule from a
-    // preset another rule already is produces two rules matching the same links,
-    // where only the first can ever win. The one difference is which rules count --
-    // re-applying the preset THIS rule already is re-syncs it, so that entry stays
-    // live rather than greying itself out.
-    void LinkTooltip::ApplyPresetFlyout_Opening(const IInspectable& sender, const IInspectable& /*args*/)
+    void LinkTooltip::AddRuleFlyout_Opening(const IInspectable& sender, const IInspectable&) { _buildPresetPicker(sender, false); }
+    void LinkTooltip::ApplyPresetFlyout_Opening(const IInspectable& sender, const IInspectable&) { _buildPresetPicker(sender, true); }
+
+    void LinkTooltip::_buildPresetPicker(const IInspectable& sender, bool applying)
     {
-        const auto flyout = sender.try_as<Controls::MenuFlyout>();
-        if (!flyout)
-        {
-            return;
-        }
-
-        auto items = flyout.Items();
-        items.Clear();
-
-        for (const auto& cat : _categorizedPresets())
-        {
-            if (cat.presets.empty())
+        const auto flyout = sender.as<Controls::Flyout>();
+        Controls::StackPanel root;
+        root.Width(420);
+        root.Spacing(8);
+        Controls::TextBox search;
+        search.PlaceholderText(L"Search presets");
+        Automation::AutomationProperties::SetName(search, L"Search presets");
+        root.Children().Append(search);
+        Controls::ScrollViewer scroll;
+        scroll.MaxHeight(460);
+        Controls::StackPanel results;
+        results.Spacing(4);
+        scroll.Content(results);
+        root.Children().Append(scroll);
+        flyout.Content(root);
+        const auto populate = [weak = get_weak(), host = make_weak(results), input = make_weak(search), popup = make_weak(flyout), applying] {
+            const auto self = weak.get();
+            const auto list = host.get();
+            const auto queryBox = input.get();
+            if (!self || !list || !queryBox) return;
+            list.Children().Clear();
+            auto query = std::wstring{ queryBox.Text() };
+            std::transform(query.begin(), query.end(), query.begin(), [](wchar_t c) { return static_cast<wchar_t>(std::towlower(c)); });
+            size_t matches = 0;
+            for (const auto& category : _categorizedPresets())
             {
-                continue;
-            }
-
-            Controls::MenuFlyoutSubItem subMenu;
-            subMenu.Text(winrt::hstring{ cat.name });
-
-            auto anyAvailable = false;
-
-            for (const auto* preset : cat.presets)
-            {
-                Controls::MenuFlyoutItem item;
-                item.Text(winrt::hstring{ preset->name });
-                if (!preset->description.empty())
+                bool headingAdded = false;
+                for (const auto* preset : category.presets)
                 {
-                    Controls::ToolTipService::SetToolTip(item, box_value(winrt::hstring{ preset->description }));
-                }
-
-                const winrt::hstring presetId{ preset->id };
-
-                if (_ViewModel.IsPresetInUseElsewhere(presetId))
-                {
-                    item.IsEnabled(false);
-                    Controls::ToolTipService::SetToolTip(item, box_value(RS_(L"LinkTooltip_AddRuleMenu_AlreadyAdded")));
-                    subMenu.Items().Append(item);
-                    continue;
-                }
-                anyAvailable = true;
-
-                item.Click([this, presetId](const auto&, const auto&) {
-                    Dispatcher().RunAsync(Windows::UI::Core::CoreDispatcherPriority::Normal, [weakThis{ get_weak() }, presetId]() {
-                        if (const auto self{ weakThis.get() })
+                    auto haystack = std::wstring{ preset->name } + L" " + std::wstring{ preset->description } + L" " + std::wstring{ preset->integration } + L" " + std::wstring{ preset->id };
+                    std::transform(haystack.begin(), haystack.end(), haystack.begin(), [](wchar_t c) { return static_cast<wchar_t>(std::towlower(c)); });
+                    if (!query.empty() && haystack.find(query) == haystack.npos) continue;
+                    if (!headingAdded)
+                    {
+                        Controls::TextBlock heading;
+                        heading.Text(category.name);
+                        heading.FontWeight(Windows::UI::Text::FontWeights::SemiBold());
+                        heading.Margin(Thickness{ 0, 8, 0, 2 });
+                        list.Children().Append(heading);
+                        headingAdded = true;
+                    }
+                    ++matches;
+                    const hstring id{ preset->id };
+                    Controls::Button button;
+                    button.HorizontalAlignment(HorizontalAlignment::Stretch);
+                    button.HorizontalContentAlignment(HorizontalAlignment::Left);
+                    Controls::StackPanel label;
+                    Controls::TextBlock name;
+                    name.Text(preset->name);
+                    name.TextWrapping(TextWrapping::Wrap);
+                    label.Children().Append(name);
+                    Controls::TextBlock description;
+                    description.Text(preset->description);
+                    description.TextWrapping(TextWrapping::Wrap);
+                    description.FontSize(12);
+                    description.Opacity(0.7);
+                    label.Children().Append(description);
+                    button.Content(label);
+                    button.IsEnabled(!(applying ? self->_ViewModel.IsPresetInUseElsewhere(id) : self->_ViewModel.IsPresetInUse(id)));
+                    button.Click([weak, popup, applying, id](auto&&, auto&&) {
+                        if (const auto current = weak.get())
                         {
-                            if (const auto currentRule = self->_ViewModel.CurrentRule())
-                            {
-                                currentRule.ApplyPreset(presetId);
-                            }
+                            if (const auto menu = popup.get()) menu.Hide();
+                            current->Dispatcher().RunAsync(Windows::UI::Core::CoreDispatcherPriority::Normal, [weak, applying, id] {
+                                if (const auto target = weak.get())
+                                {
+                                    if (applying) { if (const auto rule = target->_ViewModel.CurrentRule()) rule.ApplyPreset(id); }
+                                    else target->_ViewModel.CurrentRule(target->_ViewModel.RequestAddRuleWithPreset(id));
+                                }
+                            });
                         }
                     });
-                });
-                subMenu.Items().Append(item);
+                    list.Children().Append(button);
+                }
             }
-            subMenu.IsEnabled(anyAvailable);
-            items.Append(subMenu);
-        }
+            if (!matches) { Controls::TextBlock empty; empty.Text(L"No presets match your search."); list.Children().Append(empty); }
+        };
+        search.TextChanged([populate](auto&&, auto&&) { populate(); });
+        populate();
     }
 
     void LinkTooltip::DeleteRule_Click(const IInspectable& sender, const RoutedEventArgs& /*e*/)

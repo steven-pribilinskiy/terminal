@@ -6,6 +6,9 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <sstream>
+#include <iomanip>
+#include "../inc/LintelFileTypes.g.h"
 
 namespace winrt::TerminalApp::implementation
 {
@@ -35,7 +38,15 @@ namespace winrt::TerminalApp::implementation
             title.Value(path.filename().wstring());
             fields.Append(title);
             Control::HyperlinkPreviewField metadata;
-            metadata.Value(std::to_wstring(size) + L" bytes · " + path.extension().wstring());
+            const auto& fileType = Lintel::FindFileType(path.wstring());
+            preview.IntegrationName(fileType.name);
+            preview.IntegrationIcon(fileType.icon);
+            std::wostringstream sizeLabel;
+            if (size < 1024) sizeLabel << size << (size == 1 ? L" byte" : L" bytes");
+            else if (size < 1024 * 1024) sizeLabel << std::fixed << std::setprecision(1) << static_cast<double>(size) / 1024 << L" KiB";
+            else sizeLabel << std::fixed << std::setprecision(1) << static_cast<double>(size) / (1024 * 1024) << L" MiB";
+            metadata.Value(std::wstring{ fileType.name } + L" · " + sizeLabel.str());
+            metadata.IconUri(fileType.icon);
             fields.Append(metadata);
             preview.Fields(fields);
             std::wstring ext = path.extension().wstring();
@@ -71,7 +82,7 @@ namespace winrt::TerminalApp::implementation
                 section.Label(L"Text");
                 section.Body(text);
                 preview.FileSections(single_threaded_vector<Control::HyperlinkPreviewTab>({ section }));
-                preview.FileKind(L"text");
+                preview.FileKind(fileType.language == L"markdown" ? L"markdown" : L"text");
             }
         }
         catch (const hresult_error& error) { preview.Error(error.message()); }
