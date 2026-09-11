@@ -25,6 +25,8 @@ namespace Microsoft.Terminal.Settings.Editor
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, CiPollIntervalMinutes);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, AylithImprint);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, AylithImprintJsonOnly);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, ActivityLog);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, ActivityLogMaxKilobytes);
 
         IInspectable CurrentTextMeasurement;
         Windows.Foundation.Collections.IObservableVector<Microsoft.Terminal.Settings.Editor.EnumEntry> TextMeasurementList { get; };

@@ -74,6 +74,36 @@
         </local:SettingsCard>
 
         <!--
+            Activity log. An expander rather than two loose cards: the size cap
+            only means anything while the log is on, which is the master-plus-gated
+            shape SettingsExpander exists for. IsForkFeature goes on the expander
+            only - it forwards the mark to the card that draws its header.
+            IsEnabled is repeated on the nested card rather than set on the
+            expander, because setting it there would disable the header and make
+            the toggle that gates it unclickable.
+        -->
+        <local:SettingsExpander x:Name="ActivityLog"
+                                x:Uid="Globals_ActivityLog"
+                                IsForkFeature="True">
+            <local:SettingsExpander.Content>
+                <ToggleSwitch IsOn="{x:Bind ViewModel.ActivityLog, Mode=TwoWay}"
+                              Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+            </local:SettingsExpander.Content>
+            <local:SettingsExpander.Items>
+                <local:SettingsCard x:Name="ActivityLogMaxKilobytes"
+                                    x:Uid="Globals_ActivityLogMaxKilobytes"
+                                    IsEnabled="{x:Bind ViewModel.ActivityLog, Mode=OneWay}">
+                    <muxc:NumberBox x:Uid="Globals_ActivityLogMaxKilobytesBox"
+                                    Maximum="1048576"
+                                    Minimum="64"
+                                    SpinButtonPlacementMode="Compact"
+                                    Style="{StaticResource NumberBoxSettingStyle}"
+                                    Value="{x:Bind ViewModel.ActivityLogMaxKilobytes, Mode=TwoWay}" />
+                </local:SettingsCard>
+            </local:SettingsExpander.Items>
+        </local:SettingsExpander>
+
+        <!--
             The provenance mark. This row is itself one of ours, so it carries the
             mark it controls - which doubles as the preview of what turning it on
             does. It lives here rather than on Appearance because what it changes

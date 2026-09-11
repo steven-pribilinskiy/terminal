@@ -80,6 +80,7 @@ namespace winrt::TerminalApp::implementation
         TerminalApp::ContentManager _contentManager{ winrt::make<implementation::ContentManager>() };
 
         void _ApplyLanguageSettingChange() noexcept;
+        void _ApplyActivityLogSettingChange() noexcept;
 
         [[nodiscard]] HRESULT _TryLoadSettings() noexcept;
         void _ProcessLazySettingsChanges();

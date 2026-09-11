@@ -845,6 +845,26 @@
     <value>CI build poll interval in minutes</value>
     <comment>Name for a control to choose how often, in minutes, to poll for a new CI build.</comment>
   </data>
+  <data name="Globals_ActivityLog.Header" xml:space="preserve">
+    <value>Record an activity log</value>
+    <comment>Header for a setting that turns on a log of every process the terminal starts.</comment>
+  </data>
+  <data name="Globals_ActivityLog.Description" xml:space="preserve">
+    <value>Write every process this terminal starts, and every console program handed to it, to activity.jsonl beside your settings file: the time, the program, its full command line, its folder, and what started it. This is how you find out where an unexpected window came from. Command lines are recorded in full, so an argument containing a password or token is written to that file.</value>
+    <comment>Additional description for what the "Record an activity log" setting does. Presented near "Globals_ActivityLog.Header".</comment>
+  </data>
+  <data name="Globals_ActivityLogMaxKilobytes.Header" xml:space="preserve">
+    <value>Maximum log size (KB)</value>
+    <comment>Header for a control to set how large the activity log may grow before it is rotated.</comment>
+  </data>
+  <data name="Globals_ActivityLogMaxKilobytes.Description" xml:space="preserve">
+    <value>How large activity.jsonl may grow before it is renamed to activity.1.jsonl and a new one is started. One previous file is kept.</value>
+    <comment>Additional description for the activity log size limit. Presented near "Globals_ActivityLogMaxKilobytes.Header".</comment>
+  </data>
+  <data name="Globals_ActivityLogMaxKilobytesBox.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Maximum activity log size in kilobytes</value>
+    <comment>Name for a control to choose the largest size, in kilobytes, of the activity log.</comment>
+  </data>
   <data name="Globals_AlwaysOnTop.Description" xml:space="preserve">
     <value>Terminal will always be the topmost window on the desktop.</value>
     <comment>A description for what the "always on top" setting does. Presented near "Globals_AlwaysOnTop.Header".</comment>

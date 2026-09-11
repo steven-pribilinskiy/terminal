@@ -16,6 +16,7 @@
 #include "SlotPromotion.h"
 #include "WindowListRequest.g.h"
 
+#include <ActivityLog.h>
 #include <atomic>
 
 #include <LibraryResources.h>
@@ -185,6 +186,25 @@ namespace winrt::TerminalApp::implementation
             LOG_LAST_ERROR();
             return false;
         }
+
+        // Record it before releasing the handle, while we can still name the pid.
+        // This is one of our own hidden launches, and a hidden launch that turns
+        // visible is precisely the thing the log is meant to explain -- so the
+        // entry says it went through Invoke-Hidden.vbs, which is what makes a
+        // stray window here a bug rather than a mystery.
+        try
+        {
+            ::Microsoft::Terminal::ActivityLog::Record({
+                .kind = ::Microsoft::Terminal::ActivityLog::Kind::Helper,
+                .exe = L"wscript.exe",
+                .commandLine = args,
+                .pid = info.hProcess ? GetProcessId(info.hProcess) : 0u,
+                .parentPid = GetCurrentProcessId(),
+                .reason = relaunch ? L"slot promotion helper (will relaunch)" : L"slot promotion helper",
+            });
+        }
+        CATCH_LOG()
+
         if (info.hProcess)
         {
             CloseHandle(info.hProcess);
@@ -248,9 +268,29 @@ namespace winrt::TerminalApp::implementation
         info.lpParameters = args.c_str();
         info.nShow = SW_HIDE;
 
-        if (ShellExecuteExW(&info) && info.hProcess)
+        if (ShellExecuteExW(&info))
         {
-            CloseHandle(info.hProcess);
+            // The scheduled task this registers is itself a later spawn source
+            // the log cannot see, so record what reconciled it: when a console
+            // window appears on the poller's schedule, this entry is the link
+            // between the two.
+            try
+            {
+                ::Microsoft::Terminal::ActivityLog::Record({
+                    .kind = ::Microsoft::Terminal::ActivityLog::Kind::Helper,
+                    .exe = L"wscript.exe",
+                    .commandLine = args,
+                    .pid = info.hProcess ? GetProcessId(info.hProcess) : 0u,
+                    .parentPid = GetCurrentProcessId(),
+                    .reason = intervalMinutes > 0 ? L"CI poll task reconcile" : L"CI poll task uninstall",
+                });
+            }
+            CATCH_LOG()
+
+            if (info.hProcess)
+            {
+                CloseHandle(info.hProcess);
+            }
         }
     }
     catch (...)

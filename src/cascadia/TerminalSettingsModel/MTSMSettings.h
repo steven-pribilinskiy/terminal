@@ -47,7 +47,9 @@ Author(s):
     X(Model::ResumeSessionNotification, ResumeSessionNotification, "resumeSessionNotification", Model::ResumeSessionNotification::Toast) \
     X(IntegrationSettingsMap, Integrations, "integrations", MakeIntegrationSettingsMap())                                          \
     X(bool, AylithImprint, "aylith.imprint", false)                                                                                \
-    X(bool, AylithImprintJsonOnly, "aylith.imprintJsonOnly", false)
+    X(bool, AylithImprintJsonOnly, "aylith.imprintJsonOnly", false)                                                                \
+    X(bool, ActivityLog, "activityLog", true)                                                                                      \
+    X(int32_t, ActivityLogMaxKilobytes, "activityLogMaxKilobytes", 4096)
 
 // Settings that are per-window (may vary by window name in the future)
 #define MTSM_WINDOW_SETTINGS(X)                                                                                                                                                                       \

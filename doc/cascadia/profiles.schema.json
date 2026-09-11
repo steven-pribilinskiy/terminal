@@ -2425,6 +2425,17 @@
           "description": "When set to true, the settings window draws a small hollow diamond beside every setting that upstream Windows Terminal has but exposes only in settings.json, so it is clear which control is this fork's even though the setting is not.",
           "type": "boolean"
         },
+        "activityLog": {
+          "default": true,
+          "description": "When set to true, the Terminal records every process it starts and every console client handed to it by console delegation, to activity.jsonl beside this settings file: timestamp, image path, command line, working directory, pid, the parent process, and why it happened. This is what answers \"where did that window come from?\" after a window has already appeared, which a trace cannot. Note that it records full command lines, so an argument containing a secret is written to that file.",
+          "type": "boolean"
+        },
+        "activityLogMaxKilobytes": {
+          "default": 4096,
+          "description": "How large activity.jsonl may grow before it is rotated to activity.1.jsonl, in kilobytes. One previous generation is kept. Values below 64 are treated as 64.",
+          "minimum": 64,
+          "type": "integer"
+        },
         "controlPipe": {
           "default": true,
           "description": "When set to true, the Terminal serves a local named pipe, \\\\.\\pipe\\wt-control-<pid>, that lets another process running as you enumerate this Terminal's panes, read what is on a pane's screen, and write text into a pane. Only your own user account can open it, and it can neither run commands nor change settings. Set to false to turn it off.",

@@ -9,6 +9,7 @@
 
 #include "CTerminalHandoff.h"
 #include "../../types/inc/utils.hpp"
+#include <ActivityLog.h>
 
 #include "ConptyConnection.g.cpp"
 
@@ -181,6 +182,25 @@ namespace winrt::Microsoft::Terminal::TerminalConnection::implementation
         const std::filesystem::path processName = wil::GetModuleFileNameExW<std::wstring>(_piClient.hProcess, nullptr);
         _clientName = processName.filename().wstring();
 
+        // A launch we made ourselves, so unlike the handoff case we know the cwd
+        // exactly -- this is the post-WSL-mangling directory actually handed to
+        // CreateProcessW, not the profile's configured one, which is the value you
+        // want when a shell started somewhere surprising.
+        try
+        {
+            ::Microsoft::Terminal::ActivityLog::Record({
+                .kind = ::Microsoft::Terminal::ActivityLog::Kind::ProfileLaunch,
+                .exe = processName.wstring(),
+                .commandLine = newCommandLine,
+                .cwd = startingDirectory ? std::wstring{ startingDirectory } : std::wstring{},
+                .pid = gsl::narrow_cast<uint32_t>(_piClient.dwProcessId),
+                .parentPid = GetCurrentProcessId(),
+                .sessionId = Utils::GuidToString(_sessionId),
+                .reason = L"profile launch",
+            });
+        }
+        CATCH_LOG()
+
 #pragma warning(suppress : 26477 26485 26494 26482 26446) // We don't control TraceLoggingWrite
         TraceLoggingWrite(
             g_hTerminalConnectionProvider,
@@ -330,6 +350,34 @@ namespace winrt::Microsoft::Terminal::TerminalConnection::implementation
         return h;
     }
 
+    // Best-effort image path for a pid, for the activity log's "who started this".
+    //
+    // Two honest limits, which is why this returns an empty string rather than
+    // guessing: a parent frequently exits before its child (a script that
+    // launched something and returned), and Windows reuses pids, so a pid that
+    // does resolve is not guaranteed to be the process that actually did the
+    // launching. An empty or surprising parentExe is therefore information, not a
+    // bug -- better than a confident wrong name.
+    static std::wstring _imageNameForPid(uint32_t pid) noexcept
+    try
+    {
+        if (pid == 0)
+        {
+            return {};
+        }
+
+        wil::unique_handle process{ OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid) };
+        if (!process)
+        {
+            return {};
+        }
+        return wil::QueryFullProcessImageNameW<std::wstring>(process.get());
+    }
+    catch (...)
+    {
+        return {};
+    }
+
     // Misdiagnosis: out is being tested right in the first line.
 #pragma warning(suppress : 26430) // Symbol 'out' is not tested for nullness on all paths (f.23).
     void ConptyConnection::InitializeFromHandoff(HANDLE* in, HANDLE* out, HANDLE signal, HANDLE reference, HANDLE server, HANDLE client, const TERMINAL_STARTUP_INFO* startupInfo)
@@ -364,16 +412,40 @@ namespace winrt::Microsoft::Terminal::TerminalConnection::implementation
         _startupInfo.iconIndex = startupInfo->iconIndex;
         _startupInfo.showWindow = startupInfo->wShowWindow;
 
+        uint32_t clientParentPid{ 0 };
         try
         {
-            _commandline = _commandlineFromProcess(_piClient.hProcess);
+            _commandline = _commandlineFromProcess(_piClient.hProcess, &clientParentPid);
         }
         CATCH_LOG()
 
+        std::wstring clientImageName;
         try
         {
-            auto processImageName{ wil::QueryFullProcessImageNameW<std::wstring>(_piClient.hProcess) };
-            _clientName = std::filesystem::path{ std::move(processImageName) }.filename().wstring();
+            clientImageName = wil::QueryFullProcessImageNameW<std::wstring>(_piClient.hProcess);
+            _clientName = std::filesystem::path{ clientImageName }.filename().wstring();
+        }
+        CATCH_LOG()
+
+        // This is the case the activity log exists for: a console client we did
+        // not start, which Windows handed us because we are the delegation host.
+        // A window appears and nothing in the Terminal knows why, so record
+        // everything we can reach about the client and about whoever started it.
+        try
+        {
+            // Fully qualified: this file's namespace is
+            // winrt::Microsoft::Terminal::TerminalConnection::implementation, so a
+            // bare ActivityLog:: would be looked up under winrt::Microsoft::Terminal
+            // and not found.
+            ::Microsoft::Terminal::ActivityLog::Record({
+                .kind = ::Microsoft::Terminal::ActivityLog::Kind::Handoff,
+                .exe = clientImageName,
+                .commandLine = std::wstring{ _commandline },
+                .pid = gsl::narrow_cast<uint32_t>(GetProcessId(_piClient.hProcess)),
+                .parentPid = clientParentPid,
+                .parentExe = _imageNameForPid(clientParentPid),
+                .reason = L"console delegation handoff",
+            });
         }
         CATCH_LOG()
 
@@ -702,9 +774,19 @@ namespace winrt::Microsoft::Terminal::TerminalConnection::implementation
     }
     CATCH_LOG()
 
-    // Returns the command line of the given process.
+    // Returns the command line of the given process, and optionally who started
+    // it -- the PEB walk already reads that, and for a handed-off console client
+    // it is the only clue to where the window came from, since delegation tells
+    // us nothing about who asked for a console.
+    //
+    // Deliberately NOT returning the working directory, even though it is in the
+    // same structure: winternl.h's RTL_USER_PROCESS_PARAMETERS stops at
+    // CommandLine, and the header says in as many words that the field offsets
+    // change between Windows releases. Reading past the documented fields to save
+    // one log field is not worth a structure walk that breaks on an update.
+    //
     // Requires PROCESS_BASIC_INFORMATION | PROCESS_VM_READ privileges.
-    winrt::hstring ConptyConnection::_commandlineFromProcess(HANDLE process)
+    winrt::hstring ConptyConnection::_commandlineFromProcess(HANDLE process, uint32_t* parentPid)
     {
         struct PROCESS_BASIC_INFORMATION
         {
@@ -716,6 +798,11 @@ namespace winrt::Microsoft::Terminal::TerminalConnection::implementation
             ULONG_PTR InheritedFromUniqueProcessId;
         } info;
         THROW_IF_NTSTATUS_FAILED(NtQueryInformationProcess(process, ProcessBasicInformation, &info, sizeof(info), nullptr));
+
+        if (parentPid)
+        {
+            *parentPid = gsl::narrow_cast<uint32_t>(info.InheritedFromUniqueProcessId);
+        }
 
         // PEB: Process Environment Block
         // This is a funny structure allocated by the kernel which contains all sorts of useful

@@ -57,7 +57,7 @@ namespace winrt::Microsoft::Terminal::TerminalConnection::implementation
     private:
         static void closePseudoConsoleAsync(HPCON hPC) noexcept;
         static HRESULT NewHandoff(HANDLE* in, HANDLE* out, HANDLE signal, HANDLE reference, HANDLE server, HANDLE client, const TERMINAL_STARTUP_INFO* startupInfo) noexcept;
-        static winrt::hstring _commandlineFromProcess(HANDLE process);
+        static winrt::hstring _commandlineFromProcess(HANDLE process, uint32_t* parentPid = nullptr);
 
         void _LaunchAttachedClient();
         void _indicateExitWithStatus(unsigned int status) noexcept;

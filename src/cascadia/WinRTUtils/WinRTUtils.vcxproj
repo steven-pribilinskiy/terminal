@@ -26,6 +26,7 @@
     <ClInclude Include="inc\ThrottledFunc.h" />
     <ClInclude Include="inc\Utils.h" />
     <ClInclude Include="inc\WtExeUtils.h" />
+    <ClInclude Include="inc\ActivityLog.h" />
   </ItemGroup>
   <!-- ========================= Cpp Files ======================== -->
   <ItemGroup>
@@ -35,6 +36,7 @@
     <ClCompile Include="LibraryResources.cpp" />
     <ClCompile Include="ScopedResourceLoader.cpp" />
     <ClCompile Include="Utils.cpp" />
+    <ClCompile Include="ActivityLog.cpp" />
   </ItemGroup>
   <!-- ========================= idl Files ======================== -->
   <ItemGroup>

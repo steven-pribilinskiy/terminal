@@ -5,6 +5,7 @@
 #include "WindowEmperor.h"
 
 #include <CoreWindow.h>
+#include <ActivityLog.h>
 #include <ScopedResourceLoader.h>
 #include <WtExeUtils.h>
 #include <til/hash.h>
@@ -1635,6 +1636,11 @@ void WindowEmperor::_persistState(const ApplicationState& state) const
 
     // Ensure to write the state.json
     state.Flush();
+
+    // The activity log batches on a one-second timer, so the last launch before
+    // a close -- often the interesting one -- would otherwise be dropped when
+    // the timer is torn down with records still queued.
+    ::Microsoft::Terminal::ActivityLog::Flush();
 }
 
 // The periodic half of buffer persistence. Upstream only ever writes buffers

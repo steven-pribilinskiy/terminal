@@ -8,6 +8,7 @@
 #include "SlotPromotion.h"
 
 #include <WtExeUtils.h>
+#include <ActivityLog.h>
 #include <wil/token_helpers.h>
 
 #include "../../types/inc/utils.hpp"
@@ -393,6 +394,20 @@ namespace winrt::TerminalApp::implementation
     }
     CATCH_LOG()
 
+    // The activity log is off until settings say otherwise, so that a failure
+    // before settings load cannot write anything. This runs on every successful
+    // load, including the first, so toggling the setting takes effect without a
+    // restart -- which matters because the thing you want to catch is usually
+    // happening right now.
+    void AppLogic::_ApplyActivityLogSettingChange() noexcept
+    try
+    {
+        const auto& globals = _settings.GlobalSettings();
+        ::Microsoft::Terminal::ActivityLog::Configure(globals.ActivityLog(),
+                                                      gsl::narrow_cast<uint32_t>(std::max(0, globals.ActivityLogMaxKilobytes())));
+    }
+    CATCH_LOG()
+
     // Method Description:
     // - Reloads the settings from the settings.json file.
     // - When this is called the first time, this initializes our settings. See
@@ -442,6 +457,7 @@ namespace winrt::TerminalApp::implementation
         }
 
         _ApplyLanguageSettingChange();
+        _ApplyActivityLogSettingChange();
         _ProcessLazySettingsChanges();
 
         if (initialLoad)
