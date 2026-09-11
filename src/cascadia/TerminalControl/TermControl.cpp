@@ -5657,12 +5657,28 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             heading.TextWrapping(TextWrapping::Wrap);
             text.Children().Append(heading);
 
-            Controls::TextBlock body;
-            body.Text(comment.Body());
-            body.TextWrapping(TextWrapping::Wrap);
-            body.MaxLines(6);
-            body.IsTextSelectionEnabled(true);
-            text.Children().Append(body);
+            bool rendered = false;
+            if (tab.Format() == L"markdown" && !comment.Body().empty())
+            {
+                try
+                {
+                    auto body = winrt::Microsoft::Terminal::UI::Markdown::Builder::Convert(comment.Body(), L"");
+                    body.MaxHeight(180);
+                    body.IsTextSelectionEnabled(true);
+                    text.Children().Append(body);
+                    rendered = true;
+                }
+                CATCH_LOG();
+            }
+            if (!rendered)
+            {
+                Controls::TextBlock body;
+                body.Text(comment.Body());
+                body.TextWrapping(TextWrapping::Wrap);
+                body.MaxLines(6);
+                body.IsTextSelectionEnabled(true);
+                text.Children().Append(body);
+            }
 
             Controls::Grid::SetColumn(text, 1);
             entry.Children().Append(text);

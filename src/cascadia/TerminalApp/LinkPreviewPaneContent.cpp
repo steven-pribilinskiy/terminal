@@ -443,7 +443,7 @@ namespace winrt::TerminalApp::implementation
             text.Children().Append(heading);
 
             // A comment body is formatted the same way its tab says, exactly like a
-            // Body tab: GitHub's arrive as markdown and Jira's as flattened text, and
+            // Body tab: GitHub and Jira's ADF both arrive as Markdown, and
             // nothing on the comment itself tells the two apart.
             text.Children().Append(_makeBodyElement(comment.Body(), tab.Format()));
 

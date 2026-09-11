@@ -22,6 +22,10 @@ Formatted mode displays YAML frontmatter as metadata and applies syntax colors t
 code. Invalid metadata retains its original YAML with an error. Raw mode preserves the
 source; source-code file previews also use syntax highlighting.
 
+Comment lists respect the tab's body format in both the hover card and pane. Jira's ADF
+comments and GitHub's Markdown comments render emphasis, links, lists and code instead of
+showing literal markup.
+
 The file footer shows the full language or file type, a shared Lintel icon and readable size.
 Lintel's `file-types.json` owns these names, icons, extensions and special filenames such as
 Dockerfile. A source location like `Program.cs#L194` still matches the source-code rule.
