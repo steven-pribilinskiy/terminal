@@ -8,7 +8,7 @@
 struct MarkdownToXaml
 {
 public:
-    static winrt::Windows::UI::Xaml::Controls::RichTextBlock Convert(std::string_view markdownText, const winrt::hstring& baseUrl);
+    static winrt::Windows::UI::Xaml::Controls::RichTextBlock Convert(std::string_view markdownText, const winrt::hstring& baseUrl, size_t depth = 0);
 
 private:
     MarkdownToXaml(const winrt::hstring& baseUrl);
@@ -35,4 +35,5 @@ private:
     winrt::Windows::UI::Xaml::Controls::TextBlock _makeDefaultTextBlock();
 
     void _RenderNode(cmark_node* node, cmark_event_type ev_type);
+    void _AppendBlock(const winrt::Windows::UI::Xaml::FrameworkElement& element);
 };

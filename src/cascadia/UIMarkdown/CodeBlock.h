@@ -26,6 +26,11 @@ namespace winrt::Microsoft::Terminal::UI::Markdown::implementation
         friend struct CodeBlockT<CodeBlock>; // for Xaml to bind events
 
         void _playPressed(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::TappedRoutedEventArgs& e);
+        void _copyClicked(const Windows::Foundation::IInspectable&, const Windows::UI::Xaml::RoutedEventArgs&);
+        void _wrapClicked(const Windows::Foundation::IInspectable&, const Windows::UI::Xaml::RoutedEventArgs&);
+        void _updateWrapButton();
+        Windows::UI::Xaml::Controls::TextBlock _codeText{ nullptr };
+        bool _wrapped = false;
     };
 
     struct RequestRunCommandsArgs : RequestRunCommandsArgsT<RequestRunCommandsArgs>

@@ -17,6 +17,8 @@
 #include "../TerminalApp/FilePreviewReader.h"
 #include <filesystem>
 #include "../UIMarkdown/SyntaxHighlight.h"
+#include "../UIMarkdown/MarkdownBlocks.h"
+#include "../UIMarkdown/AdfMarkdown.h"
 #include "../inc/LintelFileTypes.g.h"
 #ifndef FILE_PREVIEW_STANDALONE
 #include "../UIMarkdown/Frontmatter.h"
@@ -83,6 +85,8 @@ namespace ControlUnitTests
         TEST_METHOD(SourceLocations);
         TEST_METHOD(SyntaxTokens);
         TEST_METHOD(SyntaxTokenWinRTText);
+        TEST_METHOD(RichMarkdownBlocks);
+        TEST_METHOD(JiraAdfBlocks);
 #ifndef FILE_PREVIEW_STANDALONE
         TEST_METHOD(YamlFrontmatter);
 #endif
@@ -147,6 +151,42 @@ namespace ControlUnitTests
         VERIFY_ARE_EQUAL(source, rebuilt);
         setText(MarkdownPreview::TokenText(source, { 0, 0, MarkdownPreview::TokenKind::Plain }));
         VERIFY_ARE_EQUAL(source, rebuilt);
+    }
+
+    void FilePreviewTests::RichMarkdownBlocks()
+    {
+        const auto blocks = MarkdownPreview::ParseRichBlocks("Before\n\n| Name | Value |\n| --- | --- |\n| A\\|B | `x|y` |\n\n> [!WARNING]\n> **Careful**\n>\n> Next paragraph\n\n```md\n| Raw | Table |\n| --- | --- |\n```\n");
+        const auto table = std::find_if(blocks.begin(), blocks.end(), [](const auto& block) { return block.kind == MarkdownPreview::RichBlock::Kind::Table; });
+        VERIFY_IS_TRUE(table != blocks.end());
+        VERIFY_ARE_EQUAL(size_t{ 2 }, table->rows.size());
+        VERIFY_ARE_EQUAL(std::string{ "A|B" }, table->rows[1][0]);
+        VERIFY_ARE_EQUAL(std::string{ "`x|y`" }, table->rows[1][1]);
+        const auto alert = std::find_if(blocks.begin(), blocks.end(), [](const auto& block) { return block.kind == MarkdownPreview::RichBlock::Kind::Callout; });
+        VERIFY_IS_TRUE(alert != blocks.end());
+        VERIFY_ARE_EQUAL(std::string{ "WARNING" }, alert->tone);
+        VERIFY_IS_TRUE(alert->text.find("**Careful**\n\nNext paragraph") != std::string::npos);
+        VERIFY_IS_TRUE(blocks.back().text.find("| Raw | Table |") != std::string::npos);
+        VERIFY_IS_FALSE(MarkdownPreview::TableDivider("| name | value |"));
+        VERIFY_IS_TRUE(MarkdownPreview::TableDivider("| :--- | ---: |"));
+    }
+
+    void FilePreviewTests::JiraAdfBlocks()
+    {
+        winrt::init_apartment();
+        const auto node = winrt::Windows::Data::Json::JsonObject::Parse(LR"({"type":"doc","content":[{"type":"panel","attrs":{"panelType":"error"},"content":[{"type":"paragraph","content":[{"type":"text","text":"Stop","marks":[{"type":"strong"}]}]}]},{"type":"table","content":[{"type":"tableRow","content":[{"type":"tableHeader","content":[{"type":"paragraph","content":[{"type":"text","text":"Name"}]}]},{"type":"tableHeader","content":[{"type":"paragraph","content":[{"type":"text","text":"Result"}]}]}]},{"type":"tableRow","content":[{"type":"tableCell","content":[{"type":"paragraph","content":[{"type":"text","text":"A|B"}]}]},{"type":"tableCell","content":[{"type":"paragraph","content":[{"type":"text","text":"422"}]}]}]}]},{"type":"codeBlock","attrs":{"language":"typescript"},"content":[{"type":"text","text":"const n = 1;"}]}]})");
+        std::wstring markdown;
+        MarkdownPreview::FlattenAdf(node, markdown, 0);
+        const auto blocks = MarkdownPreview::ParseRichBlocks(winrt::to_string(markdown));
+        const auto alert = std::find_if(blocks.begin(), blocks.end(), [](const auto& block) { return block.kind == MarkdownPreview::RichBlock::Kind::Callout; });
+        VERIFY_IS_TRUE(alert != blocks.end());
+        VERIFY_ARE_EQUAL(std::string{ "ERROR" }, alert->tone);
+        VERIFY_IS_TRUE(alert->text.find("**Stop**") != std::string::npos);
+        const auto table = std::find_if(blocks.begin(), blocks.end(), [](const auto& block) { return block.kind == MarkdownPreview::RichBlock::Kind::Table; });
+        VERIFY_IS_TRUE(table != blocks.end());
+        VERIFY_ARE_EQUAL(std::string{ "A|B" }, table->rows[1][0]);
+        VERIFY_ARE_EQUAL(std::string{ "422" }, table->rows[1][1]);
+        VERIFY_IS_TRUE(markdown.find(L"```typescript\nconst n = 1;\n```") != std::wstring::npos);
+        winrt::uninit_apartment();
     }
 
 #ifndef FILE_PREVIEW_STANDALONE
@@ -250,7 +290,9 @@ int main()
         tests.SourceLocations();
         tests.SyntaxTokens();
         tests.SyntaxTokenWinRTText();
-        std::cout << "All 8 native file preview tests passed.\n";
+        tests.RichMarkdownBlocks();
+        tests.JiraAdfBlocks();
+        std::cout << "All 10 native file preview tests passed.\n";
         return 0;
     }
     catch (const std::exception& error)

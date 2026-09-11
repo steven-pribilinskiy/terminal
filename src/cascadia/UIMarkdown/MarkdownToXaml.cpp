@@ -4,6 +4,8 @@
 #include "pch.h"
 #include "CodeBlock.h"
 #include "MarkdownToXaml.h"
+#include "MarkdownBlocks.h"
+#include <winrt/Windows.UI.Xaml.Automation.h>
 
 #include <cmark.h>
 
@@ -53,20 +55,115 @@ typedef wil::unique_any<cmark_iter*, decltype(&cmark_iter_free), cmark_iter_free
 //   to be appropriately resolved.
 // Return Value:
 // - a RichTextBlock with the rendered markdown in it.
-WUX::Controls::RichTextBlock MarkdownToXaml::Convert(std::string_view markdownText, const winrt::hstring& baseUrl)
+WUX::Controls::RichTextBlock MarkdownToXaml::Convert(std::string_view markdownText, const winrt::hstring& baseUrl, size_t depth)
 {
     MarkdownToXaml data{ baseUrl };
-
-    unique_node doc{ cmark_parse_document(markdownText.data(), markdownText.size(), CMARK_OPT_DEFAULT) };
-    unique_iter iter{ cmark_iter_new(doc.get()) };
-    cmark_event_type ev_type;
-
-    while ((ev_type = cmark_iter_next(iter.get())) != CMARK_EVENT_DONE)
+    if (depth > 8)
     {
-        data._RenderNode(cmark_iter_get_node(iter.get()), ev_type);
+        data._NewRun().Text(winrt::to_hstring(markdownText));
+        return data._root;
+    }
+    for (const auto& block : MarkdownPreview::ParseRichBlocks(markdownText))
+    {
+        if (block.kind == MarkdownPreview::RichBlock::Kind::Table)
+        {
+            WUX::Controls::Grid table;
+            const auto columns = std::min<size_t>(32, block.rows.front().size());
+            for (size_t col = 0; col < columns; ++col)
+            {
+                WUX::Controls::ColumnDefinition column;
+                column.Width(WUX::GridLength{ 1, WUX::GridUnitType::Star });
+                table.ColumnDefinitions().Append(column);
+            }
+            for (size_t row = 0; row < block.rows.size(); ++row)
+            {
+                WUX::Controls::RowDefinition definition;
+                definition.Height(WUX::GridLength{ 0, WUX::GridUnitType::Auto });
+                table.RowDefinitions().Append(definition);
+                for (size_t col = 0; col < columns; ++col)
+                {
+                    auto text = col < block.rows[row].size() ? block.rows[row][col] : std::string{};
+                    for (size_t pos = 0; (pos = text.find("<br>", pos)) != text.npos; pos += 3) text.replace(pos, 4, "  \n");
+                    auto body = Convert(text, baseUrl, depth + 1);
+                    body.TextWrapping(WUX::TextWrapping::Wrap);
+                    if (!row) body.FontWeight(Windows::UI::Text::FontWeights::SemiBold());
+                    WUX::Controls::Border cell;
+                    cell.Padding(WUX::Thickness{ 8, 7, 8, 7 });
+                    cell.BorderThickness(WUX::Thickness{ 0.5, 0.5, 0.5, 0.5 });
+                    cell.BorderBrush(WUX::Media::SolidColorBrush{ Windows::UI::Color{ 70, 128, 128, 128 } });
+                    if (!row) cell.Background(WUX::Media::SolidColorBrush{ Windows::UI::Color{ 35, 128, 128, 128 } });
+                    cell.Child(body);
+                    WUX::Controls::Grid::SetRow(cell, static_cast<int32_t>(row));
+                    WUX::Controls::Grid::SetColumn(cell, static_cast<int32_t>(col));
+                    table.Children().Append(cell);
+                }
+            }
+            data._AppendBlock(table);
+        }
+        else if (block.kind == MarkdownPreview::RichBlock::Kind::Callout)
+        {
+            const bool warning = block.tone == "WARNING" || block.tone == "IMPORTANT";
+            const bool error = block.tone == "ERROR" || block.tone == "CAUTION";
+            const bool success = block.tone == "SUCCESS" || block.tone == "TIP";
+            const Windows::UI::Color color = error ? Windows::UI::Color{ 40, 220, 65, 45 } : warning ? Windows::UI::Color{ 40, 220, 175, 0 } : success ? Windows::UI::Color{ 40, 40, 170, 95 } : Windows::UI::Color{ 40, 65, 130, 230 };
+            WUX::Controls::Grid grid;
+            WUX::Controls::ColumnDefinition iconColumn;
+            iconColumn.Width(WUX::GridLength{ 28, WUX::GridUnitType::Pixel });
+            grid.ColumnDefinitions().Append(iconColumn);
+            WUX::Controls::ColumnDefinition bodyColumn;
+            bodyColumn.Width(WUX::GridLength{ 1, WUX::GridUnitType::Star });
+            grid.ColumnDefinitions().Append(bodyColumn);
+            WUX::Controls::TextBlock icon;
+            icon.Text(error ? L"⊗" : warning ? L"⚠" : success ? L"✓" : L"ⓘ");
+            icon.FontSize(18);
+            WUX::Automation::AutomationProperties::SetName(icon, winrt::to_hstring(block.tone));
+            grid.Children().Append(icon);
+            const auto body = Convert(block.text, baseUrl, depth + 1);
+            WUX::Controls::Grid::SetColumn(body, 1);
+            grid.Children().Append(body);
+            WUX::Controls::Border card;
+            card.Padding(WUX::Thickness{ 12, 10, 12, 10 });
+            card.CornerRadius(WUX::CornerRadius{ 4, 4, 4, 4 });
+            card.Background(WUX::Media::SolidColorBrush{ color });
+            card.Child(grid);
+            data._AppendBlock(card);
+        }
+        else
+        {
+            data._EndParagraph();
+            unique_node doc{ cmark_parse_document(block.text.data(), block.text.size(), CMARK_OPT_DEFAULT) };
+            unique_iter iter{ cmark_iter_new(doc.get()) };
+            cmark_event_type ev_type;
+            while ((ev_type = cmark_iter_next(iter.get())) != CMARK_EVENT_DONE)
+                data._RenderNode(cmark_iter_get_node(iter.get()), ev_type);
+        }
     }
 
     return data._root;
+}
+
+void MarkdownToXaml::_AppendBlock(const WUX::FrameworkElement& element)
+{
+    _EndParagraph();
+    WUX::Documents::InlineUIContainer container;
+    container.Child(element);
+    _CurrentParagraph().Inlines().Append(container);
+    _CurrentParagraph().Margin(WUX::Thickness{ 0, 8, 0, 8 });
+    // Inline controls otherwise measure to their intrinsic width and can escape
+    // the pane. Reflow them with the owning rich-text block on every resize.
+    const auto resize = [root = winrt::make_weak(_root), child = winrt::make_weak(element), indent = _indent] {
+        try
+        {
+            const auto owner = root.get();
+            const auto content = child.get();
+            if (owner && content && owner.ActualWidth() > 0)
+                content.Width(std::max(1.0, owner.ActualWidth() - IndentWidth * indent));
+        }
+        CATCH_LOG();
+    };
+    _root.SizeChanged([resize](auto&&, auto&&) { resize(); });
+    element.Loaded([resize](auto&&, auto&&) { resize(); });
+    _EndParagraph();
 }
 
 MarkdownToXaml::MarkdownToXaml(const winrt::hstring& baseUrl) :
@@ -256,11 +353,7 @@ void MarkdownToXaml::_RenderNode(cmark_node* node, cmark_event_type ev_type)
         const std::wstring_view codeView{ codeHstring.c_str(), codeHstring.empty() ? 0 : codeHstring.size() - 1 };
 
         auto codeBlock = winrt::make<winrt::Microsoft::Terminal::UI::Markdown::implementation::CodeBlock>(winrt::hstring{ codeView }, winrt::to_hstring(cmark_node_get_fence_info(node) ? cmark_node_get_fence_info(node) : ""));
-        WUX::Documents::InlineUIContainer codeContainer{};
-        codeContainer.Child(codeBlock);
-        _CurrentParagraph().Inlines().Append(codeContainer);
-
-        _EndParagraph();
+        _AppendBlock(codeBlock);
     }
     break;
 

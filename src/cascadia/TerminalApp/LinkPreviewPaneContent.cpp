@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 #include "pch.h"
+#include <winrt/Windows.UI.Xaml.Shapes.h>
 #include "LinkPreviewPaneContent.h"
 #include "LinkPreviewPaneContent.g.cpp"
 
@@ -347,9 +348,7 @@ namespace winrt::TerminalApp::implementation
         return grid;
     }
 
-    // Unlike the card, the pane has room to render a markdown body as markdown.
-    // Format is only ever "text" or "markdown": an ADF document is flattened to text
-    // in the service and reported as "text", so there is no third branch to write.
+    // Jira ADF and Markdown share the rich renderer in both the card and pane.
     UIElement LinkPreviewPaneContent::_makeBodyElement(const winrt::hstring& body, const winrt::hstring& format)
     {
         if (til::equals_insensitive_ascii(std::wstring_view{ format }, L"markdown") && !body.empty())
@@ -401,7 +400,7 @@ namespace winrt::TerminalApp::implementation
             }
 
             Controls::Grid entry;
-            entry.ColumnSpacing(8);
+            entry.ColumnSpacing(12);
             {
                 Controls::ColumnDefinition avatarColumn;
                 avatarColumn.Width(GridLength{ 0, GridUnitType::Auto });
@@ -414,11 +413,14 @@ namespace winrt::TerminalApp::implementation
 
             if (const auto avatar = comment.AvatarUri(); !avatar.empty())
             {
-                Controls::Image image;
-                image.Width(24);
-                image.Height(24);
+                Windows::UI::Xaml::Shapes::Ellipse image;
+                image.Width(40);
+                image.Height(40);
                 image.VerticalAlignment(VerticalAlignment::Top);
-                image.Source(Control::HyperlinkPreviewHelpers::ImageFromUri(avatar));
+                Media::ImageBrush brush;
+                brush.ImageSource(Control::HyperlinkPreviewHelpers::ImageFromUri(avatar));
+                brush.Stretch(Media::Stretch::UniformToFill);
+                image.Fill(brush);
                 Controls::Grid::SetColumn(image, 0);
                 entry.Children().Append(image);
             }
@@ -427,20 +429,20 @@ namespace winrt::TerminalApp::implementation
             text.Spacing(2);
 
             Controls::TextBlock heading;
-            auto headingText = std::wstring{ comment.Author() };
-            if (const auto time = comment.Time(); !time.empty())
-            {
-                if (!headingText.empty())
-                {
-                    headingText.append(L" · ");
-                }
-                headingText.append(std::wstring_view{ time });
-            }
-            heading.Text(winrt::hstring{ headingText });
-            heading.Opacity(0.7);
-            heading.FontSize(12);
+            heading.Text(comment.Author());
+            heading.FontSize(16);
+            heading.FontWeight(Windows::UI::Text::FontWeights::SemiBold());
             heading.TextWrapping(TextWrapping::Wrap);
             text.Children().Append(heading);
+            if (!comment.Time().empty())
+            {
+                Controls::TextBlock time;
+                time.Text(comment.Time());
+                time.FontSize(12);
+                time.Opacity(0.7);
+                time.Margin(Thickness{ 0, 0, 0, 8 });
+                text.Children().Append(time);
+            }
 
             // A comment body is formatted the same way its tab says, exactly like a
             // Body tab: GitHub and Jira's ADF both arrive as Markdown, and
