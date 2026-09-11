@@ -59,6 +59,7 @@ namespace Lintel
     inline bool Contains(std::wstring_view list, std::wstring_view value) { return !value.empty() && list.find(L"|" + std::wstring{value} + L"|") != list.npos; }
     inline const FileType& FindFileType(std::wstring_view path)
     {
+        if (path.find(L"://") != path.npos) path = path.substr(0, path.find_first_of(L"?#"));
         const auto extension = ExtensionOf(path);
         const auto name = Lower(path.substr(path.find_last_of(L"/\\") + 1));
         for (const auto& type : FileTypes) if (Contains(type.extensions, extension) || Contains(type.filenames, name)) return type;

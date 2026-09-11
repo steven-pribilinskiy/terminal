@@ -3912,13 +3912,13 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             const auto hasExtensionCriteria = group != Control::HyperlinkFileTypeGroup::None || (customExtensions && customExtensions.Size() > 0);
             if (!isTextRule && hasExtensionCriteria)
             {
-                if (extension.empty())
+                if (!isFileLink)
                 {
                     continue;
                 }
 
-                auto matches = HyperlinkFileTypeGroups::ExtensionInGroup(group, extension);
-                if (!matches && customExtensions)
+                auto matches = HyperlinkFileTypeGroups::PathInGroup(group, uri);
+                if (!matches && !extension.empty() && customExtensions)
                 {
                     matches = std::any_of(begin(customExtensions), end(customExtensions), [&](const auto& e) {
                         return til::equals_insensitive_ascii(std::wstring_view{ extension }, std::wstring_view{ e });

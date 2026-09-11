@@ -3,18 +3,19 @@
 #include "../inc/LintelFileTypes.g.h"
 namespace winrt::Microsoft::Terminal::Control::HyperlinkFileTypeGroups
 {
-    inline bool ExtensionInGroup(HyperlinkFileTypeGroup group, const std::wstring_view& extension)
+    inline bool PathInGroup(HyperlinkFileTypeGroup group, const std::wstring_view& path)
     {
+        const auto& type = Lintel::FindFileType(path);
         switch (group)
         {
-        case HyperlinkFileTypeGroup::Image: return Lintel::GroupContains(L"image", extension);
-        case HyperlinkFileTypeGroup::Video: return Lintel::GroupContains(L"video", extension);
-        case HyperlinkFileTypeGroup::Audio: return Lintel::GroupContains(L"audio", extension);
-        case HyperlinkFileTypeGroup::Media: return Lintel::GroupContains(L"media", extension);
-        case HyperlinkFileTypeGroup::SourceCode: return Lintel::GroupContains(L"sourceCode", extension);
-        case HyperlinkFileTypeGroup::Document: return Lintel::GroupContains(L"document", extension);
-        case HyperlinkFileTypeGroup::Archive: return Lintel::GroupContains(L"archive", extension);
-        case HyperlinkFileTypeGroup::Executable: return Lintel::GroupContains(L"executable", extension);
+        case HyperlinkFileTypeGroup::Image: return Lintel::Contains(type.groups, L"image");
+        case HyperlinkFileTypeGroup::Video: return Lintel::Contains(type.groups, L"video");
+        case HyperlinkFileTypeGroup::Audio: return Lintel::Contains(type.groups, L"audio");
+        case HyperlinkFileTypeGroup::Media: return Lintel::Contains(type.groups, L"media");
+        case HyperlinkFileTypeGroup::SourceCode: return Lintel::Contains(type.groups, L"sourceCode");
+        case HyperlinkFileTypeGroup::Document: return Lintel::Contains(type.groups, L"document");
+        case HyperlinkFileTypeGroup::Archive: return Lintel::Contains(type.groups, L"archive");
+        case HyperlinkFileTypeGroup::Executable: return Lintel::Contains(type.groups, L"executable");
         default: return false;
         }
     }

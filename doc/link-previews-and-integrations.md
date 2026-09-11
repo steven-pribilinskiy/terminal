@@ -4,8 +4,8 @@ Hovering a link (or a piece of plain text that a rule recognizes) in the termina
 card with live information pulled from an external tool — a GitHub pull request's state and
 checks, a Jira issue's summary and status, a Slack message's author and text, a Stith session's
 name and state. This is driven by **integration plugins**: small JSON manifests that describe how
-to recognize a match, how to fetch data for it, and how to display the result. Five ship built in:
-**GitHub**, **Jira**, **Slack**, **Stith**, and **shefrd**.
+to recognize a match, how to fetch data for it, and how to display the result. Six ship built in:
+**GitHub**, **Jira**, **Slack**, **Stith**, **shefrd**, and **Unblocked Code**.
 
 This document covers the feature end to end: what ships out of the box, the Integrations
 settings page, text-pattern matching, the plugin manifest format for anyone writing their own,
@@ -16,6 +16,21 @@ The manifest format is **Lintel**, shared with the Tabby fork and specified at
 canonical copies of the built-ins live in the `lintel` repo and are synced into this one.
 
 ## What a link preview is
+
+Local Markdown previews offer **Formatted / Raw** buttons in both the hover card and pane.
+Formatted mode displays YAML frontmatter as metadata and applies syntax colors to fenced
+code. Invalid metadata retains its original YAML with an error. Raw mode preserves the
+source; source-code file previews also use syntax highlighting.
+
+The file footer shows the full language or file type, a shared Lintel icon and readable size.
+Lintel's `file-types.json` owns these names, icons, extensions and special filenames such as
+Dockerfile. A source location like `Program.cs#L194` still matches the source-code rule.
+
+Both preset menus have search. The rule editor's **Duplicate rule** button makes an
+independent copy of the current rule and its actions. The shared catalog includes Unblocked
+Code task IDs: `UNB-123` opens `https://getunblocked.com/dashboard/team/current/coding-task/UNB-123`.
+Add its preset from Link Tooltip settings. To contribute a new preset without building a
+terminal, use [Lintel's proposal form or contribution wizard](https://github.com/aylith-labs/lintel/blob/main/CONTRIBUTING.md).
 
 Hover a hyperlink (or a text match — see below) that a plugin recognizes, and the hyperlink card
 grows a section below the usual link target: an icon and name for the plugin, then a small set of

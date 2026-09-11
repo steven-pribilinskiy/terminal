@@ -96,6 +96,9 @@ namespace ControlUnitTests
         VERIFY_ARE_EQUAL(std::wstring{ L"C#" }, std::wstring{ Lintel::FindFileType(L"file:///src/Program.cs#L194").name });
         VERIFY_ARE_EQUAL(std::wstring{ L"Markdown" }, std::wstring{ Lintel::FindFileType(L"README.MD").name });
         VERIFY_ARE_EQUAL(std::wstring{ L"Dockerfile" }, std::wstring{ Lintel::FindFileType(L"/src/Dockerfile").name });
+        VERIFY_IS_TRUE(Lintel::Contains(Lintel::FindFileType(L"file:///src/Dockerfile#L8").groups, L"sourceCode"));
+        VERIFY_ARE_EQUAL(std::wstring{ L"Makefile" }, std::wstring{ Lintel::FindFileType(L"file:///src/Makefile?raw#L4").name });
+        VERIFY_ARE_EQUAL(std::wstring{ L"C#" }, std::wstring{ Lintel::FindFileType(L"/src/hash#name.cs").name });
         VERIFY_IS_TRUE(Lintel::ExtensionOf(L"/home/user.name/README").empty());
     }
 
