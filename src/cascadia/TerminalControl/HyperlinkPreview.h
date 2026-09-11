@@ -164,6 +164,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         HyperlinkPreviewHelpers() = default;
 
         static bool HasNestedPreview();
+        static Windows::UI::Xaml::Controls::RichTextBlock CreateTextView(const hstring& text, const Control::IHyperlinkPreviewProvider& provider, const Control::IControlSettings& settings, bool compact, int32_t depth);
         static void AttachLinkTooltips(const Windows::UI::Xaml::FrameworkElement& root, const Control::IHyperlinkPreviewProvider& provider, const Control::IControlSettings& settings, bool compact, int32_t depth);
 
         static Windows::UI::Xaml::FrameworkElement CreateFileView(const Control::HyperlinkPreview& preview, bool compact);

@@ -438,11 +438,7 @@ namespace winrt::TerminalApp::implementation
             CATCH_LOG();
         }
 
-        Controls::TextBlock text;
-        text.Text(body);
-        text.TextWrapping(TextWrapping::Wrap);
-        text.IsTextSelectionEnabled(true);
-        return text;
+        return Control::HyperlinkPreviewHelpers::CreateTextView(body, _provider, _linkSettings, _compact, _depth);
     }
 
     void LinkPreviewPaneContent::_renderBody(const Control::HyperlinkPreviewTab& tab)

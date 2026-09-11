@@ -188,6 +188,7 @@ namespace Microsoft.Terminal.Control
     // x:Bind helpers for the card's preview template.
     static runtimeclass HyperlinkPreviewHelpers
     {
+        static Windows.UI.Xaml.Controls.RichTextBlock CreateTextView(String text, IHyperlinkPreviewProvider provider, IControlSettings settings, Boolean compact, Int32 depth);
         static void AttachLinkTooltips(Windows.UI.Xaml.FrameworkElement root, IHyperlinkPreviewProvider provider, IControlSettings settings, Boolean compact, Int32 depth);
         static Boolean HasNestedPreview { get; };
         static Windows.UI.Xaml.FrameworkElement CreateFileView(HyperlinkPreview preview, Boolean compact);

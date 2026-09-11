@@ -5464,11 +5464,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             }
             if (!rendered)
             {
-                Controls::TextBlock body;
-                body.Text(comment.Body());
-                body.TextWrapping(TextWrapping::Wrap);
+                auto body = Control::HyperlinkPreviewHelpers::CreateTextView(comment.Body(), _hyperlinkPreviewProvider, _core.Settings(), true, 0);
                 body.MaxLines(6);
-                body.IsTextSelectionEnabled(true);
                 text.Children().Append(body);
             }
 
@@ -5589,8 +5586,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
             if (!rendered)
             {
-                HyperlinkCardBodyMarkdown().Content(nullptr);
-                HyperlinkCardBody().Text(tab.Body());
+                HyperlinkCardBodyMarkdown().Content(Control::HyperlinkPreviewHelpers::CreateTextView(tab.Body(), _hyperlinkPreviewProvider, _core.Settings(), true, 0));
+                rendered = true;
             }
 
             HyperlinkCardBody().Visibility(rendered ? Visibility::Collapsed : Visibility::Visible);

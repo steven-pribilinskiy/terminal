@@ -178,6 +178,18 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
     }
 
+    Windows::UI::Xaml::Controls::RichTextBlock HyperlinkPreviewHelpers::CreateTextView(const hstring& text, const Control::IHyperlinkPreviewProvider& provider, const Control::IControlSettings& settings, bool compact, int32_t depth)
+    {
+        Embedded::C::RichTextBlock view;
+        Embedded::D::Paragraph paragraph;
+        Embedded::D::Run run; run.Text(text);
+        paragraph.Inlines().Append(run); view.Blocks().Append(paragraph);
+        view.TextWrapping(Embedded::X::TextWrapping::Wrap);
+        view.IsTextSelectionEnabled(true);
+        AttachLinkTooltips(view, provider, settings, compact, depth);
+        return view;
+    }
+
     bool HyperlinkPreviewHelpers::HasNestedPreview() { return Embedded::activePopups > 0; }
 
     void HyperlinkPreviewHelpers::AttachLinkTooltips(const Windows::UI::Xaml::FrameworkElement& root, const Control::IHyperlinkPreviewProvider& provider, const Control::IControlSettings& settings, bool compact, int32_t depth)
