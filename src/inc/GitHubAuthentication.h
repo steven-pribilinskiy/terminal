@@ -28,7 +28,7 @@ namespace Microsoft::Terminal
     }
     inline std::wstring GitHubToken(const std::wstring& fallback)
     {
-        const auto output = TerminalUtils::CaptureProcess(L"cmd.exe /d /c gh auth token --hostname github.com 2>nul", {}, 4000);
+        const auto output = TerminalUtils::CaptureProcess(L"gh.exe auth token --hostname github.com", {}, 4000);
         auto token = til::u8u16(output);
         while (!token.empty() && (token.back() == L'\r' || token.back() == L'\n' || token.back() == L' ')) token.pop_back();
         const auto valid = !token.empty() && std::all_of(token.begin(), token.end(), [](wchar_t ch) { return (ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z') || (ch >= L'0' && ch <= L'9') || ch == L'_'; });

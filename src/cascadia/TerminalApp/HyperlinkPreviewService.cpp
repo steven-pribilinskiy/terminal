@@ -1230,6 +1230,16 @@ namespace
                 continue;
             }
 
+            if (plugin.Id == L"github" && step.Id == L"ghtoken" && step.IsCommand)
+            {
+                const auto saved = plugin.Credentials.find(L"token");
+                const auto token = ::Microsoft::Terminal::GitHubToken(saved == plugin.Credentials.end() ? std::wstring{} : saved->second);
+                JsonObject auth;
+                auth.SetNamedValue(L"token", JsonValue::CreateStringValue(token));
+                outcome.Results[step.Id] = auth; outcome.Last = auth;
+                continue;
+            }
+
             StepOutcome stepOutcome;
             try
             {
