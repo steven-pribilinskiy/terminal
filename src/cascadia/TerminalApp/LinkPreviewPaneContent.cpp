@@ -29,11 +29,17 @@ namespace winrt::TerminalApp::implementation
     LinkPreviewPaneContent::LinkPreviewPaneContent()
     {
         InitializeComponent();
+        SourceLink().Click([weak = get_weak()](auto&&, auto&&) {
+            if (const auto self = weak.get(); self && self->_provider && self->_linkSettings)
+                self->_provider.InvokeLinkAction(self->_sourceText, self->_linkSettings, L"open");
+        });
     }
 
     void LinkPreviewPaneContent::SetLinkSettings(const Control::IControlSettings& settings, bool compact, int32_t depth)
     {
         _linkSettings = settings; _compact = compact; _depth = depth;
+        PaneChromeHeader().Visibility(compact ? Visibility::Collapsed : Visibility::Visible);
+        SourceLink().Visibility(compact ? Visibility::Collapsed : Visibility::Visible);
         CloseButton().Visibility(compact ? Visibility::Collapsed : Visibility::Visible);
         HideTooltipsSwitch().Visibility(compact ? Visibility::Collapsed : Visibility::Visible);
         TitleText().FontSize(compact ? 15 : 18);
@@ -76,6 +82,7 @@ namespace winrt::TerminalApp::implementation
         }
 
         _sourceText = text;
+        SourceLinkText().Text(text);
         _resolvedFilePath = resolvedFilePath;
         _integrationHint = integrationHint;
         _undoChoiceId = {};

@@ -95,8 +95,7 @@ namespace winrt::TerminalApp::implementation
         if (isFile && effective.showReveal) addButton(L"Show in Explorer", L"reveal");
         if (effective.showInPane) addButton(L"Show in pane", L"showInPane");
         for (const auto& action : effective.customActions) addButton(std::wstring_view{ action.Name() }, action.ActionId());
-        host.Children().Append(buttons);
-        if (effective.showPreview && effective.integration != L"none")
+        if (effective.showPreview && effective.integration != L"none" && effective.integrationDisplayMode != Control::HyperlinkIntegrationDisplayMode::None)
         {
             const auto pane = winrt::make_self<LinkPreviewPaneContent>();
             pane->SetPreviewProvider(*this);
@@ -116,6 +115,7 @@ namespace winrt::TerminalApp::implementation
             pane->GetRoot().MaxHeight(settings.HyperlinkTooltipMaxHeight() > 0 ? std::max(100.0, static_cast<double>(settings.HyperlinkTooltipMaxHeight()) - 100) : std::numeric_limits<double>::infinity());
             host.Children().Append(pane->GetRoot());
         }
+        host.Children().Append(buttons);
         if (effective.showRule)
         {
             C::TextBlock label;
@@ -123,7 +123,12 @@ namespace winrt::TerminalApp::implementation
             label.Opacity(0.7);
             host.Children().Append(label);
         }
-        return host;
+        C::ScrollViewer viewport;
+        viewport.VerticalScrollBarVisibility(C::ScrollBarVisibility::Auto);
+        viewport.HorizontalScrollBarVisibility(C::ScrollBarVisibility::Disabled);
+        viewport.HorizontalScrollMode(C::ScrollMode::Disabled);
+        viewport.Content(host);
+        return viewport;
     }
 
     Windows::Foundation::IAsyncOperation<Control::HyperlinkPreview> HyperlinkPreviewService::GetFilePreviewAsync(hstring resolvedFilePath)

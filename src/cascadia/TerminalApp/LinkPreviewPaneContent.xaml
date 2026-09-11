@@ -44,7 +44,7 @@
         </Grid.RowDefinitions>
 
         <!--  Which integration answered, and the two things you can do to the pane itself.  -->
-        <Grid Grid.Row="0"
+        <Grid x:Name="PaneChromeHeader" Grid.Row="0"
               ColumnSpacing="6">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
@@ -95,6 +95,9 @@
         </Grid>
 
         <StackPanel Grid.Row="1" Spacing="6">
+            <HyperlinkButton x:Name="SourceLink" Padding="0" HorizontalAlignment="Left">
+                <TextBlock x:Name="SourceLinkText" TextWrapping="Wrap" />
+            </HyperlinkButton>
         <TextBlock x:Name="TitleText"
 
                    FontSize="18"
