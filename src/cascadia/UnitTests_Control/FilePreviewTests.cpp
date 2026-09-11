@@ -4,13 +4,14 @@
 #include <windows.h>
 #include <cassert>
 #include <iostream>
+#include <stdexcept>
 #define BEGIN_TEST_CLASS(...)
 #define TEST_CLASS_PROPERTY(...)
 #define END_TEST_CLASS()
 #define TEST_METHOD(name) public: void name()
-#define VERIFY_ARE_EQUAL(expected, actual) assert((expected) == (actual))
-#define VERIFY_IS_TRUE(value) assert(value)
-#define VERIFY_IS_FALSE(value) assert(!(value))
+#define VERIFY_IS_TRUE(value) do { if (!(value)) throw std::runtime_error("Line " + std::to_string(__LINE__) + ": " #value); } while (false)
+#define VERIFY_ARE_EQUAL(expected, actual) VERIFY_IS_TRUE((expected) == (actual))
+#define VERIFY_IS_FALSE(value) VERIFY_IS_TRUE(!(value))
 #else
 #include "pch.h"
 #endif
@@ -289,8 +290,11 @@ int main()
         tests.RejectDtd();
         tests.SourceLocations();
         tests.SyntaxTokens();
+        std::cerr << "SyntaxTokenWinRTText\n";
         tests.SyntaxTokenWinRTText();
+        std::cerr << "RichMarkdownBlocks\n";
         tests.RichMarkdownBlocks();
+        std::cerr << "JiraAdfBlocks\n";
         tests.JiraAdfBlocks();
         std::cout << "All 10 native file preview tests passed.\n";
         return 0;
