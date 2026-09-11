@@ -136,8 +136,7 @@ namespace ControlUnitTests
         // Exercise the same WinRT parameter conversion as Run.Text, without a
         // XAML host. An unterminated view aborts here before a setter can run.
         const auto setText = [&](const winrt::param::hstring& value) {
-            winrt::hstring text;
-            winrt::copy_from_abi(text, winrt::get_abi(value));
+            const winrt::hstring& text = value;
             VERIFY_IS_TRUE(text.c_str()[text.size()] == L'\0');
             rebuilt.append(text.c_str(), text.size());
         };
