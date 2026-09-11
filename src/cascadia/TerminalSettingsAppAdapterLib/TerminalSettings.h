@@ -106,6 +106,8 @@ namespace winrt::Microsoft::Terminal::Settings
         // TerminalApp overrides these when duplicating a session
         void StartingDirectory(const hstring& startingDirectory) { _StartingDirectory = startingDirectory; }
         void Commandline(const hstring& commandline) { _Commandline = commandline; }
+        // Keep a preview pane bound to its source shell across settings reloads.
+        void PathTranslationStyle(winrt::Microsoft::Terminal::Control::PathTranslationStyle value) { _PathTranslationStyle = value; }
 
     private:
         std::optional<std::array<Microsoft::Terminal::Core::Color, COLOR_TABLE_SIZE>> _ColorTable;
