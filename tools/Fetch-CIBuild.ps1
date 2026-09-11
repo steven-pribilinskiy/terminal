@@ -23,7 +23,7 @@ Param(
     # Re-download even when the newest run is one we have already staged.
     [switch]$Force,
     # Stage a specific run instead of the newest successful one. Either the run
-    # id from `gh run list`, or any prefix of a commit sha.
+    # id from `Invoke-HiddenGitHubCli run list`, or any prefix of a commit sha.
     #
     # The point is going backwards. Without this the only build reachable is the
     # newest green one, so when a promoted build turns out not to start there is
@@ -69,6 +69,31 @@ if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
     throw 'gh is not on PATH. Install the GitHub CLI and run `gh auth login`.'
 }
 
+# A hidden PowerShell process has no console for native children to inherit.
+# Calling gh directly can allocate one and trigger Terminal delegation.
+$GitHubCliPath = (Get-Command gh -CommandType Application -ErrorAction Stop).Source
+function Invoke-HiddenGitHubCli {
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $GitHubCliPath
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    foreach ($argument in $args) { $startInfo.ArgumentList.Add([string]$argument) }
+    $process = [System.Diagnostics.Process]::Start($startInfo)
+    try {
+        $stdout = $process.StandardOutput.ReadToEndAsync()
+        $stderr = $process.StandardError.ReadToEndAsync()
+        $process.WaitForExit()
+        $script:LASTEXITCODE = $process.ExitCode
+        $output = $stdout.GetAwaiter().GetResult()
+        $errors = $stderr.GetAwaiter().GetResult()
+        if ($output) { Write-Output $output.TrimEnd() }
+        if ($errors) { Write-Error $errors.TrimEnd() -ErrorAction Continue }
+    }
+    finally { $process.Dispose() }
+}
+
 # Separate from the payload download so it can run on its own: asking for symbols
 # against a build that is already staged is the common case (you only want them
 # once a crash has happened), and the early "nothing to do" exit below would
@@ -83,7 +108,7 @@ function Get-CISymbols {
     $temp = Join-Path ([System.IO.Path]::GetTempPath()) ("wt-sym-" + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Force -Path $temp | Out-Null
     try {
-        gh run download $RunDatabaseId --repo $Repo --name $SymbolArtifact --dir $temp 2>$null
+        Invoke-HiddenGitHubCli run download $RunDatabaseId --repo $Repo --name $SymbolArtifact --dir $temp 2>$null
         if ($LASTEXITCODE -ne 0) {
             Say "No '$SymbolArtifact' artifact on run $RunDatabaseId (older build, or it expired)." ([ConsoleColor]::DarkYellow)
             return
@@ -123,11 +148,11 @@ $pinned = $RunId -or $Commit
 # are after and only successful runs have one.
 $errFile = [System.IO.Path]::GetTempFileName()
 if ($pinned) {
-    $runJson = gh run list --repo $Repo --workflow $Workflow --branch $Branch `
+    $runJson = Invoke-HiddenGitHubCli run list --repo $Repo --workflow $Workflow --branch $Branch `
         --status success --limit 60 --json databaseId,headSha,updatedAt 2>$errFile
 }
 else {
-    $runJson = gh run list --repo $Repo --workflow $Workflow --branch $Branch `
+    $runJson = Invoke-HiddenGitHubCli run list --repo $Repo --workflow $Workflow --branch $Branch `
         --status success --limit 1 --json databaseId,headSha,updatedAt 2>$errFile
 }
 $code = $LASTEXITCODE
@@ -148,14 +173,14 @@ if ($code -ne 0) {
     # before calling it benign; otherwise a silent poller would report "no builds
     # yet" forever against a repo that does not exist.
     if ($errText -match 'not found on the default branch|could not find any workflows|no runs found') {
-        gh repo view $Repo --json name > $null 2>&1
+        Invoke-HiddenGitHubCli repo view $Repo --json name > $null 2>&1
         if ($LASTEXITCODE -eq 0) {
             Say 'No CI builds yet.'
             return
         }
         throw "cannot reach $Repo -- check the repo name, and gh auth status"
     }
-    throw "gh run list failed ($code): $errText"
+    throw "Invoke-HiddenGitHubCli run list failed ($code): $errText"
 }
 
 $runs = @($runJson | ConvertFrom-Json)
@@ -209,8 +234,8 @@ Say "Fetching run $($run.databaseId) ($($run.headSha.Substring(0,9)))" ([Console
 $temp = Join-Path ([System.IO.Path]::GetTempPath()) ("wt-ci-" + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $temp | Out-Null
 try {
-    gh run download $run.databaseId --repo $Repo --name $ArtifactName --dir $temp 2>$null
-    if ($LASTEXITCODE -ne 0) { throw "gh run download failed ($LASTEXITCODE) for run $($run.databaseId)" }
+    Invoke-HiddenGitHubCli run download $run.databaseId --repo $Repo --name $ArtifactName --dir $temp 2>$null
+    if ($LASTEXITCODE -ne 0) { throw "Invoke-HiddenGitHubCli run download failed ($LASTEXITCODE) for run $($run.databaseId)" }
 
     $payloadSrc = Join-Path $temp 'dev-staged'
     $markerSrc  = Join-Path $temp 'dev-pending.json'
