@@ -12,7 +12,7 @@
 namespace winrt
 {
     namespace MUX = Microsoft::UI::Xaml;
-    namespace WUX = Windows::UI::Xaml;
+    namespace WUX = winrt::Windows::UI::Xaml;
     using IInspectable = Windows::Foundation::IInspectable;
 }
 using namespace winrt;
@@ -86,12 +86,12 @@ WUX::Controls::RichTextBlock MarkdownToXaml::Convert(std::string_view markdownTe
                     for (size_t pos = 0; (pos = text.find("<br>", pos)) != text.npos; pos += 3) text.replace(pos, 4, "  \n");
                     auto body = Convert(text, baseUrl, depth + 1);
                     body.TextWrapping(WUX::TextWrapping::Wrap);
-                    if (!row) body.FontWeight(Windows::UI::Text::FontWeights::SemiBold());
+                    if (!row) body.FontWeight(winrt::Windows::UI::Text::FontWeights::SemiBold());
                     WUX::Controls::Border cell;
                     cell.Padding(WUX::Thickness{ 8, 7, 8, 7 });
                     cell.BorderThickness(WUX::Thickness{ 0.5, 0.5, 0.5, 0.5 });
-                    cell.BorderBrush(WUX::Media::SolidColorBrush{ Windows::UI::Color{ 70, 128, 128, 128 } });
-                    if (!row) cell.Background(WUX::Media::SolidColorBrush{ Windows::UI::Color{ 35, 128, 128, 128 } });
+                    cell.BorderBrush(WUX::Media::SolidColorBrush{ winrt::Windows::UI::Color{ 70, 128, 128, 128 } });
+                    if (!row) cell.Background(WUX::Media::SolidColorBrush{ winrt::Windows::UI::Color{ 35, 128, 128, 128 } });
                     cell.Child(body);
                     WUX::Controls::Grid::SetRow(cell, static_cast<int32_t>(row));
                     WUX::Controls::Grid::SetColumn(cell, static_cast<int32_t>(col));
@@ -105,7 +105,7 @@ WUX::Controls::RichTextBlock MarkdownToXaml::Convert(std::string_view markdownTe
             const bool warning = block.tone == "WARNING" || block.tone == "IMPORTANT";
             const bool error = block.tone == "ERROR" || block.tone == "CAUTION";
             const bool success = block.tone == "SUCCESS" || block.tone == "TIP";
-            const Windows::UI::Color color = error ? Windows::UI::Color{ 40, 220, 65, 45 } : warning ? Windows::UI::Color{ 40, 220, 175, 0 } : success ? Windows::UI::Color{ 40, 40, 170, 95 } : Windows::UI::Color{ 40, 65, 130, 230 };
+            const winrt::Windows::UI::Color color = error ? winrt::Windows::UI::Color{ 40, 220, 65, 45 } : warning ? winrt::Windows::UI::Color{ 40, 220, 175, 0 } : success ? winrt::Windows::UI::Color{ 40, 40, 170, 95 } : winrt::Windows::UI::Color{ 40, 65, 130, 230 };
             WUX::Controls::Grid grid;
             WUX::Controls::ColumnDefinition iconColumn;
             iconColumn.Width(WUX::GridLength{ 28, WUX::GridUnitType::Pixel });

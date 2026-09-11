@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 #include "pch.h"
+#include <winrt/Windows.UI.Xaml.Controls.Primitives.h>
 #include "CodeBlock.h"
 #include "MarkdownPresentation.h"
 #include <winrt/Windows.ApplicationModel.DataTransfer.h>
