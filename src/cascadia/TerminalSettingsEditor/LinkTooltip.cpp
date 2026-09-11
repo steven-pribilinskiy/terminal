@@ -82,7 +82,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             else if (preset.fileTypeGroup != Model::HyperlinkFileTypeGroup::None || !preset.customExtensions.empty()) category = L"Files & Media";
             else if (preset.id.starts_with(L"git")) category = L"Git";
             auto found = std::find_if(categories.begin(), categories.end(), [&](const auto& entry) { return entry.name == category; });
-            if (found == categories.end()) { categories.push_back({ category, {} }); found = categories.end() - 1; }
+            if (found == categories.end()) { categories.push_back({ std::wstring{ category }, {} }); found = categories.end() - 1; }
             found->presets.push_back(&preset);
         }
         return categories;

@@ -11,7 +11,6 @@
 #include "ButtonChoiceViewModel.g.cpp"
 #include "EnumEntry.h"
 #include "LinkTooltipPresets.h"
-#include "../TerminalSettingsModel/HyperlinkTooltipRule.h"
 
 // Last, and deliberately: <icu.h> is a large C header full of macros, and the
 // rule preview has to compile patterns the way the control does at runtime --
@@ -1960,7 +1959,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     {
         if (!source) return nullptr;
         const auto original = get_self<HyperlinkTooltipRuleViewModel>(source)->Rule();
-        const auto rule = get_self<Model::implementation::HyperlinkTooltipRule>(original)->Copy();
+        const auto rule = original.Copy();
         const std::wstring base = (original.Name().empty() ? std::wstring{ L"Rule" } : std::wstring{ original.Name() }) + L" (copy)";
         std::wstring name = base;
         size_t count = 2;

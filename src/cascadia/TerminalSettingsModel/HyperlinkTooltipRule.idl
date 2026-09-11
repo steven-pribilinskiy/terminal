@@ -102,6 +102,8 @@ namespace Microsoft.Terminal.Settings.Model
     [default_interface] runtimeclass HyperlinkTooltipRule
     {
         HyperlinkTooltipRule();
+        // An independent copy, including criteria lists and custom actions.
+        HyperlinkTooltipRule Copy();
 
         String Name;
         Boolean Enabled;
