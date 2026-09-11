@@ -2,6 +2,7 @@
 #pragma once
 #include "../../inc/GitHubAuthentication.h"
 #include <winrt/Windows.Web.Http.h>
+#include <winrt/Windows.Web.Http.Headers.h>
 #include <winrt/Windows.Web.Http.Filters.h>
 #include <winrt/Windows.Data.Json.h>
 #include <winrt/Windows.Security.Cryptography.h>
