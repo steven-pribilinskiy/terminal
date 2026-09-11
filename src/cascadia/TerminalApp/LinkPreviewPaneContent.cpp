@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 #include "pch.h"
+#include "../inc/PreviewPresentation.h"
 #include <winrt/Windows.UI.Xaml.Shapes.h>
 #include "LinkPreviewPaneContent.h"
 #include "../TerminalSettingsAppAdapterLib/TerminalSettings.h"
@@ -342,7 +343,8 @@ namespace winrt::TerminalApp::implementation
         {
             // The title already has its own place at the top of the pane, so it is
             // skipped here rather than repeated inside the field list.
-            if (field.IsTitle() || field.Placement() == L"header" || field.Placement() == L"status")
+            if (field.IsTitle() || field.Placement() == L"header" || field.Placement() == L"status" ||
+                (_compact && ::Microsoft::Terminal::PreviewPresentation::IsZeroCount(field.Value())))
             {
                 continue;
             }
@@ -353,7 +355,8 @@ namespace winrt::TerminalApp::implementation
 
             Controls::TextBlock label;
             label.Text(field.Label());
-            label.Opacity(0.7);
+            const bool zero = ::Microsoft::Terminal::PreviewPresentation::IsZeroCount(field.Value());
+            label.Opacity(zero ? 0.45 : 0.7);
             label.VerticalAlignment(VerticalAlignment::Top);
             label.TextWrapping(TextWrapping::Wrap);
             Controls::Grid::SetRow(label, row);
@@ -363,6 +366,7 @@ namespace winrt::TerminalApp::implementation
             // A Grid and not a horizontal StackPanel: a horizontal StackPanel
             // measures with infinite width, so nothing inside it ever wraps.
             Controls::Grid cell;
+            cell.Opacity(zero ? 0.45 : 1.0);
             cell.ColumnSpacing(6);
             {
                 Controls::ColumnDefinition iconColumn;

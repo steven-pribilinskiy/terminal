@@ -331,11 +331,12 @@
                                             Value="{x:Bind ViewModel.HyperlinkTooltipMaxHeight, Mode=TwoWay}" />
                         </local:SettingsCard>
 
-                        <local:SettingsCard x:Name="HyperlinkTooltipNested" x:Uid="Globals_HyperlinkTooltipNested">
-                            <ToggleSwitch IsOn="{x:Bind ViewModel.HyperlinkTooltipNested, Mode=TwoWay}" />
-                        </local:SettingsCard>
                     </local:SettingsExpander.Items>
                 </local:SettingsExpander>
+
+                <local:SettingsCard x:Name="HyperlinkTooltipNested" x:Uid="Globals_HyperlinkTooltipNested">
+                    <ToggleSwitch IsOn="{x:Bind ViewModel.HyperlinkTooltipNested, Mode=TwoWay}" />
+                </local:SettingsCard>
 
                 <!--
                     The button row: the switch is the group's header, and what the

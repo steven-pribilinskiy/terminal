@@ -21,6 +21,7 @@
 #include "../UIMarkdown/MarkdownBlocks.h"
 #include "../UIMarkdown/AdfMarkdown.h"
 #include "../inc/LintelFileTypes.g.h"
+#include "../inc/PreviewPresentation.h"
 #include "../../inc/LintelPaths.h"
 #ifndef FILE_PREVIEW_STANDALONE
 #include "../UIMarkdown/Frontmatter.h"
@@ -90,6 +91,7 @@ namespace ControlUnitTests
         TEST_METHOD(RichMarkdownBlocks);
         TEST_METHOD(JiraAdfBlocks);
         TEST_METHOD(SharedPathResolution);
+        TEST_METHOD(PreviewFieldPresentation);
 #ifndef FILE_PREVIEW_STANDALONE
         TEST_METHOD(YamlFrontmatter);
 #endif
@@ -279,6 +281,21 @@ namespace ControlUnitTests
     }
 }
 
+void ControlUnitTests::FilePreviewTests::PreviewFieldPresentation()
+{
+    using namespace Microsoft::Terminal::PreviewPresentation;
+    VERIFY_IS_TRUE(IsCommitGroup(L"github", L"commit"));
+    VERIFY_IS_FALSE(IsCommitGroup(L"jira", L"commit"));
+    VERIFY_IS_FALSE(IsCommitGroup(L"jira", L"details"));
+    VERIFY_IS_FALSE(IsCommitGroup(L"github", L"pullRequest"));
+    VERIFY_IS_FALSE(IsCommitGroup(L"github", L""));
+    VERIFY_IS_TRUE(IsZeroCount(L"0"));
+    VERIFY_IS_FALSE(IsZeroCount(L"10"));
+    VERIFY_IS_FALSE(IsZeroCount(L"0%"));
+    VERIFY_IS_FALSE(IsZeroCount(L""));
+    VERIFY_IS_FALSE(IsZeroCount(L"AT-0"));
+}
+
 void ControlUnitTests::FilePreviewTests::SharedPathResolution()
 {
     const auto windows = Lintel::PathCandidates(LR"(Z:\home\stevenp\x.png)", true, L"Ubuntu", { L"Debian" });
@@ -316,7 +333,8 @@ int main()
         std::cerr << "JiraAdfBlocks\n";
         tests.JiraAdfBlocks();
         tests.SharedPathResolution();
-        std::cout << "All 11 native file preview tests passed.\n";
+        tests.PreviewFieldPresentation();
+        std::cout << "All 12 native file preview tests passed.\n";
         return 0;
     }
     catch (const winrt::hresult_error& error)

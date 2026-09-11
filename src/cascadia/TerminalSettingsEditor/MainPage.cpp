@@ -114,6 +114,17 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _profilesPageVM{ winrt::make<ProfilesPageViewModel>() }
     {
         InitializeComponent();
+        // The shortcuts list owns its scrolling. Letting the page's ScrollViewer
+        // measure it with infinite height disables ListView virtualization.
+        contentFrame().Navigated([weakThis = get_weak()](auto&&, const Navigation::NavigationEventArgs& args) {
+            if (const auto self = weakThis.get())
+            {
+                const bool shortcuts = args.Content().try_as<Editor::Actions>() != nullptr;
+                const auto scroll = self->SettingsMainPage_ScrollViewer();
+                scroll.VerticalScrollBarVisibility(shortcuts ? ScrollBarVisibility::Disabled : ScrollBarVisibility::Auto);
+                scroll.VerticalScrollMode(shortcuts ? ScrollMode::Disabled : ScrollMode::Enabled);
+            }
+        });
         _UpdateBackgroundForMica();
 
         _newTabMenuPageVM = winrt::make<NewTabMenuViewModel>(_settingsClone);

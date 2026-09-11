@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 #include "pch.h"
+#include "../inc/PreviewPresentation.h"
 #include "../../inc/LintelPaths.h"
 #include "TermControl.h"
 
@@ -5115,6 +5116,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             {
                 continue;
             }
+            // Field labels are presentation, not identity: Jira also has a Parent.
+            // Only GitHub's explicit commit group selects this specialized view.
+            if (::Microsoft::Terminal::PreviewPresentation::IsCommitGroup(preview.IntegrationId(), f.Group())) isCommit = true;
             const auto label = f.Label();
             const auto val = f.Value();
             if (f.IsTitle() && (label == L"Message" || label.empty()))
@@ -5138,12 +5142,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             }
             else if (label == L"Commit")
             {
-                isCommit = true;
                 commitSha = val;
             }
             else if (label == L"Parent")
             {
-                isCommit = true;
                 commitParent = val;
             }
             else if (label == L"Added")
@@ -5157,21 +5159,6 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             else if (label == L"Files changed")
             {
                 commitFilesCount = _wtoi(val.c_str());
-            }
-        }
-
-        if (!isCommit && !_hoveredUri.empty())
-        {
-            static const std::wregex commitRe{ LR"(/commit/([0-9a-fA-F]{7,40}))", std::regex_constants::ECMAScript | std::regex_constants::icase };
-            std::wsmatch match;
-            std::wstring uriStr{ _hoveredUri };
-            if (std::regex_search(uriStr, match, commitRe))
-            {
-                isCommit = true;
-                if (commitSha.empty())
-                {
-                    commitSha = match[1].str();
-                }
             }
         }
 
@@ -5191,7 +5178,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 HyperlinkCommitBody().Visibility(Visibility::Collapsed);
             }
 
-            HyperlinkCommitBranch().Text(L"main");
+            // A commit need not belong to main, or even to a single branch.
+            HyperlinkCommitBranch().Visibility(Visibility::Collapsed);
 
             if (!commitParent.empty())
             {
@@ -5200,14 +5188,14 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             }
             else
             {
-                HyperlinkCommitParents().Text(L"1 parent");
+                HyperlinkCommitParents().Text(L"");
             }
 
             _currentCommitFullSha = commitSha;
             const auto shortSha = commitSha.size() >= 7 ? commitSha.substr(0, 7) : commitSha;
             HyperlinkCommitSha().Text(winrt::hstring{ shortSha });
 
-            const auto fileCount = commitFilesCount > 0 ? commitFilesCount : 1;
+            const auto fileCount = commitFilesCount;
             HyperlinkCommitFilesChanged().Text(winrt::hstring{ fmt::format(L"{} changed file{}", fileCount, (fileCount == 1 ? L"" : L"s")) });
             HyperlinkCommitStatsText().Text(winrt::hstring{ fmt::format(L"+{} -{}", commitAdditions, commitDeletions) });
 
@@ -5255,7 +5243,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         auto row = 0;
         for (const auto& field : fields)
         {
-            if (!field)
+            // Keep zero counts in the full pane, but omit them from the hover card.
+            if (!field || (!field.IsTitle() && ::Microsoft::Terminal::PreviewPresentation::IsZeroCount(field.Value())))
             {
                 continue;
             }

@@ -220,14 +220,18 @@
     </Page.Resources>
 
     <Border MaxWidth="{StaticResource StandardControlMaxWidth}">
-        <StackPanel HorizontalAlignment="Stretch"
-                    Spacing="8"
-                    Style="{StaticResource SettingsStackStyle}">
+        <Grid RowSpacing="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
             <HyperlinkButton x:Uid="Actions_Disclaimer"
                              Margin="-10,0,0,0"
                              NavigateUri="https://go.microsoft.com/fwlink/?linkid=2341386" />
             <!--  Add New Button  -->
             <Button x:Name="AddNewButton"
+                    Grid.Row="1"
                     Margin="2,0,0,0"
                     Click="{x:Bind ViewModel.AddNewCommand}"
                     Style="{StaticResource AccentButtonStyle}">
@@ -242,7 +246,8 @@
             </Button>
 
             <!--  Commands  -->
-            <Grid Background="{ThemeResource LayerFillColorDefaultBrush}"
+            <Grid Grid.Row="2"
+                  Background="{ThemeResource LayerFillColorDefaultBrush}"
                   BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                   BorderThickness="1"
                   CornerRadius="{StaticResource OverlayCornerRadius}">
@@ -254,6 +259,6 @@
                           ItemsSource="{x:Bind ViewModel.CommandList, Mode=OneWay}"
                           SelectionMode="None" />
             </Grid>
-        </StackPanel>
+        </Grid>
     </Border>
 </Page>

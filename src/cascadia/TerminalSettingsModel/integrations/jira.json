@@ -102,11 +102,11 @@
         { "key": "summary", "label": "Summary", "path": "issue:/fields/summary", "kind": "title", "default": true },
         { "key": "status", "placement": "status", "label": "Status", "path": "issue:/fields/status/name", "kind": "badge", "colorPath": "issue:/fields/status/statusCategory/colorName", "default": true },
         { "key": "resolution", "label": "Resolution", "path": "issue:/fields/resolution/name", "kind": "badge", "default": false },
-        { "key": "assignee", "label": "Assignee", "path": "issue:/fields/assignee/displayName", "kind": "text", "iconPath": "issue:/fields/assignee/avatarUrls/24x24", "default": true },
+        { "key": "assignee", "label": "Assignee", "path": "issue:/fields/assignee/displayName", "kind": "text", "iconPath": "issue:/fields/assignee/avatarUrls/48x48", "default": true },
         { "key": "priority", "placement": "header", "link": "https://{{settings.host}}/issues/?jql=priority%3D{{issue:/fields/priority/id}}", "label": "Priority", "path": "issue:/fields/priority/name", "kind": "text", "iconPath": "issue:/fields/priority/iconUrl", "default": true },
         { "key": "type", "placement": "header", "link": "https://{{settings.host}}/issues/?jql=issuetype%3D{{issue:/fields/issuetype/id}}", "label": "Type", "path": "issue:/fields/issuetype/name", "kind": "text", "iconPath": "issue:/fields/issuetype/iconUrl", "default": true },
         { "key": "parent", "placement": "header", "label": "Parent", "path": "issue:/fields/parent/key", "link": "https://{{settings.host}}/browse/{{issue:/fields/parent/key}}", "kind": "text", "default": true },
-        { "key": "reporter", "label": "Reporter", "path": "issue:/fields/reporter/displayName", "kind": "text", "iconPath": "issue:/fields/reporter/avatarUrls/24x24", "default": false },
+        { "key": "reporter", "label": "Reporter", "path": "issue:/fields/reporter/displayName", "kind": "text", "iconPath": "issue:/fields/reporter/avatarUrls/48x48", "default": false },
         { "key": "updated", "label": "Updated", "path": "issue:/fields/updated", "kind": "text", "format": "relativeTime", "default": true },
 
         { "key": "devBranches", "label": "Branches", "path": "devsummary:/summary/branch/overall/count", "kind": "text", "default": false },
@@ -135,7 +135,7 @@
             "path": "issue:/fields/comment/comments",
             "format": "adf",
             "itemAuthorPath": "/author/displayName",
-            "itemAvatarPath": "/author/avatarUrls/24x24",
+            "itemAvatarPath": "/author/avatarUrls/48x48",
             "itemBodyPath": "/body",
             "itemTimePath": "/created",
             "default": false

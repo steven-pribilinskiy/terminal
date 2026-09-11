@@ -21,6 +21,11 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         struct FileImageState
         {
             weak_ref<Controls::Image> image;
+            weak_ref<Controls::ScrollViewer> scroll;
+            weak_ref<Controls::Primitives::ToggleButton> fitButton;
+            double width = 0;
+            double height = 0;
+            bool fit = false;
             weak_ref<Controls::TextBlock> status;
             weak_ref<Controls::ComboBox> pages;
             PdfDocument document{ nullptr };
@@ -28,6 +33,24 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             bool closed = false;
             bool compact = false;
         };
+
+        void SizeImage(const std::shared_ptr<FileImageState>& state)
+        {
+            const auto image = state->image.get();
+            const auto scroll = state->scroll.get();
+            if (!image || !scroll || state->compact || state->width <= 0 || state->height <= 0) return;
+            double scale = 1;
+            if (state->fit)
+            {
+                // Leave room for scrollbar rounding. MaxHeight is the preview's
+                // available vertical budget even before the image has been laid out.
+                const auto width = scroll.ActualWidth() - 16;
+                if (width <= 0) return;
+                scale = std::min(width / state->width, (scroll.MaxHeight() - 16) / state->height);
+            }
+            image.Width(state->width * scale);
+            image.Height(state->height * scale);
+        }
 
         fire_and_forget RenderPage(std::shared_ptr<FileImageState> state, uint32_t index)
         {
@@ -54,6 +77,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 Media::Imaging::BitmapImage bitmap;
                 co_await bitmap.SetSourceAsync(stream);
                 if (state->closed || state->generation != generation) co_return;
+                state->width = bitmap.PixelWidth();
+                state->height = bitmap.PixelHeight();
+                SizeImage(state);
                 if (const auto image = state->image.get()) image.Source(bitmap);
                 if (const auto status = state->status.get()) status.Text(L"Page " + to_hstring(index + 1) + L" of " + to_hstring(document.PageCount()));
             }
@@ -97,17 +123,22 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 else
                 {
                     const auto decoder = co_await Windows::Graphics::Imaging::BitmapDecoder::CreateAsync(stream);
-                    if (static_cast<uint64_t>(decoder.PixelWidth()) * decoder.PixelHeight() > 16000000)
+                    const auto width = decoder.PixelWidth();
+                    const auto height = decoder.PixelHeight();
+                    if (static_cast<uint64_t>(width) * height > 16000000)
                         throw hresult_error(E_FAIL, L"Image exceeds the 16 megapixel preview limit.");
                     co_await ui;
                     if (state->closed || state->generation != generation) co_return;
                     Media::Imaging::BitmapImage bitmap;
-                    bitmap.DecodePixelWidth(state->compact ? 640 : std::min(decoder.PixelWidth(), 4096u));
+                    bitmap.DecodePixelWidth(state->compact ? 640 : std::min(width, 4096u));
                     stream.Seek(0);
                     co_await bitmap.SetSourceAsync(stream);
                     if (state->closed || state->generation != generation) co_return;
+                    state->width = width;
+                    state->height = height;
+                    SizeImage(state);
+                    if (const auto status = state->status.get()) status.Text(to_hstring(width) + L" × " + to_hstring(height));
                     if (const auto image = state->image.get()) image.Source(bitmap);
-                    if (const auto status = state->status.get()) status.Text(to_hstring(decoder.PixelWidth()) + L" × " + to_hstring(decoder.PixelHeight()));
                 }
             }
             catch (const hresult_error& error)
@@ -136,6 +167,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         {
             auto state = std::make_shared<FileImageState>();
             state->compact = compact;
+            state->scroll = make_weak(scroll);
+            scroll.SizeChanged([state](auto&&, auto&&) { if (!state->closed && state->fit) SizeImage(state); });
             Controls::TextBlock status;
             status.Text(L"Loading preview…");
             status.TextWrapping(TextWrapping::Wrap);
@@ -161,12 +194,26 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 scroll.MaxZoomFactor(4.0f);
                 Controls::StackPanel zoom;
                 zoom.Orientation(Controls::Orientation::Horizontal);
+                Controls::Primitives::ToggleButton fit;
+                fit.Content(box_value(L"Fit"));
+                Controls::ToolTipService::SetToolTip(fit, box_value(L"Fit the whole image or page"));
+                state->fitButton = make_weak(fit);
+                fit.Click([state](auto&&, auto&&) {
+                    state->fit = true;
+                    if (const auto button = state->fitButton.get()) button.IsChecked(true);
+                    SizeImage(state);
+                    if (const auto view = state->scroll.get()) view.ChangeView(0.0, 0.0, 1.0f, true);
+                });
+                zoom.Children().Append(fit);
                 for (const auto factor : { 0.5f, 1.0f, 2.0f })
                 {
                     Controls::Button button;
                     button.Content(box_value(to_hstring(static_cast<int>(factor * 100)) + L"%"));
-                    button.Click([weak = make_weak(scroll), factor](auto&&, auto&&) {
-                        if (const auto view = weak.get()) view.ChangeView(nullptr, nullptr, factor);
+                    button.Click([state, factor](auto&&, auto&&) {
+                        state->fit = false;
+                        if (const auto button = state->fitButton.get()) button.IsChecked(false);
+                        SizeImage(state);
+                        if (const auto view = state->scroll.get()) view.ChangeView(0.0, 0.0, factor, true);
                     });
                     zoom.Children().Append(button);
                 }

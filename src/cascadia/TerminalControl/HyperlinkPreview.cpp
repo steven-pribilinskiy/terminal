@@ -97,7 +97,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         try
         {
             Imaging::BitmapImage image;
-            image.DecodePixelHeight(24);
+            // Pane avatars are 40 DIPs; retain enough detail for high-DPI displays.
+            image.DecodePixelHeight(96);
             image.UriSource(Windows::Foundation::Uri{ uri });
             return image;
         }
