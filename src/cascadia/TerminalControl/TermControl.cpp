@@ -3722,20 +3722,16 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
     void TermControl::_hoveredHyperlinkChanged(const IInspectable& /*sender*/, const IInspectable& /*args*/)
     {
-        // A link preview pane is showing "pane only". The card is off entirely until
-        // it goes away again -- not merely emptied, since the point of the switch is
-        // that nothing follows the pointer around any more.
-        if (_hyperlinkTooltipsSuppressed)
-        {
-            return;
-        }
-
         const auto lastHoveredCell = _core.HoveredCell();
         auto uriText = lastHoveredCell ? _core.HoveredUriText() : hstring{};
         if (uriText.empty())
         {
             // Off the link. Don't hide at once -- the pointer may be on its way to the card.
             _lastPanePreviewUri = {};
+            auto ended = winrt::make<ShowHyperlinkPreviewRequestedEventArgs>(L"", L"", L"");
+            ended.IsHover(true);
+            ended.CreatePane(false);
+            ShowHyperlinkPreviewRequested.raise(*this, ended);
             _scheduleHyperlinkCardHide();
             return;
         }
@@ -3777,17 +3773,19 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // pane fetches its own copy of the preview from the same provider. The
         // last-raised check matters because this fires on every pointer move across
         // the link, and re-asking would refetch the same thing dozens of times.
-        if (_currentHyperlinkTooltipSettings.preferPane)
+        if (_currentHyperlinkTooltipSettings.preferPane || _hyperlinkTooltipsSuppressed)
         {
             _hideHyperlinkCard();
             if (_lastPanePreviewUri != _hoveredUri)
             {
                 _lastPanePreviewUri = _hoveredUri;
-                _raiseShowHyperlinkPreviewRequested();
+                _raiseShowHyperlinkPreviewRequested(true, _currentHyperlinkTooltipSettings.preferPane);
             }
             return;
         }
         _lastPanePreviewUri = {};
+        // Pinned panes also accept temporary hovers when popovers remain enabled.
+        _raiseShowHyperlinkPreviewRequested(true, false);
 
         // A preview belongs to exactly one hover. Drop the last one before anything below
         // reads it, and move the generation on so a fetch still in flight for the previous
@@ -5038,17 +5036,19 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     // Ask the app to put this link's preview in a pane. The card is not the place
     // for the answer, so it goes away; the integration hint travels with the request
     // so the pane resolves the same link with the same integration the card used.
-    void TermControl::_raiseShowHyperlinkPreviewRequested()
+    void TermControl::_raiseShowHyperlinkPreviewRequested(bool hover, bool createPane)
     {
         if (_hoveredUri.empty())
         {
             return;
         }
 
-        ShowHyperlinkPreviewRequested.raise(*this,
-                                            winrt::make<ShowHyperlinkPreviewRequestedEventArgs>(_hoveredUri,
-                                                                                                _currentHyperlinkTooltipSettings.showPreview ? _currentHyperlinkTooltipSettings.integration : winrt::hstring{ L"none" },
-                                                                                                winrt::hstring{ _resolvedHyperlinkTarget() }));
+        auto args = winrt::make<ShowHyperlinkPreviewRequestedEventArgs>(_hoveredUri,
+            _currentHyperlinkTooltipSettings.showPreview ? _currentHyperlinkTooltipSettings.integration : winrt::hstring{ L"none" },
+            winrt::hstring{ _resolvedHyperlinkTarget() });
+        args.IsHover(hover);
+        args.CreatePane(createPane);
+        ShowHyperlinkPreviewRequested.raise(*this, args);
     }
 
     void TermControl::_HyperlinkShowInPaneClick(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)

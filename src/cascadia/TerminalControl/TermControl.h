@@ -412,7 +412,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void _HyperlinkActionUndoClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
         void _HyperlinkShowInPaneClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
         void _HyperlinkRuleInfoClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
-        void _raiseShowHyperlinkPreviewRequested();
+        void _raiseShowHyperlinkPreviewRequested(bool hover = false, bool createPane = true);
 
         // A preview whose integration returned rendered HTML is drawn by a WebView2
         // parented to the owning window rather than by the field list. It is created

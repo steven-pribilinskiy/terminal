@@ -43,6 +43,7 @@ namespace winrt::TerminalApp::implementation
         SourceLink().Visibility(compact ? Visibility::Collapsed : Visibility::Visible);
         CloseButton().Visibility(compact ? Visibility::Collapsed : Visibility::Visible);
         HideTooltipsSwitch().Visibility(compact ? Visibility::Collapsed : Visibility::Visible);
+        PinLinkButton().Visibility(compact ? Visibility::Collapsed : Visibility::Visible);
         TitleText().FontSize(compact ? 15 : 18);
     }
 
@@ -69,6 +70,52 @@ namespace winrt::TerminalApp::implementation
     // of reusing one: pressing "Show in pane" on a second link retargets the pane
     // that is already there rather than splitting again.
     void LinkPreviewPaneContent::ShowLink(const winrt::hstring& text, const winrt::hstring& integrationHint, const winrt::hstring& resolvedFilePath)
+    {
+        // An explicit selection replaces the pin; hover never changes it.
+        _pinnedText = {};
+        _pinnedPreview = nullptr;
+        PinLinkButton().IsChecked(false);
+        _showLink(text, integrationHint, resolvedFilePath);
+    }
+
+    void LinkPreviewPaneContent::HoverLink(const winrt::hstring& text, const winrt::hstring& integrationHint, const winrt::hstring& resolvedFilePath, bool preferred)
+    {
+        if (!_pinnedText.empty() && _sourceText == _pinnedText) _pinnedTab = _selectedTab;
+        if (_hideTooltips || !_pinnedText.empty() || preferred) _showLink(text, integrationHint, resolvedFilePath);
+    }
+
+    void LinkPreviewPaneContent::EndHover()
+    {
+        if (_pinnedText.empty() || _sourceText == _pinnedText) return;
+        const auto cached = _pinnedPreview;
+        _showLink(_pinnedText, _pinnedHint, _pinnedFilePath);
+        if (cached)
+        {
+            ++_generation; // A late temporary preview must never replace the pin.
+            _setLoading(false);
+            _render(cached);
+            _showTab(_pinnedTab);
+        }
+    }
+
+    void LinkPreviewPaneContent::_pinClick(const IInspectable&, const RoutedEventArgs&)
+    {
+        if (PinLinkButton().IsChecked().Value())
+        {
+            _pinnedText = _sourceText;
+            _pinnedHint = _integrationHint;
+            _pinnedFilePath = _resolvedFilePath;
+            _pinnedPreview = LoadingRing().IsActive() ? nullptr : _preview;
+            _pinnedTab = _selectedTab;
+        }
+        else
+        {
+            _pinnedText = {};
+            _pinnedPreview = nullptr;
+        }
+    }
+
+    void LinkPreviewPaneContent::_showLink(const winrt::hstring& text, const winrt::hstring& integrationHint, const winrt::hstring& resolvedFilePath)
     {
         if (text.empty())
         {
@@ -171,6 +218,7 @@ namespace winrt::TerminalApp::implementation
     void LinkPreviewPaneContent::_render(const Control::HyperlinkPreview& preview)
     {
         _preview = preview;
+        if (!_pinnedText.empty() && _sourceText == _pinnedText) _pinnedPreview = preview;
         FilePreviewHost().Content(Control::HyperlinkPreviewHelpers::CreateFileView(preview, _compact));
 
         if (!preview)

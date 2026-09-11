@@ -17,6 +17,9 @@ namespace winrt::TerminalApp::implementation
         void SetPreviewProvider(const winrt::Microsoft::Terminal::Control::IHyperlinkPreviewProvider& provider);
         void ShowLink(const winrt::hstring& text, const winrt::hstring& integrationHint, const winrt::hstring& resolvedFilePath);
 
+        void HoverLink(const winrt::hstring& text, const winrt::hstring& integrationHint, const winrt::hstring& resolvedFilePath, bool preferred);
+        void EndHover();
+
         bool HideTooltips() const noexcept { return _hideTooltips; }
         til::typed_event<winrt::Windows::Foundation::IInspectable, winrt::Windows::Foundation::IInspectable> HideTooltipsChanged;
 
@@ -63,6 +66,11 @@ namespace winrt::TerminalApp::implementation
         // first is still in flight. Same guard the card uses, for the same reason.
         uint32_t _generation{ 0 };
         bool _hideTooltips{ false };
+        winrt::hstring _pinnedText, _pinnedHint, _pinnedFilePath;
+        winrt::Microsoft::Terminal::Control::HyperlinkPreview _pinnedPreview{ nullptr };
+        int32_t _pinnedTab{ -1 };
+        void _showLink(const winrt::hstring& text, const winrt::hstring& integrationHint, const winrt::hstring& resolvedFilePath);
+        void _pinClick(const winrt::Windows::Foundation::IInspectable&, const winrt::Windows::UI::Xaml::RoutedEventArgs&);
 
         // -1 is the field list, 0.. index into the preview's own Tabs.
         int32_t _selectedTab{ -1 };

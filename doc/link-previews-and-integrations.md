@@ -229,8 +229,14 @@ start block and extended selections — on a link the chord wins, and selection 
 everywhere else.
 
 **Show in pane** puts the same preview — header, tabs, field groups, actions — into a real pane
-with room to read it, and offers a "Pane only — hide tooltips" switch that silences hover cards
-while the pane is open and restores them when it closes. See [`panes.md`](panes.md).
+with room to read it. **Pane only — follow hovered links here** immediately updates the existing
+pane as the pointer crosses links, suppressing hover cards in that tab. **Pin link** is separate:
+other hovered links temporarily replace the pinned content, and leaving restores it. Without a
+pin, the last hovered link stays visible. Explicitly choosing **Show in pane** clears the pin.
+Closing the pane restores hover cards. See [`panes.md`](panes.md).
+
+Zero-count detail rows are omitted from popovers and remain muted in the full pane. Jira avatars
+use the largest standard avatar URL (48×48); a field named Parent never selects GitHub's commit UI.
 
 ## Writing a plugin manifest
 
@@ -857,6 +863,8 @@ forking a shipped plugin or handing ownership of it to another project's own rep
 Local Windows, UNC and WSL file links preview without an integration or tooltip rule.
 The card shows up to 30 text lines or a first image/PDF page; **Show in pane** provides
 selectable text, line numbers, image/PDF zoom, PDF pages, and Office sheet/slide selectors.
+**Fit** scales the entire image or PDF page into the preview area and follows width changes;
+50%, 100%, and 200% return to a fixed zoom level.
 Existing preview switches and explicit integration selections still apply. File previews
 do not change the “No rule matched” attribution: built-in capability is independent of rules.
 

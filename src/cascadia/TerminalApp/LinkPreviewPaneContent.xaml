@@ -183,9 +183,15 @@
 
 
 
-        <ToggleSwitch x:Name="HideTooltipsSwitch"
-                      x:Uid="LinkPreviewHideTooltipsSwitch"
-                      Grid.Row="6"
-                      Toggled="_hideTooltipsToggled" />
+        <StackPanel Grid.Row="6" Spacing="8">
+            <ToggleButton x:Name="PinLinkButton"
+                          Content="Pin link"
+                          HorizontalAlignment="Left"
+                          ToolTipService.ToolTip="Keep this link. Other hovered links appear temporarily."
+                          Click="_pinClick" />
+            <ToggleSwitch x:Name="HideTooltipsSwitch"
+                          x:Uid="LinkPreviewHideTooltipsSwitch"
+                          Toggled="_hideTooltipsToggled" />
+        </StackPanel>
     </Grid>
 </UserControl>

@@ -3048,13 +3048,11 @@ namespace winrt::TerminalApp::implementation
         term.ShowHyperlinkPreviewRequested({ this, &TerminalPage::_ShowHyperlinkPreviewRequestedHandler });
         term.EditHyperlinkRuleRequested({ this, &TerminalPage::_EditHyperlinkRuleRequestedHandler });
 
-        // A pane may already be silencing hover cards. A control created after that
-        // switch was flipped has to be told, or it is the one terminal in the window
-        // still showing them.
-        if (_hyperlinkTooltipsSuppressed)
-        {
-            term.HyperlinkTooltipsSuppressed(true);
-        }
+        // Wait until the new control belongs to its pane tree. A preview in a
+        // different tab must not suppress this terminal's hover cards.
+        term.Loaded([weakThis = get_weak()](auto&&, auto&&) {
+            if (const auto self = weakThis.get()) self->_refreshHyperlinkPaneMode();
+        });
 
         // Add an event handler for when the terminal or tab wants to set a
         // progress indicator on the taskbar
@@ -4482,10 +4480,7 @@ namespace winrt::TerminalApp::implementation
     void TerminalPage::_ShowHyperlinkPreviewRequestedHandler(const IInspectable& sender,
                                                              const Microsoft::Terminal::Control::ShowHyperlinkPreviewRequestedEventArgs& eventArgs)
     {
-        if (!eventArgs || eventArgs.Uri().empty())
-        {
-            return;
-        }
+        if (!eventArgs) return;
 
         const auto focusedTab{ _senderOrFocusedTab(sender) };
 
@@ -4508,9 +4503,15 @@ namespace winrt::TerminalApp::implementation
         if (existing)
         {
             if (const auto control = sender.try_as<Microsoft::Terminal::Control::TermControl>()) existing->SetLinkSettings(control.Settings());
-            existing->ShowLink(eventArgs.Uri(), eventArgs.IntegrationHint(), eventArgs.ResolvedFilePath());
+            if (eventArgs.IsHover())
+            {
+                if (eventArgs.Uri().empty()) existing->EndHover();
+                else existing->HoverLink(eventArgs.Uri(), eventArgs.IntegrationHint(), eventArgs.ResolvedFilePath(), eventArgs.CreatePane());
+            }
+            else existing->ShowLink(eventArgs.Uri(), eventArgs.IntegrationHint(), eventArgs.ResolvedFilePath());
             return;
         }
+        if (eventArgs.Uri().empty() || !eventArgs.CreatePane()) return;
 
         const auto& previewContent{ winrt::make_self<LinkPreviewPaneContent>() };
         previewContent->UpdateSettings(_settings, _currentWindowSettings());
@@ -4561,19 +4562,22 @@ namespace winrt::TerminalApp::implementation
             return;
         }
 
-        _setHyperlinkTooltipsSuppressed(content->HideTooltips());
+        _refreshHyperlinkPaneMode();
     }
 
-    void TerminalPage::_setHyperlinkTooltipsSuppressed(bool suppressed)
+    void TerminalPage::_refreshHyperlinkPaneMode()
     {
-        _hyperlinkTooltipsSuppressed = suppressed;
-
         for (const auto& tab : _tabs)
         {
             if (const auto tabImpl{ _GetTabImpl(tab) })
             {
                 if (const auto rootPane{ tabImpl->GetRootPane() })
                 {
+                    bool suppressed = false;
+                    rootPane->WalkTree([&](const auto& pane) {
+                        if (const auto preview = pane->GetContent().template try_as<LinkPreviewPaneContent>())
+                            suppressed = suppressed || preview->HideTooltips();
+                    });
                     rootPane->WalkTree([suppressed](auto&& pane) {
                         if (const auto& control{ pane->GetTerminalControl() })
                         {

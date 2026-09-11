@@ -139,6 +139,11 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         ShowHyperlinkPreviewRequestedEventArgs(hstring uri, hstring integrationHint, hstring resolvedFilePath) :
             _uri(uri), _integrationHint(integrationHint), _resolvedFilePath(resolvedFilePath) {}
 
+        bool IsHover() const noexcept { return _isHover; }
+        void IsHover(bool value) noexcept { _isHover = value; }
+        bool CreatePane() const noexcept { return _createPane; }
+        void CreatePane(bool value) noexcept { _createPane = value; }
+
         hstring ResolvedFilePath() { return _resolvedFilePath; };
 
         hstring Uri() { return _uri; };
@@ -148,6 +153,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         hstring _uri;
         hstring _integrationHint;
         hstring _resolvedFilePath;
+        bool _isHover{ false };
+        bool _createPane{ true };
     };
 
     struct EditHyperlinkRuleRequestedEventArgs : public EditHyperlinkRuleRequestedEventArgsT<EditHyperlinkRuleRequestedEventArgs>

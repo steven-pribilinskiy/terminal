@@ -1122,7 +1122,7 @@ Applying on next launch closes nothing now: the swap happens once you have close
     <comment>Label of the button in the link preview pane that reverses the action that was just applied.</comment>
   </data>
   <data name="LinkPreviewHideTooltipsSwitch.Header" xml:space="preserve">
-    <value>Pane only — hide tooltips</value>
+    <value>Pane only — follow hovered links here</value>
     <comment>Label of the switch in the link preview pane that stops link previews appearing as hover cards over the terminal while the pane is open.</comment>
   </data>
   <data name="LinkPreviewFieldsTabLabel" xml:space="preserve">
