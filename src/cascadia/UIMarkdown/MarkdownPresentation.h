@@ -26,7 +26,7 @@ namespace MarkdownPresentation
             for (const auto& token : MarkdownPreview::Highlight(std::wstring_view{ source }, std::wstring_view{ language }))
             {
                 Xaml::Documents::Run run;
-                run.Text(std::wstring_view{ source }.substr(token.start, token.length));
+                run.Text(MarkdownPreview::TokenText(std::wstring_view{ source }, token));
                 if (!contrast && token.kind != MarkdownPreview::TokenKind::Plain)
                 {
                     uint32_t rgb = 0;

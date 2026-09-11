@@ -82,6 +82,7 @@ namespace ControlUnitTests
         TEST_METHOD(RejectDtd);
         TEST_METHOD(SourceLocations);
         TEST_METHOD(SyntaxTokens);
+        TEST_METHOD(SyntaxTokenWinRTText);
 #ifndef FILE_PREVIEW_STANDALONE
         TEST_METHOD(YamlFrontmatter);
 #endif
@@ -123,6 +124,30 @@ namespace ControlUnitTests
         VERIFY_IS_TRUE(unknown[0].kind == MarkdownPreview::TokenKind::Plain);
         const auto yaml = MarkdownPreview::Highlight(L"title: 'hello'\n", L"yml");
         VERIFY_IS_TRUE(yaml[0].kind == MarkdownPreview::TokenKind::Key);
+    }
+
+    void FilePreviewTests::SyntaxTokenWinRTText()
+    {
+        const std::wstring source{ L"public class Program { string text = \"hello\"; int count = 42; }" };
+        const auto tokens = MarkdownPreview::Highlight(source, L"cs");
+        VERIFY_IS_TRUE(tokens.size() > 1);
+        VERIFY_IS_TRUE(source[tokens.front().start + tokens.front().length] != L'\0');
+        std::wstring rebuilt;
+        // Exercise the same WinRT parameter conversion as Run.Text, without a
+        // XAML host. An unterminated view aborts here before a setter can run.
+        const auto setText = [&](const winrt::param::hstring& value) {
+            uint32_t length = 0;
+            const auto buffer = WindowsGetStringRawBuffer(static_cast<HSTRING>(winrt::get_abi(value)), &length);
+            VERIFY_IS_TRUE(buffer[length] == L'\0');
+            rebuilt.append(buffer, length);
+        };
+        for (const auto& token : tokens)
+        {
+            setText(MarkdownPreview::TokenText(source, token));
+        }
+        VERIFY_ARE_EQUAL(source, rebuilt);
+        setText(MarkdownPreview::TokenText(source, { 0, 0, MarkdownPreview::TokenKind::Plain }));
+        VERIFY_ARE_EQUAL(source, rebuilt);
     }
 
 #ifndef FILE_PREVIEW_STANDALONE
@@ -225,7 +250,8 @@ int main()
         tests.RejectDtd();
         tests.SourceLocations();
         tests.SyntaxTokens();
-        std::cout << "All 7 native file preview tests passed.\n";
+        tests.SyntaxTokenWinRTText();
+        std::cout << "All 8 native file preview tests passed.\n";
         return 0;
     }
     catch (const std::exception& error)

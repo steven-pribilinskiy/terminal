@@ -12,6 +12,14 @@ namespace MarkdownPreview
     enum class TokenKind { Plain, Keyword, String, Number, Comment, Key, Markup };
     struct Token { size_t start; size_t length; TokenKind kind; };
 
+    // WinRT string parameters require a terminator after the supplied text.
+    // A token is usually a slice in the middle of the source, so own its text
+    // before passing it to a XAML setter; passing the view can call abort().
+    inline std::wstring TokenText(std::wstring_view source, const Token& token)
+    {
+        return std::wstring{ source.substr(token.start, token.length) };
+    }
+
     inline std::wstring Language(std::wstring_view info)
     {
         auto value = std::wstring{ info.substr(0, info.find_first_of(L" \t\r\n")) };

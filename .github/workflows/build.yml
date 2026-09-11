@@ -188,7 +188,7 @@ jobs:
       # then four unnamed TerminalApp frames where the actual throw was, which is
       # exactly the part that needed reading.
       #
-      # Only the five modules whose code we write. bin\ holds PDBs for every
+      # Only the modules whose code we write. bin\ holds PDBs for every
       # dependency too and none of those are worth the upload.
       - name: Collect symbols
         shell: pwsh
@@ -201,6 +201,8 @@ jobs:
             'Microsoft.Terminal.Control.pdb'
             'Microsoft.Terminal.Settings.Model.pdb'
             'Microsoft.Terminal.Settings.Editor.pdb'
+            'Microsoft.Terminal.UI.Markdown.pdb'
+            'Microsoft.Terminal.UI.pdb'
           )
           foreach ($name in $want) {
             $pdb = Get-ChildItem .\bin\x64\Release -Recurse -Filter $name -ErrorAction SilentlyContinue |
