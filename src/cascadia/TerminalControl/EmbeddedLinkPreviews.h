@@ -37,6 +37,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 popup.Child(nullptr);
                 if (counted) { --activePopups; counted = false; }
                 current = {};
+                inside = false;
             }
             ~Hover() { try { Close(); } catch (...) {} }
 
