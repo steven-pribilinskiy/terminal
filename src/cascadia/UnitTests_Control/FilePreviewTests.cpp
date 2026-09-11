@@ -174,6 +174,7 @@ namespace ControlUnitTests
     void FilePreviewTests::JiraAdfBlocks()
     {
         winrt::init_apartment();
+        const auto apartment = wil::scope_exit([] { winrt::uninit_apartment(); });
         const auto node = winrt::Windows::Data::Json::JsonObject::Parse(LR"({"type":"doc","content":[{"type":"panel","attrs":{"panelType":"error"},"content":[{"type":"paragraph","content":[{"type":"text","text":"Stop","marks":[{"type":"strong"}]}]}]},{"type":"table","content":[{"type":"tableRow","content":[{"type":"tableHeader","content":[{"type":"paragraph","content":[{"type":"text","text":"Name"}]}]},{"type":"tableHeader","content":[{"type":"paragraph","content":[{"type":"text","text":"Result"}]}]}]},{"type":"tableRow","content":[{"type":"tableCell","content":[{"type":"paragraph","content":[{"type":"text","text":"A|B"}]}]},{"type":"tableCell","content":[{"type":"paragraph","content":[{"type":"text","text":"422"}]}]}]}]},{"type":"codeBlock","attrs":{"language":"typescript"},"content":[{"type":"text","text":"const n = 1;"}]}]})");
         std::wstring markdown;
         MarkdownPreview::FlattenAdf(node, markdown, 0);
@@ -187,7 +188,6 @@ namespace ControlUnitTests
         VERIFY_ARE_EQUAL(std::string{ "A|B" }, table->rows[1][0]);
         VERIFY_ARE_EQUAL(std::string{ "422" }, table->rows[1][1]);
         VERIFY_IS_TRUE(markdown.find(L"```typescript\nconst n = 1;\n```") != std::wstring::npos);
-        winrt::uninit_apartment();
     }
 
 #ifndef FILE_PREVIEW_STANDALONE
@@ -298,6 +298,11 @@ int main()
         tests.JiraAdfBlocks();
         std::cout << "All 10 native file preview tests passed.\n";
         return 0;
+    }
+    catch (const winrt::hresult_error& error)
+    {
+        std::cerr << "WinRT error " << std::hex << error.code().value << ": " << winrt::to_string(error.message()) << '\n';
+        return 1;
     }
     catch (const std::exception& error)
     {
