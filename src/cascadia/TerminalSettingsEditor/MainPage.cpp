@@ -492,7 +492,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 [weakThis = get_weak()]() {
                     if (const auto page = weakThis.get())
                     {
-                        winrt::get_self<MainPage>(page)->_ReevaluateDirtyState();
+                        page->_ReevaluateDirtyState();
                     }
                 });
         }
@@ -508,7 +508,14 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                     return;
                 }
 
-                const auto self = winrt::get_self<MainPage>(page);
+                // get_weak() here is the implementation's own, so get() already
+                // hands back a com_ptr to the implementation. get_self is for
+                // going from a *projected* type to the implementation behind it
+                // (see _notifyMainPageOfViewModelChange, which resolves a
+                // weak_ref<Editor::MainPage> and does need it); applying it to
+                // this com_ptr asks the compiler for producer<MainPage, MainPage>,
+                // which does not exist.
+                const auto self = page.get();
 
                 // SettingsNav_Unloaded is the fast way out, and for two of the three
                 // hosts it is the one that fires: the tab host's pane teardown detaches

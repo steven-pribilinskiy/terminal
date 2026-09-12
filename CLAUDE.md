@@ -498,6 +498,24 @@ does not fail at all.
   scope, and a bare `Input::PointerRoutedEventArgs` binds to `Windows::UI::Input`
   rather than `Windows::UI::Xaml::Input`. Both were hit within an hour of each
   other by two different sessions.
+- **`get_weak()` inside an implementation hands back the implementation, not the
+  projection.** `weakThis.get()` is a `com_ptr<implementation::Foo>`, so reach
+  private members straight through it — `page->_Thing()`. Two mistakes follow from
+  forgetting that, and both cost a CI round on 2026-09-12, in opposite directions:
+  calling a *projected* member on it (`page.IsLoaded()`) fails with
+  `error C2039: 'IsLoaded': is not a member of 'winrt::com_ptr<D>'` and needs a
+  `try_as<WUX::FrameworkElement>()` first; and wrapping it in `get_self`
+  (`get_self<MainPage>(page)`) asks for `producer<MainPage, MainPage>` and fails
+  with `C2079 ... uses undefined struct produce<D,I>` from inside `base.h`, which
+  names no code of ours until you read the instantiation context. `get_self` is
+  for going the other way, from a projected type to the implementation behind it —
+  a `weak_ref<Editor::MainPage>` resolved from file scope does need it.
+- **A `winrt/…h` the pch does not carry is a compile error at the first call, not
+  at the type name.** `using namespace winrt::Windows::UI::Xaml::Documents;` and
+  `Documents::Run r;` both compile against the forward declarations; `r.Text(...)`
+  is what fails, with `C3779: a function that returns 'auto' cannot be used before
+  it is defined`. The editor's pch carries `Media` and `Markup` but not
+  `Documents`, so anything building inlines by hand includes it itself.
 - **`StyleProperty` is on `FrameworkElement`, not `Control`.** `Control` inherits
   `Style`, but the static DP accessor is declared on the base. Same trap with
   **`Grid::SetRow`/`SetColumn`/`SetRowSpan`/`SetColumnSpan`**, which take a
