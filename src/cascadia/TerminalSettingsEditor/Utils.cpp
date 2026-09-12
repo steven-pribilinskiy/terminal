@@ -193,6 +193,22 @@ namespace winrt::Microsoft::Terminal::Settings
         control.Focus(FocusState::Programmatic);
     }
 
+    // Sends the editor to one topic on the Documentation page. The window root a page is
+    // handed in NavigateToPageArgs *is* the MainPage, so the cast is the whole of it --
+    // but it is a weak reference on the caller's side, so a null one is expected rather
+    // than exceptional and must not be passed to try_as.
+    void OpenDocumentationTopic(const Editor::IHostedInWindow& windowRoot, const winrt::hstring& topicElementName)
+    {
+        if (!windowRoot)
+        {
+            return;
+        }
+        if (const auto mainPage = windowRoot.try_as<Editor::MainPage>())
+        {
+            mainPage.NavigateToDocumentationTopic(topicElementName);
+        }
+    }
+
     // Depth-first search of the visual tree under 'root' for the first KeyChordListener.
     Editor::KeyChordListener FindKeyChordListener(const DependencyObject& root)
     {

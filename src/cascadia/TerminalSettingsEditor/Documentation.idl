@@ -1,0 +1,14 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
+namespace Microsoft.Terminal.Settings.Editor
+{
+    // The in-app documentation. No view model: the topic list is fixed and lives in
+    // the page's own XAML so that the search index generator can see it, and a topic
+    // body is markdown read off disk rather than anything the settings model holds.
+    // Nothing here is a setting, so there is no clone to edit and nothing to save.
+    [default_interface] runtimeclass Documentation : Windows.UI.Xaml.Controls.Page
+    {
+        Documentation();
+    }
+}

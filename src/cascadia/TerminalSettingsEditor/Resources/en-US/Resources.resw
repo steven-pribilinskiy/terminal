@@ -4051,4 +4051,96 @@
     <value>Write every change as you make it. Save and Discard changes are disabled while this is on.</value>
     <comment>A description of what the auto-save switch does. Presented near "Settings_AutoSaveSwitch". {Locked="Discard changes"} matches the label of the button named by Settings_ResetSettingsButton.Content.</comment>
   </data>
+  <data name="Nav_Documentation.Content" xml:space="preserve">
+    <value>Documentation</value>
+    <comment>Header for the "documentation" menu item. This navigates to a page listing the terminal's own documentation topics, which are read inside the app rather than on a website.</comment>
+  </data>
+  <data name="Documentation_PageDescription.Text" xml:space="preserve">
+    <value>The terminal's documentation, shipped with it rather than on a website. Pick a topic to read it here; links between topics stay in the app, and the trail at the top of the page brings you back to this list.</value>
+    <comment>Introductory text at the top of the Documentation page, above the list of topics.</comment>
+  </data>
+  <data name="Documentation_Missing.Text" xml:space="preserve">
+    <value>This topic's file is not installed. That usually means the build that produced this copy of the terminal did not package it.</value>
+    <comment>Shown in place of a documentation topic when its markdown file cannot be read. The path it was looked for is printed underneath.</comment>
+  </data>
+  <data name="Documentation_TopicKeyboardShortcuts.Header" xml:space="preserve">
+    <value>Keyboard shortcuts</value>
+    <comment>Header for a documentation topic about actions, key chords and action IDs.</comment>
+  </data>
+  <data name="Documentation_TopicKeyboardShortcuts.Description" xml:space="preserve">
+    <value>Actions and the key chords that reach them, recording a chord, resolving a conflict, and what action IDs are for.</value>
+    <comment>Additional text presented near "Documentation_TopicKeyboardShortcuts.Header".</comment>
+  </data>
+  <data name="Documentation_TopicRegularExpressions.Header" xml:space="preserve">
+    <value>Regular expressions</value>
+    <comment>Header for a documentation topic about the regular expression syntax the terminal accepts.</comment>
+  </data>
+  <data name="Documentation_TopicRegularExpressions.Description" xml:space="preserve">
+    <value>The syntax the profile matcher and link tooltip rules accept, which parts of a value have to match, and named captures.</value>
+    <comment>Additional text presented near "Documentation_TopicRegularExpressions.Header".</comment>
+  </data>
+  <data name="Documentation_TopicExtensions.Header" xml:space="preserve">
+    <value>Extensions</value>
+    <comment>Header for a documentation topic about fragment extensions.</comment>
+  </data>
+  <data name="Documentation_TopicExtensions.Description" xml:space="preserve">
+    <value>What an extension may add to your settings, where extensions are found, turning one off, and writing your own.</value>
+    <comment>Additional text presented near "Documentation_TopicExtensions.Header".</comment>
+  </data>
+  <data name="Documentation_TopicTabStrip.Header" xml:space="preserve">
+    <value>Tabs and the tab strip</value>
+    <comment>Header for a documentation topic about where tabs sit and what each one shows.</comment>
+  </data>
+  <data name="Documentation_TopicTabStrip.Description" xml:space="preserve">
+    <value>Tab position and the vertical sidebar, tab width, the profile icon, and the close button.</value>
+    <comment>Additional text presented near "Documentation_TopicTabStrip.Header".</comment>
+  </data>
+  <data name="Documentation_TopicWindowBehaviour.Header" xml:space="preserve">
+    <value>Window behaviour</value>
+    <comment>Header for a documentation topic about animations and where the settings page opens.</comment>
+  </data>
+  <data name="Documentation_TopicWindowBehaviour.Description" xml:space="preserve">
+    <value>Whether the app animates, and whether settings open as a tab, a dialog, or a window of their own.</value>
+    <comment>Additional text presented near "Documentation_TopicWindowBehaviour.Header".</comment>
+  </data>
+  <data name="Documentation_TopicLinkTooltips.Header" xml:space="preserve">
+    <value>Link tooltips</value>
+    <comment>Header for a documentation topic about the card shown when a link in the terminal is hovered.</comment>
+  </data>
+  <data name="Documentation_TopicLinkTooltips.Description" xml:space="preserve">
+    <value>The card a hovered link shows, the buttons on it, and the rules that change it per link.</value>
+    <comment>Additional text presented near "Documentation_TopicLinkTooltips.Header".</comment>
+  </data>
+  <data name="Documentation_TopicIntegrations.Header" xml:space="preserve">
+    <value>Integrations</value>
+    <comment>Header for a documentation topic about the plugins that fetch a preview of what a link refers to.</comment>
+  </data>
+  <data name="Documentation_TopicIntegrations.Description" xml:space="preserve">
+    <value>What ships with the terminal, what each one needs, where credentials are kept, and adding your own.</value>
+    <comment>Additional text presented near "Documentation_TopicIntegrations.Header".</comment>
+  </data>
+  <data name="Documentation_TopicSessionRestore.Header" xml:space="preserve">
+    <value>Session restore</value>
+    <comment>Header for a documentation topic about what comes back when the terminal starts.</comment>
+  </data>
+  <data name="Documentation_TopicSessionRestore.Description" xml:space="preserve">
+    <value>Which windows, panes and programs come back when the terminal starts, and what saving pane contents costs.</value>
+    <comment>Additional text presented near "Documentation_TopicSessionRestore.Header".</comment>
+  </data>
+  <data name="Documentation_TopicActivityLog.Header" xml:space="preserve">
+    <value>Activity log</value>
+    <comment>Header for a documentation topic about the record of every program the terminal started.</comment>
+  </data>
+  <data name="Documentation_TopicActivityLog.Description" xml:space="preserve">
+    <value>How to find out where an unexpected window came from, what is recorded, and what that means for secrets on a command line.</value>
+    <comment>Additional text presented near "Documentation_TopicActivityLog.Header".</comment>
+  </data>
+  <data name="Documentation_TopicForkMarks.Header" xml:space="preserve">
+    <value>Provenance marks</value>
+    <comment>Header for a documentation topic about the two marks that say which settings are not in upstream Windows Terminal.</comment>
+  </data>
+  <data name="Documentation_TopicForkMarks.Description" xml:space="preserve">
+    <value>What the two marks beside a setting mean, and how to tell which parts of this terminal other documentation will not describe.</value>
+    <comment>Additional text presented near "Documentation_TopicForkMarks.Header".</comment>
+  </data>
 </root>

@@ -1,0 +1,166 @@
+<!--
+    Copyright (c) Microsoft Corporation. All rights reserved. Licensed under
+    the MIT License. See LICENSE in the project root for license information.
+-->
+<Page x:Class="Microsoft.Terminal.Settings.Editor.Documentation"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:local="using:Microsoft.Terminal.Settings.Editor"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      mc:Ignorable="d">
+
+    <Page.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="CommonResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Page.Resources>
+
+    <StackPanel Spacing="2"
+                Style="{StaticResource SettingsStackStyle}">
+
+        <!--
+            The topic list. Each card is one topic; its Tag is the base name of the
+            markdown file under Docs\ in the package, and the page loads that file on
+            click. Every card carries x:Uid and x:Name because the search index is
+            generated from exactly those two: the uid supplies the header and the
+            description and keys the entry, and the name is what a search result
+            navigates to. A result that lands here with a card's name opens that
+            topic rather than merely scrolling to it, so searching for a topic goes
+            straight to the text.
+        -->
+        <StackPanel x:Name="TopicList"
+                    Spacing="2">
+
+            <TextBlock x:Uid="Documentation_PageDescription"
+                       Margin="4,0,4,12"
+                       Style="{StaticResource SettingsPageItemDescriptionStyle}" />
+
+            <local:SettingsCard x:Name="TopicKeyboardShortcuts"
+                                x:Uid="Documentation_TopicKeyboardShortcuts"
+                                Click="TopicCard_Click"
+                                IsClickEnabled="True"
+                                Tag="keyboard-shortcuts">
+                <local:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xE765;" />
+                </local:SettingsCard.HeaderIcon>
+            </local:SettingsCard>
+
+            <local:SettingsCard x:Name="TopicRegularExpressions"
+                                x:Uid="Documentation_TopicRegularExpressions"
+                                Click="TopicCard_Click"
+                                IsClickEnabled="True"
+                                Tag="regular-expressions">
+                <local:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xE943;" />
+                </local:SettingsCard.HeaderIcon>
+            </local:SettingsCard>
+
+            <local:SettingsCard x:Name="TopicExtensions"
+                                x:Uid="Documentation_TopicExtensions"
+                                Click="TopicCard_Click"
+                                IsClickEnabled="True"
+                                Tag="extensions">
+                <local:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xEA86;" />
+                </local:SettingsCard.HeaderIcon>
+            </local:SettingsCard>
+
+            <local:SettingsCard x:Name="TopicTabStrip"
+                                x:Uid="Documentation_TopicTabStrip"
+                                Click="TopicCard_Click"
+                                IsClickEnabled="True"
+                                IsForkFeature="True"
+                                Tag="tab-strip">
+                <local:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xE8A9;" />
+                </local:SettingsCard.HeaderIcon>
+            </local:SettingsCard>
+
+            <local:SettingsCard x:Name="TopicWindowBehaviour"
+                                x:Uid="Documentation_TopicWindowBehaviour"
+                                Click="TopicCard_Click"
+                                IsClickEnabled="True"
+                                IsForkFeature="True"
+                                Tag="window-behaviour">
+                <local:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xE771;" />
+                </local:SettingsCard.HeaderIcon>
+            </local:SettingsCard>
+
+            <local:SettingsCard x:Name="TopicLinkTooltips"
+                                x:Uid="Documentation_TopicLinkTooltips"
+                                Click="TopicCard_Click"
+                                IsClickEnabled="True"
+                                IsForkFeature="True"
+                                Tag="link-tooltips">
+                <local:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xE71B;" />
+                </local:SettingsCard.HeaderIcon>
+            </local:SettingsCard>
+
+            <local:SettingsCard x:Name="TopicIntegrations"
+                                x:Uid="Documentation_TopicIntegrations"
+                                Click="TopicCard_Click"
+                                IsClickEnabled="True"
+                                IsForkFeature="True"
+                                Tag="integrations">
+                <local:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xE774;" />
+                </local:SettingsCard.HeaderIcon>
+            </local:SettingsCard>
+
+            <local:SettingsCard x:Name="TopicSessionRestore"
+                                x:Uid="Documentation_TopicSessionRestore"
+                                Click="TopicCard_Click"
+                                IsClickEnabled="True"
+                                IsForkFeature="True"
+                                Tag="session-restore">
+                <local:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xE777;" />
+                </local:SettingsCard.HeaderIcon>
+            </local:SettingsCard>
+
+            <local:SettingsCard x:Name="TopicActivityLog"
+                                x:Uid="Documentation_TopicActivityLog"
+                                Click="TopicCard_Click"
+                                IsClickEnabled="True"
+                                IsForkFeature="True"
+                                Tag="activity-log">
+                <local:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xE81C;" />
+                </local:SettingsCard.HeaderIcon>
+            </local:SettingsCard>
+
+            <local:SettingsCard x:Name="TopicForkMarks"
+                                x:Uid="Documentation_TopicForkMarks"
+                                Click="TopicCard_Click"
+                                IsClickEnabled="True"
+                                IsForkFeature="True"
+                                Tag="fork-marks">
+                <local:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xE734;" />
+                </local:SettingsCard.HeaderIcon>
+            </local:SettingsCard>
+        </StackPanel>
+
+        <!--
+            One topic, rendered. The markdown renderer hands back a RichTextBlock,
+            which goes into TopicContent; getting back out is the breadcrumb the
+            editor already draws, the same as every other sub-page here.
+        -->
+        <StackPanel x:Name="TopicBody"
+                    Spacing="8"
+                    Visibility="Collapsed">
+            <Border Padding="20,16,20,20"
+                    Background="{ThemeResource LayerFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource OverlayCornerRadius}">
+                <StackPanel x:Name="TopicContent" />
+            </Border>
+        </StackPanel>
+    </StackPanel>
+</Page>

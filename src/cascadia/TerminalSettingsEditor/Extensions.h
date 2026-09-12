@@ -27,10 +27,12 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         void ExtensionNavigator_Click(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& args);
         void NavigateToProfile_Click(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& args);
         void NavigateToColorScheme_Click(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& args);
+        void DisclaimerLink_Click(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& args);
 
         WINRT_PROPERTY(Editor::ExtensionsViewModel, ViewModel, nullptr);
 
     private:
+        winrt::weak_ref<Editor::IHostedInWindow> _weakWindowRoot;
         Editor::ExtensionPackageTemplateSelector _extensionPackageIdentifierTemplateSelector;
     };
 

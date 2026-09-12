@@ -168,6 +168,15 @@ $ClassMap = @{
         NavigationParam = "Profiles_Nav"
         SubPage         = "BreadcrumbSubPage::None"
     }
+    # Each card on this page is a documentation topic rather than a setting, and its
+    # ElementName is what opens the topic: Documentation::OnNavigatedTo reads the named
+    # card's Tag and loads that markdown file. So a search for a topic lands on the text
+    # rather than on a row to scroll to.
+    "Microsoft::Terminal::Settings::Editor::Documentation" = @{
+        ResourceName    = "Nav_Documentation/Content"
+        NavigationParam = "Documentation_Nav"
+        SubPage         = "BreadcrumbSubPage::None"
+    }
 }
 
 function IsProfileSubPage($pageClass)

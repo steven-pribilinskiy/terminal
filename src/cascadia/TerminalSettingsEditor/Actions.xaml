@@ -226,9 +226,16 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
-            <HyperlinkButton x:Uid="Actions_Disclaimer"
+            <!--
+                Goes to the in-app Keyboard shortcuts topic rather than to
+                go.microsoft.com. Same wording, different destination: this fork carries
+                its own documentation, and the Documentation page is the only thing that
+                describes the actions upstream does not have.
+            -->
+            <HyperlinkButton x:Name="DisclaimerLink"
+                             x:Uid="Actions_Disclaimer"
                              Margin="-10,0,0,0"
-                             NavigateUri="https://go.microsoft.com/fwlink/?linkid=2341386" />
+                             Click="DisclaimerLink_Click" />
             <!--  Add New Button  -->
             <Button x:Name="AddNewButton"
                     Grid.Row="1"

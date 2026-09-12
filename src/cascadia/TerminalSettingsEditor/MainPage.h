@@ -69,6 +69,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         void SetHostingWindow(uint64_t hostingWindow) noexcept;
         void NavigateToLinkTooltipRule(int32_t ruleIndex, const winrt::hstring& ruleName);
+        void NavigateToDocumentationTopic(const winrt::hstring& topicElementName);
         bool TryPropagateHostingWindow(IInspectable object) noexcept;
         uint64_t GetHostingWindow() const noexcept;
 

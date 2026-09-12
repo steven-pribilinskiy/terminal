@@ -31,6 +31,14 @@
       <DeploymentContent>true</DeploymentContent>
       <Link>IntegrationIcons\%(RecursiveDir)%(FileName)%(Extension)</Link>
     </Content>
+    <!-- In-app documentation. The Settings UI's Documentation page reads these off
+         disk at Docs\<topic>.md beside the binaries, which is exactly what this Link
+         produces; without the Link they would land in the package root instead, and
+         the page would draw its "not installed" message with a green build behind it. -->
+    <Content Include="$(OpenConsoleDir)src\cascadia\CascadiaPackage\Docs\**\*">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Docs\%(RecursiveDir)%(FileName)%(Extension)</Link>
+    </Content>
     <!-- Default Settings -->
     <Content Include="$(OpenConsoleDir)src\cascadia\TerminalSettingsModel\defaults.json">
       <DeploymentContent>true</DeploymentContent>
