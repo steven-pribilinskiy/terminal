@@ -56,6 +56,14 @@
 #include <winrt/Microsoft.Terminal.Control.h>
 #include <winrt/Microsoft.Terminal.Settings.Model.h>
 #include <winrt/Microsoft.Terminal.UI.h>
+// In the pch and not just where the Documentation page uses it: referencing a
+// XAML component library makes the XAML compiler emit a reference to that
+// library's XamlMetaDataProvider into XamlTypeInfo.g.cpp, which is generated
+// from the project as a whole and compiles against this header. Without it the
+// generated file fails on a namespace it was told to use -
+// "'Markdown': the symbol to the left of a '::' must be a type". TerminalApp and
+// TerminalControl carry it in their pch for the same reason.
+#include <winrt/Microsoft.Terminal.UI.Markdown.h>
 
 // Including TraceLogging essentials for the binary
 #include <TraceLoggingProvider.h>
