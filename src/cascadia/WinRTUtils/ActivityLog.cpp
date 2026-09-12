@@ -6,6 +6,8 @@
 
 #include <til/throttled_func.h>
 
+#include <chrono>
+
 #include "WtExeUtils.h"
 
 using namespace std::chrono_literals;
@@ -21,13 +23,26 @@ namespace Microsoft::Terminal::ActivityLog
         constexpr std::wstring_view UnpackagedSettingsFolderName{ L"Microsoft\\Windows Terminal\\" };
         constexpr std::wstring_view LogFilename{ L"activity.jsonl" };
         constexpr std::wstring_view RotatedFilename{ L"activity.1.jsonl" };
+        // The on/off switch, and the size cap as its contents. A file rather than
+        // a static because this library is linked separately into each module --
+        // see the note on Configure in the header.
+        constexpr std::wstring_view MarkerFilename{ L"activity.enabled" };
+
+        // How long a read of the marker is trusted. Short enough that toggling the
+        // setting takes effect while you watch, long enough that a burst of
+        // launches does not stat the disk once per record.
+        constexpr auto MarkerCacheDuration{ std::chrono::seconds{ 2 } };
 
         struct State
         {
             std::mutex mutex;
             std::string pending;
-            std::atomic<bool> enabled{ false };
-            std::atomic<uint32_t> maxBytes{ 4 * 1024 * 1024 };
+
+            // Cache of the marker, per module. Not the source of truth.
+            std::mutex markerMutex;
+            std::chrono::steady_clock::time_point markerCheckedAt{};
+            bool markerPresent{ false };
+            uint32_t maxBytes{ 4 * 1024 * 1024 };
         };
 
         State& state() noexcept
@@ -154,7 +169,13 @@ namespace Microsoft::Terminal::ActivityLog
                 return;
             }
 
-            rotateIfNeeded(path, state().maxBytes.load(std::memory_order_relaxed));
+            uint32_t maxBytes{ 0 };
+            {
+                auto& s = state();
+                std::lock_guard guard{ s.markerMutex };
+                maxBytes = s.maxBytes;
+            }
+            rotateIfNeeded(path, maxBytes);
 
             // FILE_APPEND_DATA without FILE_WRITE_DATA, and one WriteFile for the
             // whole batch: the OS appends at the end of the file as a single
@@ -199,10 +220,22 @@ namespace Microsoft::Terminal::ActivityLog
         // on every call, so a steady stream of launches would postpone the write
         // indefinitely. ApplicationState can debounce because it only ever needs
         // the final value; a log needs all of them, reasonably soon.
+        //
+        // Not leading either, even though that would write the first record at
+        // once: throttled_func runs a leading edge on the CALLING thread, which is
+        // the launch path this is supposed to stay off.
+        //
+        // 250ms rather than ApplicationState's 1s because of a limit worth stating
+        // plainly: WindowEmperor's Flush() on the way out drains only the copy of
+        // this state living in WindowsTerminal.exe, and the profile-launch and
+        // handoff records are raised in TerminalConnection, whose copy nothing can
+        // reach from there. A record is therefore lost if the process exits within
+        // the delay of raising it. Shortening the window is the cheap mitigation;
+        // for a diagnostic log that is the right trade against blocking a tab.
         til::throttled_func<>& flusher()
         {
             static til::throttled_func<> f{
-                til::throttled_func_options{ .delay = 1s, .debounce = false, .trailing = true },
+                til::throttled_func_options{ .delay = 250ms, .debounce = false, .trailing = true },
                 []() { flushPending(); }
             };
             return f;
@@ -239,23 +272,159 @@ namespace Microsoft::Terminal::ActivityLog
         return {};
     }
 
-    bool Enabled() noexcept
+    // The marker sits beside the log, so it inherits the same per-package
+    // location: each slot has its own switch, like each slot has its own settings.
+    static std::filesystem::path MarkerPath() noexcept
+    try
     {
-        return state().enabled.load(std::memory_order_relaxed);
+        auto path{ Path() };
+        if (path.empty())
+        {
+            return {};
+        }
+        path.replace_filename(MarkerFilename);
+        return path;
+    }
+    catch (...)
+    {
+        return {};
+    }
+
+    // The marker's contents are the cap in kilobytes. Returns 0 for anything it
+    // cannot make sense of, which the caller treats as "keep the default".
+    static uint32_t _readCapKilobytes(const std::filesystem::path& marker) noexcept
+    try
+    {
+        wil::unique_hfile file{ CreateFileW(marker.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr) };
+        if (!file)
+        {
+            return 0;
+        }
+
+        char buffer[32]{};
+        DWORD read{ 0 };
+        if (!ReadFile(file.get(), buffer, sizeof(buffer) - 1, &read, nullptr) || read == 0)
+        {
+            return 0;
+        }
+
+        // Parsed by hand rather than with from_chars: <charconv> is not in this
+        // project's precompiled header and nothing else here uses it, and the
+        // grammar is "some digits".
+        uint32_t value{ 0 };
+        bool sawDigit{ false };
+        for (DWORD i = 0; i < read; ++i)
+        {
+            const auto ch{ buffer[i] };
+            if (ch < '0' || ch > '9')
+            {
+                break;
+            }
+            sawDigit = true;
+            // Saturate rather than wrap on a silly value.
+            if (value > (0xFFFFFFFFu - 9u) / 10u)
+            {
+                value = 0xFFFFFFFFu / 1024u;
+                break;
+            }
+            value = value * 10u + static_cast<uint32_t>(ch - '0');
+        }
+        if (!sawDigit)
+        {
+            return 0;
+        }
+        return std::max<uint32_t>(64u, value);
+    }
+    catch (...)
+    {
+        return 0;
+    }
+
+    bool Enabled() noexcept
+    try
+    {
+        auto& s = state();
+        const auto now = std::chrono::steady_clock::now();
+
+        std::lock_guard guard{ s.markerMutex };
+        if (s.markerCheckedAt != std::chrono::steady_clock::time_point{} &&
+            now - s.markerCheckedAt < MarkerCacheDuration)
+        {
+            return s.markerPresent;
+        }
+        s.markerCheckedAt = now;
+
+        const auto marker{ MarkerPath() };
+        if (marker.empty())
+        {
+            s.markerPresent = false;
+            return false;
+        }
+
+        // GetFileAttributes rather than std::filesystem::exists: no allocation, no
+        // exceptions, and this is consulted on a launch path.
+        const auto attributes = GetFileAttributesW(marker.c_str());
+        s.markerPresent = attributes != INVALID_FILE_ATTRIBUTES && !WI_IsFlagSet(attributes, FILE_ATTRIBUTE_DIRECTORY);
+
+        if (s.markerPresent)
+        {
+            // The cap rides along in the marker's contents so it crosses modules
+            // with the flag. A malformed or empty marker keeps the default.
+            if (const auto kb{ _readCapKilobytes(marker) })
+            {
+                s.maxBytes = kb * 1024u;
+            }
+        }
+
+        return s.markerPresent;
+    }
+    catch (...)
+    {
+        return false;
     }
 
     void Configure(bool enabled, uint32_t maxFileKilobytes) noexcept
+    try
     {
         // Clamp rather than trust: a zero cap would rotate on every single write.
         const auto kb = std::max<uint32_t>(64u, maxFileKilobytes);
-        state().maxBytes.store(kb * 1024u, std::memory_order_relaxed);
 
-        const auto was = state().enabled.exchange(enabled, std::memory_order_relaxed);
-        if (was && !enabled)
+        const auto marker{ MarkerPath() };
+        if (marker.empty())
         {
-            // Turning it off should not silently drop what was already recorded.
-            Flush();
+            return;
         }
+
+        if (enabled)
+        {
+            const auto text{ fmt::format("{}\n", kb) };
+            wil::unique_hfile file{ CreateFileW(marker.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr) };
+            if (file)
+            {
+                DWORD written{ 0 };
+                WriteFile(file.get(), text.data(), gsl::narrow_cast<DWORD>(text.size()), &written, nullptr);
+            }
+        }
+        else
+        {
+            // Turning it off should not silently drop what was already recorded,
+            // so drain before the marker goes.
+            Flush();
+
+            std::error_code ec;
+            std::filesystem::remove(marker, ec);
+        }
+
+        // Whatever we just did, this module's cached view of it is stale.
+        {
+            auto& s = state();
+            std::lock_guard guard{ s.markerMutex };
+            s.markerCheckedAt = {};
+            s.maxBytes = kb * 1024u;
+        }
+    }
+    catch (...)
+    {
     }
 
     void Record(const Entry& entry) noexcept

@@ -90,8 +90,24 @@ namespace Microsoft::Terminal::ActivityLog
     // Turn recording on or off, and bound the file. Called when settings load and
     // whenever they change; until it is called the log is off, so a crash before
     // settings are read cannot write anything.
+    //
+    // The on/off state CANNOT live in a static here. WinRTUtils is a
+    // StaticLibrary, so TerminalApp, TerminalConnection, TerminalControl and
+    // WindowsTerminal.exe each link their own copy of this translation unit and
+    // therefore their own copy of any static. Settings are read in TerminalApp,
+    // while the two records that matter most -- the profile launch and the
+    // defterm handoff -- are raised in TerminalConnection, which would never see
+    // the flag TerminalApp set. It compiles, links, and records nothing; found by
+    // running it, because no build could have told us.
+    //
+    // So Configure writes a marker file beside the log and Record consults it.
+    // That crosses module boundaries and, for free, process boundaries too --
+    // several Terminal windows are several processes, and only the one that
+    // happened to load settings would otherwise log at all.
     void Configure(bool enabled, uint32_t maxFileKilobytes) noexcept;
 
+    // Whether recording is currently on, according to the marker. Cached briefly,
+    // so calling it per record costs nothing.
     bool Enabled() noexcept;
 
     // Write anything queued, synchronously. For process shutdown -- the throttled
