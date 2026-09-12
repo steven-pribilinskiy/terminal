@@ -119,6 +119,37 @@
                     </muxc:BreadcrumbBar.Resources>
                 </muxc:BreadcrumbBar>
 
+                <!--
+                    TabIndex, because moving the box out of the pane moved it from the
+                    second tab stop to the last but one. NavigationView.Header lives in
+                    SplitView.Content (NavigationView.xaml: HeaderContent at 659, inside
+                    SplitView.Content from 633), while the items it used to sit above are
+                    in SplitView.Pane (475-631) - so tree order now walks the whole
+                    navigation list before reaching search, and the person most likely to
+                    want search is the one who opened Settings to search.
+
+                    Two facts make one value enough, both from the platform's own source
+                    rather than from how it looks:
+
+                    UIElement::TabIndex() returns XINT32_MAX when the property was never
+                    set (dxaml/xcp/core/inc/uielement.h) - so every other element here
+                    ties at MAXINT and falls back to tree order, and any lower value wins
+                    outright.
+
+                    And TabIndex is compared across the whole subtree the traversal
+                    reaches, not merely among siblings: CFocusManager::
+                    GetNextTabStopInternal recurses through non-tab-stop children and
+                    compares every candidate with CompareTabIndex (dxaml/xcp/core/dll/
+                    focusmgr.cpp). Only TabNavigation Once and Cycle change that walk;
+                    the Local on MUX's MenuItemsScrollViewer does not wall its items off
+                    from a value set out here.
+
+                    Consequence worth knowing: forward Tab from a MAXINT element never
+                    lands here, because the search is for the lowest index ABOVE the
+                    current one. The box is the first stop when focus enters, and the
+                    wrap point of the Cycle - not a station in the middle. That is what
+                    was wanted; the pane toggle becomes the second stop.
+                -->
                 <AutoSuggestBox x:Name="SettingsSearchBox"
                                 x:Uid="Nav_SearchBox"
                                 Grid.Column="1"
@@ -128,6 +159,7 @@
                                 QueryIcon="Find"
                                 QuerySubmitted="SettingsSearchBox_QuerySubmitted"
                                 SuggestionChosen="SettingsSearchBox_SuggestionChosen"
+                                TabIndex="0"
                                 TextChanged="SettingsSearchBox_TextChanged">
                     <AutoSuggestBox.ItemTemplate>
                         <DataTemplate x:DataType="local:FilteredSearchResult">
