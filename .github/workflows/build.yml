@@ -52,6 +52,14 @@ jobs:
         shell: pwsh
         run: .\tools\Check-SettingsModelConsistency.ps1
 
+      # Seconds here against fifteen minutes into "Restore and build", which is
+      # where the XAML compiler rejects a comment containing "--". Worth its own
+      # step because [xml] in PowerShell parses such a file happily, so the
+      # obvious local check reports success on markup that cannot compile.
+      - name: XAML comments
+        shell: pwsh
+        run: .\tools\Check-XamlComments.ps1
+
       # The checked-in dep\nuget\nuget.exe is 4.1.0 (2017) and predates .slnx:
       # restoring with it fails with "Invalid input 'OpenConsole.slnx'. The file
       # type was not recognized." Upstream installs a current nuget for the same
