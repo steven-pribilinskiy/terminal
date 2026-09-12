@@ -495,10 +495,32 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             _dirtyCheckTimer = WUX::DispatcherTimer{};
             _dirtyCheckTimer.Interval(DirtyCheckInterval);
             _dirtyCheckTimer.Tick([weakThis = get_weak()](auto&&, auto&&) {
-                if (const auto page = weakThis.get())
+                const auto page = weakThis.get();
+                if (!page)
                 {
-                    winrt::get_self<MainPage>(page)->_ReevaluateDirtyState();
+                    return;
                 }
+
+                const auto self = winrt::get_self<MainPage>(page);
+
+                // SettingsNav_Unloaded is the fast way out, and for two of the three
+                // hosts it is the one that fires: the tab host's pane teardown detaches
+                // the page, and the dialog host explicitly does dialog.Content(nullptr)
+                // when it closes. But this sweep serializes the whole settings document
+                // on the UI thread once a second, so it must not depend on having found
+                // every teardown path. settingsUIHost "window" is the one I could not
+                // follow to an Unloaded -- the page lives in a Terminal window of its
+                // own, and closing that destroys the island rather than detaching
+                // anything -- so the tick also checks for itself and gives up when the
+                // page is no longer in a live tree. A reparent that fires Unloaded
+                // without a Loaded is covered by the same check.
+                if (!page.IsLoaded())
+                {
+                    self->_dirtyCheckTimer.Stop();
+                    return;
+                }
+
+                self->_ReevaluateDirtyState();
             });
         }
         _dirtyCheckTimer.Start();
@@ -511,8 +533,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     {
         // The timer is the only thing here that costs anything while nothing is on
         // screen -- it would go on serializing the settings once a second for a page
-        // nobody is looking at. The hook stays armed: it is cheap, it resolves a weak
-        // reference, and Loaded can bring this same page back.
+        // nobody is looking at. This is the prompt way to stop it; the tick itself also
+        // stops when the page is no longer loaded, so a host whose teardown does not
+        // reach here loses at most one more sweep. The hook stays armed either way: it
+        // is cheap, it resolves a weak reference, and Loaded can bring this same page
+        // back.
         if (_dirtyCheckTimer)
         {
             _dirtyCheckTimer.Stop();
@@ -1426,14 +1451,21 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 // Stop auto-saving rather than retrying on the next tick. A write that
                 // fails tends to keep failing (the file is locked, the disk is full),
                 // and a retry loop would append a warning per attempt and never tell
-                // anyone. Handing the user back the Save button puts them on the path
-                // that does report it.
+                // anyone. Switching off hands the user back the Save button, which is
+                // the path that does report it -- SaveButton_Click raises the warnings
+                // dialog on the same failure.
+                //
+                // Nothing is raised from here. The only dialog available reports
+                // settings *load* warnings, and a failed write usually adds none, so it
+                // would come up either empty or describing something unrelated to what
+                // just happened. Saying nothing and re-enabling the button the user
+                // already knows is better than that; a real "could not write
+                // settings.json" message would need a string and a surface of its own.
                 _autoSave = false;
                 _applyingChromePreferences = true;
                 AutoSaveSwitch().IsOn(false);
                 _applyingChromePreferences = false;
                 Model::ApplicationState::SharedInstance().SettingsAutoSave(false);
-                ShowLoadWarningsDialog.raise(*this, _settingsClone.Warnings());
             }
         }
 
