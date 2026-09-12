@@ -98,6 +98,34 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
     }
 
+    // The first entry in the navigation that is actually a page.
+    //
+    // Since the list grew group headings, "the first menu item" and "the first
+    // page" are different things: a NavigationViewItemHeader derives from
+    // NavigationViewItemBase, not from NavigationViewItem, so it has no Tag and
+    // as<NavigationViewItem> on one throws E_NOINTERFACE. Both callers used to
+    // take entry zero and cast it, and on a Loaded handler that throw is a stowed
+    // exception - the window fail-fasts at 0xc000027b before Settings draws.
+    //
+    // Returns null for a list with no pages at all, which cannot happen today but
+    // is cheaper to handle than to prove impossible.
+    template<typename T>
+    static MUX::Controls::NavigationViewItem _firstNavigablePage(const T& items)
+    {
+        if (!items)
+        {
+            return nullptr;
+        }
+        for (const auto& item : items)
+        {
+            if (const auto navItem = item.template try_as<MUX::Controls::NavigationViewItem>())
+            {
+                return navItem;
+            }
+        }
+        return nullptr;
+    }
+
     static WUX::Controls::FontIcon _fontIconForNavTag(const std::wstring_view navTag)
     {
         WUX::Controls::FontIcon icon{};
@@ -378,10 +406,12 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
         else if (!destination.try_as<hstring>())
         {
-            // Couldn't find a meaningful previous page. Fall back to the first menu item.
-            if (_menuItemSource && _menuItemSource.Size() > 0)
+            // Couldn't find a meaningful previous page. Fall back to the first one
+            // that is a page: entry zero is a group heading, which carries no tag
+            // and is not a NavigationViewItem.
+            if (const auto first = _firstNavigablePage(_menuItemSource))
             {
-                destination = _menuItemSource.GetAt(0).as<MUX::Controls::NavigationViewItem>().Tag();
+                destination = first.Tag();
                 subPage = BreadcrumbSubPage::None;
             }
         }
@@ -450,13 +480,20 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     {
         if (SettingsNav().SelectedItem() == nullptr)
         {
-            const auto initialItem = SettingsNav().MenuItems().GetAt(0);
-            SettingsNav().SelectedItem(initialItem);
-
-            // Manually navigate because setting the selected item programmatically doesn't trigger ItemInvoked.
-            if (const auto tag = initialItem.as<MUX::Controls::NavigationViewItem>().Tag())
+            // The first entry is a group heading now, not a page. A
+            // NavigationViewItemHeader derives from NavigationViewItemBase and not
+            // from NavigationViewItem, so as<> on it throws E_NOINTERFACE - and on
+            // a Loaded handler that is a stowed exception, which fail-fasts the
+            // whole window at 0xc000027b before Settings ever draws.
+            if (const auto initialItem = _firstNavigablePage(SettingsNav().MenuItems()))
             {
-                _Navigate(tag, BreadcrumbSubPage::None);
+                SettingsNav().SelectedItem(initialItem);
+
+                // Manually navigate because setting the selected item programmatically doesn't trigger ItemInvoked.
+                if (const auto tag = initialItem.Tag())
+                {
+                    _Navigate(tag, BreadcrumbSubPage::None);
+                }
             }
         }
 
