@@ -22,6 +22,7 @@ guard that exists for good reasons. Symptoms lie:
 | Fail-fast `0xc000027b`, no frame of ours on the stack | Something threw during **measure/render** on a later tick. `CCoreServices::NWDrawTree` → `CLayoutManager::UpdateLayout`. |
 | Controls silently disappear, no crash | An exception **was** thrown and **was** caught — by `_ApplyTabPosition`'s guard, a `CATCH_LOG`, or C++/WinRT's boundary. |
 | "It renders nothing" from a screenshot | `PrintWindow` cannot capture DirectComposition content in XAML Islands. It is a capture artifact, not a rendering failure. |
+| A screenshot and a UIA snapshot disagree | Believe **UIA for XAML** (the Settings UI, dialogs, cards) and the **screenshot for the terminal surface and the tab strip**. They fail in opposite directions, which is why "just take a screenshot" is not a rule you can apply blind: a Settings dialog that is open, sized and populated photographs as an ordinary terminal window, while a vertical tab strip that is drawn perfectly reports zero `TabItem`s. Both have happened here. Check the one that can see the layer you are asking about. |
 
 So: get the first-chance stack before forming a theory. `scripts/Capture-FirstChance.ps1`
 does the whole thing.
