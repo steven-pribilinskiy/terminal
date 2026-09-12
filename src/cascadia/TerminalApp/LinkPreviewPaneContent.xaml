@@ -121,14 +121,37 @@
 
             <!--
                 The status badge belongs beside the dropdown that changes it and
-                centred on that dropdown, which is why the form of required fields
-                and the error line sit below this row rather than inside it:
+                centred on that dropdown, so the form of required fields and the
+                error line go in rows below it rather than in a column beside it:
                 centring a badge against a column that grows walks it off the
                 control it describes.
+
+                A Grid and not two stacked StackPanels, for two reasons. The badge
+                is centred on row 0, which holds the dropdown and nothing else,
+                whatever appears underneath. And an Auto row whose only child is
+                collapsed is zero high, full stop, where a StackPanel's Spacing
+                between collapsed children is an implementation detail none of
+                this should depend on; the gaps here are margins on the rows that
+                come and go.
             -->
-            <StackPanel Orientation="Horizontal" Spacing="8">
-                <StackPanel x:Name="TicketStatusHost" VerticalAlignment="Center" />
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <StackPanel x:Name="TicketStatusHost"
+                            Grid.Row="0"
+                            Grid.Column="0"
+                            VerticalAlignment="Center" />
                 <StackPanel x:Name="ActionRow"
+                            Grid.Row="0"
+                            Grid.Column="1"
                             Orientation="Horizontal"
                             Spacing="6"
                             Visibility="Collapsed">
@@ -154,16 +177,22 @@
                                       IsActive="False"
                                       Visibility="Collapsed" />
                 </StackPanel>
-            </StackPanel>
 
-            <StackPanel x:Name="ActionFields"
-                        Spacing="4"
-                        Visibility="Collapsed" />
+                <StackPanel x:Name="ActionFields"
+                            Grid.Row="1"
+                            Grid.ColumnSpan="2"
+                            Margin="0,6,0,0"
+                            Spacing="4"
+                            Visibility="Collapsed" />
 
-            <TextBlock x:Name="ActionError"
-                       Opacity="0.8"
-                       TextWrapping="Wrap"
-                       Visibility="Collapsed" />
+                <TextBlock x:Name="ActionError"
+                           Grid.Row="2"
+                           Grid.ColumnSpan="2"
+                           Margin="0,6,0,0"
+                           Opacity="0.8"
+                           TextWrapping="Wrap"
+                           Visibility="Collapsed" />
+            </Grid>
 
             <StackPanel x:Name="TicketMetadataHost" Orientation="Horizontal" Spacing="8" />
         </StackPanel>

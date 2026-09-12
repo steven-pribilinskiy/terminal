@@ -273,10 +273,16 @@ namespace Microsoft.Terminal.Settings.Model
 
         Boolean Enabled;
         Windows.Foundation.Collections.IMap<String, String> Values;
-        // Keys of the display fields to show; null means the manifest defaults.
-        Windows.Foundation.Collections.IVector<String> Fields;
-        // Keys of the tabs to show; null means the manifest defaults.
-        Windows.Foundation.Collections.IVector<String> Tabs;
+        // Which display fields the user turned on, and which off, by key.
+        //
+        // A key the map does not mention takes the manifest's own default. That
+        // is the whole point of the shape: a field a manifest gains later has
+        // never been offered to anyone, so it arrives at its default instead of
+        // being read as declined -- which is what a list of "the keys to show"
+        // could not express, since absence meant both things at once.
+        Windows.Foundation.Collections.IMap<String, Boolean> Fields;
+        // Same, for tabs.
+        Windows.Foundation.Collections.IMap<String, Boolean> Tabs;
     }
 
     // Discovers manifests: built-ins embedded in this DLL, then

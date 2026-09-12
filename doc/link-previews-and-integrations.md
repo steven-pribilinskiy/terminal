@@ -102,11 +102,12 @@ source and an enable/disable toggle. Opening a plugin shows:
 - **Credentials** — a password box per credential field, with a "stored" indicator and a Clear
   button once one is saved. Saving writes straight to the Windows credential vault; it never
   touches `settings.json`.
-- **Show in tooltip** — a checkbox per display field, to choose which ones appear on the card and
-  in what order. Leaving all of them unchecked falls back to the manifest's own defaults. When the
-  manifest declares [field groups](#field-groups), the checkboxes are grouped under a tri-state
-  header checkbox that selects or clears the whole group; fields that belong to no group fall into
-  an implicit "Details" group.
+- **Show in tooltip** — a checkbox per display field. Each box records only itself: a field nobody
+  has touched stays at the manifest's `"default"`, and a box set back to that default stops being
+  recorded at all. The order the fields appear in on the card is the manifest's, never the order the
+  boxes were ticked. When the manifest declares [field groups](#field-groups), the checkboxes are
+  grouped under a tri-state header checkbox that selects or clears the whole group; fields that
+  belong to no group fall into an implicit "Details" group.
 - **Tabs** — a checkbox per [tab](#tabs) the manifest declares. With no tab enabled the card shows
   no tab strip at all.
 - **Text matching** — any of the plugin's *suggested* text matchers (see below), each with an
@@ -123,18 +124,34 @@ Only non-secret settings and field selections are persisted to `settings.json`, 
     "jira": {
         "enabled": true,
         "settings": { "host": "acme.atlassian.net" },
-        "fields": [ "summary", "status", "assignee", "updated" ],
-        "tabs": [ "description", "comments" ]
+        "fields": { "devPullRequests": true, "updated": false },
+        "tabs": { "comments": true }
     }
 }
 ```
 
 - `enabled` — whether the plugin is used for matching and preview at all.
 - `settings` — the plugin's non-secret setting values, keyed by the manifest's setting `key`.
-- `fields` — the display field keys to show, in order. Omit it (or leave it unset) to use the
-  manifest's own `"default": true` fields.
-- `tabs` — the [tab](#tabs) keys to show, in order. Omit it to use the manifest's own
-  `"default": true` tabs.
+- `fields` — the display fields the user turned **on or off**, keyed by field key. `true` shows one
+  the manifest hides by default; `false` hides one it shows.
+- `tabs` — the same, for [tabs](#tabs).
+
+**A key that is not mentioned takes the manifest's own `"default"`.** That is the point of the
+shape rather than a list of "the fields to show": a field a manifest gains later has never been put
+in front of anyone, so it arrives at its default instead of being read as one the user declined. A
+list could not say that — absence in a list meant "turned off" and "did not exist yet" at the same
+time, so every new `"default": true` field was invisible to everyone who had ever ticked a box.
+
+Only decisions are stored. Setting a box back to what the manifest says **erases** the key rather
+than writing it explicitly, so the file stays the size of what the user actually changed, and a
+manifest that later changes its own default is followed rather than overruled by a value nobody
+chose.
+
+The older form — `"fields": [ "summary", "status" ]`, the complete set of keys to show — is still
+read, so an existing `settings.json` keeps working. It is converted to overrides the first time a
+box is ticked. Because that form cannot distinguish a field the user hid from one that did not
+exist when it was written, the conversion keeps only the keys it names: a field you had hidden
+reappears once, at its manifest default.
 
 ### Where credentials live
 
@@ -556,7 +573,7 @@ condition the stored-token variants wait for. Nothing has to detect the failure 
 | `colorPath` | JSON pointer | A JSON pointer to a color value, for `badge` fields. |
 | `color` | string | A literal color (`"#rrggbb"` or a name — see below), for `badge` fields. It is the **fallback**: `colorPath` is resolved first, and `color` is used only when that pointer yields nothing. |
 | `format` | `"relativeTime"` \| `"date"` \| unset | Formats the raw value: `relativeTime` turns an ISO 8601 timestamp into "3 h ago"; `date` renders it as a date. |
-| `default` | boolean | Shown by default before the user picks a custom field set. |
+| `default` | boolean | Whether the field is shown when the user has expressed no opinion about this key. It is a real default, not a first-run seed: see [Where configuration lives](#where-configuration-lives-in-settingsjson). |
 
 `kind` values: `text`, `title` (bold, first line), `subtitle`, `badge` (a colored pill), `link`,
 `image` (≤ 24 px, from `iconPath`), `multiline` (up to 6 lines).
@@ -646,7 +663,7 @@ field list. Two shapes:
 | `itemBodyPath` | JSON pointer | `list` only, relative to each element. |
 | `itemTimePath` | JSON pointer | `list` only, relative to each element. |
 | `step` | string | The `deferred` fetch step this tab's content comes from. See [Lazily fetched tabs](#lazily-fetched-tabs). |
-| `default` | boolean | Shown by default before the user picks a custom tab set. |
+| `default` | boolean | Whether the tab is offered when the user has expressed no opinion about this key, exactly as a display field's `default` works. |
 
 ```jsonc
 "tabs": [

@@ -297,22 +297,18 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         return label.empty() ? _Field.Key() : label;
     }
 
+    // The user's own answer for this key if they have given one, and the
+    // manifest's default if they have not. Nothing has to be seeded, and nothing
+    // has to be kept in step with the manifest: a key nobody has decided is
+    // simply absent, which is a state the old list of "keys to show" could not
+    // hold.
     bool IntegrationDisplayFieldViewModel::Visible() const
     {
         if (const auto entry = _findEntry(_GlobalSettings, _IntegrationId))
         {
-            // A null list means "the manifest decides"; a present list is the
-            // complete set of keys the user wants.
-            if (const auto fields = entry.Fields())
+            if (const auto fields = entry.Fields(); fields && fields.HasKey(_Field.Key()))
             {
-                for (const auto& key : fields)
-                {
-                    if (key == _Field.Key())
-                    {
-                        return true;
-                    }
-                }
-                return false;
+                return fields.Lookup(_Field.Key());
             }
         }
         return _Field.DefaultVisible();
@@ -326,58 +322,30 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
 
         const auto entry = _ensureEntry(_GlobalSettings, _IntegrationId);
-
-        std::vector<hstring> keys;
-        if (const auto existing = entry.Fields())
+        auto overrides = entry.Fields();
+        if (!overrides)
         {
-            for (const auto& key : existing)
-            {
-                keys.push_back(key);
-            }
-        }
-        else if (const auto manifestFields = _Manifest.Fields())
-        {
-            // First edit: start from what the manifest shows by default, so
-            // ticking one box doesn't silently hide everything else.
-            for (const auto& field : manifestFields)
-            {
-                if (field.DefaultVisible())
-                {
-                    keys.push_back(field.Key());
-                }
-            }
+            overrides = single_threaded_map<hstring, bool>();
+            entry.Fields(overrides);
         }
 
+        // A choice that agrees with the manifest is not recorded, it is erased:
+        // that keeps settings.json to the decisions the user actually made, and
+        // it means a manifest that later changes its own default is followed
+        // rather than overruled by a value nobody chose.
         const auto key = _Field.Key();
-        const auto existingKey = std::find(keys.begin(), keys.end(), key);
-        if (value)
+        if (value == _Field.DefaultVisible())
         {
-            if (existingKey == keys.end())
+            if (overrides.HasKey(key))
             {
-                keys.push_back(key);
+                overrides.Remove(key);
             }
         }
-        else if (existingKey != keys.end())
+        else
         {
-            keys.erase(existingKey);
+            overrides.Insert(key, value);
         }
 
-        // Store them in manifest order, so the card renders in the order the
-        // integration intended no matter which boxes were ticked when.
-        if (const auto manifestFields = _Manifest.Fields())
-        {
-            std::vector<hstring> ordered;
-            for (const auto& field : manifestFields)
-            {
-                if (std::find(keys.begin(), keys.end(), field.Key()) != keys.end())
-                {
-                    ordered.push_back(field.Key());
-                }
-            }
-            keys = std::move(ordered);
-        }
-
-        entry.Fields(single_threaded_vector<hstring>(std::move(keys)));
         _NotifyChanges(L"Visible");
     }
 
@@ -476,16 +444,9 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     {
         if (const auto entry = _findEntry(_GlobalSettings, _IntegrationId))
         {
-            if (const auto tabs = entry.Tabs())
+            if (const auto tabs = entry.Tabs(); tabs && tabs.HasKey(_Tab.Key()))
             {
-                for (const auto& key : tabs)
-                {
-                    if (key == _Tab.Key())
-                    {
-                        return true;
-                    }
-                }
-                return false;
+                return tabs.Lookup(_Tab.Key());
             }
         }
         return _Tab.DefaultVisible();
@@ -499,61 +460,29 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
 
         const auto entry = _ensureEntry(_GlobalSettings, _IntegrationId);
-
-        std::vector<hstring> keys;
-        if (const auto existing = entry.Tabs())
+        auto overrides = entry.Tabs();
+        if (!overrides)
         {
-            for (const auto& key : existing)
-            {
-                keys.push_back(key);
-            }
-        }
-        else if (const auto manifestTabs = _Manifest.Tabs())
-        {
-            // First edit: start from what the manifest shows by default, so
-            // ticking one box doesn't silently hide everything else.
-            for (const auto& tab : manifestTabs)
-            {
-                if (tab.DefaultVisible())
-                {
-                    keys.push_back(tab.Key());
-                }
-            }
+            overrides = single_threaded_map<hstring, bool>();
+            entry.Tabs(overrides);
         }
 
+        // "Every tab off" needs no special case any more: each "off" is written
+        // as its own false, so it survives a read without an empty collection
+        // having to stand for it.
         const auto key = _Tab.Key();
-        const auto existingKey = std::find(keys.begin(), keys.end(), key);
-        if (value)
+        if (value == _Tab.DefaultVisible())
         {
-            if (existingKey == keys.end())
+            if (overrides.HasKey(key))
             {
-                keys.push_back(key);
+                overrides.Remove(key);
             }
         }
-        else if (existingKey != keys.end())
+        else
         {
-            keys.erase(existingKey);
+            overrides.Insert(key, value);
         }
 
-        // Store them in manifest order, so the card draws the tab strip the way
-        // the integration intended however the boxes were ticked.
-        if (const auto manifestTabs = _Manifest.Tabs())
-        {
-            std::vector<hstring> ordered;
-            for (const auto& tab : manifestTabs)
-            {
-                if (std::find(keys.begin(), keys.end(), tab.Key()) != keys.end())
-                {
-                    ordered.push_back(tab.Key());
-                }
-            }
-            keys = std::move(ordered);
-        }
-
-        // An empty list is stored rather than pruned: "the user turned every tab
-        // off" and "the user has never said" are different states, and pruning
-        // would turn the first back into the second on the next read.
-        entry.Tabs(single_threaded_vector<hstring>(std::move(keys)));
         _NotifyChanges(L"Visible");
     }
 

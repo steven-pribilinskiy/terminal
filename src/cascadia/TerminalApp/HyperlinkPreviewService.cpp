@@ -25,7 +25,6 @@
 #include <map>
 #include <mutex>
 #include <optional>
-#include <set>
 #include <utility>
 #include <vector>
 
@@ -2431,17 +2430,11 @@ namespace winrt::TerminalApp::implementation
                     }
                 }
 
-                // A null Fields collection means "the manifest's own defaults";
-                // an empty one means the user unticked everything.
+                // The user's overrides, per key. A key the map does not mention
+                // has never been decided and takes the manifest's own default --
+                // which is what lets a field a manifest gains later arrive
+                // visible rather than being read as one the user declined.
                 const auto chosen = entry.Fields();
-                std::set<std::wstring> selected;
-                if (chosen)
-                {
-                    for (const auto& key : chosen)
-                    {
-                        selected.insert(std::wstring{ key });
-                    }
-                }
 
                 if (const auto displayFields = manifest.Fields())
                 {
@@ -2452,7 +2445,8 @@ namespace winrt::TerminalApp::implementation
                             continue;
                         }
                         const std::wstring key{ field.Key() };
-                        const auto visible = chosen ? selected.count(key) != 0 : field.DefaultVisible();
+                        const auto visible = chosen && chosen.HasKey(field.Key()) ? chosen.Lookup(field.Key()) :
+                                                                                   field.DefaultVisible();
                         if (!visible)
                         {
                             continue;
@@ -2497,18 +2491,8 @@ namespace winrt::TerminalApp::implementation
                     }
                 }
 
-                // Same contract as Fields: a null Tabs collection means "the
-                // manifest's own defaults", an empty one means the user turned
-                // every tab off.
+                // Same contract as Fields, per key.
                 const auto chosenTabs = entry.Tabs();
-                std::set<std::wstring> selectedTabs;
-                if (chosenTabs)
-                {
-                    for (const auto& key : chosenTabs)
-                    {
-                        selectedTabs.insert(std::wstring{ key });
-                    }
-                }
 
                 if (const auto tabs = manifest.Tabs())
                 {
@@ -2519,7 +2503,8 @@ namespace winrt::TerminalApp::implementation
                             continue;
                         }
                         const std::wstring key{ tab.Key() };
-                        const auto visible = chosenTabs ? selectedTabs.count(key) != 0 : tab.DefaultVisible();
+                        const auto visible = chosenTabs && chosenTabs.HasKey(tab.Key()) ? chosenTabs.Lookup(tab.Key()) :
+                                                                                          tab.DefaultVisible();
                         if (!visible)
                         {
                             continue;
