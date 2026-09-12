@@ -64,6 +64,15 @@ namespace Microsoft.Terminal.Settings.Model
         void SetSettingsGroupExpanded(String key, Boolean expanded);
         Windows.Foundation.IReference<Boolean> SettingsGroupExpanded(String key);
 
+        // Two pieces of Settings UI chrome, kept here rather than in settings.json
+        // alongside ExpandedSettingsGroups: they describe how the editor presents
+        // itself, not how the Terminal behaves, and they have to persist the moment
+        // they are flipped. A global setting would live on the editor's settings
+        // clone instead, which would make turning either of them on count as an
+        // unsaved change - and both exist to interact with the Save button.
+        Boolean SettingsShowDescriptions;
+        Boolean SettingsAutoSave;
+
         String SettingsHash;
         Windows.Foundation.Collections.IVector<WindowLayout> PersistedWindowLayouts;
         Windows.Foundation.Collections.IVector<String> RecentCommands;

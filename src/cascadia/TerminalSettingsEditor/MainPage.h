@@ -9,6 +9,8 @@
 #include "Utils.h"
 #include "SearchIndex.h"
 
+#include <ThrottledFunc.h>
+
 namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 {
     struct Breadcrumb : BreadcrumbT<Breadcrumb>
@@ -55,6 +57,9 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         void SettingsSearchBox_SuggestionChosen(const Windows::UI::Xaml::Controls::AutoSuggestBox& sender, const Windows::UI::Xaml::Controls::AutoSuggestBoxSuggestionChosenEventArgs& args);
 
         void SettingsNav_Loaded(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& args);
+        void SettingsNav_Unloaded(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& args);
+        void ShowDescriptionsSwitch_Toggled(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& args);
+        void AutoSaveSwitch_Toggled(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& args);
         void SettingsNav_ItemInvoked(const Microsoft::UI::Xaml::Controls::NavigationView& sender, const Microsoft::UI::Xaml::Controls::NavigationViewItemInvokedEventArgs& args);
         void SettingsNav_PaneOpened(const Microsoft::UI::Xaml::Controls::NavigationView& sender, const Windows::Foundation::IInspectable& args);
         void SettingsNav_PaneClosed(const Microsoft::UI::Xaml::Controls::NavigationView& sender, const Windows::Foundation::IInspectable& args);
@@ -68,6 +73,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         uint64_t GetHostingWindow() const noexcept;
 
         winrt::Windows::UI::Xaml::Media::Brush BackgroundBrush();
+
+        // Called from ViewModelChangeHook when any view model raises PropertyChanged.
+        // Public only because the free function that forwards to it lives at file
+        // scope in MainPage.cpp, which cannot reach a private member.
+        void OnAnyViewModelChanged();
 
         Windows::Foundation::Collections::IObservableVector<IInspectable> Breadcrumbs() noexcept;
         Editor::ExtensionsViewModel ExtensionsVM() const noexcept { return _extensionsVM; }
@@ -121,6 +131,48 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         void _ApplyMotionPreference();
         // What MainPage.xaml asked for, kept so reduced motion can be undone.
         winrt::Windows::UI::Xaml::Media::Animation::TransitionCollection _pageTransitions{ nullptr };
+
+        // Unsaved-change tracking, and the auto-save that rides on it.
+        //
+        // There is no single "the settings changed" signal to hang this on: the
+        // observable view-model macros raise PropertyChanged for pure UI state as well
+        // as for settings, and GETSET_BINDABLE_ENUM_SETTING writes through to the
+        // settings model without raising anything. So the verdict is always a
+        // comparison of CascadiaSettings::SerializedFingerprint against what it was
+        // when the clone was made, and the notifications below only decide *when* to
+        // look.
+        void _ArmDirtyTracking();
+        void _RecordCleanState();
+        void _ReevaluateDirtyState();
+        void _ApplySaveButtonState();
+        void _ReadEditorChromePreferences();
+        bool _AbsorbOwnAutoSaveReload(const Model::CascadiaSettings& settings);
+
+        // How many of our own auto-save writes to keep hashes for. A reload is not
+        // guaranteed per write -- ReloadSettingsThrottled debounces -- so the list
+        // absorbs a burst, and anything this far back is never coming.
+        static constexpr size_t MaxTrackedAutoSaveWrites{ 8 };
+
+        // The clone's fingerprint as of the last time it matched settings.json: when
+        // the editor opened, when Discard rebuilt it, or when a save wrote it out.
+        winrt::hstring _cleanFingerprint;
+        bool _unsavedChanges{ false };
+        bool _autoSave{ false };
+        // Set while _ReadEditorChromePreferences is pushing stored values into the two
+        // switches, so their Toggled handlers can tell "restoring" from "the user just
+        // flipped this" and not write the value straight back out.
+        bool _applyingChromePreferences{ false };
+        // settings.json's hash after each of our own auto-save writes, so the reloads
+        // those writes provoke can be recognised and not tear the page down mid-edit.
+        // Only ever appended to by the auto-save path -- a manual Save still goes
+        // through the full rebuild, as it always has.
+        std::vector<winrt::hstring> _autoSaveWrittenHashes;
+        // Coalesces a burst of PropertyChanged (every keystroke in a text box raises
+        // one) into a single serialization.
+        std::shared_ptr<ThrottledFunc<>> _dirtyCheckThrottle;
+        // The backstop for the changes nothing notifies about. Runs only while the
+        // page is loaded.
+        winrt::Windows::UI::Xaml::DispatcherTimer _dirtyCheckTimer{ nullptr };
 
         safe_void_coroutine _UpdateSearchIndex();
 

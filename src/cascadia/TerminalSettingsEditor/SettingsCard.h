@@ -64,6 +64,18 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         static bool JsonOnlyImprintEnabled() noexcept;
         static void JsonOnlyImprintEnabled(bool value);
 
+        // Whether a row with a description prints it under the header, for the whole
+        // settings window. Off by default: most pages carry a description on nearly
+        // every row and several of them run to four lines, which buries the settings
+        // themselves. With this off the text is still there, one hover away on the
+        // help glyph beside the header.
+        //
+        // Same app-wide shape as the two imprint switches above, for the same
+        // reason: a dependency property would have to be threaded through every
+        // page's view model to reach cards that have nothing else to do with it.
+        static bool DescriptionsVisible() noexcept;
+        static void DescriptionsVisible(bool value);
+
     private:
         static void _InitializeProperties();
         static void _OnHeaderChanged(const Windows::UI::Xaml::DependencyObject& d, const Windows::UI::Xaml::DependencyPropertyChangedEventArgs& e);
@@ -77,7 +89,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         void _UpdateForkImprint();
 
-        // Redraws the marks on every card still alive, and compacts the registry
+        // Everything on a card that an app-wide switch decides: the two provenance
+        // marks and whether the description line is drawn.
+        void _UpdateChrome();
+
+        // Redraws the chrome on every card still alive, and compacts the registry
         // while it is walking it.
         static void _RefreshLiveCards();
 
@@ -95,6 +111,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         void _UpdateHeaderVisibility();
         void _UpdateDescriptionVisibility();
         void _UpdateFullDescription();
+        void _UpdateDescriptionHelp();
         void _UpdateHeaderIconVisibility();
         void _UpdateContentVisibility();
         void _UpdateContentAlignmentState();

@@ -54,6 +54,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     static constexpr std::wstring_view RootGridPart{ L"PART_RootGrid" };
     static constexpr std::wstring_view AylithImprintPart{ L"PART_AylithImprint" };
     static constexpr std::wstring_view JsonOnlyImprintPart{ L"PART_JsonOnlyImprint" };
+    static constexpr std::wstring_view DescriptionHelpPart{ L"PART_DescriptionHelp" };
 
     // Whether fork-only rows draw their mark, and every card built so far.
     //
@@ -64,7 +65,13 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     // unregister step that nothing would reliably call.
     static bool g_imprintEnabled{ false };
     static bool g_jsonOnlyImprintEnabled{ false };
+    static bool g_descriptionsVisible{ false };
     static std::vector<winrt::weak_ref<SettingsCard>> g_liveCards;
+
+    // How wide the help popover is allowed to get before it wraps. Descriptions in
+    // this editor run to a sentence or four; unbounded, a ToolTip lays them out as
+    // one line the width of the monitor.
+    static constexpr double DescriptionHelpToolTipMaxWidth{ 320.0 };
 
     static constexpr double SettingsCardVerticalHeaderContentSpacing{ 8.0 };
 
@@ -104,11 +111,19 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         {
             if (const auto card = weak.get())
             {
-                card->_UpdateForkImprint();
+                card->_UpdateChrome();
                 alive.emplace_back(weak);
             }
         }
         g_liveCards = std::move(alive);
+    }
+
+    // One entry point for every switch that is app-wide rather than per-row, so a
+    // walk of the live cards does not have to know which switch moved.
+    void SettingsCard::_UpdateChrome()
+    {
+        _UpdateForkImprint();
+        _UpdateDescriptionVisibility();
     }
 
     void SettingsCard::ImprintEnabled(bool value)
@@ -133,6 +148,21 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             return;
         }
         g_jsonOnlyImprintEnabled = value;
+        _RefreshLiveCards();
+    }
+
+    bool SettingsCard::DescriptionsVisible() noexcept
+    {
+        return g_descriptionsVisible;
+    }
+
+    void SettingsCard::DescriptionsVisible(bool value)
+    {
+        if (g_descriptionsVisible == value)
+        {
+            return;
+        }
+        g_descriptionsVisible = value;
         _RefreshLiveCards();
     }
 
@@ -580,15 +610,18 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     void SettingsCard::_UpdateDescriptionVisibility()
     {
+        const auto haveDescription = !_isNullOrEmpty(Description());
+
         if (const auto child{ GetTemplateChild(hstring{ DescriptionPresenter }) })
         {
             if (const auto frameworkChild{ child.try_as<FrameworkElement>() })
             {
-                frameworkChild.Visibility(_isNullOrEmpty(Description()) ? Visibility::Collapsed : Visibility::Visible);
+                frameworkChild.Visibility(haveDescription && g_descriptionsVisible ? Visibility::Visible : Visibility::Collapsed);
             }
         }
 
         _UpdateFullDescription();
+        _UpdateDescriptionHelp();
     }
 
     // DEVIATION FROM WCT: Expose the Description via FullDescription
@@ -603,6 +636,50 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         {
             AutomationProperties::SetFullDescription(element, text);
         }
+    }
+
+    // The help glyph beside the header, and the popover hanging off it. Shown
+    // whenever the row has a description, whether or not the description line itself
+    // is drawn, so that a row always admits it has more to say.
+    //
+    // Only a string description gets one. Description is typed as an Object and a
+    // page is free to hand it a TextBlock; a UIElement has exactly one parent, so
+    // presenting the same one twice would tear it out of the description line. Every
+    // description in this editor is a string today, and the failure mode for a future
+    // one that isn't is a missing glyph rather than a missing description.
+    void SettingsCard::_UpdateDescriptionHelp()
+    {
+        const auto child{ GetTemplateChild(hstring{ DescriptionHelpPart }) };
+        if (!child)
+        {
+            return;
+        }
+
+        const auto help{ child.try_as<FrameworkElement>() };
+        if (!help)
+        {
+            return;
+        }
+
+        const auto description = Description();
+        const auto text = _isNullOrEmpty(description) ? hstring{} : unbox_value_or<hstring>(description, hstring{});
+        if (text.empty())
+        {
+            help.Visibility(Visibility::Collapsed);
+            ToolTipService::SetToolTip(help, nullptr);
+            return;
+        }
+
+        TextBlock body{};
+        body.Text(text);
+        body.TextWrapping(TextWrapping::Wrap);
+        body.MaxWidth(DescriptionHelpToolTipMaxWidth);
+
+        ToolTip tip{};
+        tip.Content(body);
+        ToolTipService::SetToolTip(help, tip);
+
+        help.Visibility(Visibility::Visible);
     }
 
     void SettingsCard::_UpdateHeaderIconVisibility()

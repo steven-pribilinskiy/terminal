@@ -4019,4 +4019,36 @@
   <data name="Globals_HyperlinkTooltipMaxHeightBox.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Maximum popover height</value></data>
   <data name="Globals_HyperlinkTooltipNested.Header" xml:space="preserve"><value>Link tooltips inside popovers</value></data>
   <data name="Globals_HyperlinkTooltipNested.Description" xml:space="preserve"><value>Preview links and recognized IDs inside a link popover using the same Link Tooltip rules. Off by default.</value></data>
+  <data name="Nav_ShowDescriptions.OnContent" xml:space="preserve">
+    <value>Show descriptions</value>
+    <comment>Label beside a switch in the navigation footer. On means every setting prints its explanatory text under its name; off means the text is only shown when you hover the help glyph beside the name.</comment>
+  </data>
+  <data name="Nav_ShowDescriptions.OffContent" xml:space="preserve">
+    <value>Show descriptions</value>
+    <comment>The same label as Nav_ShowDescriptions.OnContent. It is deliberately the same in both states: the label names what the switch controls, and the knob shows which way it is set.</comment>
+  </data>
+  <data name="Nav_ShowDescriptions.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Show descriptions</value>
+    <comment>Accessible name for the "Show descriptions" switch in the navigation footer.</comment>
+  </data>
+  <data name="Nav_ShowDescriptions.[using:Windows.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Print each setting's explanation under its name. With this off, hover the help glyph beside a setting to read it.</value>
+    <comment>A description of what the "Show descriptions" switch does. Presented near "Nav_ShowDescriptions".</comment>
+  </data>
+  <data name="Settings_AutoSaveSwitch.OnContent" xml:space="preserve">
+    <value>Auto-save</value>
+    <comment>Label beside a switch next to the Save button. On means every change is written to settings.json as it is made.</comment>
+  </data>
+  <data name="Settings_AutoSaveSwitch.OffContent" xml:space="preserve">
+    <value>Auto-save</value>
+    <comment>The same label as Settings_AutoSaveSwitch.OnContent. It is deliberately the same in both states: the label names what the switch controls, and the knob shows which way it is set.</comment>
+  </data>
+  <data name="Settings_AutoSaveSwitch.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Auto-save</value>
+    <comment>Accessible name for the auto-save switch beside the Save button.</comment>
+  </data>
+  <data name="Settings_AutoSaveSwitch.[using:Windows.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Write every change as you make it. Save and Discard changes are disabled while this is on.</value>
+    <comment>A description of what the auto-save switch does. Presented near "Settings_AutoSaveSwitch". {Locked="Discard changes"} matches the label of the button named by Settings_ResetSettingsButton.Content.</comment>
+  </data>
 </root>
