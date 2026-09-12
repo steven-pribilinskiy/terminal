@@ -42,38 +42,28 @@
                                    Text="{x:Bind ExeName}" />
                         <Border Padding="6,1"
                                 VerticalAlignment="Center"
-                                Background="{ThemeResource ActivityKindBadgeBackground}"
+                                Background="{ThemeResource SubtleFillColorSecondaryBrush}"
                                 CornerRadius="3">
                             <TextBlock FontSize="11"
-                                       Foreground="{ThemeResource ActivityKindBadgeForeground}"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        Text="{x:Bind Kind}" />
                         </Border>
                         <TextBlock FontSize="11"
                                    VerticalAlignment="Center"
-                                   Foreground="{ThemeResource ActivityMutedForeground}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                    Text="{x:Bind Timestamp}" />
                     </StackPanel>
 
                     <!--  Why it happened  -->
                     <TextBlock Grid.Row="1"
                                FontSize="12"
-                               Foreground="{ThemeResource ActivityMutedForeground}"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                Text="{x:Bind Reason}"
                                TextWrapping="WrapWholeWords" />
 
                     <!--
                         The command line, monospaced because that is what it is,
-                        and WRAPPED rather than sideways-scrolling.
-                        A ScrollViewer here is what killed the process: the
-                        ListView's virtualizing panel measures its items through
-                        ModernCollectionBasePanel, a scroll-capable container
-                        nested inside that is measured unconstrained, and
-                        MeasureOverride came back E_FAIL, and the process
-                        fail-fasted with 0xc000027b and none of our frames on the
-                        stack. Captured rather than guessed; see the diagnostics
-                        skill.
-                        Wrapping is the better answer anyway: the whole command
-                        line is visible at once, which is the point of the pane.
+                        and wrapped so the whole of it is visible at once.
                     -->
                     <TextBlock Grid.Row="2"
                                Margin="0,4,0,0"
@@ -90,12 +80,12 @@
                                 Orientation="Horizontal"
                                 Spacing="12">
                         <TextBlock FontSize="11"
-                                   Foreground="{ThemeResource ActivityMutedForeground}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                    IsTextSelectionEnabled="True"
                                    Text="{x:Bind WorkingDirectory}"
                                    Visibility="{x:Bind HasWorkingDirectory}" />
                         <TextBlock FontSize="11"
-                                   Foreground="{ThemeResource ActivityMutedForeground}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                    IsTextSelectionEnabled="True"
                                    Text="{x:Bind ParentExe}"
                                    Visibility="{x:Bind HasParent}" />
@@ -103,35 +93,35 @@
                 </Grid>
             </DataTemplate>
 
+            <!--
+                Only PageBackground lives here, and only because it is used on
+                the root Grid rather than inside the DataTemplate above.
+
+                Everything the template draws with uses a system brush instead
+                (TextFillColorSecondaryBrush, SubtleFillColorSecondaryBrush).
+                That is not a style preference: a custom key defined in these
+                ThemeDictionaries is NOT resolvable from inside a DataTemplate
+                that a virtualizing panel instantiates. It fail-fasts the process
+                with 0xc000027b, and the stack blames measure. The real frame is
+                BinaryFormatObjectWriter::ProvideThemeResourceValue under
+                CDataTemplate::QueryContentNoRef, i.e. the template could not be
+                loaded at all because a ThemeResource in it did not resolve.
+
+                SnippetsPaneContent looks like a counter-example and is not: its
+                custom PlayButton* keys are referenced from a ControlTemplate
+                inside a Style, never from its DataTemplate.
+            -->
             <ResourceDictionary.ThemeDictionaries>
                 <!--  PageBackground matches SnippetsPaneContent, which matches MainPage.  -->
                 <ResourceDictionary x:Key="Dark">
                     <Color x:Key="PageBackground">#282828</Color>
-                    <SolidColorBrush x:Key="ActivityMutedForeground"
-                                     Color="#A0FFFFFF" />
-                    <SolidColorBrush x:Key="ActivityKindBadgeBackground"
-                                     Color="#30FFFFFF" />
-                    <SolidColorBrush x:Key="ActivityKindBadgeForeground"
-                                     Color="#FFFFFFFF" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Light">
                     <Color x:Key="PageBackground">#F9F9F9</Color>
-                    <SolidColorBrush x:Key="ActivityMutedForeground"
-                                     Color="#99000000" />
-                    <SolidColorBrush x:Key="ActivityKindBadgeBackground"
-                                     Color="#18000000" />
-                    <SolidColorBrush x:Key="ActivityKindBadgeForeground"
-                                     Color="#DE000000" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="HighContrast">
                     <StaticResource x:Key="PageBackground"
                                     ResourceKey="SystemColorWindowColorBrush" />
-                    <StaticResource x:Key="ActivityMutedForeground"
-                                    ResourceKey="SystemColorWindowTextColorBrush" />
-                    <StaticResource x:Key="ActivityKindBadgeBackground"
-                                    ResourceKey="SystemColorWindowColorBrush" />
-                    <StaticResource x:Key="ActivityKindBadgeForeground"
-                                    ResourceKey="SystemColorWindowTextColorBrush" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
 
@@ -183,7 +173,7 @@
         <TextBlock Grid.Row="1"
                    Margin="8,0,8,8"
                    FontSize="12"
-                   Foreground="{ThemeResource ActivityMutedForeground}"
+                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                    Text="{x:Bind StatusText, Mode=OneWay}"
                    TextWrapping="WrapWholeWords" />
 
