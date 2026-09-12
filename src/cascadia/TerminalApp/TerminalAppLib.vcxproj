@@ -77,6 +77,9 @@
     <Page Include="SnippetsPaneContent.xaml">
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="ActivityPaneContent.xaml">
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="MarkdownPaneContent.xaml">
       <SubType>Designer</SubType>
     </Page>
@@ -177,6 +180,9 @@
     </ClInclude>
     <ClInclude Include="SnippetsPaneContent.h">
       <DependentUpon>SnippetsPaneContent.xaml</DependentUpon>
+    </ClInclude>
+    <ClInclude Include="ActivityPaneContent.h">
+      <DependentUpon>ActivityPaneContent.xaml</DependentUpon>
     </ClInclude>
     <ClInclude Include="SettingsPaneContent.h">
       <DependentUpon>TerminalPaneContent.idl</DependentUpon>
@@ -310,6 +316,9 @@
     </ClCompile>
     <ClCompile Include="SnippetsPaneContent.cpp">
       <DependentUpon>SnippetsPaneContent.xaml</DependentUpon>
+    </ClCompile>
+    <ClCompile Include="ActivityPaneContent.cpp">
+      <DependentUpon>ActivityPaneContent.xaml</DependentUpon>
     </ClCompile>
     <ClCompile Include="SettingsPaneContent.cpp">
       <DependentUpon>TerminalPaneContent.idl</DependentUpon>

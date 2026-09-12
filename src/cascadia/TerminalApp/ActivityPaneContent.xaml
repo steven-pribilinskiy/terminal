@@ -1,0 +1,210 @@
+<!--
+    Copyright (c) Microsoft Corporation. All rights reserved. Licensed under
+    the MIT License. See LICENSE in the project root for license information.
+-->
+<UserControl x:Class="TerminalApp.ActivityPaneContent"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="using:TerminalApp"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:mtu="using:Microsoft.Terminal.UI"
+             xmlns:mux="using:Microsoft.UI.Xaml.Controls"
+             AutomationProperties.LocalizedControlType="pane"
+             mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+
+            <!--
+                One recorded event. The headline is the program and when; the
+                command line and folder are the part you actually came for, so
+                they are always visible rather than hidden behind selection - a
+                log you have to click through row by row is no faster than
+                opening the file.
+            -->
+            <DataTemplate x:Key="ActivityItemTemplate"
+                          x:DataType="local:ActivityEntry">
+                <Grid Margin="0,4,0,8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!--  Program, kind and timestamp  -->
+                    <StackPanel Grid.Row="0"
+                                Orientation="Horizontal"
+                                Spacing="8">
+                        <TextBlock FontWeight="SemiBold"
+                                   Style="{ThemeResource BodyTextBlockStyle}"
+                                   Text="{x:Bind ExeName}" />
+                        <Border Padding="6,1"
+                                VerticalAlignment="Center"
+                                Background="{ThemeResource ActivityKindBadgeBackground}"
+                                CornerRadius="3">
+                            <TextBlock FontSize="11"
+                                       Foreground="{ThemeResource ActivityKindBadgeForeground}"
+                                       Text="{x:Bind Kind}" />
+                        </Border>
+                        <TextBlock FontSize="11"
+                                   VerticalAlignment="Center"
+                                   Foreground="{ThemeResource ActivityMutedForeground}"
+                                   Text="{x:Bind Timestamp}" />
+                    </StackPanel>
+
+                    <!--  Why it happened  -->
+                    <TextBlock Grid.Row="1"
+                               FontSize="12"
+                               Foreground="{ThemeResource ActivityMutedForeground}"
+                               Text="{x:Bind Reason}"
+                               TextWrapping="WrapWholeWords" />
+
+                    <!--
+                        The command line, monospaced because that is what it is.
+                        It scrolls sideways rather than wrapping: a wrapped
+                        command line is hard to read back and harder to copy.
+                    -->
+                    <ScrollViewer Grid.Row="2"
+                                  Margin="0,4,0,0"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  HorizontalScrollMode="Auto"
+                                  VerticalScrollBarVisibility="Disabled"
+                                  VerticalScrollMode="Disabled"
+                                  Visibility="{x:Bind HasCommandLine}">
+                        <TextBlock FontFamily="Cascadia Mono, Consolas"
+                                   FontSize="12"
+                                   IsTextSelectionEnabled="True"
+                                   Text="{x:Bind CommandLine}" />
+                    </ScrollViewer>
+
+                    <!--  Folder and who started it  -->
+                    <StackPanel Grid.Row="3"
+                                Margin="0,2,0,0"
+                                Orientation="Horizontal"
+                                Spacing="12">
+                        <TextBlock FontSize="11"
+                                   Foreground="{ThemeResource ActivityMutedForeground}"
+                                   IsTextSelectionEnabled="True"
+                                   Text="{x:Bind WorkingDirectory}"
+                                   Visibility="{x:Bind HasWorkingDirectory}" />
+                        <TextBlock FontSize="11"
+                                   Foreground="{ThemeResource ActivityMutedForeground}"
+                                   IsTextSelectionEnabled="True"
+                                   Text="{x:Bind ParentExe}"
+                                   Visibility="{x:Bind HasParent}" />
+                    </StackPanel>
+                </Grid>
+            </DataTemplate>
+
+            <ResourceDictionary.ThemeDictionaries>
+                <!--  PageBackground matches SnippetsPaneContent, which matches MainPage.  -->
+                <ResourceDictionary x:Key="Dark">
+                    <Color x:Key="PageBackground">#282828</Color>
+                    <SolidColorBrush x:Key="ActivityMutedForeground"
+                                     Color="#A0FFFFFF" />
+                    <SolidColorBrush x:Key="ActivityKindBadgeBackground"
+                                     Color="#30FFFFFF" />
+                    <SolidColorBrush x:Key="ActivityKindBadgeForeground"
+                                     Color="#FFFFFFFF" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Light">
+                    <Color x:Key="PageBackground">#F9F9F9</Color>
+                    <SolidColorBrush x:Key="ActivityMutedForeground"
+                                     Color="#99000000" />
+                    <SolidColorBrush x:Key="ActivityKindBadgeBackground"
+                                     Color="#18000000" />
+                    <SolidColorBrush x:Key="ActivityKindBadgeForeground"
+                                     Color="#DE000000" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="HighContrast">
+                    <StaticResource x:Key="PageBackground"
+                                    ResourceKey="SystemColorWindowColorBrush" />
+                    <StaticResource x:Key="ActivityMutedForeground"
+                                    ResourceKey="SystemColorWindowTextColorBrush" />
+                    <StaticResource x:Key="ActivityKindBadgeBackground"
+                                    ResourceKey="SystemColorWindowColorBrush" />
+                    <StaticResource x:Key="ActivityKindBadgeForeground"
+                                    ResourceKey="SystemColorWindowTextColorBrush" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <!--  Same shape as SnippetsPaneContent: TabFocusNavigation="Cycle" keeps tab focus inside the pane.  -->
+    <Grid AllowFocusOnInteraction="False"
+          AutomationProperties.AccessibilityView="Raw"
+          Background="{ThemeResource PageBackground}"
+          TabFocusNavigation="Cycle">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0"
+              Margin="4"
+              HorizontalAlignment="Stretch">
+            <TextBlock x:Name="_title"
+                       x:Uid="ActivityPaneTitle"
+                       HorizontalAlignment="Left"
+                       FontSize="24" />
+            <StackPanel HorizontalAlignment="Right"
+                        Orientation="Horizontal"
+                        Spacing="4">
+                <Button x:Uid="RefreshActivityPaneButton"
+                        Click="_refreshClick">
+                    <Button.Content>
+                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                                  FontSize="12"
+                                  Glyph="&#xE72C;" />
+                    </Button.Content>
+                </Button>
+                <Button x:Uid="CloseActivityPaneButton"
+                        Click="_closePaneClick">
+                    <Button.Content>
+                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                                  FontSize="12"
+                                  Glyph="&#xE8BB;" />
+                    </Button.Content>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!--  How many entries, or why there are none.  -->
+        <TextBlock Grid.Row="1"
+                   Margin="8,0,8,8"
+                   FontSize="12"
+                   Foreground="{ThemeResource ActivityMutedForeground}"
+                   Text="{x:Bind StatusText, Mode=OneWay}"
+                   TextWrapping="WrapWholeWords" />
+
+        <TextBox x:Name="_filterBox"
+                 x:Uid="ActivityFilterBox"
+                 Grid.Row="2"
+                 Margin="8,0,8,8"
+                 AllowFocusOnInteraction="True"
+                 TextChanged="_filterTextChanged">
+            <TextBox.ContextFlyout>
+                <mtu:TextMenuFlyout />
+            </TextBox.ContextFlyout>
+        </TextBox>
+
+        <ListView x:Name="_entryList"
+                  Grid.Row="3"
+                  AllowFocusOnInteraction="True"
+                  ItemTemplate="{StaticResource ActivityItemTemplate}"
+                  ItemsSource="{x:Bind Entries, Mode=OneWay}"
+                  SelectionMode="Single">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                </Style>
+            </ListView.ItemContainerStyle>
+        </ListView>
+    </Grid>
+
+</UserControl>

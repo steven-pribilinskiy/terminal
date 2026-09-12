@@ -1080,6 +1080,46 @@ Applying on next launch closes nothing now: the swap happens once you have close
   <data name="CloseSnippetsPaneButton.[using:Windows.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
     <value>Close pane</value>
   </data>
+  <data name="ActivityPaneTitle.Text" xml:space="preserve">
+    <value>Activity</value>
+    <comment>Header for a pane listing the programs this terminal has started.</comment>
+  </data>
+  <data name="ActivityFilterBox.PlaceholderText" xml:space="preserve">
+    <value>Filter activity...</value>
+    <comment>Placeholder text for a text box to filter the activity list (on the same pane as the 'ActivityPaneTitle')</comment>
+  </data>
+  <data name="ActivityPaneCount.Text" xml:space="preserve">
+    <value>{0} recorded events, newest first.</value>
+    <comment>{0} is replaced with a count of entries. Shown above the activity list.</comment>
+  </data>
+  <data name="ActivityPaneEmpty.Text" xml:space="preserve">
+    <value>Nothing recorded yet. Programs started from now on will be listed here.</value>
+    <comment>Shown on the activity pane when the log exists but has no entries.</comment>
+  </data>
+  <data name="ActivityPaneDisabled.Text" xml:space="preserve">
+    <value>The activity log is turned off. Turn on "Record an activity log" in Settings, under Compatibility.</value>
+    <comment>Shown on the activity pane when the setting that records activity is disabled.</comment>
+  </data>
+  <data name="ActivityPaneNoLocation.Text" xml:space="preserve">
+    <value>Could not work out where the activity log is kept.</value>
+    <comment>Shown on the activity pane when the folder holding the log cannot be determined.</comment>
+  </data>
+  <data name="ActivityPaneReadFailed.Text" xml:space="preserve">
+    <value>The activity log could not be read.</value>
+    <comment>Shown on the activity pane when reading the log file failed.</comment>
+  </data>
+  <data name="RefreshActivityPaneButton.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="RefreshActivityPaneButton.[using:Windows.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Re-read the activity log</value>
+  </data>
+  <data name="CloseActivityPaneButton.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Close pane</value>
+  </data>
+  <data name="CloseActivityPaneButton.[using:Windows.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Close pane</value>
+  </data>
   <data name="TabMoveLeft" xml:space="preserve">
     <value>Move left</value>
   </data>

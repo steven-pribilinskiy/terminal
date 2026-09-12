@@ -34,4 +34,35 @@ namespace TerminalApp
         Boolean HasSnippets { get; };
         event Windows.Foundation.TypedEventHandler<Object, Microsoft.Terminal.Settings.Model.Command> DispatchCommandRequested;
     }
+
+    // One line of activity.jsonl, as the viewer shows it. Strings rather than
+    // typed fields on purpose: the log is append-only and older lines will be
+    // missing keys that newer ones have, so a reader that tolerates absence ages
+    // better than one that insists on a shape.
+    [default_interface] runtimeclass ActivityEntry
+    {
+        String Timestamp { get; };
+        String Kind { get; };
+        String Exe { get; };
+        String ExeName { get; };
+        String CommandLine { get; };
+        String WorkingDirectory { get; };
+        String ParentExe { get; };
+        String Reason { get; };
+        String Pid { get; };
+        String ParentPid { get; };
+        // Everything above flattened, lowercased, for the filter box to match on.
+        String SearchText { get; };
+        Boolean HasCommandLine { get; };
+        Boolean HasWorkingDirectory { get; };
+        Boolean HasParent { get; };
+    }
+
+    [default_interface] runtimeclass ActivityPaneContent : Windows.UI.Xaml.Controls.UserControl, IPaneContent, Windows.UI.Xaml.Data.INotifyPropertyChanged
+    {
+        ActivityPaneContent();
+        Windows.Foundation.Collections.IObservableVector<ActivityEntry> Entries { get; };
+        String StatusText { get; };
+        Boolean IsEmpty { get; };
+    }
 }

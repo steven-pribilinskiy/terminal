@@ -15,6 +15,7 @@
 #include "../../types/inc/ColorFix.hpp"
 #include "../../types/inc/utils.hpp"
 #include "../TerminalSettingsAppAdapterLib/TerminalSettings.h"
+#include "ActivityPaneContent.h"
 #include "App.h"
 #include "DebugTapConnection.h"
 #include "LinkPreviewPaneContent.h"
@@ -5318,6 +5319,33 @@ namespace winrt::TerminalApp::implementation
             }
 
             content = *tasksContent;
+        }
+        else if (paneType == L"activity")
+        {
+            // One per tab, like the snippets pane above: if the focused tab
+            // already has one, focus it rather than opening a second.
+            if (const auto& focusedTab{ _GetFocusedTabImpl() })
+            {
+                const auto rootPane{ focusedTab->GetRootPane() };
+                const bool found = rootPane == nullptr ? false : rootPane->WalkTree([](const auto& p) -> bool {
+                    if (const auto& activity{ p->GetContent().try_as<ActivityPaneContent>() })
+                    {
+                        activity->Focus(FocusState::Programmatic);
+                        return true;
+                    }
+                    return false;
+                });
+                if (found)
+                {
+                    return nullptr;
+                }
+            }
+
+            const auto& activityContent{ winrt::make_self<ActivityPaneContent>() };
+            activityContent->UpdateSettings(_settings, _currentWindowSettings());
+            activityContent->GetRoot().KeyDown({ this, &TerminalPage::_KeyDownHandler });
+
+            content = *activityContent;
         }
         else if (paneType == L"x-link-preview")
         {

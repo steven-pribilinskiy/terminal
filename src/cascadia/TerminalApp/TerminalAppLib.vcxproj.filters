@@ -124,6 +124,7 @@
     <Page Include="AboutDialog.xaml" />
     <Page Include="SuggestionsControl.xaml" />
     <Page Include="SnippetsPaneContent.xaml" />
+    <Page Include="ActivityPaneContent.xaml" />
     <Page Include="MarkdownPaneContent.xaml" />
     <Page Include="LinkPreviewPaneContent.xaml" />
   </ItemGroup>

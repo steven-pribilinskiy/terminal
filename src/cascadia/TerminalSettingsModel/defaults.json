@@ -635,6 +635,7 @@
         { "command": { "action": "movePane", "window": "new" }, "id": "Terminal.MovePaneToNewWindow" },
         { "command": "restartConnection", "id": "Terminal.RestartConnection" },
         { "command": { "action": "splitPane", "type": "snippets" }, "id": "Terminal.OpenSnippetsPane", "name": { "key": "SnippetsPaneCommandName" } },
+        { "command": { "action": "splitPane", "type": "activity" }, "id": "Terminal.OpenActivityPane", "name": { "key": "ActivityPaneCommandName" } },
 
         // Clipboard Integration
         { "command": { "action": "copy", "singleLine": false }, "id": "Terminal.CopyToClipboard" },
