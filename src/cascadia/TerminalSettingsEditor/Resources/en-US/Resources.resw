@@ -1243,7 +1243,11 @@
   </data>
   <data name="Nav_GroupAdvanced.Content" xml:space="preserve">
     <value>ADVANCED</value>
-    <comment>Section heading in the settings navigation list, above the compatibility, activity log and documentation pages. Upper case is the intended styling for these headings; lower-case it if that reads badly in your locale.</comment>
+    <comment>Section heading in the settings navigation list, above the compatibility and activity log pages. Upper case is the intended styling for these headings; lower-case it if that reads badly in your locale.</comment>
+  </data>
+  <data name="Nav_GroupHelp.Content" xml:space="preserve">
+    <value>HELP</value>
+    <comment>Section heading in the settings navigation list, above the documentation page. Upper case is the intended styling for these headings; lower-case it if that reads badly in your locale.</comment>
   </data>
   <data name="Nav_ProfileDefaults.Content" xml:space="preserve">
     <value>Defaults</value>

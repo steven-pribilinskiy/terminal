@@ -174,7 +174,7 @@
         </muxc:NavigationView.Header>
 
         <!--
-            Thirteen ungrouped rows were one undifferentiated list, so the items are
+            Fourteen ungrouped rows were one undifferentiated list, so the items are
             gathered under headings. The list is still one scroll; these are headings,
             not expanders.
 
@@ -271,6 +271,15 @@
             <muxc:NavigationViewItem x:Name="ActivityNavItem"
                                      x:Uid="Nav_Activity"
                                      Tag="Activity_Nav" />
+
+            <!--
+                A heading of its own for one item, rather than a seventh row under
+                ADVANCED. Compatibility and Activity are advanced in the sense that you
+                can hurt yourself there; documentation is the opposite of that, and
+                filing help under a warning would be the wrong signal.
+            -->
+            <muxc:NavigationViewItemHeader x:Uid="Nav_GroupHelp"
+                                           Margin="0,12,0,0" />
 
             <muxc:NavigationViewItem x:Name="DocumentationNavItem"
                                      x:Uid="Nav_Documentation"
