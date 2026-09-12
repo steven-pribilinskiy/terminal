@@ -5,6 +5,12 @@
 #include "HighlightedText.h"
 #include "HighlightedText.g.cpp"
 
+// Not in the editor's pch: only this control and the Documentation page build
+// inlines by hand. Without it the Documents types name-resolve through the
+// forward declarations and every call on one fails with C3779, "a function that
+// returns 'auto' cannot be used before it is defined".
+#include <winrt/Windows.UI.Xaml.Documents.h>
+
 using namespace winrt::Windows::Foundation;
 using namespace winrt::Windows::Foundation::Collections;
 using namespace winrt::Windows::UI::Text;
@@ -110,7 +116,9 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 matched.FontWeight(FontWeights::Bold());
                 inlines.Append(matched);
 
-                lastPos = std::min(runEnd, text.size());
+                // Explicit size_t: hstring::size() is uint32_t and runEnd is
+                // size_t, so the deduced overload does not exist.
+                lastPos = std::min<size_t>(runEnd, text.size());
             }
         }
 
