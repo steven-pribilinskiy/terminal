@@ -395,7 +395,32 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
 
         auto strongThis{ get_strong() };
-        auto task{ co_await winrt::Windows::ApplicationModel::StartupTask::GetAsync(StartupTaskName) };
+
+        // GetAsync throws E_INVALIDARG when the running package's manifest
+        // declares no startup task by this id, and one of ours does not: the Test
+        // slot's manifest carries fewer extensions than the Dev slot's, because
+        // the two are packaged from byte-identical binaries and only the manifests
+        // differ. So opening Startup there threw on every visit, unhandled, inside
+        // a fire-and-forget coroutine - logged and swallowed in Release, and the
+        // reason a first-chance capture of an unrelated bug had a stray
+        // E_INVALIDARG sitting in it.
+        //
+        // Degrading is right rather than merely quiet: with no task to read,
+        // StartOnUserLoginConfigurable already answers false and the row explains
+        // itself. Catching only turns "throw, then report unavailable" into
+        // "report unavailable".
+        winrt::Windows::ApplicationModel::StartupTask task{ nullptr };
+        try
+        {
+            task = co_await winrt::Windows::ApplicationModel::StartupTask::GetAsync(StartupTaskName);
+        }
+        CATCH_LOG();
+
+        if (!task)
+        {
+            co_return;
+        }
+
         _startOnUserLoginTask = std::move(task);
         _NotifyChanges(L"StartOnUserLoginConfigurable", L"StartOnUserLoginStatefulHelpText", L"StartOnUserLogin");
     }
