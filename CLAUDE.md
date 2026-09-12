@@ -470,16 +470,22 @@ Builds happen only in CI, so every mistake below costs ~40 minutes to discover.
 Three of them cost exactly that on 2026-09-06; the first cost more, because it
 does not fail at all.
 
-- **A packaged asset must be listed in `src/cascadia/CascadiaResources.build.items`.**
-  Nothing globs a folder. Every asset directory — `ProfileIcons`,
-  `ProfileGeneratorIcons`, `IntegrationIcons` — is an explicit `<Content Include>`
-  with a `<Link>`, and the `<Link>` is what decides where it lands in the package;
-  without one the file goes to the package root, and without the entry it is
-  simply absent. **This fails silently**: green build, package produced, missing
-  file, and you find out from a screenshot. Do not infer packaging from the built
-  payload — a folder being there only proves *something* packaged it. And note
-  the file extension: a grep filtered to `*.vcxproj`/`*.targets`/`*.props`/`*.wapproj`
-  will not match `.build.items` and will tell you nothing references it.
+- **A packaged asset must be covered by `src/cascadia/CascadiaResources.build.items`.**
+  Each asset *directory* gets one entry, and that entry **is** a recursive glob —
+  `ProfileIcons`, `ProfileGeneratorIcons` and `IntegrationIcons` are all
+  `<Content Include="...\<Dir>\**\*">` with
+  `<Link><Dir>\%(RecursiveDir)%(FileName)%(Extension)</Link>`. So **a new file
+  dropped into one of those three directories is packaged with no edit at all**
+  (verified 2026-09-12: `IntegrationIcons\shefrd.png` reached both staged payloads
+  without being named anywhere). What still needs an entry is a **new directory**,
+  or a file that lives outside them — and the `<Link>` is what decides where it
+  lands, so without one the file goes to the package root. **The failure is
+  silent**: green build, package produced, missing file, and you find out from a
+  screenshot. Do not infer packaging from the source tree — check the staged
+  payload (`C:\TerminalSlots\{dev,test}-staged-ci\...`), which is the only thing
+  that proves it. And note the file extension: a grep filtered to
+  `*.vcxproj`/`*.targets`/`*.props`/`*.wapproj` will not match `.build.items` and
+  will tell you nothing references it.
 - **A new runtimeclass with a constructor needs its `.g.cpp` compiled.** Declaring
   one in an `.idl` makes `module.g.cpp` reference a factory; the definition only
   exists once the generated `.g.cpp` is included somewhere. `EventArgs.cpp` lists
