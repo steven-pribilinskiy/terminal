@@ -7,6 +7,8 @@
 #include <winrt/Windows.UI.Xaml.Documents.h>
 #include <winrt/Windows.UI.Xaml.Input.h>
 #include <winrt/Windows.System.h>
+#include <memory>
+#include <vector>
 
 namespace winrt::Microsoft::Terminal::Control::implementation
 {
@@ -15,8 +17,28 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         namespace X = winrt::Windows::UI::Xaml;
         namespace D = X::Documents;
         namespace C = X::Controls;
-        inline thread_local int activePopups = 0;
         inline bool IsFileText(std::wstring_view text) { return Lintel::ClassifyPath(text) != Lintel::PathKind::None || til::starts_with_insensitive_ascii(text, L"file://"); }
+
+        struct Hover;
+
+        // One preview per level, and every level below it closed.
+        //
+        // A counter alone could not enforce that. Each link-bearing element in a
+        // card - the body RichTextBlock, a table cell, the footer - owns its own
+        // Hover with its own Popup, so "close mine before I open" leaves a
+        // sibling's popup on screen at the same depth. Two of those then made
+        // the count 2 at depth 0, and the hide timer's "am I the deepest?" test
+        // (activePopups <= depth + 1) refused to close either, so the pile stayed
+        // up. This registry is the whole set of open popups on this thread, and
+        // opening one closes every popup at its depth or deeper, wherever it
+        // came from.
+        inline thread_local std::vector<std::weak_ptr<Hover>> openHovers;
+
+        // Defined after Hover, which needs to call them.
+        inline void RegisterHover(const std::shared_ptr<Hover>& hover);
+        inline void UnregisterHover(const Hover* hover);
+        inline void CloseHoversFrom(int32_t depth, const Hover* keep);
+        inline bool AnyHoverDeeperThan(int32_t depth);
 
         struct Hover : std::enable_shared_from_this<Hover>
         {
@@ -35,9 +57,12 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 showTimer.Stop(); hideTimer.Stop();
                 popup.IsOpen(false);
                 popup.Child(nullptr);
-                if (counted) { --activePopups; counted = false; }
+                if (counted) { UnregisterHover(this); counted = false; }
                 current = {};
                 inside = false;
+                // Dropping the child destroys the elements the deeper hovers are
+                // attached to, so nothing else would ever close their popups.
+                CloseHoversFrom(depth + 1, this);
             }
             ~Hover() { try { Close(); } catch (...) {} }
 
@@ -65,6 +90,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 showTimer.Stop();
                 const auto root = owner.get();
                 if (!root || !root.XamlRoot() || current.empty()) return;
+                // Take this level for ourselves before building anything.
+                CloseHoversFrom(depth, this);
                 const auto effective = ResolveHyperlinkRules(settings, std::wstring_view{ current }, IsFileText(std::wstring_view{ current }));
                 const auto size = root.XamlRoot().Size();
                 const double width = std::min(effective.maxWidth > 0 ? static_cast<double>(effective.maxWidth) : 640.0, std::max(1.0, static_cast<double>(size.Width) - 16));
@@ -90,9 +117,49 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 popup.HorizontalOffset(std::clamp(static_cast<double>(point.X), 8.0, std::max(8.0, size.Width - width - 8)));
                 popup.VerticalOffset(std::clamp(static_cast<double>(point.Y) + 16, 8.0, std::max(8.0, size.Height - height - 8)));
                 popup.IsOpen(true);
-                ++activePopups; counted = true;
+                RegisterHover(shared_from_this()); counted = true;
             }
         };
+
+        inline void RegisterHover(const std::shared_ptr<Hover>& hover)
+        {
+            UnregisterHover(hover.get());
+            openHovers.push_back(hover);
+        }
+
+        inline void UnregisterHover(const Hover* hover)
+        {
+            std::erase_if(openHovers, [hover](const std::weak_ptr<Hover>& entry) {
+                const auto held = entry.lock();
+                return !held || held.get() == hover;
+            });
+        }
+
+        inline void CloseHoversFrom(int32_t depth, const Hover* keep)
+        {
+            // Snapshot first: Close() unregisters, and closing one level closes
+            // the next, so the registry is rewritten underneath this loop.
+            const auto snapshot = openHovers;
+            for (const auto& entry : snapshot)
+            {
+                if (const auto held = entry.lock(); held && held.get() != keep && held->depth >= depth)
+                {
+                    held->Close();
+                }
+            }
+        }
+
+        inline bool AnyHoverDeeperThan(int32_t depth)
+        {
+            for (const auto& entry : openHovers)
+            {
+                if (const auto held = entry.lock(); held && held->depth > depth)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
 
         inline std::shared_ptr<Hover> MakeHover(const X::FrameworkElement& root, const Control::IHyperlinkPreviewProvider& provider, const Control::IControlSettings& settings, int32_t depth)
         {
@@ -100,7 +167,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             state->owner = winrt::make_weak(root); state->provider = provider; state->settings = settings; state->depth = depth;
             const std::weak_ptr<Hover> weak = state;
             state->showTimer.Tick([weak](auto&&, auto&&) { try { if (const auto self = weak.lock()) self->Show(); } CATCH_LOG(); });
-            state->hideTimer.Tick([weak](auto&&, auto&&) { if (const auto self = weak.lock(); self && !self->inside && activePopups <= self->depth + 1) self->Close(); });
+            state->hideTimer.Tick([weak](auto&&, auto&&) { if (const auto self = weak.lock(); self && !self->inside && !AnyHoverDeeperThan(self->depth)) self->Close(); });
             root.Unloaded([state](auto&&, auto&&) { state->Close(); });
             return state;
         }
@@ -190,7 +257,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         return view;
     }
 
-    bool HyperlinkPreviewHelpers::HasNestedPreview() { return Embedded::activePopups > 0; }
+    bool HyperlinkPreviewHelpers::HasNestedPreview() { return Embedded::AnyHoverDeeperThan(-1); }
 
     void HyperlinkPreviewHelpers::AttachLinkTooltips(const Windows::UI::Xaml::FrameworkElement& root, const Control::IHyperlinkPreviewProvider& provider, const Control::IControlSettings& settings, bool compact, int32_t depth)
     {
