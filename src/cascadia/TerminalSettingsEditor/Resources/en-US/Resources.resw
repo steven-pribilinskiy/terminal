@@ -288,6 +288,26 @@
     <value>Always</value>
     <comment>An option to choose from for the "Pane title bars" setting. When selected, every pane shows a title bar.</comment>
   </data>
+  <data name="Globals_Motion.Header" xml:space="preserve">
+    <value>Motion</value>
+    <comment>Header for a control to choose whether the app animates.</comment>
+  </data>
+  <data name="Globals_Motion.Description" xml:space="preserve">
+    <value>Whether tabs, panes, dialogs and settings pages animate. "Follow Windows" reads the animation effects setting under Accessibility → Visual effects.</value>
+    <comment>A description for what the "Motion" setting does. "Accessibility" and "Visual effects" name pages in the Windows Settings app.</comment>
+  </data>
+  <data name="Globals_MotionSystem.Content" xml:space="preserve">
+    <value>Follow Windows</value>
+    <comment>An option to choose from for the "Motion" setting. When selected, the app animates only if Windows has animation effects turned on.</comment>
+  </data>
+  <data name="Globals_MotionFull.Content" xml:space="preserve">
+    <value>Always animate</value>
+    <comment>An option to choose from for the "Motion" setting. When selected, the app animates even if Windows has animation effects turned off.</comment>
+  </data>
+  <data name="Globals_MotionReduced.Content" xml:space="preserve">
+    <value>Never animate</value>
+    <comment>An option to choose from for the "Motion" setting. When selected, the app does not animate even if Windows has animation effects turned on.</comment>
+  </data>
   <data name="Globals_CopyOnSelect.Header" xml:space="preserve">
     <value>Automatically copy selection to clipboard</value>
     <comment>Header for a control to toggle whether selected text should be copied to the clipboard automatically, or not.</comment>
@@ -865,6 +885,58 @@
     <value>Maximum activity log size in kilobytes</value>
     <comment>Name for a control to choose the largest size, in kilobytes, of the activity log.</comment>
   </data>
+  <data name="Globals_ActivityLogPath.Header" xml:space="preserve">
+    <value>Log file</value>
+    <comment>Header for a row that shows the full path of the activity log file on disk.</comment>
+  </data>
+  <data name="Globals_ActivityLogPath.Description" xml:space="preserve">
+    <value>Where the log is written. Each installed version of the terminal keeps its own.</value>
+    <comment>Additional description for the row showing where the activity log is written. Presented near "Globals_ActivityLogPath.Header".</comment>
+  </data>
+  <data name="Activity_RecordedHeader.Text" xml:space="preserve">
+    <value>Recorded events</value>
+    <comment>Header above the list of events read back from the activity log.</comment>
+  </data>
+  <data name="Activity_Filter.Header" xml:space="preserve">
+    <value>Filter</value>
+    <comment>Header for a text box that narrows the list of recorded events.</comment>
+  </data>
+  <data name="Activity_Filter.Description" xml:space="preserve">
+    <value>Show only events whose program, command line, folder, reason or time contains this text.</value>
+    <comment>Additional description for the filter box. Presented near "Activity_Filter.Header".</comment>
+  </data>
+  <data name="Activity_FilterBox.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Filter recorded events</value>
+    <comment>Name for the text box that narrows the list of recorded events.</comment>
+  </data>
+  <data name="Activity_FilterBox.PlaceholderText" xml:space="preserve">
+    <value>Filter activity...</value>
+    <comment>Placeholder text in the box that narrows the list of recorded events.</comment>
+  </data>
+  <data name="Activity_Refresh.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Reload the activity log</value>
+    <comment>Name for a button that re-reads the activity log from disk.</comment>
+  </data>
+  <data name="Activity_Refresh.[using:Windows.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Reload the activity log</value>
+    <comment>Tooltip for a button that re-reads the activity log from disk.</comment>
+  </data>
+  <data name="Activity_Count.Text" xml:space="preserve">
+    <value>Showing {0} of {1} recorded events, newest first.</value>
+    <comment>Status line above the list of recorded events. {0} is how many are shown after filtering, {1} is how many were read.</comment>
+  </data>
+  <data name="Activity_Empty.Text" xml:space="preserve">
+    <value>Nothing recorded yet. Events appear here as the terminal starts programs.</value>
+    <comment>Status line shown when the activity log exists but is empty.</comment>
+  </data>
+  <data name="Activity_Disabled.Text" xml:space="preserve">
+    <value>Recording is off, so nothing has been written. Turn it on above to start.</value>
+    <comment>Status line shown when the activity log setting is turned off.</comment>
+  </data>
+  <data name="Activity_NoLocation.Text" xml:space="preserve">
+    <value>The log location could not be determined.</value>
+    <comment>Status line shown when the folder the activity log lives in cannot be found.</comment>
+  </data>
   <data name="Globals_AlwaysOnTop.Description" xml:space="preserve">
     <value>Terminal will always be the topmost window on the desktop.</value>
     <comment>A description for what the "always on top" setting does. Presented near "Globals_AlwaysOnTop.Header".</comment>
@@ -1124,6 +1196,10 @@
   <data name="Nav_Compatibility.Content" xml:space="preserve">
     <value>Compatibility</value>
     <comment>Header for the "compatibility" menu item. This navigates to a page that lets you see and modify settings related to compatibility with command line scenarios.</comment>
+  </data>
+  <data name="Nav_Activity.Content" xml:space="preserve">
+    <value>Activity</value>
+    <comment>Header for the "activity" menu item. This navigates to a page listing every program the terminal has started or been handed.</comment>
   </data>
   <data name="Nav_Launch.Content" xml:space="preserve">
     <value>Startup</value>

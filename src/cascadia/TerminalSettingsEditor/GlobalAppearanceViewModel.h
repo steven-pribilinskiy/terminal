@@ -26,6 +26,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         GETSET_BINDABLE_ENUM_SETTING(TabCloseButton, Model::TabCloseButtonVisibility, _WindowSettings.TabCloseButton);
         GETSET_BINDABLE_ENUM_SETTING(DockWindow, Model::WindowDock, _WindowSettings.DockWindow);
         GETSET_BINDABLE_ENUM_SETTING(PaneTitlebarVisibility, Model::PaneTitlebarVisibility, _WindowSettings.PaneTitlebarVisibility);
+        GETSET_BINDABLE_ENUM_SETTING(Motion, Model::MotionPreference, _GlobalSettings.Motion);
 
     public:
         winrt::Windows::Foundation::IInspectable CurrentTheme();

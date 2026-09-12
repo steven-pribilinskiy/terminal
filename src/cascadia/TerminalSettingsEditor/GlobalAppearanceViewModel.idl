@@ -49,6 +49,9 @@ namespace Microsoft.Terminal.Settings.Editor
         IInspectable CurrentPaneTitlebarVisibility;
         Windows.Foundation.Collections.IObservableVector<Microsoft.Terminal.Settings.Editor.EnumEntry> PaneTitlebarVisibilityList { get; };
 
+        IInspectable CurrentMotion;
+        Windows.Foundation.Collections.IObservableVector<Microsoft.Terminal.Settings.Editor.EnumEntry> MotionList { get; };
+
         Boolean InvertedDisableAnimations;
 
         void ShowTitlebarToggled(IInspectable sender, Windows.UI.Xaml.RoutedEventArgs args);

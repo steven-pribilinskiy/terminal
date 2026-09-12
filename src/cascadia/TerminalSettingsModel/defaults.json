@@ -23,6 +23,7 @@
     "tabPosition": "top",
     "newTabButtonPosition": "bottom",
     "settingsUIHost": "tab",
+    "motion": "system",
     "showTabIndex": false,
     "closeWindowOnLastTab": true,
     "tabSwitcherMode": "inOrder",

@@ -42,6 +42,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
     DEFINE_ENUM_MAP(Model::TabPosition, TabPosition);
     DEFINE_ENUM_MAP(Model::NewTabButtonPosition, NewTabButtonPosition);
     DEFINE_ENUM_MAP(Model::SettingsUIHost, SettingsUIHost);
+    DEFINE_ENUM_MAP(Model::MotionPreference, MotionPreference);
     DEFINE_ENUM_MAP(Model::IconStyle, IconStyle);
     DEFINE_ENUM_MAP(Model::TabCloseButtonVisibility, TabCloseButtonVisibility);
     DEFINE_ENUM_MAP(Model::WindowDock, WindowDock);

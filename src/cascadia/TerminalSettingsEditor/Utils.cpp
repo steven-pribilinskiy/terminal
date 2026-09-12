@@ -173,7 +173,10 @@ namespace winrt::Microsoft::Terminal::Settings
             // before we bring it into view.
             root.UpdateLayout();
 
-            if (expandedAny)
+            // No animation, no wait. TerminalPage::_ApplyMotionPreference writes
+            // globals.motion here, and this is a delay that only exists to let an
+            // animation finish, so under reduced motion it is pure latency.
+            if (expandedAny && Media::Animation::Timeline::AllowDependentAnimations())
             {
                 // SettingsExpander's expand animation slides its content in via a RenderTransform
                 // over 0:0:0.333 (see SettingsControlsStyle.xaml). UpdateLayout()

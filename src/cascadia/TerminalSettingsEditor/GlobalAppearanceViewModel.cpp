@@ -35,6 +35,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         INITIALIZE_BINDABLE_ENUM_SETTING(TabCloseButton, TabCloseButtonVisibility, Model::TabCloseButtonVisibility, L"Globals_TabCloseButton", L"Content");
         INITIALIZE_BINDABLE_ENUM_SETTING(DockWindow, WindowDock, Model::WindowDock, L"Globals_DockWindow", L"Content");
         INITIALIZE_BINDABLE_ENUM_SETTING(PaneTitlebarVisibility, PaneTitlebarVisibility, Model::PaneTitlebarVisibility, L"Globals_PaneTitlebarVisibility", L"Content");
+        INITIALIZE_BINDABLE_ENUM_SETTING(Motion, MotionPreference, Model::MotionPreference, L"Globals_Motion", L"Content");
         _UpdateThemeList();
     }
 

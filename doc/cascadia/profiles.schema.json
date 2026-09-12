@@ -3092,6 +3092,16 @@
           ],
           "type": "string"
         },
+        "motion": {
+          "default": "system",
+          "description": "Whether the app animates. Possible values include:\n -\"system\" follows Settings > Accessibility > Visual effects > Animation effects, the same switch a web page reads as prefers-reduced-motion\n -\"full\" animates even when Windows has animations turned off\n -\"reduced\" turns off tab, pane, dialog and settings-page animations even when Windows has them on.",
+          "enum": [
+            "system",
+            "full",
+            "reduced"
+          ],
+          "type": "string"
+        },
         "tabWidthMode": {
           "default": "equal",
           "description": "Sets the width of the tabs. Possible values include:\n -\"equal\" sizes each tab to the same width\n -\"titleLength\" sizes each tab to the length of its title\n -\"compact\" sizes each tab to the length of its title when focused, and shrinks to the size of only the icon when the tab is unfocused.",

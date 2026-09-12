@@ -98,12 +98,22 @@
                               Style="{StaticResource ComboBoxSettingStyle}" />
                 </local:SettingsCard>
 
-                <!--  Disable Animations  -->
-                <!--  NOTE: the UID is "DisablePaneAnimationsReversed" not "DisablePaneAnimations". See GH#9124 for more details.  -->
-                <local:SettingsCard x:Name="DisableAnimations"
-                                    x:Uid="Globals_DisableAnimationsReversed">
-                    <ToggleSwitch IsOn="{x:Bind ViewModel.InvertedDisableAnimations, Mode=TwoWay}"
-                                  Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+                <!--
+                    Motion. This replaces the older animations toggle, which
+                    could only force animations off: it had no way to say
+                    "whatever Windows says", so turning animations off in
+                    Windows left the Terminal animating anyway. The old
+                    disableAnimations key still forces them off under
+                    "system", so an existing settings.json behaves as before.
+                -->
+                <local:SettingsCard x:Name="Motion"
+                                    x:Uid="Globals_Motion"
+                                    IsForkFeature="True">
+                    <ComboBox AutomationProperties.AccessibilityView="Content"
+                              ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                              ItemsSource="{x:Bind ViewModel.MotionList, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.CurrentMotion, Mode=TwoWay}"
+                              Style="{StaticResource ComboBoxSettingStyle}" />
                 </local:SettingsCard>
             </StackPanel>
         </StackPanel>

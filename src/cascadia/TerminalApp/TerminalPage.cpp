@@ -435,6 +435,64 @@ namespace winrt::TerminalApp::implementation
     }
 
     // Method Description:
+    // - Resolves globals.motion and applies it to the whole process.
+    // - Timeline::AllowDependentAnimations is the carrier on purpose. It is real
+    //   XAML state rather than a variable of ours, so the Settings Editor - a
+    //   different DLL - reads the same answer instead of its own copy of a
+    //   header's static. That distinction has already cost this repo one round
+    //   trip: the activity log's enable flag lived in WinRTUtils, a static
+    //   library, so every module that linked it got a private copy and the
+    //   modules that mattered never saw the switch turn on.
+    // - "System" reads Windows' own animation-effects setting, which is the
+    //   switch a browser reports as prefers-reduced-motion. The other two
+    //   override it, because that switch is machine-wide and this one is not.
+    // - This supersedes the older boolean disableAnimations, which could only
+    //   force animations off and had no way to say "whatever Windows says".
+    //   That flag still forces them off under "system", so an existing
+    //   settings.json keeps behaving as it did.
+    void TerminalPage::_ApplyMotionPreference()
+    {
+        auto enabled = true;
+        switch (_settings.GlobalSettings().Motion())
+        {
+        case MotionPreference::Full:
+            enabled = true;
+            break;
+        case MotionPreference::Reduced:
+            enabled = false;
+            break;
+        default:
+            try
+            {
+                enabled = !_currentWindowSettings().DisableAnimations() &&
+                          winrt::Windows::UI::ViewManagement::UISettings{}.AnimationsEnabled();
+            }
+            CATCH_LOG();
+            break;
+        }
+
+        namespace Anim = winrt::Windows::UI::Xaml::Media::Animation;
+        Anim::Timeline::AllowDependentAnimations(enabled);
+
+        // App.xaml gives the tab list a ContentThemeTransition and a
+        // ReorderThemeTransition. Those are independent animations, so
+        // AllowDependentAnimations does not touch them and they have to be
+        // removed by hand. An empty collection rather than nullptr: the
+        // property is what the implicit style set, and clearing it outright
+        // would let the style's value come back.
+        if (_tabStripList)
+        {
+            Anim::TransitionCollection transitions{};
+            if (enabled)
+            {
+                transitions.Append(Anim::ContentThemeTransition{});
+                transitions.Append(Anim::ReorderThemeTransition{});
+            }
+            _tabStripList.ItemContainerTransitions(transitions);
+        }
+    }
+
+    // Method Description:
     // - Lays the root grid out so the tab strip sits on the edge named by the
     //   active theme's window.tabPosition. Safe to call repeatedly: it resets to
     //   the XAML layout first, which is what lets the Settings UI and the
@@ -1434,10 +1492,7 @@ namespace winrt::TerminalApp::implementation
 
         _UpdateTabWidthMode();
 
-        // Settings AllowDependentAnimations will affect whether animations are
-        // enabled application-wide, so we don't need to check it each time we
-        // want to create an animation.
-        WUX::Media::Animation::Timeline::AllowDependentAnimations(!_currentWindowSettings().DisableAnimations());
+        _ApplyMotionPreference();
 
         // Once the page is actually laid out on the screen, trigger all our
         // startup actions. Things like Panes need to know at least how big the
@@ -5559,10 +5614,7 @@ namespace winrt::TerminalApp::implementation
 
         _showTabsFullscreen = _currentWindowSettings().ShowTabsFullscreen();
 
-        // Settings AllowDependentAnimations will affect whether animations are
-        // enabled application-wide, so we don't need to check it each time we
-        // want to create an animation.
-        WUX::Media::Animation::Timeline::AllowDependentAnimations(!_currentWindowSettings().DisableAnimations());
+        _ApplyMotionPreference();
 
         _tabRow.ShowElevationShield(IsRunningElevated() && _currentWindowSettings().ShowAdminShield());
 

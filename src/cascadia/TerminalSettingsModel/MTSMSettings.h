@@ -49,7 +49,8 @@ Author(s):
     X(bool, AylithImprint, "aylith.imprint", false)                                                                                \
     X(bool, AylithImprintJsonOnly, "aylith.imprintJsonOnly", false)                                                                \
     X(bool, ActivityLog, "activityLog", true)                                                                                      \
-    X(int32_t, ActivityLogMaxKilobytes, "activityLogMaxKilobytes", 4096)
+    X(int32_t, ActivityLogMaxKilobytes, "activityLogMaxKilobytes", 4096)                                                           \
+    X(Model::MotionPreference, Motion, "motion", Model::MotionPreference::System)
 
 // Settings that are per-window (may vary by window name in the future)
 #define MTSM_WINDOW_SETTINGS(X)                                                                                                                                                                       \

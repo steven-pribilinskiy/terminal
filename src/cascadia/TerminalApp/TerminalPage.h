@@ -539,6 +539,10 @@ namespace winrt::TerminalApp::implementation
         void _UpdateTabView();
         void _UpdateTabWidthMode();
 
+        // Motion. Resolves globals.motion against the Windows animation setting
+        // and writes the answer where the whole process can read it.
+        void _ApplyMotionPreference();
+
         // Tab strip placement. _ApplyTabPosition is always safe to call again:
         // it resets the root grid to its XAML shape first, which is what lets
         // the setting and the toggle action take effect without a new window.

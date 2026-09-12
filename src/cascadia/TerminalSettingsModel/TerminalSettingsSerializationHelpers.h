@@ -731,6 +731,15 @@ JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::SettingsUIHost)
     };
 };
 
+JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::MotionPreference)
+{
+    JSON_MAPPINGS(3) = {
+        pair_type{ "system", ValueType::System },
+        pair_type{ "full", ValueType::Full },
+        pair_type{ "reduced", ValueType::Reduced },
+    };
+};
+
 JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::WindowDock)
 {
     JSON_MAPPINGS(5) = {

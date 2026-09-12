@@ -103,6 +103,19 @@ namespace Microsoft.Terminal.Settings.Model
         Window,
     };
 
+    // Whether the app animates, and whether that follows Windows or is decided
+    // here. "System" reads Settings > Accessibility > Visual effects >
+    // Animation effects, which is the same switch a web page's
+    // prefers-reduced-motion reports. The other two override it in either
+    // direction, because the OS switch is all-or-nothing for every app on the
+    // machine and this one is not.
+    enum MotionPreference
+    {
+        System,  // Follow the Windows animation-effects setting.
+        Full,    // Animate, whatever Windows says.
+        Reduced, // Do not animate, whatever Windows says.
+    };
+
     // How resuming a recognized agent or multiplexer session announces itself
     // on the next startup that finds one to resume. Independent of which
     // programs are eligible: this only matters once something is.
@@ -143,6 +156,7 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(Boolean, AylithImprintJsonOnly);
         INHERITABLE_SETTING(Boolean, ActivityLog);
         INHERITABLE_SETTING(Int32, ActivityLogMaxKilobytes);
+        INHERITABLE_SETTING(MotionPreference, Motion);
         INHERITABLE_SETTING(Boolean, EnableColorSelection);
         INHERITABLE_SETTING(Int32, CiPollIntervalMinutes);
         INHERITABLE_SETTING(Boolean, ResumeAgents);
