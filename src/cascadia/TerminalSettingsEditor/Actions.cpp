@@ -225,6 +225,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     void Actions::OnNavigatedTo(const NavigationEventArgs& e)
     {
         const auto args = e.Parameter().as<Editor::NavigateToPageArgs>();
+        _weakWindowRoot = args.WindowRoot();
         _ViewModel = args.ViewModel().as<Editor::ActionsViewModel>();
         _ViewModel.ReSortCommandList();
         _focusKeyChordContainerRevoker = _ViewModel.FocusKeyChordContainerRequested(winrt::auto_revoke, { this, &Actions::_FocusKeyChordContainer });
@@ -263,5 +264,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         {
             get_self<ActionsViewModel>(_ViewModel)->CancelPendingKeyChordEdit();
         }
+    }
+
+    void Actions::DisclaimerLink_Click(const Windows::Foundation::IInspectable& /*sender*/,
+                                       const Windows::UI::Xaml::RoutedEventArgs& /*e*/)
+    {
+        OpenDocumentationTopic(_weakWindowRoot.get(), L"TopicKeyboardShortcuts");
     }
 }

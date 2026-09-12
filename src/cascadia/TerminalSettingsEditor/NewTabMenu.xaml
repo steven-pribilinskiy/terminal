@@ -574,8 +574,17 @@
                         <local:SettingsExpander.ItemsHeader>
                             <ContentPresenter Padding="16,12,16,16">
                                 <StackPanel Spacing="8">
-                                    <HyperlinkButton x:Uid="NewTabMenu_AddMatchProfiles_Help"
-                                                     NavigateUri="https://learn.microsoft.com/en-us/dotnet/standard/base-types/regular-expression-language-quick-reference" />
+                                    <!--
+                                        Goes to the in-app Regular expressions topic. The
+                                        link it replaced pointed at .NET's quick reference,
+                                        which describes the wrong engine: these patterns are
+                                        run by ICU, and they have to match the whole value
+                                        rather than be found inside it. Same wording, a
+                                        destination that is actually true.
+                                    -->
+                                    <HyperlinkButton x:Name="AddMatchProfilesHelpLink"
+                                                     x:Uid="NewTabMenu_AddMatchProfiles_Help"
+                                                     Click="AddMatchProfilesHelpLink_Click" />
                                     <TextBox x:Uid="NewTabMenu_AddMatchProfiles_Name"
                                              Text="{x:Bind ViewModel.ProfileMatcherName, Mode=TwoWay}" />
                                     <TextBox x:Uid="NewTabMenu_AddMatchProfiles_Source"

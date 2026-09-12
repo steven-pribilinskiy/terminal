@@ -209,6 +209,10 @@
             <muxc:NavigationViewItem x:Name="ProfilesNavItem"
                                      x:Uid="Nav_Profiles"
                                      Tag="Profiles_Nav" />
+
+            <muxc:NavigationViewItem x:Name="DocumentationNavItem"
+                                     x:Uid="Nav_Documentation"
+                                     Tag="Documentation_Nav" />
         </muxc:NavigationView.MenuItems>
 
         <muxc:NavigationView.FooterMenuItems>

@@ -11,6 +11,7 @@
 #include "LinkTooltip.h"
 #include "Integrations.h"
 #include "Activity.h"
+#include "Documentation.h"
 #include "Compatibility.h"
 #include "Rendering.h"
 #include "RenderingViewModel.h"
@@ -1066,6 +1067,20 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 contentFrame().Navigate(xaml_typename<Editor::GlobalAppearance>(), winrt::make<NavigateToPageArgs>(winrt::make<GlobalAppearanceViewModel>(_settingsClone.GlobalSettings(), _windowSettingsClone), *this, elementToFocus));
                 _breadcrumbs.Append(winrt::make<Breadcrumb>(vm, RS_(L"Nav_Appearance/Content"), BreadcrumbSubPage::None));
             }
+            else if (*clickedItemTag == documentationTag)
+            {
+                // No view model: the page edits nothing, so there is no clone to hand
+                // it. elementToFocus doubles as the topic to open -- a search result
+                // or a "Learn more" link names a topic card, and the page opens that
+                // topic rather than merely scrolling to it.
+                //
+                // No sub-page handling either, deliberately. Opening a topic appends a
+                // crumb from inside the page; clicking the "Documentation" crumb comes
+                // straight back here and navigates a fresh page, which is the topic
+                // list. That is the whole of its back navigation.
+                contentFrame().Navigate(xaml_typename<Editor::Documentation>(), winrt::make<NavigateToPageArgs>(nullptr, *this, elementToFocus));
+                _breadcrumbs.Append(winrt::make<Breadcrumb>(vm, RS_(L"Nav_Documentation/Content"), BreadcrumbSubPage::None));
+            }
         }
         else if (const auto& profile = vm.try_as<Editor::ProfileViewModel>())
         {
@@ -1672,6 +1687,12 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             // list is a better answer than an unrelated rule opened for editing.
             _linkTooltipVM.SelectRule(ruleIndex, ruleName);
         }
+    }
+
+    void MainPage::NavigateToDocumentationTopic(const winrt::hstring& topicElementName)
+    {
+        _Navigate(box_value(hstring{ documentationTag }), BreadcrumbSubPage::None, topicElementName);
+        _SelectNavItemByTag(documentationTag);
     }
 
     void MainPage::_AppendProfilesRootCrumb()

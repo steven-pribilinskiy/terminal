@@ -385,10 +385,15 @@
         <StackPanel MaxWidth="{StaticResource StandardControlMaxWidth}"
                     Visibility="{x:Bind mtu:Converters.InvertedBooleanToVisibility(ViewModel.IsExtensionView), Mode=OneWay}">
 
-            <!--  Learn more about fragment extensions  -->
-            <HyperlinkButton x:Uid="Extensions_DisclaimerHyperlink"
+            <!--
+                Learn more about fragment extensions. Goes to the in-app Extensions
+                topic rather than to go.microsoft.com, so the documentation and the
+                page it describes ship together and work offline.
+            -->
+            <HyperlinkButton x:Name="DisclaimerLink"
+                             x:Uid="Extensions_DisclaimerHyperlink"
                              Margin="-12,0,0,0"
-                             NavigateUri="https://go.microsoft.com/fwlink/?linkid=2321753" />
+                             Click="DisclaimerLink_Click" />
 
             <!--  Grouping: Active Extensions  -->
             <TextBlock x:Uid="Extensions_ActiveExtensionsHeader"

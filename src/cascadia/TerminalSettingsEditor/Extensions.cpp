@@ -35,6 +35,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     void Extensions::OnNavigatedTo(const NavigationEventArgs& e)
     {
         const auto args = e.Parameter().as<Editor::NavigateToPageArgs>();
+        _weakWindowRoot = args.WindowRoot();
         _ViewModel = args.ViewModel().as<Editor::ExtensionsViewModel>();
 
         // The extensions are loaded asynchronously as a part of the VM ctor.
@@ -95,6 +96,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         const auto element = sender.as<FrameworkElement>();
         const auto schemeVM = element.Tag().as<Editor::ColorSchemeViewModel>();
         get_self<ExtensionsViewModel>(_ViewModel)->NavigateToColorScheme(schemeVM);
+    }
+
+    void Extensions::DisclaimerLink_Click(const IInspectable& /*sender*/, const RoutedEventArgs& /*args*/)
+    {
+        OpenDocumentationTopic(_weakWindowRoot.get(), L"TopicExtensions");
     }
 
     ExtensionsViewModel::ExtensionsViewModel(const Model::CascadiaSettings& settings, const Editor::ColorSchemesPageViewModel& colorSchemesPageVM) :

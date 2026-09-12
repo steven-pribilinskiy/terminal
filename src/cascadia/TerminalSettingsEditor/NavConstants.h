@@ -29,6 +29,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     inline constexpr std::wstring_view globalProfileTag{ L"GlobalProfile_Nav" };
     inline constexpr std::wstring_view colorSchemesTag{ L"ColorSchemes_Nav" };
     inline constexpr std::wstring_view globalAppearanceTag{ L"GlobalAppearance_Nav" };
+    inline constexpr std::wstring_view documentationTag{ L"Documentation_Nav" };
 
     // Map from navigation tags to Segoe MDL2 Assets icon glyphs
     inline constexpr til::static_map NavTagIconMap{
@@ -52,5 +53,6 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         std::pair{ globalProfileTag, L"\xE7EE" }, /* Other User */
         std::pair{ openJsonTag, L"\xE713" }, /* Settings */
         std::pair{ showDescriptionsTag, L"\xE7B3" }, /* Reading Mode */
+        std::pair{ documentationTag, L"\xE897" }, /* Help */
     };
 }

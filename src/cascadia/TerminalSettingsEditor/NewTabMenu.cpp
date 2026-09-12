@@ -144,6 +144,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _ScrollToEntry(_ViewModel.RequestAddRemainingProfilesEntry());
     }
 
+    void NewTabMenu::AddMatchProfilesHelpLink_Click(const IInspectable& /*sender*/, const RoutedEventArgs& /*e*/)
+    {
+        OpenDocumentationTopic(_weakWindowRoot.get(), L"TopicRegularExpressions");
+    }
+
     // As a QOL improvement, we scroll to the newly added entry.
     // Calling ScrollIntoView() on its own causes the items to briefly disappear.
     // Calling UpdateLayout() beforehand remedies this issue.

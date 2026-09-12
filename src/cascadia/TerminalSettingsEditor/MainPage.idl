@@ -66,6 +66,14 @@ namespace Microsoft.Terminal.Settings.Editor
         // is also what happens when the rule can no longer be found.
         void NavigateToLinkTooltipRule(Int32 ruleIndex, String ruleName);
 
+        // Opens the Documentation page on one topic. The three "Learn more" links in
+        // this editor -- on Shortcuts, Extensions and the Dropdown Menu -- use it, and
+        // like the rule deep link above it is the only way in from outside. The
+        // argument is the x:Name of the topic's card on Documentation.xaml, which is
+        // also what a search result carries, so both arrive the same way. An unknown
+        // name lands on the topic list.
+        void NavigateToDocumentationTopic(String topicElementName);
+
         Windows.Foundation.Collections.IObservableVector<IInspectable> Breadcrumbs { get; };
         ExtensionsViewModel ExtensionsVM { get; };
         ActionsViewModel ActionsVM { get; };

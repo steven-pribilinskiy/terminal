@@ -18,10 +18,14 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         void OnNavigatedTo(const winrt::Windows::UI::Xaml::Navigation::NavigationEventArgs& e);
         void OnNavigatedFrom(const winrt::Windows::UI::Xaml::Navigation::NavigationEventArgs& e);
 
+        void DisclaimerLink_Click(const winrt::Windows::Foundation::IInspectable& sender,
+                                  const winrt::Windows::UI::Xaml::RoutedEventArgs& e);
+
         til::property_changed_event PropertyChanged;
         WINRT_OBSERVABLE_PROPERTY(Editor::ActionsViewModel, ViewModel, PropertyChanged.raise, nullptr);
 
     private:
+        winrt::weak_ref<Editor::IHostedInWindow> _weakWindowRoot;
         winrt::Windows::UI::Xaml::FrameworkElement::LayoutUpdated_revoker _layoutUpdatedRevoker;
         Editor::ActionsViewModel::FocusKeyChordContainerRequested_revoker _focusKeyChordContainerRevoker;
 

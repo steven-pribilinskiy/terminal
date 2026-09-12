@@ -98,6 +98,12 @@ namespace winrt::Microsoft::Terminal::Settings
     winrt::hstring GetSelectedItemTag(const winrt::Windows::Foundation::IInspectable& comboBoxAsInspectable);
     winrt::hstring LocalizedNameForEnumName(const std::wstring_view sectionAndType, const std::wstring_view enumValue, const std::wstring_view propertyType);
     safe_void_coroutine ExpandAncestorsAndBringIntoView(winrt::Windows::UI::Xaml::FrameworkElement root, winrt::Windows::UI::Xaml::Controls::Control control);
+    // Sends the editor to one topic on the Documentation page, named by the x:Name of
+    // its card. Three pages need this -- Shortcuts, Extensions and the Dropdown Menu,
+    // whose "Learn more" links used to leave the app -- and each of them already holds
+    // a weak IHostedInWindow, which is the MainPage. Does nothing if the window root
+    // has gone away, which is the right answer for a link on a page being torn down.
+    void OpenDocumentationTopic(const Editor::IHostedInWindow& windowRoot, const winrt::hstring& topicElementName);
     Editor::KeyChordListener FindKeyChordListener(const winrt::Windows::UI::Xaml::DependencyObject& root);
     winrt::Windows::UI::Xaml::Controls::Control FindFirstFocusable(const winrt::Windows::UI::Xaml::DependencyObject& root);
 }

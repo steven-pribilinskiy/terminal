@@ -83,6 +83,9 @@
     <ClInclude Include="Activity.h">
       <DependentUpon>Activity.xaml</DependentUpon>
     </ClInclude>
+    <ClInclude Include="Documentation.h">
+      <DependentUpon>Documentation.xaml</DependentUpon>
+    </ClInclude>
     <ClInclude Include="KeyChordListener.h">
       <DependentUpon>KeyChordListener.xaml</DependentUpon>
     </ClInclude>
@@ -251,6 +254,9 @@
     <Page Include="Activity.xaml">
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="Documentation.xaml">
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="KeyChordListener.xaml">
       <SubType>Designer</SubType>
     </Page>
@@ -352,6 +358,9 @@
     </ClCompile>
     <ClCompile Include="Activity.cpp">
       <DependentUpon>Activity.xaml</DependentUpon>
+    </ClCompile>
+    <ClCompile Include="Documentation.cpp">
+      <DependentUpon>Documentation.xaml</DependentUpon>
     </ClCompile>
     <ClCompile Include="KeyChordListener.cpp">
       <DependentUpon>KeyChordListener.xaml</DependentUpon>
@@ -559,6 +568,10 @@
       <DependentUpon>Activity.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Midl>
+    <Midl Include="Documentation.idl">
+      <DependentUpon>Documentation.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Midl>
     <Midl Include="Rendering.idl">
       <DependentUpon>Rendering.xaml</DependentUpon>
       <SubType>Code</SubType>
@@ -665,6 +678,23 @@
       <Project>{3c46e2b0-ae6c-4132-9122-6772fb411959}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
+    <!--
+      The Documentation page renders its topics as markdown, and this is the
+      renderer TerminalApp's markdown pane and TerminalControl's link tooltip
+      already use. No cycle: UIMarkdown depends only on UIHelpers, WinRTUtils and
+      types, all three of which are referenced above.
+
+      Private and ReferenceOutputAssembly are both false, with the manual winmd
+      reference below doing the compile-time half. The DLL and CodeBlock's xbf
+      already reach the package through WindowsTerminal.vcxproj, and copying them
+      here as well would roll the same xbf up twice. That is the same reason
+      TerminalControl is referenced this way.
+    -->
+    <ProjectReference Include="$(OpenConsoleDir)src\cascadia\UIMarkdown\UIMarkdown.vcxproj">
+      <Project>{7615F03F-E56D-4DB4-B23D-BD4FB80DB36F}</Project>
+      <Private>false</Private>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <!-- Manually add a reference to TerminalControl here. We need this so
@@ -679,6 +709,15 @@
     </Reference>
     <Reference Include="Microsoft.Terminal.Core">
       <HintPath>$(OpenConsoleCommonOutDir)TerminalCore\Microsoft.Terminal.Core.winmd</HintPath>
+      <IsWinMDFile>true</IsWinMDFile>
+      <Private>false</Private>
+      <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
+    </Reference>
+    <!-- Same shape, and for the same reason: this is what tells MDMERGE and cppwinrt
+    where Microsoft.Terminal.UI.Markdown's types are defined, without copying the
+    project's output into ours. -->
+    <Reference Include="Microsoft.Terminal.UI.Markdown">
+      <HintPath>$(OpenConsoleCommonOutDir)Microsoft.Terminal.UI.Markdown\Microsoft.Terminal.UI.Markdown.winmd</HintPath>
       <IsWinMDFile>true</IsWinMDFile>
       <Private>false</Private>
       <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
