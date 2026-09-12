@@ -26,6 +26,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         Editor::ActionsViewModel::FocusKeyChordContainerRequested_revoker _focusKeyChordContainerRevoker;
 
         void _FocusKeyChordContainer(const Editor::CommandViewModel& cmdVM, const Editor::KeyChordViewModel& kcVM);
+
+        // The shortcuts list needs a real MaxHeight to virtualize at all (see the
+        // comment on CommandsListView in Actions.xaml), and it should be the room left
+        // in the settings page's viewport rather than a guess. Both live here because
+        // the ScrollViewer is the hosting page's, above this page in the tree.
+        void _ArmCommandsListHeightTracking();
+        void _UpdateCommandsListHeight();
+
+        winrt::weak_ref<winrt::Windows::UI::Xaml::Controls::ScrollViewer> _pageScrollViewer;
+        winrt::Windows::UI::Xaml::FrameworkElement::SizeChanged_revoker _scrollViewerSizeChangedRevoker;
     };
 }
 

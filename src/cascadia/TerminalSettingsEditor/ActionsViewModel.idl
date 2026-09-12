@@ -4,6 +4,7 @@
 import "EnumEntry.idl";
 import "ColorSchemeViewModel.idl";
 import "MainPage.idl";
+import "HighlightedText.idl";
 
 namespace Microsoft.Terminal.Settings.Editor
 {
@@ -59,6 +60,12 @@ namespace Microsoft.Terminal.Settings.Editor
         Boolean HasNoKeyChords { get; };
         Windows.UI.Xaml.VerticalAlignment NameVerticalAlignment { get; };
         String DisplayNameAndKeyChordAutomationPropName { get; };
+
+        // Which characters of DisplayName the current shortcuts filter matched, or
+        // null when there is no filter. Null in key chord mode too: what matched
+        // there is the chord, and the chord is drawn as a row of key caps rather
+        // than as text this could emphasise.
+        IVector<HighlightedTextRun> NameHighlights { get; };
 
         // UI side (command list page)
         void Edit_Click();
@@ -184,6 +191,18 @@ namespace Microsoft.Terminal.Settings.Editor
         CommandViewModel CurrentCommand;
         IObservableVector<CommandViewModel> CommandList { get; };
         void CmdListItemClicked(IInspectable sender, Windows.UI.Xaml.Controls.ItemClickEventArgs args);
+
+        // The shortcuts filter. CommandList above stays the whole, name-sorted set -
+        // it is what Add, Delete and the settings reload maintain, and what a command
+        // is looked up in - and FilteredCommandList is what the page shows: the same
+        // view models, narrowed and reordered by score. Empty SearchText publishes the
+        // full list in name order.
+        //
+        // A leading '@' matches key chords instead of names, so "@shift" finds every
+        // shortcut whose chord has Shift in it.
+        String SearchText;
+        IObservableVector<CommandViewModel> FilteredCommandList { get; };
+        Boolean FilterMatchedNothing { get; };
 
         // Raised when a key chord row enters or leaves inline edit mode, so the
         // hosting Actions page can move focus to (or away from) that row's listener.

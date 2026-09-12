@@ -12,6 +12,7 @@
 #include "EnumEntry.h"
 #include "ColorSchemeViewModel.h"
 #include "../WinRTUtils/inc/Utils.h"
+#include "../fzf/fzf.h"
 
 using namespace winrt::Windows::Foundation;
 using namespace winrt::Windows::Foundation::Collections;
@@ -38,6 +39,12 @@ inline const std::set<winrt::Microsoft::Terminal::Settings::Model::ShortcutActio
 namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 {
     static constexpr std::wstring_view ActionsPageId{ L"page.actions" };
+
+    // Leading character that points the shortcuts filter at key chords rather than
+    // action names: "@shift" finds every shortcut whose chord has Shift in it. Chosen
+    // because no action name starts with it, so it can never be ambiguous with a name
+    // the user meant to type.
+    static constexpr wchar_t ChordSearchPrefix{ L'@' };
 
     CommandViewModel::CommandViewModel(const Command& cmd, std::vector<Control::KeyChord> keyChordList, const Editor::ActionsViewModel& actionsPageVM, Windows::Foundation::Collections::IMap<Model::ShortcutAction, winrt::hstring> availableActionsAndNamesMap, Windows::Foundation::Collections::IMap<winrt::hstring, Model::ShortcutAction> nameToActionMap) :
         _command{ cmd },
@@ -177,6 +184,36 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
 
         return DisplayName() + L", " + winrt::hstring{ joined };
+    }
+
+    // What the shortcuts filter matches a name against. DisplayName rather than Name:
+    // it is what the row shows, and it is what the highlight runs have to index into.
+    winrt::hstring CommandViewModel::FilterNameText()
+    {
+        return DisplayName();
+    }
+
+    // Every chord on this command, each as its own string, in the same spelling the
+    // row displays (KeyChordVisual splits this serialization on '+' to draw its key
+    // caps). Separate strings rather than one joined one so that a subsequence cannot
+    // run across two chords and report a match the user cannot see.
+    std::vector<winrt::hstring> CommandViewModel::FilterKeyChordTexts() const
+    {
+        std::vector<winrt::hstring> texts;
+        if (!_KeyChordList)
+        {
+            return texts;
+        }
+
+        texts.reserve(_KeyChordList.Size());
+        for (const auto& kc : _KeyChordList)
+        {
+            if (auto text = kc.KeyChordText(); !text.empty())
+            {
+                texts.push_back(std::move(text));
+            }
+        }
+        return texts;
     }
 
     winrt::hstring CommandViewModel::FirstKeyChordText() const
@@ -1368,6 +1405,153 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             return lhs.DisplayName() < rhs.DisplayName();
         });
         _CommandList = single_threaded_observable_vector(std::move(commandList));
+        _ApplyCommandFilter();
+    }
+
+    winrt::hstring ActionsViewModel::SearchText() const noexcept
+    {
+        return _searchText;
+    }
+
+    void ActionsViewModel::SearchText(const winrt::hstring& value)
+    {
+        if (_searchText == value)
+        {
+            return;
+        }
+        _searchText = value;
+        _NotifyChanges(L"SearchText");
+        _ApplyCommandFilter();
+    }
+
+    Windows::Foundation::Collections::IObservableVector<Editor::CommandViewModel> ActionsViewModel::FilteredCommandList() const noexcept
+    {
+        return _FilteredCommandList;
+    }
+
+    bool ActionsViewModel::FilterMatchedNothing() const noexcept
+    {
+        return _filterMatchedNothing;
+    }
+
+    // Narrows and reorders the list the page shows, from whatever is in the search box.
+    //
+    // The matching is fzf's, not ours: ParsePattern splits the query on spaces into
+    // terms that must all match, and each term matches as an ordered subsequence,
+    // case-folded. Scores rank the results. Deliberately no minimum score, unlike
+    // SearchIndex.cpp - that one merges weighted results from several different
+    // haystacks, where one thin match can outrank a good match elsewhere, whereas here
+    // there is a single haystack per row and the matched characters are shown, so the
+    // user can see what a thin match matched and refine it.
+    void ActionsViewModel::_ApplyCommandFilter()
+    {
+        if (!_CommandList)
+        {
+            return;
+        }
+
+        const std::wstring_view query{ _searchText };
+        const auto chordMode = query.starts_with(ChordSearchPrefix);
+        const auto needle = chordMode ? query.substr(1) : query;
+
+        std::vector<Editor::CommandViewModel> result;
+        result.reserve(_CommandList.Size());
+
+        if (needle.empty())
+        {
+            // No filter, including a bare "@" - which has chosen a haystack but given
+            // nothing to match yet. fzf answers an empty pattern with a score of 0 for
+            // everything, so going through the scoring path here would reorder the
+            // whole list on ties instead of leaving it in name order.
+            for (const auto& cmd : _CommandList)
+            {
+                get_self<CommandViewModel>(cmd)->NameHighlights(nullptr);
+                result.push_back(cmd);
+            }
+        }
+        else
+        {
+            const auto pattern = fzf::matcher::ParsePattern(needle);
+
+            struct ScoredCommand
+            {
+                int32_t Score;
+                Editor::CommandViewModel Command;
+            };
+            std::vector<ScoredCommand> scored;
+            scored.reserve(_CommandList.Size());
+
+            for (const auto& cmd : _CommandList)
+            {
+                const auto cmdImpl = get_self<CommandViewModel>(cmd);
+
+                if (chordMode)
+                {
+                    auto best = 0;
+                    for (const auto& chordText : cmdImpl->FilterKeyChordTexts())
+                    {
+                        if (const auto match = fzf::matcher::Match(chordText, pattern))
+                        {
+                            best = std::max(best, match->Score);
+                        }
+                    }
+                    if (best <= 0)
+                    {
+                        continue;
+                    }
+
+                    // Nothing to emphasise in chord mode: what matched is the chord,
+                    // and the chord is drawn as a row of key caps rather than as text.
+                    cmdImpl->NameHighlights(nullptr);
+                    scored.push_back({ best, cmd });
+                }
+                else
+                {
+                    const auto name = cmdImpl->FilterNameText();
+                    const auto match = fzf::matcher::Match(name, pattern);
+                    if (!match)
+                    {
+                        continue;
+                    }
+
+                    std::vector<Editor::HighlightedTextRun> runs;
+                    runs.reserve(match->Runs.size());
+                    for (const auto& run : match->Runs)
+                    {
+                        runs.push_back({ static_cast<uint64_t>(run.Start), static_cast<uint64_t>(run.End) });
+                    }
+                    cmdImpl->NameHighlights(runs.empty() ? nullptr : single_threaded_vector(std::move(runs)));
+                    scored.push_back({ match->Score, cmd });
+                }
+            }
+
+            // Best match first, ties by name. Without the tiebreak the order of equally
+            // scored rows would depend on where they happened to sit, which makes the
+            // list shuffle as the user types.
+            std::sort(scored.begin(), scored.end(), [](const ScoredCommand& lhs, const ScoredCommand& rhs) {
+                if (lhs.Score != rhs.Score)
+                {
+                    return lhs.Score > rhs.Score;
+                }
+                return lhs.Command.DisplayName() < rhs.Command.DisplayName();
+            });
+
+            for (const auto& entry : scored)
+            {
+                result.push_back(entry.Command);
+            }
+        }
+
+        const auto matchedNothing = result.empty() && !needle.empty();
+
+        _FilteredCommandList = single_threaded_observable_vector(std::move(result));
+        _NotifyChanges(L"FilteredCommandList");
+
+        if (_filterMatchedNothing != matchedNothing)
+        {
+            _filterMatchedNothing = matchedNothing;
+            _NotifyChanges(L"FilterMatchedNothing");
+        }
     }
 
     void ActionsViewModel::AddNewCommand()
@@ -1383,6 +1567,19 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _RegisterCmdVMEvents(cmdVM);
         cmdVM->Initialize();
         _CommandList.Append(*cmdVM);
+
+        // Clear the filter. A new command has no name yet, so it would almost certainly
+        // not match whatever is in the search box, and coming back from Edit Shortcut to
+        // a list that does not contain the shortcut you just added reads as the add
+        // having failed.
+        //
+        // Both calls are needed. SearchText re-filters only when the value actually
+        // changed, and appending to _CommandList no longer refreshes the page by itself
+        // now that it binds the filtered list - so the explicit call is what covers the
+        // case where the box was already empty.
+        SearchText({});
+        _ApplyCommandFilter();
+
         CurrentCommand(*cmdVM);
         CurrentPage(ActionsSubPage::Edit);
     }
@@ -1404,6 +1601,12 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             _NotifyChanges(L"CommandList");
             _CommandListDirty = false;
         }
+
+        // Unconditionally, not only when the sort above ran. Every navigation back to
+        // the Shortcuts page comes through here, and a command added or renamed while we
+        // were away on Edit Shortcut has to be re-scored against whatever is still in
+        // the search box.
+        _ApplyCommandFilter();
     }
 
     void ActionsViewModel::CurrentCommand(const Editor::CommandViewModel& newCommand)
@@ -1576,6 +1779,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             }
         }
         _Settings.ActionMap().DeleteUserCommand(senderVM.ID());
+
+        // The page binds the filtered list, so removing from _CommandList is no longer
+        // enough to take the row off screen.
+        _ApplyCommandFilter();
+
         CurrentCommand(nullptr);
         CurrentPage(ActionsSubPage::Base);
     }

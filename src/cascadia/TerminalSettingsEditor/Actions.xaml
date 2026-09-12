@@ -194,11 +194,16 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!--  Command Name  -->
-                    <TextBlock Grid.Column="0"
-                               VerticalAlignment="{x:Bind NameVerticalAlignment, Mode=OneWay}"
-                               Style="{StaticResource ActionRowNameTextStyle}"
-                               Text="{x:Bind DisplayName, Mode=OneWay}" />
+                    <!--
+                        Command Name. A HighlightedText rather than a TextBlock so the
+                        characters the shortcuts filter matched can be emphasised;
+                        NameHighlights is null when there is no filter, which draws the
+                        name plainly.
+                    -->
+                    <local:HighlightedText Grid.Column="0"
+                                           VerticalAlignment="{x:Bind NameVerticalAlignment, Mode=OneWay}"
+                                           Runs="{x:Bind NameHighlights, Mode=OneWay}"
+                                           Text="{x:Bind DisplayName, Mode=OneWay}" />
 
                     <!--  Key chords, stacked vertically (empty when there are none)  -->
                     <ItemsControl Grid.Column="1"
@@ -225,6 +230,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <HyperlinkButton x:Uid="Actions_Disclaimer"
                              Margin="-10,0,0,0"
@@ -245,8 +251,20 @@
                 </Button.Content>
             </Button>
 
+            <!--
+                Filter. TwoWay so that clearing it from the view model - which
+                AddNewCommand does, since a new shortcut has no name to match - reaches
+                the box. x:Bind updates the source per keystroke, so the list narrows as
+                you type without a TextChanged handler.
+            -->
+            <TextBox x:Name="ShortcutsSearchBox"
+                     x:Uid="Actions_SearchBox"
+                     Grid.Row="2"
+                     Margin="2,0,0,0"
+                     Text="{x:Bind ViewModel.SearchText, Mode=TwoWay}" />
+
             <!--  Commands  -->
-            <Grid Grid.Row="2"
+            <Grid Grid.Row="3"
                   Background="{ThemeResource LayerFillColorDefaultBrush}"
                   BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                   BorderThickness="1"
@@ -261,6 +279,12 @@
                     also gives the list a height, but it reports an empty
                     effective viewport to its descendants and the list comes out
                     populated with nothing at all.
+
+                    The value set here is only the one the first measure uses,
+                    and it has to be a real number for that measure to
+                    virtualize. Actions.cpp replaces it with the room actually
+                    left in the ScrollViewer's viewport, and keeps it in step
+                    with the window - see _UpdateCommandsListHeight.
                 -->
                 <ListView x:Name="CommandsListView"
                           MaxHeight="720"
@@ -268,8 +292,17 @@
                           ItemClick="{x:Bind ViewModel.CmdListItemClicked}"
                           ItemContainerStyle="{StaticResource ActionRowItemContainerStyle}"
                           ItemTemplate="{StaticResource CommandTemplate}"
-                          ItemsSource="{x:Bind ViewModel.CommandList, Mode=OneWay}"
+                          ItemsSource="{x:Bind ViewModel.FilteredCommandList, Mode=OneWay}"
                           SelectionMode="None" />
+
+                <!--  Shown in place of the rows when the filter excludes everything.  -->
+                <TextBlock x:Name="NoShortcutsFoundText"
+                           x:Uid="Actions_NoSearchResults"
+                           Margin="12,16"
+                           HorizontalAlignment="Center"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           TextWrapping="Wrap"
+                           Visibility="{x:Bind ViewModel.FilterMatchedNothing, Mode=OneWay}" />
             </Grid>
         </Grid>
     </Border>
