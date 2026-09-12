@@ -78,7 +78,27 @@
             </ResourceDictionary>
         </muxc:NavigationView.Resources>
         <muxc:NavigationView.Header>
-            <Grid Padding="16,0">
+            <!--
+                Two columns rather than one, because the search box lives here now
+                instead of in NavigationView.AutoSuggestBox. In that slot MUX replaces
+                the box with a PaneAutoSuggestButton whenever the pane is compact or
+                minimal - an icon you click to get a box back - and search should be a
+                box you can type in whatever the pane is doing.
+
+                Proportional columns, not a fixed width on the box: the breadcrumb gets
+                two thirds and the box one, capped by its own MaxWidth so it does not
+                sprawl on a wide window. On a very narrow one the box hits MinWidth and
+                the breadcrumb gives way, which is the right way round - the breadcrumb
+                trims to an ellipsis and says where you are, the box has to stay usable
+                to be worth having here at all.
+            -->
+            <Grid Padding="16,0"
+                  ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
                 <!--  Wrapping the BreadcrumbBar in a Grid to avoid the title to drift (and no longer being aligned with the content of the page) when resizing the window. It's weird, I know. I believe it has to do with https://github.com/microsoft/microsoft-ui-xaml/issues/3842 doing funky things when setting a MaxWidth  -->
                 <muxc:BreadcrumbBar x:Name="NavigationBreadcrumbBar"
                                     MaxWidth="1000"
@@ -99,60 +119,87 @@
                     </muxc:BreadcrumbBar.Resources>
                 </muxc:BreadcrumbBar>
 
-            </Grid>
-        </muxc:NavigationView.Header>
+                <AutoSuggestBox x:Name="SettingsSearchBox"
+                                x:Uid="Nav_SearchBox"
+                                Grid.Column="1"
+                                MinWidth="140"
+                                MaxWidth="320"
+                                VerticalAlignment="Center"
+                                QueryIcon="Find"
+                                QuerySubmitted="SettingsSearchBox_QuerySubmitted"
+                                SuggestionChosen="SettingsSearchBox_SuggestionChosen"
+                                TextChanged="SettingsSearchBox_TextChanged">
+                    <AutoSuggestBox.ItemTemplate>
+                        <DataTemplate x:DataType="local:FilteredSearchResult">
+                            <Grid HorizontalAlignment="Stretch"
+                                  ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
 
-        <muxc:NavigationView.AutoSuggestBox>
-            <AutoSuggestBox x:Name="SettingsSearchBox"
-                            x:Uid="Nav_SearchBox"
-                            QueryIcon="Find"
-                            QuerySubmitted="SettingsSearchBox_QuerySubmitted"
-                            SuggestionChosen="SettingsSearchBox_SuggestionChosen"
-                            TextChanged="SettingsSearchBox_TextChanged">
-                <AutoSuggestBox.ItemTemplate>
-                    <DataTemplate x:DataType="local:FilteredSearchResult">
-                        <Grid HorizontalAlignment="Stretch"
-                              ColumnSpacing="8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-
-                            <ContentPresenter Grid.Column="0"
-                                              HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              Content="{x:Bind Icon}" />
-                            <StackPanel Grid.Column="1"
-                                        VerticalAlignment="Center">
-                                <TextBlock FontSize="{ThemeResource BodyTextBlockFontSize}"
-                                           Foreground="{ThemeResource TextFillColorPrimary}"
-                                           Text="{x:Bind Label}"
-                                           TextTrimming="CharacterEllipsis" />
-                                <TextBlock FontSize="{ThemeResource CaptionTextBlockFontSize}"
-                                           Foreground="{ThemeResource TextFillColorSecondary}"
-                                           Text="{x:Bind SecondaryLabel}"
-                                           TextTrimming="CharacterEllipsis"
-                                           Visibility="{x:Bind mtu:Converters.StringNotEmptyToVisibility(SecondaryLabel)}" />
-                            </StackPanel>
-
-                            <ToolTipService.ToolTip>
-                                <StackPanel>
-                                    <TextBlock FontSize="{ThemeResource CaptionTextBlockFontSize}"
+                                <ContentPresenter Grid.Column="0"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  Content="{x:Bind Icon}" />
+                                <StackPanel Grid.Column="1"
+                                            VerticalAlignment="Center">
+                                    <TextBlock FontSize="{ThemeResource BodyTextBlockFontSize}"
                                                Foreground="{ThemeResource TextFillColorPrimary}"
-                                               Text="{x:Bind Label}" />
+                                               Text="{x:Bind Label}"
+                                               TextTrimming="CharacterEllipsis" />
                                     <TextBlock FontSize="{ThemeResource CaptionTextBlockFontSize}"
                                                Foreground="{ThemeResource TextFillColorSecondary}"
                                                Text="{x:Bind SecondaryLabel}"
+                                               TextTrimming="CharacterEllipsis"
                                                Visibility="{x:Bind mtu:Converters.StringNotEmptyToVisibility(SecondaryLabel)}" />
                                 </StackPanel>
-                            </ToolTipService.ToolTip>
-                        </Grid>
-                    </DataTemplate>
-                </AutoSuggestBox.ItemTemplate>
-            </AutoSuggestBox>
-        </muxc:NavigationView.AutoSuggestBox>
 
+                                <ToolTipService.ToolTip>
+                                    <StackPanel>
+                                        <TextBlock FontSize="{ThemeResource CaptionTextBlockFontSize}"
+                                                   Foreground="{ThemeResource TextFillColorPrimary}"
+                                                   Text="{x:Bind Label}" />
+                                        <TextBlock FontSize="{ThemeResource CaptionTextBlockFontSize}"
+                                                   Foreground="{ThemeResource TextFillColorSecondary}"
+                                                   Text="{x:Bind SecondaryLabel}"
+                                                   Visibility="{x:Bind mtu:Converters.StringNotEmptyToVisibility(SecondaryLabel)}" />
+                                    </StackPanel>
+                                </ToolTipService.ToolTip>
+                            </Grid>
+                        </DataTemplate>
+                    </AutoSuggestBox.ItemTemplate>
+                </AutoSuggestBox>
+            </Grid>
+        </muxc:NavigationView.Header>
+
+        <!--
+            Thirteen ungrouped rows were one undifferentiated list, so the items are
+            gathered under headings. The list is still one scroll; these are headings,
+            not expanders.
+
+            The Margin on each heading is load-bearing, and not decoration. MUX's
+            NavigationViewItemHeader template (NavigationView.xaml, the
+            HeaderTextCollapsed visual state) answers a closed compact pane by setting
+            HeaderText.Visibility to Collapsed AND InnerHeaderGrid.Height to 0 - so the
+            heading contributes nothing at all, and without this the icon runs would butt
+            together with no sign that the grouping exists. The state does not touch the
+            header element's own Margin, so the margin is what survives into the
+            collapsed pane and becomes the spacing between runs.
+
+            Headings are inert by MUX's own style, which sets IsEnabled="False",
+            IsTabStop="False" and AutomationProperties.AccessibilityView="Raw" on them -
+            they cannot be clicked, tabbed to, or announced. They carry no Tag and no
+            x:Name for the same reason: nothing navigates to a heading, and the three
+            passes that walk the item source all filter on
+            try_as<NavigationViewItem>(), which a NavigationViewItemHeader is not (it
+            derives from NavigationViewItemBase directly). That is what keeps them out of
+            the unguarded NavTagIconMap lookup.
+        -->
         <muxc:NavigationView.MenuItems>
+            <muxc:NavigationViewItemHeader x:Uid="Nav_GroupStartup"
+                                           Margin="0,4,0,0" />
+
             <muxc:NavigationViewItem x:Name="LaunchNavItem"
                                      x:Uid="Nav_Launch"
                                      Tag="Launch_Nav" />
@@ -160,6 +207,9 @@
             <muxc:NavigationViewItem x:Name="SessionRestoreNavItem"
                                      x:Uid="Nav_SessionRestore"
                                      Tag="SessionRestore_Nav" />
+
+            <muxc:NavigationViewItemHeader x:Uid="Nav_GroupBehavior"
+                                           Margin="0,12,0,0" />
 
             <muxc:NavigationViewItem x:Name="InteractionNavItem"
                                      x:Uid="Nav_Interaction"
@@ -173,6 +223,9 @@
                                      x:Uid="Nav_Integrations"
                                      Tag="Integrations_Nav" />
 
+            <muxc:NavigationViewItemHeader x:Uid="Nav_GroupAppearance"
+                                           Margin="0,12,0,0" />
+
             <muxc:NavigationViewItem x:Name="AppearanceNavItem"
                                      x:Uid="Nav_Appearance"
                                      Tag="GlobalAppearance_Nav" />
@@ -181,13 +234,8 @@
                                      x:Uid="Nav_Rendering"
                                      Tag="Rendering_Nav" />
 
-            <muxc:NavigationViewItem x:Name="CompatibilityNavItem"
-                                     x:Uid="Nav_Compatibility"
-                                     Tag="Compatibility_Nav" />
-
-            <muxc:NavigationViewItem x:Name="ActivityNavItem"
-                                     x:Uid="Nav_Activity"
-                                     Tag="Activity_Nav" />
+            <muxc:NavigationViewItemHeader x:Uid="Nav_GroupCommands"
+                                           Margin="0,12,0,0" />
 
             <muxc:NavigationViewItem x:Name="ActionsNavItem"
                                      x:Uid="Nav_Actions"
@@ -202,13 +250,27 @@
                                      x:Uid="Nav_NewTabMenu"
                                      Tag="NewTabMenu_Nav" />
 
-            <muxc:NavigationViewItem x:Name="ExtensionsNavItem"
-                                     x:Uid="Nav_Extensions"
-                                     Tag="Extensions_Nav" />
+            <muxc:NavigationViewItemHeader x:Uid="Nav_GroupProfiles"
+                                           Margin="0,12,0,0" />
 
             <muxc:NavigationViewItem x:Name="ProfilesNavItem"
                                      x:Uid="Nav_Profiles"
                                      Tag="Profiles_Nav" />
+
+            <muxc:NavigationViewItem x:Name="ExtensionsNavItem"
+                                     x:Uid="Nav_Extensions"
+                                     Tag="Extensions_Nav" />
+
+            <muxc:NavigationViewItemHeader x:Uid="Nav_GroupAdvanced"
+                                           Margin="0,12,0,0" />
+
+            <muxc:NavigationViewItem x:Name="CompatibilityNavItem"
+                                     x:Uid="Nav_Compatibility"
+                                     Tag="Compatibility_Nav" />
+
+            <muxc:NavigationViewItem x:Name="ActivityNavItem"
+                                     x:Uid="Nav_Activity"
+                                     Tag="Activity_Nav" />
 
             <muxc:NavigationViewItem x:Name="DocumentationNavItem"
                                      x:Uid="Nav_Documentation"

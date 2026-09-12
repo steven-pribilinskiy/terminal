@@ -1221,6 +1221,30 @@
     <value>Open JSON file</value>
     <comment>Header for a menu item. This opens the JSON file that is used to log the app's settings.</comment>
   </data>
+  <data name="Nav_GroupStartup.Content" xml:space="preserve">
+    <value>STARTUP</value>
+    <comment>Section heading in the settings navigation list, above the pages about what happens when the Terminal opens. Upper case is the intended styling for these headings; lower-case it if that reads badly in your locale.</comment>
+  </data>
+  <data name="Nav_GroupBehavior.Content" xml:space="preserve">
+    <value>BEHAVIOR</value>
+    <comment>Section heading in the settings navigation list, above the pages about how the Terminal responds to the user and to what is on screen. Upper case is the intended styling for these headings; lower-case it if that reads badly in your locale.</comment>
+  </data>
+  <data name="Nav_GroupAppearance.Content" xml:space="preserve">
+    <value>APPEARANCE</value>
+    <comment>Section heading in the settings navigation list, above the pages about how the Terminal looks and how text is drawn. Upper case is the intended styling for these headings; lower-case it if that reads badly in your locale.</comment>
+  </data>
+  <data name="Nav_GroupCommands.Content" xml:space="preserve">
+    <value>COMMANDS</value>
+    <comment>Section heading in the settings navigation list, above the pages about the ways a command can be invoked: keyboard shortcuts and the new tab dropdown menu. Upper case is the intended styling for these headings; lower-case it if that reads badly in your locale.</comment>
+  </data>
+  <data name="Nav_GroupProfiles.Content" xml:space="preserve">
+    <value>PROFILES</value>
+    <comment>Section heading in the settings navigation list, above the pages about the profiles the Terminal can open and the extensions that contribute them. Upper case is the intended styling for these headings; lower-case it if that reads badly in your locale.</comment>
+  </data>
+  <data name="Nav_GroupAdvanced.Content" xml:space="preserve">
+    <value>ADVANCED</value>
+    <comment>Section heading in the settings navigation list, above the compatibility, activity log and documentation pages. Upper case is the intended styling for these headings; lower-case it if that reads badly in your locale.</comment>
+  </data>
   <data name="Nav_ProfileDefaults.Content" xml:space="preserve">
     <value>Defaults</value>
     <comment>Header for the "defaults" menu item. This navigates to a page that lets you see and modify settings that affect profiles. This is the lowest layer of profile settings that all other profile settings are based on. If a profile doesn't define a setting, this page is responsible for figuring out what that setting is supposed to be.</comment>

@@ -587,6 +587,17 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     {
         if (const auto clickedItemContainer = args.InvokedItemContainer())
         {
+            // Group headings are NavigationViewItemHeaders, not NavigationViewItems, and
+            // MUX's style for them sets IsEnabled="False" and IsTabStop="False" - so this
+            // should never fire for one. Guarded anyway, because the fall-through below
+            // is _Navigate with a null tag, which clears the breadcrumbs and navigates
+            // nowhere; a blank page is a poor answer to a click that should not have been
+            // possible.
+            if (!clickedItemContainer.try_as<MUX::Controls::NavigationViewItem>())
+            {
+                return;
+            }
+
             const auto navString = clickedItemContainer.Tag().try_as<hstring>();
 
             // Handled ahead of the scroll-to-top below, because this row is a toggle
