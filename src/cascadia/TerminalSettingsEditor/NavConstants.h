@@ -10,6 +10,10 @@
 namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 {
     inline constexpr std::wstring_view openJsonTag{ L"OpenJson_Nav" };
+    // Not a page: a footer switch that decides whether rows print their
+    // descriptions. It carries a tag only so ItemInvoked can recognise it and
+    // decline to navigate anywhere.
+    inline constexpr std::wstring_view showDescriptionsTag{ L"ShowDescriptions_Nav" };
     inline constexpr std::wstring_view launchTag{ L"Launch_Nav" };
     inline constexpr std::wstring_view sessionRestoreTag{ L"SessionRestore_Nav" };
     inline constexpr std::wstring_view interactionTag{ L"Interaction_Nav" };
@@ -47,5 +51,6 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         std::pair{ profilesTag, L"\xE7EE" }, /* Other User */
         std::pair{ globalProfileTag, L"\xE7EE" }, /* Other User */
         std::pair{ openJsonTag, L"\xE713" }, /* Settings */
+        std::pair{ showDescriptionsTag, L"\xE7B3" }, /* Reading Mode */
     };
 }

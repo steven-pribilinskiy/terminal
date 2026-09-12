@@ -174,6 +174,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         void ResetToDefaultSettings();
         bool WriteSettingsToDisk();
         Json::Value ToJson() const;
+        winrt::hstring SerializedFingerprint() const;
         Model::Profile ProfileDefaults() const;
         Model::Profile CreateNewProfile();
         Model::Profile FindProfile(const winrt::guid& guid) const noexcept;

@@ -285,6 +285,27 @@
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                            Text="&#x25C7;"
                                            Visibility="Collapsed" />
+                                <!--
+                                    The row's description, one hover away. A Border
+                                    rather than the bare FontIcon so the hover target
+                                    is bigger than the glyph, and Raw to automation
+                                    because the description is already on the card as
+                                    AutomationProperties.FullDescription - a screen
+                                    reader announcing it twice would be worse than not
+                                    reaching the popover at all. Visibility and the
+                                    popover's content are set from
+                                    SettingsCard.cpp::_UpdateDescriptionHelp.
+                                -->
+                                <Border x:Name="PART_DescriptionHelp"
+                                        Padding="2"
+                                        VerticalAlignment="Center"
+                                        AutomationProperties.AccessibilityView="Raw"
+                                        Visibility="Collapsed">
+                                    <FontIcon FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                              FontSize="12"
+                                              Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                              Glyph="&#xE897;" />
+                                </Border>
                             </StackPanel>
 
                             <ContentPresenter x:Name="PART_DescriptionPresenter"

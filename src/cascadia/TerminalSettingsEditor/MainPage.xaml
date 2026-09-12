@@ -70,7 +70,8 @@
                          Loaded="SettingsNav_Loaded"
                          PaneClosed="SettingsNav_PaneClosed"
                          PaneOpened="SettingsNav_PaneOpened"
-                         TabFocusNavigation="Cycle">
+                         TabFocusNavigation="Cycle"
+                         Unloaded="SettingsNav_Unloaded">
         <muxc:NavigationView.Resources>
             <ResourceDictionary>
                 <Thickness x:Key="NavigationViewHeaderMargin">0,4,0,0</Thickness>
@@ -211,6 +212,20 @@
         </muxc:NavigationView.MenuItems>
 
         <muxc:NavigationView.FooterMenuItems>
+            <!--
+                Not a page, so it never selects and ItemInvoked declines to navigate
+                for it (MainPage.cpp::SettingsNav_ItemInvoked). The switch inside is
+                the only thing that toggles it, so that clicking the row and clicking
+                the switch cannot both fire and cancel each other out.
+            -->
+            <muxc:NavigationViewItem x:Name="ShowDescriptionsNavItem"
+                                     SelectsOnInvoked="False"
+                                     Tag="ShowDescriptions_Nav">
+                <ToggleSwitch x:Name="ShowDescriptionsSwitch"
+                              x:Uid="Nav_ShowDescriptions"
+                              Toggled="ShowDescriptionsSwitch_Toggled" />
+            </muxc:NavigationViewItem>
+
             <muxc:NavigationViewItem x:Name="OpenJsonNavItem"
                                      x:Uid="Nav_OpenJSON"
                                      SelectsOnInvoked="False"
@@ -273,6 +288,17 @@
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center"
                             Orientation="Horizontal">
+                    <!--
+                        While this is on, Save and Discard are disabled and every
+                        change is written as it is made. It sits beside them rather
+                        than on a settings page because what it changes is whether
+                        those two buttons mean anything.
+                    -->
+                    <ToggleSwitch x:Name="AutoSaveSwitch"
+                                  x:Uid="Settings_AutoSaveSwitch"
+                                  Margin="0,0,16,0"
+                                  VerticalAlignment="Center"
+                                  Toggled="AutoSaveSwitch_Toggled" />
                     <Button x:Name="SaveButton"
                             x:Uid="Settings_SaveSettingsButton"
                             Click="SaveButton_Click"

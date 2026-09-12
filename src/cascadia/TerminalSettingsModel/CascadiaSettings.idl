@@ -36,6 +36,20 @@ namespace Microsoft.Terminal.Settings.Model
 
         String Hash { get; };
 
+        // A cheap stand-in for "what would WriteSettingsToDisk write right now".
+        // Hash of the serialized settings plus its byte length, so two different
+        // documents would have to collide on both to read as equal.
+        //
+        // Hash above is the hash of the file on disk and does not move when an
+        // in-memory copy is edited, which is exactly what the settings editor needs
+        // to know: it serializes its clone once when it opens and again after a
+        // change, and a difference means there is something to save. Comparing the
+        // serialization rather than the objects means what it compares is precisely
+        // what a save would write - no per-setting equality to keep in step with
+        // MTSMSettings.h, and no false difference from a setting that round-trips to
+        // the same JSON.
+        String SerializedFingerprint { get; };
+
         GlobalAppSettings GlobalSettings { get; };
 
         WindowSettings WindowSettingsDefaults();

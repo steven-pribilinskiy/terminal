@@ -1656,6 +1656,19 @@ void CascadiaSettings::ResetToDefaultSettings()
     _writeSettingsToDisk(LoadStringResource(IDR_USER_DEFAULTS));
 }
 
+// The exact form settings.json is written in. Pulled out of WriteSettingsToDisk so
+// that SerializedFingerprint() below fingerprints the bytes that would actually be
+// written, rather than a differently-formatted rendering of the same tree that would
+// compare unequal to itself.
+static std::string _serializeSettings(const Json::Value& root)
+{
+    Json::StreamWriterBuilder wbuilder;
+    wbuilder.settings_["enableYAMLCompatibility"] = true; // suppress spaces around colons
+    wbuilder.settings_["indentation"] = "    ";
+    wbuilder.settings_["precision"] = 6; // prevent values like 1.1000000000000001
+    return Json::writeString(wbuilder, root);
+}
+
 // Method Description:
 // - Write the current state of CascadiaSettings to our settings file
 // - Create a backup file with the current contents, if one does not exist
@@ -1666,15 +1679,10 @@ void CascadiaSettings::ResetToDefaultSettings()
 // - <none>
 bool CascadiaSettings::WriteSettingsToDisk()
 {
-    // write current settings to current settings file
-    Json::StreamWriterBuilder wbuilder;
-    wbuilder.settings_["enableYAMLCompatibility"] = true; // suppress spaces around colons
-    wbuilder.settings_["indentation"] = "    ";
-    wbuilder.settings_["precision"] = 6; // prevent values like 1.1000000000000001
-
     try
     {
-        _writeSettingsToDisk(Json::writeString(wbuilder, ToJson()));
+        // write current settings to current settings file
+        _writeSettingsToDisk(_serializeSettings(ToJson()));
     }
     catch (...)
     {
@@ -1683,6 +1691,28 @@ bool CascadiaSettings::WriteSettingsToDisk()
         return false;
     }
     return true;
+}
+
+// Method Description:
+// - Fingerprints what WriteSettingsToDisk would write, without writing it. The
+//   settings editor calls this to decide whether its clone still matches the
+//   settings it was opened from, which is what enables the Save button.
+// Return Value:
+// - a string that differs whenever the serialized settings would
+winrt::hstring CascadiaSettings::SerializedFingerprint() const
+{
+    try
+    {
+        const auto contents = _serializeSettings(ToJson());
+        return winrt::hstring{ fmt::format(FMT_COMPILE(L"{:016x}-{}"), til::hash(std::string_view{ contents }), contents.size()) };
+    }
+    CATCH_LOG();
+
+    // An empty fingerprint has to read as "no answer", not as "unchanged": the
+    // caller compares it against a previous one, and returning a fixed string on
+    // failure would make every settings object look identical. Callers treat an
+    // empty result as "cannot tell" and leave their previous verdict alone.
+    return {};
 }
 
 void CascadiaSettings::_writeSettingsToDisk(std::string_view contents)

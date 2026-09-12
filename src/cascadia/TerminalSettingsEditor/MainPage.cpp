@@ -30,6 +30,7 @@
 #include "NewTabMenuViewModel.h"
 #include "NewTabMenu.h"
 #include "NavConstants.h"
+#include "ViewModelHelpers.h"
 #include "..\types\inc\utils.hpp"
 #include <..\WinRTUtils\inc\Utils.h>
 
@@ -71,6 +72,28 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 }
             }
             _setThemeOnPopups(child, theme);
+        }
+    }
+
+    // How often the unsaved-change backstop runs while the settings page is up.
+    // Deliberately slow: it exists for the changes that notify nothing at all, and a
+    // Save button that lights up within a second of a dropdown is indistinguishable
+    // from instant, while the serialization it costs is not free.
+    static constexpr std::chrono::seconds DirtyCheckInterval{ 1 };
+    // And how long after a notified change, which is nearly all of them, to wait for
+    // the typing to stop before serializing.
+    static constexpr std::chrono::milliseconds DirtyCheckDebounce{ 120 };
+
+    // The page that ViewModelChangeHook points at. Weak, and resolved on every call,
+    // so the hook cannot outlive the page -- there is no destructor on a XAML page
+    // that would reliably clear a raw pointer.
+    static winrt::weak_ref<Editor::MainPage> g_mainPage;
+
+    static void _notifyMainPageOfViewModelChange()
+    {
+        if (const auto page = g_mainPage.get())
+        {
+            winrt::get_self<MainPage>(page)->OnAnyViewModelChanged();
         }
     }
 
@@ -217,12 +240,37 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         OpenJsonNavItem().Icon(_fontIconForNavTag(openJsonTag));
         WUX::Controls::ToolTipService::SetToolTip(OpenJsonNavItem(), box_value(RS_(L"Nav_OpenJSON/Content")));
 
+        // The footer items are not in the loop above -- it walks MenuItems -- so this
+        // one gets its icon and tooltip the same way Open JSON does: the tooltip is the
+        // label, because with the pane collapsed the icon is all there is and the
+        // tooltip is the only thing that says what it does. The longer explanation goes
+        // to HelpText, and the switch itself carries it as a tooltip via its x:Uid, so
+        // hovering the row names the setting and hovering the switch explains it.
+        //
+        // Its Content is the switch rather than a label, so the row has no name to
+        // borrow and gets one explicitly; without it the automation tree shows an
+        // unnamed list item wrapping a named switch.
+        ShowDescriptionsNavItem().Icon(_fontIconForNavTag(showDescriptionsTag));
+        Automation::AutomationProperties::SetName(ShowDescriptionsNavItem(), RS_(L"Nav_ShowDescriptions/OnContent"));
+        WUX::Controls::ToolTipService::SetToolTip(ShowDescriptionsNavItem(), box_value(RS_(L"Nav_ShowDescriptions/OnContent")));
+
         Automation::AutomationProperties::SetHelpText(SaveButton(), RS_(L"Settings_SaveSettingsButton/[using:Windows.UI.Xaml.Controls]ToolTipService/ToolTip"));
         Automation::AutomationProperties::SetHelpText(ResetButton(), RS_(L"Settings_ResetSettingsButton/[using:Windows.UI.Xaml.Controls]ToolTipService/ToolTip"));
         Automation::AutomationProperties::SetHelpText(OpenJsonNavItem(), RS_(L"Nav_OpenJSON/[using:Windows.UI.Xaml.Controls]ToolTipService/ToolTip"));
+        Automation::AutomationProperties::SetHelpText(ShowDescriptionsNavItem(), RS_(L"Nav_ShowDescriptions/[using:Windows.UI.Xaml.Controls]ToolTipService/ToolTip"));
+        Automation::AutomationProperties::SetHelpText(AutoSaveSwitch(), RS_(L"Settings_AutoSaveSwitch/[using:Windows.UI.Xaml.Controls]ToolTipService/ToolTip"));
 
         _breadcrumbs = single_threaded_observable_vector<IInspectable>();
         _UpdateSearchIndex();
+
+        _ReadEditorChromePreferences();
+
+        // Last, so the baseline is taken from a clone nothing has touched yet. The
+        // machinery that watches for it moving is armed in SettingsNav_Loaded rather
+        // than here, because it needs get_weak() and this page is a composed XAML
+        // control -- the outer object a weak reference has to name is not necessarily
+        // in place while this constructor is still running.
+        _RecordCleanState();
     }
 
     // Method Description:
@@ -234,6 +282,28 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     // - <none>
     void MainPage::UpdateSettings(const Model::CascadiaSettings& settings, const Model::WindowSettings& windowSettings)
     {
+        // An auto-save writes settings.json, the Terminal notices the file changed,
+        // reloads, and hands the result straight back here. Taking the full path for
+        // that would rebuild the clone and every view model and re-navigate, which
+        // with auto-save on happens while you are still typing -- the control you are
+        // editing loses focus mid-word. So a reload carrying the hash one of our own
+        // writes produced is absorbed: adopt the new source, keep the clone and the
+        // view models, and leave the page where it is.
+        //
+        // Deliberately narrow. Only the auto-save path records a hash, so a manual
+        // Save still rebuilds exactly as it always has, and any other reason the file
+        // changed -- an external editor, defaults.json, a dynamic profile appearing --
+        // cannot match and takes the full path. What absorbing costs is that
+        // normalisation the load performed (a generated guid on a brand-new profile,
+        // say) is not reflected in the editor until something reloads it for another
+        // reason.
+        if (_AbsorbOwnAutoSaveReload(settings))
+        {
+            _settingsSource = settings;
+            _windowSettingsSource = windowSettings;
+            return;
+        }
+
         _settingsSource = settings;
         _settingsClone = settings.Copy();
         _windowSettingsSource = windowSettings;
@@ -395,6 +465,89 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         const auto hasThemeForSettings{ theme.Settings() != nullptr };
         const auto requestedTheme = hasThemeForSettings ? theme.Settings().RequestedTheme() : theme.RequestedTheme();
         _setThemeOnPopups(SettingsSearchBox(), requestedTheme);
+
+        _ArmDirtyTracking();
+    }
+
+    // Starts watching for unsaved changes. Here rather than in the constructor because
+    // both the throttle and the timer need a weak reference to this page, and
+    // get_weak() on a composed XAML control wants the outer object -- which is not
+    // necessarily in place while the derived constructor is still running. Nothing can
+    // change a setting before the page has loaded, so nothing is missed by waiting.
+    //
+    // Loaded fires again whenever the settings pane is re-attached, so everything here
+    // is written to be safe to repeat.
+    void MainPage::_ArmDirtyTracking()
+    {
+        if (!_dirtyCheckThrottle)
+        {
+            _dirtyCheckThrottle = std::make_shared<ThrottledFunc<>>(
+                winrt::Windows::System::DispatcherQueue::GetForCurrentThread(),
+                til::throttled_func_options{
+                    .delay = DirtyCheckDebounce,
+                    .debounce = true,
+                    .trailing = true,
+                },
+                [weakThis = get_weak()]() {
+                    if (const auto page = weakThis.get())
+                    {
+                        winrt::get_self<MainPage>(page)->_ReevaluateDirtyState();
+                    }
+                });
+        }
+
+        if (!_dirtyCheckTimer)
+        {
+            _dirtyCheckTimer = WUX::DispatcherTimer{};
+            _dirtyCheckTimer.Interval(DirtyCheckInterval);
+            _dirtyCheckTimer.Tick([weakThis = get_weak()](auto&&, auto&&) {
+                const auto page = weakThis.get();
+                if (!page)
+                {
+                    return;
+                }
+
+                const auto self = winrt::get_self<MainPage>(page);
+
+                // SettingsNav_Unloaded is the fast way out, and for two of the three
+                // hosts it is the one that fires: the tab host's pane teardown detaches
+                // the page, and the dialog host explicitly does dialog.Content(nullptr)
+                // when it closes. But this sweep serializes the whole settings document
+                // on the UI thread once a second, so it must not depend on having found
+                // every teardown path. settingsUIHost "window" is the one I could not
+                // follow to an Unloaded -- the page lives in a Terminal window of its
+                // own, and closing that destroys the island rather than detaching
+                // anything -- so the tick also checks for itself and gives up when the
+                // page is no longer in a live tree. A reparent that fires Unloaded
+                // without a Loaded is covered by the same check.
+                if (!page.IsLoaded())
+                {
+                    self->_dirtyCheckTimer.Stop();
+                    return;
+                }
+
+                self->_ReevaluateDirtyState();
+            });
+        }
+        _dirtyCheckTimer.Start();
+
+        g_mainPage = *this;
+        ViewModelChangeHook::AnyViewModelChanged = &_notifyMainPageOfViewModelChange;
+    }
+
+    void MainPage::SettingsNav_Unloaded(const IInspectable&, const RoutedEventArgs&)
+    {
+        // The timer is the only thing here that costs anything while nothing is on
+        // screen -- it would go on serializing the settings once a second for a page
+        // nobody is looking at. This is the prompt way to stop it; the tick itself also
+        // stops when the page is no longer loaded, so a host whose teardown does not
+        // reach here loses at most one more sweep. The hook stays armed either way: it
+        // is cheap, it resolves a weak reference, and Loaded can bring this same page
+        // back.
+        if (_dirtyCheckTimer)
+        {
+            _dirtyCheckTimer.Stop();
+        }
     }
 
     void MainPage::_AnnounceNavPaneState(bool opened)
@@ -429,6 +582,30 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     {
         if (const auto clickedItemContainer = args.InvokedItemContainer())
         {
+            const auto navString = clickedItemContainer.Tag().try_as<hstring>();
+
+            // Handled ahead of the scroll-to-top below, because this row is a toggle
+            // rather than a destination and snapping the page back to the top because
+            // someone flipped a switch in the footer would be its own small bug.
+            if (navString && *navString == showDescriptionsTag)
+            {
+                // With the pane open, the switch is sitting right there and is the only
+                // thing that flips it: if this flipped it too, a click the switch did
+                // not swallow would be counted twice and cancel itself out.
+                //
+                // Collapsed, the pane draws the item as an icon and never realizes its
+                // content, so there is no switch to click and nothing to double-fire.
+                // The row has to be the control, or the setting is unreachable for as
+                // long as the pane stays narrow - which here is most of the time.
+                // Assigning IsOn raises Toggled, so the one handler still does the work.
+                if (!SettingsNav().IsPaneOpen())
+                {
+                    const auto toggle = ShowDescriptionsSwitch();
+                    toggle.IsOn(!toggle.IsOn());
+                }
+                return;
+            }
+
             if (clickedItemContainer.IsSelected())
             {
                 // Clicked on the selected item.
@@ -441,7 +618,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 SettingsMainPage_ScrollViewer().ScrollToVerticalOffset(0);
             }
 
-            if (const auto navString = clickedItemContainer.Tag().try_as<hstring>())
+            if (navString)
             {
                 if (*navString == openJsonTag)
                 {
@@ -1054,6 +1231,10 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         {
             _SelectNavItemByTag(selectedNavTag);
         }
+
+        // The clone is brand new, so it matches the file again: this is the baseline
+        // for both a fresh open and a Discard.
+        _RecordCleanState();
     }
 
     void MainPage::SaveButton_Click(const IInspectable& /*sender*/, const RoutedEventArgs& /*args*/)
@@ -1062,7 +1243,13 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         if (!_settingsClone.WriteSettingsToDisk())
         {
             ShowLoadWarningsDialog.raise(*this, _settingsClone.Warnings());
+            return;
         }
+
+        // Grey the buttons out now rather than waiting for the reload this write sets
+        // off to come back around through UpdateSettings, which is debounced and would
+        // leave them live for a beat after a successful save.
+        _RecordCleanState();
     }
 
     // Link Tooltip and Integrations are whole pages this fork added, not settings
@@ -1122,6 +1309,190 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     void MainPage::ResetButton_Click(const IInspectable& /*sender*/, const RoutedEventArgs& /*args*/)
     {
         UpdateSettings(_settingsSource, _windowSettingsSource);
+    }
+
+    // Both editor-chrome switches, read back from where they were persisted. They are
+    // in ApplicationState rather than settings.json because they describe how the
+    // editor presents itself, and because a global setting would live on the clone --
+    // which would make turning either of them on count as an unsaved change, and both
+    // of them exist to interact with the Save button.
+    void MainPage::_ReadEditorChromePreferences()
+    {
+        const auto state = Model::ApplicationState::SharedInstance();
+
+        // Assigning IsOn raises Toggled, which would write the value straight back to
+        // ApplicationState. Harmless but pointless, and it makes the handlers look
+        // like they can run before the page has a baseline.
+        _applyingChromePreferences = true;
+        const auto showDescriptions = state.SettingsShowDescriptions();
+        ShowDescriptionsSwitch().IsOn(showDescriptions);
+        _autoSave = state.SettingsAutoSave();
+        AutoSaveSwitch().IsOn(_autoSave);
+        _applyingChromePreferences = false;
+
+        // Seed the cards before anything navigates, so the first page drawn already
+        // agrees with the switch -- the same reason the provenance marks are seeded in
+        // UpdateSettings.
+        SettingsCard::DescriptionsVisible(showDescriptions);
+    }
+
+    void MainPage::ShowDescriptionsSwitch_Toggled(const IInspectable& sender, const RoutedEventArgs& /*args*/)
+    {
+        if (_applyingChromePreferences)
+        {
+            return;
+        }
+
+        // Read the switch rather than any projected property: Toggled and a binding's
+        // write-back are not ordered against each other, so anything read through the
+        // binding here can still be reporting the old value. Same trap as
+        // CompatibilityViewModel::AylithImprintToggled.
+        const auto toggle = sender.try_as<ToggleSwitch>();
+        if (!toggle)
+        {
+            return;
+        }
+
+        const auto isOn = toggle.IsOn();
+        SettingsCard::DescriptionsVisible(isOn);
+        Model::ApplicationState::SharedInstance().SettingsShowDescriptions(isOn);
+    }
+
+    void MainPage::AutoSaveSwitch_Toggled(const IInspectable& sender, const RoutedEventArgs& /*args*/)
+    {
+        if (_applyingChromePreferences)
+        {
+            return;
+        }
+
+        const auto toggle = sender.try_as<ToggleSwitch>();
+        if (!toggle)
+        {
+            return;
+        }
+
+        _autoSave = toggle.IsOn();
+        Model::ApplicationState::SharedInstance().SettingsAutoSave(_autoSave);
+
+        // Turning it on has to flush whatever is already pending, or the changes made
+        // before the switch was flipped would sit unsaved behind a disabled Save
+        // button. Turning it off only has to re-enable the buttons, which
+        // _ReevaluateDirtyState does on its way through.
+        _ReevaluateDirtyState();
+    }
+
+    // True if this reload is settings.json coming back to us from one of our own
+    // auto-save writes. See the comment at the top of UpdateSettings for why that
+    // matters and why this is kept this narrow.
+    bool MainPage::_AbsorbOwnAutoSaveReload(const Model::CascadiaSettings& settings)
+    {
+        if (_autoSaveWrittenHashes.empty())
+        {
+            return false;
+        }
+
+        const auto hash = settings.Hash();
+        const auto it = std::ranges::find(_autoSaveWrittenHashes, hash);
+        if (it == _autoSaveWrittenHashes.end())
+        {
+            return false;
+        }
+
+        // Drop this echo and anything older. Several writes can be in flight at once --
+        // ReloadSettingsThrottled debounces, so a burst of auto-saves can produce fewer
+        // reloads than writes -- which is the whole reason this is a list and not one
+        // hash.
+        _autoSaveWrittenHashes.erase(_autoSaveWrittenHashes.begin(), it + 1);
+        return true;
+    }
+
+    void MainPage::_RecordCleanState()
+    {
+        _cleanFingerprint = _settingsClone.SerializedFingerprint();
+        _unsavedChanges = false;
+        _ApplySaveButtonState();
+    }
+
+    void MainPage::_ApplySaveButtonState()
+    {
+        // With auto-save on there is by definition never anything to save or discard,
+        // so both buttons stay down rather than being hidden: the row they sit in is
+        // where the auto-save switch lives, and a row that changes shape when you flip
+        // the switch beside it reads as a glitch.
+        const auto enabled = !_autoSave && _unsavedChanges;
+        SaveButton().IsEnabled(enabled);
+        ResetButton().IsEnabled(enabled);
+    }
+
+    void MainPage::OnAnyViewModelChanged()
+    {
+        if (_dirtyCheckThrottle)
+        {
+            _dirtyCheckThrottle->Run();
+        }
+    }
+
+    // The one place that decides whether there is anything to save, and the one place
+    // auto-save writes from.
+    //
+    // The verdict is always a fresh fingerprint compared against the one taken when
+    // the clone last matched the file. Nothing here trusts *which* notification got us
+    // here: a view model raises PropertyChanged for pure UI state as readily as for a
+    // setting, and an enum dropdown writes through to the settings model and raises
+    // nothing at all.
+    void MainPage::_ReevaluateDirtyState()
+    {
+        const auto fingerprint = _settingsClone.SerializedFingerprint();
+        if (fingerprint.empty())
+        {
+            // Serialization failed. Leave the previous verdict standing -- an empty
+            // fingerprint is "cannot tell", and treating it as "unchanged" would grey
+            // out Save over real edits.
+            return;
+        }
+
+        auto dirty = _cleanFingerprint.empty() || fingerprint != _cleanFingerprint;
+
+        if (dirty && _autoSave)
+        {
+            _settingsClone.LogSettingChanges(false);
+            if (_settingsClone.WriteSettingsToDisk())
+            {
+                _autoSaveWrittenHashes.emplace_back(_settingsClone.Hash());
+                // Bounded because a reload is not guaranteed for every write; without
+                // this the list would grow for as long as the window stays open.
+                if (_autoSaveWrittenHashes.size() > MaxTrackedAutoSaveWrites)
+                {
+                    _autoSaveWrittenHashes.erase(_autoSaveWrittenHashes.begin());
+                }
+                _cleanFingerprint = fingerprint;
+                dirty = false;
+            }
+            else
+            {
+                // Stop auto-saving rather than retrying on the next tick. A write that
+                // fails tends to keep failing (the file is locked, the disk is full),
+                // and a retry loop would append a warning per attempt and never tell
+                // anyone. Switching off hands the user back the Save button, which is
+                // the path that does report it -- SaveButton_Click raises the warnings
+                // dialog on the same failure.
+                //
+                // Nothing is raised from here. The only dialog available reports
+                // settings *load* warnings, and a failed write usually adds none, so it
+                // would come up either empty or describing something unrelated to what
+                // just happened. Saying nothing and re-enabling the button the user
+                // already knows is better than that; a real "could not write
+                // settings.json" message would need a string and a surface of its own.
+                _autoSave = false;
+                _applyingChromePreferences = true;
+                AutoSaveSwitch().IsOn(false);
+                _applyingChromePreferences = false;
+                Model::ApplicationState::SharedInstance().SettingsAutoSave(false);
+            }
+        }
+
+        _unsavedChanges = dirty;
+        _ApplySaveButtonState();
     }
 
     void MainPage::BreadcrumbBar_ItemClicked(const Microsoft::UI::Xaml::Controls::BreadcrumbBar& /*sender*/, const Microsoft::UI::Xaml::Controls::BreadcrumbBarItemClickedEventArgs& args)

@@ -3,6 +3,36 @@
 
 #pragma once
 
+namespace ViewModelChangeHook
+{
+    // Called after any view model in the settings editor raises PropertyChanged.
+    // MainPage points this at itself so it can re-check whether its settings clone
+    // still matches what is on disk, which is what drives the Save button.
+    //
+    // A file-scope hook rather than subscribing to each view model: the editor builds
+    // dozens of them, several nested inside a profile, and they come and go with every
+    // navigation - so "subscribe to all of them" is a list that silently stops being
+    // complete. There is exactly one MainPage and the editor is single-threaded UI
+    // code, so one pointer is enough. It is set to a free function that resolves a
+    // weak reference, so it cannot outlive the page it points at.
+    //
+    // This only ever means "something may have changed". VIEW_MODEL_OBSERVABLE_PROPERTY
+    // is used for pure UI state too (the current folder, the selected sub-page), so the
+    // verdict has to come from comparing the serialized settings, never from the fact
+    // that this ran. It is also not sufficient on its own: a
+    // GETSET_BINDABLE_ENUM_SETTING writes straight through to the settings model and
+    // raises nothing at all, which is why MainPage keeps a slower backstop as well.
+    inline void (*AnyViewModelChanged)(){ nullptr };
+
+    inline void Notify()
+    {
+        if (AnyViewModelChanged)
+        {
+            AnyViewModelChanged();
+        }
+    }
+}
+
 template<typename T>
 struct ViewModelHelper
 {
@@ -21,6 +51,7 @@ protected:
     void _NotifyChangeCore(const std::wstring_view name)
     {
         _propertyChangedHandlers(*static_cast<T*>(this), ::winrt::Windows::UI::Xaml::Data::PropertyChangedEventArgs{ name });
+        ViewModelChangeHook::Notify();
     }
 
     // template recursion base case: single dispatch

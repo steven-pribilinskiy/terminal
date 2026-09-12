@@ -7,8 +7,9 @@ Checks the Settings Model's parallel lists agree with each other.
 .DESCRIPTION
 A setting in this codebase is spelled out in several files that nothing forces
 to agree: the X-macro lists in MTSMSettings.h, the WinRT projection in
-GlobalAppSettings.idl, a JSON mapper for each enum type, and an EnumMappings
-entry for each enum a settings page shows in a dropdown.
+GlobalAppSettings.idl, a JSON mapper for each enum type, an EnumMappings
+entry for each enum a settings page shows in a dropdown, and a localized string
+in whichever of the two Resources.resw files the code that names it lives in.
 
 Most disagreements are caught by the compiler. The ones that are not fail at
 runtime, in the Settings Model, when the settings page that needs them is built
@@ -193,6 +194,32 @@ foreach ($key in $referencedKeys) {
     }
 }
 
+# ---- 6b. The same, for the Settings Editor's own resw ----
+#
+# Same unguarded ValueAsString(), same dead process, a different resw. The editor
+# also reaches for keys the XAML side owns -- a control's x:Uid plus the property,
+# as in RS_(L"Nav_OpenJSON/Content") -- and RS_ spells the separator '/' where the
+# resw spells it '.', so the key has to be translated before it is looked up. That
+# is the only difference from the block above; without it every such key would read
+# as missing and this check would be useless noise rather than a gate.
+$editorReswRaw = Get-Content -Raw -LiteralPath (Join-Path $EditorDir 'Resources\en-US\Resources.resw')
+$editorDefinedStrings = [regex]::Matches($editorReswRaw, '<data name="([^"]+)"') |
+    ForEach-Object { $_.Groups[1].Value }
+
+$editorReferencedKeys = Get-ChildItem $EditorDir -Recurse -Include *.cpp, *.h -File |
+    Where-Object { $_.FullName -notmatch '\\Generated Files\\' } |
+    ForEach-Object {
+        [regex]::Matches((Get-Content -Raw -LiteralPath $_.FullName), $keyPattern) | ForEach-Object {
+            @($_.Groups[1].Value, $_.Groups[2].Value, $_.Groups[3].Value) | Where-Object { $_ }
+        }
+    } | Sort-Object -Unique
+
+foreach ($key in $editorReferencedKeys) {
+    if ($editorDefinedStrings -notcontains ($key -replace '/', '.')) {
+        $problems.Add("resource key '$key' is used in the Settings Editor but has no entry in its Resources.resw -- looking it up crashes the Settings UI")
+    }
+}
+
 # ---- 7. Every enum dropdown value has a label in the editor's resw ----
 #
 # The same crash one page deeper, and quieter. Utils.cpp's LocalizedNameForEnumName
@@ -323,7 +350,7 @@ if ($uncheckedMaps.Count -gt 0) {
     Write-Host ("Not checked (no json mapper found): {0}" -f (($uncheckedMaps | Sort-Object -Unique) -join ', ')) -ForegroundColor DarkYellow
 }
 
-Write-Host ("Checked {0} settings, {1} EnumMappings entries, {2} action arguments, {3} resource keys, {4} enum dropdown labels, {5} schema entries." -f $settings.Count, $declaredMaps.Count, $argNames.Count, $referencedKeys.Count, $checkedValues, $schemaChecked)
+Write-Host ("Checked {0} settings, {1} EnumMappings entries, {2} action arguments, {3} model resource keys, {4} editor resource keys, {5} enum dropdown labels, {6} schema entries." -f $settings.Count, $declaredMaps.Count, $argNames.Count, $referencedKeys.Count, $editorReferencedKeys.Count, $checkedValues, $schemaChecked)
 
 if ($problems.Count -gt 0) {
     Write-Host ''
