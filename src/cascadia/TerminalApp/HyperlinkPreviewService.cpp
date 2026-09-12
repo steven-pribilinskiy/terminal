@@ -85,6 +85,9 @@ namespace winrt::TerminalApp::implementation
             // pipeline: an undocumented endpoint that 400s on some servers, or
             // a probe (`gh auth token`) that is allowed to come back empty.
             bool Optional{ false };
+            // Skipped by the fetch that paints the card; run by GetTabAsync
+            // when a tab naming this step is first opened.
+            bool Deferred{ false };
         };
 
         struct Field
@@ -93,8 +96,14 @@ namespace winrt::TerminalApp::implementation
             std::wstring Label;
             std::wstring Path;
             std::wstring IconPath;
+            // Non-empty: a pointer to an array this field repeats over, each
+            // element readable as the step id "item".
+            std::wstring EachPath;
             std::wstring Placement;
             std::wstring LinkTemplate;
+            // A URL the result carries whole, read as a pointer rather than
+            // built (and percent-encoded) as a template.
+            std::wstring LinkPath;
             std::wstring ColorPath;
             std::wstring Color;
             std::wstring Format;
@@ -123,6 +132,8 @@ namespace winrt::TerminalApp::implementation
             std::wstring ItemAvatarPath;
             std::wstring ItemBodyPath;
             std::wstring ItemTimePath;
+            // The deferred step this tab's content comes from, if any.
+            std::wstring StepId;
         };
 
         // Something the user can do to the thing behind the link. A Choice
@@ -197,11 +208,33 @@ namespace winrt::TerminalApp::implementation
         std::vector<std::shared_ptr<Plugin>> Plugins;
         std::vector<TextRule> TextRules;
     };
+
+    // What one run of an integration's steps produced. Kept alongside the
+    // preview in the cache, because a tab opened later is built from the same
+    // results the card was -- and a deferred step then joins them rather than
+    // the whole pipeline being run again. Named in the header (as an incomplete
+    // type) for that reason; the anonymous namespace below calls it
+    // PipelineOutcome, which is what every use of it reads as.
+    struct HyperlinkPreviewPipeline
+    {
+        // Keyed by step id, exactly as a "stepId:/pointer" path spells it.
+        std::map<std::wstring, Windows::Data::Json::IJsonValue> Results;
+        // The last step that parsed at all: what an unqualified "/pointer"
+        // reads against.
+        Windows::Data::Json::IJsonValue Last{ nullptr };
+        std::wstring Error;
+        // Optional steps that failed. Deliberately NOT the card's error: an
+        // absent `gh` or a Jira site without dev-status is an ordinary outcome,
+        // and putting it on a hover card would train the user to ignore the
+        // error line. Surfaced only when the fetch produced nothing else.
+        std::vector<std::wstring> OptionalErrors;
+    };
 }
 
 namespace
 {
     using Snapshot = winrt::TerminalApp::implementation::HyperlinkPreviewSnapshot;
+    using PipelineOutcome = winrt::TerminalApp::implementation::HyperlinkPreviewPipeline;
     using TemplateValueMap = std::map<std::wstring, std::wstring>;
 
     // ---- small string helpers -------------------------------------------
@@ -1193,34 +1226,32 @@ namespace
     }
 
     // What a whole pipeline produced.
-    struct PipelineOutcome
-    {
-        // Keyed by step id, exactly as a "stepId:/pointer" path spells it.
-        std::map<std::wstring, IJsonValue> Results;
-        // The last step that parsed at all: what an unqualified "/pointer"
-        // reads against.
-        IJsonValue Last{ nullptr };
-        std::wstring Error;
-        // Optional steps that failed. Deliberately NOT the card's error: an
-        // absent `gh` or a Jira site without dev-status is an ordinary outcome,
-        // and putting it on a hover card would train the user to ignore the
-        // error line. Surfaced only when the fetch produced nothing else.
-        std::vector<std::wstring> OptionalErrors;
-    };
-
     // Runs every step of one integration's pipeline. The caller must already
     // have pointed `context.Results` at `outcome.Results`: steps write results
     // into it as they go, and later templates read them back out.
+    //
+    // A deferred step only runs when `deferredStep` names it. With `onlyDeferred`
+    // it runs alone, against an outcome that already holds the rest of the
+    // pipeline -- which is how one tab's payload is fetched when the user opens
+    // it, without everything the card was built from being requested again.
     //
     // Blocking; always called from a background thread.
     void RunPipeline(const Snapshot::Plugin& plugin,
                      const ExpandContext& context,
                      PipelineOutcome& outcome,
                      WWH::HttpClient& plainClient,
-                     WWH::HttpClient& lenientClient)
+                     WWH::HttpClient& lenientClient,
+                     const std::wstring& deferredStep = {},
+                     bool onlyDeferred = false)
     {
         for (const auto& step : plugin.Steps)
         {
+            const auto wanted = step.Deferred ? (!deferredStep.empty() && step.Id == deferredStep) :
+                                                !onlyDeferred;
+            if (!wanted)
+            {
+                continue;
+            }
             if (!step.When.empty() && Expand(step.When, context, Escape::None).empty())
             {
                 continue;
@@ -1355,119 +1386,159 @@ namespace
         return text;
     }
 
-    // The secondary content the user turned on. A tab with nothing in it is
-    // dropped rather than shown empty -- an integration that offers Comments
+    // One tab. Null when there is nothing behind it: a tab with nothing in it
+    // is dropped rather than shown empty -- an integration that offers Comments
     // should not put a Comments tab on an issue that has none.
+    //
+    // `withContent` is false while the card's own fetch is being turned into a
+    // preview. The row then carries its name and Pending and nothing else, and
+    // the reader is only asked "is there anything here at all" -- a pointer
+    // lookup, where building the content means flattening a description or
+    // fifty comment bodies. A tab fed by a deferred step cannot be asked even
+    // that (the request has not been made), so it is always offered; opening it
+    // is what finds out.
     //
     // The kinds are mapped by hand rather than cast: the manifest's Body/List
     // pair has no counterpart for HyperlinkPreviewTabKind::Fields, which names
     // the built-in field list the control always shows first.
+    Control::HyperlinkPreviewTab BuildTab(const Snapshot::Tab& tab, const ResultReader& reader, bool withContent)
+    {
+        Control::HyperlinkPreviewTab row{};
+        row.Key(winrt::hstring{ tab.Key });
+        row.Label(winrt::hstring{ tab.Label });
+        row.Pending(!withContent);
+
+        // ADF is converted here, so what leaves this function is only ever
+        // "text" or "markdown" -- never a format the control would have to
+        // know how to parse. The format is stamped on a Comments tab too:
+        // GitHub's comment bodies are markdown and Jira's are converted
+        // ADF, and nothing downstream could tell them apart otherwise.
+        //
+        // Converted ADF is stamped "markdown", not "text". It always came
+        // out as markdown - fenced code, "- " bullets, "1. " ordered lists -
+        // but calling it text meant every surface printed those markers
+        // literally instead of rendering them, so a Jira description read as
+        // a wall of punctuation. Headings, bold, italic, strike and links
+        // come across too now.
+        const auto flatten = tab.Format == L"adf";
+        row.Format(winrt::hstring{ flatten ? std::wstring{ L"markdown" } :
+                                             (tab.Format.empty() ? std::wstring{ L"text" } : tab.Format) });
+
+        const auto fetchedLater = !tab.StepId.empty();
+        const auto value = reader.Json(tab.Path);
+
+        if (!tab.IsList)
+        {
+            row.Kind(Control::HyperlinkPreviewTabKind::Body);
+
+            if (!withContent)
+            {
+                // A JSON null is an answer, not a value: Jira spells an issue
+                // with no description "description": null, and a tab offered for
+                // that would open on nothing.
+                const auto present = value && value.ValueType() != JsonValueType::Null;
+                if (!fetchedLater && !present)
+                {
+                    return nullptr;
+                }
+                return row;
+            }
+
+            std::wstring body;
+            if (flatten)
+            {
+                FlattenAdf(value, body, 0);
+            }
+            else
+            {
+                body = ValueToString(value);
+            }
+
+            body = TrimTrailingBlank(std::move(body));
+            if (body.empty())
+            {
+                return nullptr;
+            }
+            row.Body(winrt::hstring{ body });
+            return row;
+        }
+
+        row.Kind(Control::HyperlinkPreviewTabKind::Comments);
+
+        const auto isArray = value && value.ValueType() == JsonValueType::Array;
+        if (!withContent)
+        {
+            if (!fetchedLater && !(isArray && value.GetArray().Size() > 0))
+            {
+                return nullptr;
+            }
+            return row;
+        }
+        if (!isArray)
+        {
+            return nullptr;
+        }
+
+        auto comments = winrt::single_threaded_vector<Control::HyperlinkPreviewComment>();
+        const auto array = value.GetArray();
+        // Bounded: a long-running issue can carry hundreds, and no
+        // surface here wants to render them all.
+        const auto count = std::min(array.Size(), 50u);
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            const auto item = array.GetAt(i);
+
+            std::wstring body;
+            const auto rawBody = At(item, tab.ItemBodyPath);
+            if (flatten)
+            {
+                FlattenAdf(rawBody, body, 0);
+            }
+            else
+            {
+                body = ValueToString(rawBody);
+            }
+            body = TrimTrailingBlank(std::move(body));
+
+            const auto author = ValueToString(At(item, tab.ItemAuthorPath));
+            if (body.empty() && author.empty())
+            {
+                continue;
+            }
+
+            Control::HyperlinkPreviewComment comment{};
+            comment.Author(winrt::hstring{ author });
+            comment.AvatarUri(winrt::hstring{ ValueToString(At(item, tab.ItemAvatarPath)) });
+            comment.Body(winrt::hstring{ body });
+            // RelativeTime hands back whatever it was given when it
+            // cannot parse it, so an unexpected shape still shows.
+            if (const auto when = ValueToString(At(item, tab.ItemTimePath)); !when.empty())
+            {
+                comment.Time(winrt::hstring{ RelativeTime(when) });
+            }
+            comments.Append(comment);
+        }
+
+        if (comments.Size() == 0)
+        {
+            return nullptr;
+        }
+        row.Comments(comments);
+        return row;
+    }
+
+    // The secondary content the user turned on, as a strip of names: each one's
+    // content is built when it is first opened. See BuildTab.
     void BuildTabs(const Snapshot::Plugin& plugin, const ResultReader& reader, const Control::HyperlinkPreview& preview)
     {
         auto tabs = winrt::single_threaded_vector<Control::HyperlinkPreviewTab>();
 
         for (const auto& tab : plugin.Tabs)
         {
-            Control::HyperlinkPreviewTab row{};
-            row.Key(winrt::hstring{ tab.Key });
-            row.Label(winrt::hstring{ tab.Label });
-
-            // ADF is converted here, so what leaves this function is only ever
-            // "text" or "markdown" -- never a format the control would have to
-            // know how to parse. The format is stamped on a Comments tab too:
-            // GitHub's comment bodies are markdown and Jira's are converted
-            // ADF, and nothing downstream could tell them apart otherwise.
-            //
-            // Converted ADF is stamped "markdown", not "text". It always came
-            // out as markdown - fenced code, "- " bullets, "1. " ordered lists -
-            // but calling it text meant every surface printed those markers
-            // literally instead of rendering them, so a Jira description read as
-            // a wall of punctuation. Headings, bold, italic, strike and links
-            // come across too now.
-            const auto flatten = tab.Format == L"adf";
-            row.Format(winrt::hstring{ flatten ? std::wstring{ L"markdown" } :
-                                                 (tab.Format.empty() ? std::wstring{ L"text" } : tab.Format) });
-
-            if (!tab.IsList)
+            if (const auto row = BuildTab(tab, reader, false))
             {
-                row.Kind(Control::HyperlinkPreviewTabKind::Body);
-
-                const auto value = reader.Json(tab.Path);
-                std::wstring body;
-                if (flatten)
-                {
-                    FlattenAdf(value, body, 0);
-                }
-                else
-                {
-                    body = ValueToString(value);
-                }
-
-                body = TrimTrailingBlank(std::move(body));
-                if (body.empty())
-                {
-                    continue;
-                }
-                row.Body(winrt::hstring{ body });
+                tabs.Append(row);
             }
-            else
-            {
-                row.Kind(Control::HyperlinkPreviewTabKind::Comments);
-
-                const auto value = reader.Json(tab.Path);
-                if (!value || value.ValueType() != JsonValueType::Array)
-                {
-                    continue;
-                }
-
-                auto comments = winrt::single_threaded_vector<Control::HyperlinkPreviewComment>();
-                const auto array = value.GetArray();
-                // Bounded: a long-running issue can carry hundreds, and no
-                // surface here wants to render them all.
-                const auto count = std::min(array.Size(), 50u);
-                for (uint32_t i = 0; i < count; ++i)
-                {
-                    const auto item = array.GetAt(i);
-
-                    std::wstring body;
-                    const auto rawBody = At(item, tab.ItemBodyPath);
-                    if (flatten)
-                    {
-                        FlattenAdf(rawBody, body, 0);
-                    }
-                    else
-                    {
-                        body = ValueToString(rawBody);
-                    }
-                    body = TrimTrailingBlank(std::move(body));
-
-                    const auto author = ValueToString(At(item, tab.ItemAuthorPath));
-                    if (body.empty() && author.empty())
-                    {
-                        continue;
-                    }
-
-                    Control::HyperlinkPreviewComment comment{};
-                    comment.Author(winrt::hstring{ author });
-                    comment.AvatarUri(winrt::hstring{ ValueToString(At(item, tab.ItemAvatarPath)) });
-                    comment.Body(winrt::hstring{ body });
-                    // RelativeTime hands back whatever it was given when it
-                    // cannot parse it, so an unexpected shape still shows.
-                    if (const auto when = ValueToString(At(item, tab.ItemTimePath)); !when.empty())
-                    {
-                        comment.Time(winrt::hstring{ RelativeTime(when) });
-                    }
-                    comments.Append(comment);
-                }
-
-                if (comments.Size() == 0)
-                {
-                    continue;
-                }
-                row.Comments(comments);
-            }
-
-            tabs.Append(row);
         }
 
         preview.Tabs(tabs);
@@ -1603,7 +1674,10 @@ namespace
 
     // Runs the whole pipeline for one integration and renders the result.
     // Blocking; always called from a background thread.
-    Control::HyperlinkPreview RunFetch(const Snapshot::Plugin& plugin, const std::wstring& text, const TemplateValueMap& groups)
+    // `pipeline` is an out-parameter rather than a local because the service
+    // caches it beside the preview: a tab opened afterwards is built from the
+    // same results the card was, and only a deferred step has to go out again.
+    Control::HyperlinkPreview RunFetch(const Snapshot::Plugin& plugin, const std::wstring& text, const TemplateValueMap& groups, PipelineOutcome& pipeline)
     {
         Control::HyperlinkPreview preview{};
         preview.IntegrationId(winrt::hstring{ plugin.Id });
@@ -1699,8 +1773,6 @@ namespace
             }
         }
 
-        PipelineOutcome pipeline;
-
         ExpandContext context;
         context.Groups = &effectiveGroups;
         context.Settings = &plugin.Settings;
@@ -1725,8 +1797,7 @@ namespace
             }
         }
 
-        for (const auto& field : plugin.Fields)
-        {
+        const auto emitRow = [&](const Snapshot::Field& field) {
             auto value = reader.Text(field.Path);
             if (field.Format == L"relativeTime")
             {
@@ -1738,14 +1809,15 @@ namespace
             }
             if (value.empty())
             {
-                continue;
+                return;
             }
 
             Control::HyperlinkPreviewField row{};
             row.Label(winrt::hstring{ field.Label });
             row.Value(winrt::hstring{ value });
             row.Placement(winrt::hstring{ field.Placement });
-            row.LinkUri(winrt::hstring{ Expand(field.LinkTemplate, context, Escape::Url) });
+            row.LinkUri(winrt::hstring{ field.LinkPath.empty() ? Expand(field.LinkTemplate, context, Escape::Url) :
+                                                                 reader.Text(field.LinkPath) });
             // Model::IntegrationFieldKind and Control::HyperlinkPreviewFieldKind
             // declare the same members in the same order on purpose, so the two
             // sides can be cast rather than switched over.
@@ -1768,6 +1840,56 @@ namespace
                 row.GroupLabel(winrt::hstring{ group->second.second });
             }
             fields.Append(row);
+        };
+
+        // One field is one row -- unless it declares `each`, when the array it
+        // names is walked and every element gets a row of its own. The element
+        // under construction is published as the step id "item", which costs no
+        // new syntax anywhere: "item:/url" is read by the same code that reads
+        // "issue:/key", both as a `path` and inside a {{…}} template.
+        //
+        // "item" is a name a manifest may already have given a step -- GitHub's
+        // issue/pull step is called exactly that, and its Description tab reads
+        // "item:/body" -- so the name is shadowed for the length of the loop and
+        // put back afterwards. Inside an `each` field, "item:" is the element;
+        // everywhere else it is whatever the manifest made it.
+        for (const auto& field : plugin.Fields)
+        {
+            if (field.EachPath.empty())
+            {
+                emitRow(field);
+                continue;
+            }
+
+            const auto each = reader.Json(field.EachPath);
+            if (!each || each.ValueType() != JsonValueType::Array)
+            {
+                continue;
+            }
+
+            IJsonValue shadowed{ nullptr };
+            if (const auto existing = pipeline.Results.find(L"item"); existing != pipeline.Results.end())
+            {
+                shadowed = existing->second;
+            }
+
+            const auto elements = each.GetArray();
+            // Bounded for the same reason a comment list is: a card is not a table.
+            const auto count = std::min(elements.Size(), 10u);
+            for (uint32_t i = 0; i < count; ++i)
+            {
+                pipeline.Results[L"item"] = elements.GetAt(i);
+                emitRow(field);
+            }
+
+            if (shadowed)
+            {
+                pipeline.Results[L"item"] = shadowed;
+            }
+            else
+            {
+                pipeline.Results.erase(L"item");
+            }
         }
 
         BuildTabs(plugin, reader, preview);
@@ -2295,6 +2417,7 @@ namespace winrt::TerminalApp::implementation
                         entryStep.When = std::wstring{ step.When() };
                         entryStep.Unless = std::wstring{ step.Unless() };
                         entryStep.Optional = step.Optional();
+                        entryStep.Deferred = step.Deferred();
                         entryStep.TimeoutMs = step.TimeoutMs() > 0 ? static_cast<unsigned long>(step.TimeoutMs()) : 8000ul;
 
                         if (const auto headers = step.Headers())
@@ -2340,8 +2463,10 @@ namespace winrt::TerminalApp::implementation
                         entryField.Label = std::wstring{ field.Label() };
                         entryField.Path = std::wstring{ field.Path() };
                         entryField.IconPath = std::wstring{ field.IconPath() };
+                        entryField.EachPath = std::wstring{ field.EachPath() };
                         entryField.Placement = std::wstring{ field.Placement() };
                         entryField.LinkTemplate = std::wstring{ field.LinkTemplate() };
+                        entryField.LinkPath = std::wstring{ field.LinkPath() };
                         entryField.ColorPath = std::wstring{ field.ColorPath() };
                         entryField.Color = std::wstring{ field.Color() };
                         entryField.Format = std::wstring{ field.Format() };
@@ -2417,6 +2542,7 @@ namespace winrt::TerminalApp::implementation
                         entryTab.ItemAvatarPath = std::wstring{ tab.ItemAvatarPath() };
                         entryTab.ItemBodyPath = std::wstring{ tab.ItemBodyPath() };
                         entryTab.ItemTimePath = std::wstring{ tab.ItemTimePath() };
+                        entryTab.StepId = std::wstring{ tab.StepId() };
                         plugin->Tabs.push_back(std::move(entryTab));
                     }
                 }
@@ -2529,13 +2655,35 @@ namespace winrt::TerminalApp::implementation
         return found->second.Preview;
     }
 
+    // The step results behind a cached preview, for a tab the user has just
+    // opened. Null once the entry has expired, which is the caller's cue to go
+    // and fetch again rather than build a tab out of nothing.
+    std::shared_ptr<HyperlinkPreviewPipeline> HyperlinkPreviewService::_cachedPipeline(const std::wstring& key)
+    {
+        std::scoped_lock lock{ _mutex };
+        const auto found = _cache.find(key);
+        if (found == _cache.end())
+        {
+            return nullptr;
+        }
+        if (std::chrono::steady_clock::now() >= found->second.Expiry)
+        {
+            _cache.erase(found);
+            return nullptr;
+        }
+        return found->second.Pipeline;
+    }
+
     void HyperlinkPreviewService::_cacheErase(const std::wstring& key)
     {
         std::scoped_lock lock{ _mutex };
         _cache.erase(key);
     }
 
-    void HyperlinkPreviewService::_cacheStore(const std::wstring& key, const Control::HyperlinkPreview& preview, int32_t seconds)
+    void HyperlinkPreviewService::_cacheStore(const std::wstring& key,
+                                             const Control::HyperlinkPreview& preview,
+                                             std::shared_ptr<HyperlinkPreviewPipeline> pipeline,
+                                             int32_t seconds)
     {
         std::scoped_lock lock{ _mutex };
         // Bounded: this lives for the life of the window, and a long session
@@ -2544,7 +2692,7 @@ namespace winrt::TerminalApp::implementation
         {
             _cache.clear();
         }
-        _cache[key] = CacheEntry{ preview, std::chrono::steady_clock::now() + std::chrono::seconds{ seconds } };
+        _cache[key] = CacheEntry{ preview, std::move(pipeline), std::chrono::steady_clock::now() + std::chrono::seconds{ seconds } };
     }
 
     // A match -> the URL it stands for.
@@ -2701,9 +2849,10 @@ namespace winrt::TerminalApp::implementation
         };
 
         Control::HyperlinkPreview preview{ nullptr };
+        auto pipeline = std::make_shared<HyperlinkPreviewPipeline>();
         try
         {
-            preview = RunFetch(*plugin, source, groups);
+            preview = RunFetch(*plugin, source, groups, *pipeline);
         }
         catch (const winrt::hresult_error& e)
         {
@@ -2718,9 +2867,119 @@ namespace winrt::TerminalApp::implementation
         // fresh round trip on every hover, but it should recover quickly once
         // the token is fixed.
         const auto seconds = preview.Error().empty() ? std::max(1, plugin->CacheSeconds) : 30;
-        strongThis->_cacheStore(cacheKey, preview, seconds);
+        strongThis->_cacheStore(cacheKey, preview, std::move(pipeline), seconds);
 
         co_return preview;
+    }
+
+    // One tab's content, asked for when the user opens that tab.
+    //
+    // The pipeline the card was built from is still in the cache, so nothing is
+    // requested again unless the tab names a deferred step -- and then only that
+    // step runs. An expired entry means the whole pipeline has to run, which is
+    // the same work a hover would have done; its result is deliberately not
+    // written back, because the preview beside it describes an older fetch.
+    IAsyncOperation<Control::HyperlinkPreviewTab> HyperlinkPreviewService::GetTabAsync(hstring text, hstring integrationHint, hstring tabKey)
+    {
+        auto strongThis = get_strong();
+
+        // Resolved and copied on the caller's thread, for the same reason
+        // _previewAsync does it: a settings reload must not pull the plugin out
+        // from under a request that is already running.
+        std::shared_ptr<HyperlinkPreviewSnapshot::Plugin> plugin;
+        TemplateValueMap groups;
+        std::wstring source;
+        std::wstring cacheKey;
+        std::wstring wanted{ tabKey };
+        std::shared_ptr<HyperlinkPreviewPipeline> cached;
+
+        try
+        {
+            source = std::wstring{ text };
+            if (auto found = FindMatch(strongThis->_currentSnapshot(), source, std::wstring{ integrationHint }, false);
+                found && found->Owner->Configured && !found->Owner->Steps.empty())
+            {
+                plugin = found->Owner;
+                groups = std::move(found->Groups);
+                cacheKey = plugin->Id + L"|" + source;
+                cached = strongThis->_cachedPipeline(cacheKey);
+            }
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+        }
+
+        if (!plugin || wanted.empty())
+        {
+            co_return nullptr;
+        }
+
+        const HyperlinkPreviewSnapshot::Tab* tab{ nullptr };
+        for (const auto& candidate : plugin->Tabs)
+        {
+            if (candidate.Key == wanted)
+            {
+                tab = &candidate;
+                break;
+            }
+        }
+        if (!tab)
+        {
+            co_return nullptr;
+        }
+
+        co_await winrt::resume_background();
+
+        // Same rule as a preview: nothing here may throw. A tab that cannot be
+        // built comes back empty, and the surface says so in its own words.
+        Control::HyperlinkPreviewTab row{ nullptr };
+        try
+        {
+            // `plugin` and therefore `tab` live in the coroutine frame, and a
+            // published snapshot is never mutated, so the pointer stays good.
+            HyperlinkPreviewPipeline pipeline;
+            if (cached)
+            {
+                // Copying shares the parsed JSON rather than reparsing it: the
+                // map holds refcounted IJsonValues.
+                pipeline = *cached;
+            }
+            else
+            {
+                RunFetch(*plugin, source, groups, pipeline);
+            }
+
+            if (!tab->StepId.empty())
+            {
+                ExpandContext context;
+                context.Groups = &groups;
+                context.Settings = &plugin->Settings;
+                context.Credentials = &plugin->Credentials;
+                context.Results = &pipeline.Results;
+
+                WWH::HttpClient plainClient{ nullptr };
+                WWH::HttpClient lenientClient{ nullptr };
+                RunPipeline(*plugin, context, pipeline, plainClient, lenientClient, tab->StepId, true);
+            }
+
+            const ResultReader reader{ &pipeline };
+            row = BuildTab(*tab, reader, true);
+        }
+        CATCH_LOG();
+
+        if (!row)
+        {
+            // Not the same thing as a failure: an issue really can have no
+            // comments. The name stays on the strip and the tab is simply
+            // empty, which is what Pending being cleared says.
+            row = Control::HyperlinkPreviewTab{};
+            row.Key(hstring{ wanted });
+            row.Label(hstring{ tab->Label });
+            row.Kind(tab->IsList ? Control::HyperlinkPreviewTabKind::Comments : Control::HyperlinkPreviewTabKind::Body);
+        }
+
+        co_return row;
     }
 
     IAsyncOperation<Control::HyperlinkActionResult> HyperlinkPreviewService::InvokeActionAsync(hstring text,

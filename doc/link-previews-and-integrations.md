@@ -308,11 +308,14 @@ parse is skipped and logged, never fatal.
             "id": "issue",
             "type": "http",
             "method": "GET",
-            "url": "https://{{settings.host}}/rest/api/3/issue/{{key}}?fields=summary,status,resolution,assignee,priority,issuetype,updated,reporter,description,comment",
+            "url": "https://{{settings.host}}/rest/api/3/issue/{{key}}?fields=summary,status,resolution,assignee,priority,issuetype,updated,reporter,description,parent",
             "auth": { "type": "basic", "user": "{{credentials.email}}", "password": "{{credentials.token}}" },
             "headers": { "Accept": "application/json" },
             "timeoutMs": 8000
         },
+        // The Comments tab, and nothing else, needs this -- so it is not requested
+        // until the tab is opened. See "Lazily fetched tabs" below.
+        { "id": "comments", "optional": true, "deferred": true, "url": "https://{{settings.host}}/rest/api/3/issue/{{key}}/comment?maxResults=50", /* … */ },
         // The options for the transitions action, below.
         { "id": "transitions", "optional": true, "url": "https://{{settings.host}}/rest/api/3/issue/{{key}}/transitions?expand=transitions.fields", /* … */ },
         // Jira's Development panel. Undocumented and not present on every site,
@@ -323,8 +326,8 @@ parse is skipped and logged, never fatal.
 
     // Which fields belong together, for the card and for the settings checkboxes.
     "fieldGroups": [
-        { "key": "details",     "label": "Details",     "fields": [ "summary", "status", "resolution", "assignee", "priority", "type", "reporter", "updated" ] },
-        { "key": "development", "label": "Development", "fields": [ "devBranches", "devCommits", "devPullRequests", "devBuilds", "devDeployments" ] }
+        { "key": "details",     "label": "Details",     "fields": [ "summary", "parent", "issueKey", "status", "resolution", "type", "priority", "assignee", "reporter", "updated" ] },
+        { "key": "development", "label": "Development", "fields": [ "devBranches", "devCommits", "devPullRequests", "devPullLinks", "devBuilds", "devDeployments" ] }
     ],
 
     // The card's field list. "default": true fields show unless the user picks a
@@ -333,23 +336,36 @@ parse is skipped and logged, never fatal.
     // ran last, which is not the one you meant.
     "fields": [
         { "key": "summary",  "label": "Summary",  "path": "issue:/fields/summary",              "kind": "title",  "default": true },
-        { "key": "status",   "label": "Status",   "path": "issue:/fields/status/name",          "kind": "badge",  "colorPath": "issue:/fields/status/statusCategory/colorName", "default": true },
-        { "key": "assignee", "label": "Assignee", "path": "issue:/fields/assignee/displayName", "kind": "text",   "iconPath": "issue:/fields/assignee/avatarUrls/24x24", "default": true },
-        { "key": "priority", "label": "Priority", "path": "issue:/fields/priority/name",        "kind": "text",   "iconPath": "issue:/fields/priority/iconUrl", "default": false },
-        { "key": "type",     "label": "Type",     "path": "issue:/fields/issuetype/name",       "kind": "text",   "iconPath": "issue:/fields/issuetype/iconUrl", "default": false },
-        { "key": "reporter", "label": "Reporter", "path": "issue:/fields/reporter/displayName", "kind": "text",   "iconPath": "issue:/fields/reporter/avatarUrls/24x24", "default": false },
+
+        // The breadcrumb above the title: the parent first, then this issue, with
+        // each one's work-type icon. The `/` between them is the card's, not the
+        // manifest's -- see "placement" in the display-field reference.
+        { "key": "parent",   "label": "Parent",   "path": "issue:/fields/parent/key",           "kind": "text",   "placement": "breadcrumb",
+          "iconPath": "issue:/fields/parent/fields/issuetype/iconUrl", "link": "https://{{settings.host}}/browse/{{issue:/fields/parent/key}}", "default": true },
+        { "key": "issueKey", "label": "Key",      "path": "issue:/key",                         "kind": "text",   "placement": "breadcrumb",
+          "iconPath": "issue:/fields/issuetype/iconUrl", "link": "https://{{settings.host}}/browse/{{issue:/key}}", "default": true },
+
+        { "key": "status",   "label": "Status",   "path": "issue:/fields/status/name",          "kind": "badge",  "placement": "status", "colorPath": "issue:/fields/status/statusCategory/colorName", "default": true },
+        { "key": "type",     "label": "Type",     "path": "issue:/fields/issuetype/name",       "kind": "text",   "iconPath": "issue:/fields/issuetype/iconUrl", "default": true },
+        { "key": "priority", "label": "Priority", "path": "issue:/fields/priority/name",        "kind": "text",   "iconPath": "issue:/fields/priority/iconUrl", "default": true },
+        { "key": "assignee", "label": "Assignee", "path": "issue:/fields/assignee/displayName", "kind": "text",   "iconPath": "issue:/fields/assignee/avatarUrls/48x48", "default": true },
+        { "key": "reporter", "label": "Reporter", "path": "issue:/fields/reporter/displayName", "kind": "text",   "iconPath": "issue:/fields/reporter/avatarUrls/48x48", "default": false },
         { "key": "updated",  "label": "Updated",  "path": "issue:/fields/updated",              "kind": "text",   "format": "relativeTime", "default": true },
 
         { "key": "devBranches",     "label": "Branches",      "path": "devsummary:/summary/branch/overall/count",      "kind": "text", "default": false },
         { "key": "devCommits",      "label": "Commits",       "path": "devsummary:/summary/repository/overall/count",  "kind": "text", "default": false },
-        { "key": "devPullRequests", "label": "Pull requests", "path": "devsummary:/summary/pullrequest/overall/count", "kind": "text", "default": false }
+        { "key": "devPullRequests", "label": "Pull requests", "path": "devsummary:/summary/pullrequest/overall/count", "kind": "text", "default": false },
+        // One row per pull request, rather than a count of them. See "Repeating a
+        // field over an array".
+        { "key": "devPullLinks",    "label": "Pull request",  "each": "devdetail:/detail/0/pullRequests",
+          "path": "item:/name", "linkPath": "item:/url", "kind": "link", "default": true }
     ],
 
     // Secondary content behind a tab strip. See "Tabs" below.
     "tabs": [
         { "key": "description", "label": "Description", "kind": "body", "path": "issue:/fields/description", "format": "adf", "default": true },
-        { "key": "comments",    "label": "Comments",    "kind": "list", "path": "issue:/fields/comment/comments", "format": "adf",
-          "itemAuthorPath": "/author/displayName", "itemAvatarPath": "/author/avatarUrls/24x24",
+        { "key": "comments",    "label": "Comments",    "kind": "list", "step": "comments", "path": "comments:/comments", "format": "adf",
+          "itemAuthorPath": "/author/displayName", "itemAvatarPath": "/author/avatarUrls/48x48",
           "itemBodyPath": "/body", "itemTimePath": "/created", "default": false }
     ],
 
@@ -445,6 +461,7 @@ never consults the shell.
 | `when` | template string | Run this step only if the template expands to a non-empty string. |
 | `unless` | template string | Skip this step if the template expands to a non-empty string. |
 | `optional` | boolean | A failing step is recorded and stepped over instead of ending the fetch. See [Optional steps](#optional-steps). |
+| `deferred` | boolean | Not run by the fetch that paints the card. Run when a tab naming this step (`"step": "<id>"`) is first opened. See [Lazily fetched tabs](#lazily-fetched-tabs). |
 
 Slack's manifest uses `when`/`unless` on a shared step `id` (`"message"`) to pick between a
 top-level `conversations.history` call and a `conversations.replies` call, depending on whether
@@ -531,7 +548,11 @@ condition the stored-token variants wait for. Nothing has to detect the failure 
 | `label` | string | Shown next to the value. |
 | `path` | JSON pointer | Where in a fetch step's result this field's value lives. See [Paths](#paths-json-pointers). |
 | `kind` | see below | How the value renders. |
-| `iconPath` | JSON pointer | A small (≤ 24 px) icon shown with the value. |
+| `iconPath` | JSON pointer | A small (≤ 24 px) icon shown with the value. A `.svg` URL is rasterized; anything else is decoded as a bitmap. |
+| `each` | JSON pointer | A pointer to an **array**. The field then renders once per element, up to ten. See [Repeating a field](#repeating-a-field-over-an-array). |
+| `placement` | `"status"` \| `"header"` \| `"breadcrumb"` \| unset | Where on the card the value goes instead of into the labelled field list. `status` is the badge beside the status dropdown; `breadcrumb` is the trail of ids above the title, joined with `/` in manifest order; `header` is a chip row under it. Unset is an ordinary labelled row. |
+| `link` | template string | Where the value goes when clicked, built out of pieces. Every substitution that came off the wire is percent-encoded, which is what makes it safe to paste a key into a query. |
+| `linkPath` | JSON pointer | Where the value goes when clicked, when the result already carries the whole URL. Not escaped, and it wins over `link`. A pull request's own `url` needs this: run through `link` its scheme would come back as `https%3A%2F%2F`. |
 | `colorPath` | JSON pointer | A JSON pointer to a color value, for `badge` fields. |
 | `color` | string | A literal color (`"#rrggbb"` or a name — see below), for `badge` fields. It is the **fallback**: `colorPath` is resolved first, and `color` is used only when that pointer yields nothing. |
 | `format` | `"relativeTime"` \| `"date"` \| unset | Formats the raw value: `relativeTime` turns an ISO 8601 timestamp into "3 h ago"; `date` renders it as a date. |
@@ -543,6 +564,31 @@ condition the stored-token variants wait for. Nothing has to detect the failure 
 A field whose value resolves to an empty string is **not rendered at all** — no label, no row. That
 is what lets one field list serve several link shapes: GitHub's `additions`/`deletions` fields sit
 in the manifest unconditionally and simply vanish on an issue link, which has no such numbers.
+
+##### Repeating a field over an array
+
+A count is not a link. Jira's dev-status endpoint knows how many pull requests an issue has *and*
+what they are called and where they live, and "Pull requests 2" is the least useful of those three.
+`each` turns one field declaration into one row per array element:
+
+```jsonc
+{
+    "key": "devPullLinks", "label": "Pull request",
+    "each": "devdetail:/detail/0/pullRequests",
+    "path": "item:/name",
+    "linkPath": "item:/url",
+    "kind": "link", "default": true
+}
+```
+
+Inside such a field, **`item:` is the element under construction** — in `path`, `iconPath`,
+`colorPath`, `linkPath` and in a `{{…}}` template. It is an ordinary step id as far as every reader
+is concerned, which is why no new syntax is needed. A manifest that already has a step called
+`item` (GitHub's does) keeps it: the name is shadowed for the length of the loop and put back
+afterwards.
+
+The field is one entry in the user's field list however many rows it produces, and at most ten rows
+are drawn — a card is not a table.
 
 Badge colors are matched case-insensitively. `#rrggbb` is taken literally; otherwise a small set of
 names is recognized, chosen to cover Jira's `statusCategory.colorName` values and the obvious status
@@ -599,6 +645,7 @@ field list. Two shapes:
 | `itemAvatarPath` | JSON pointer | `list` only, relative to each element. |
 | `itemBodyPath` | JSON pointer | `list` only, relative to each element. |
 | `itemTimePath` | JSON pointer | `list` only, relative to each element. |
+| `step` | string | The `deferred` fetch step this tab's content comes from. See [Lazily fetched tabs](#lazily-fetched-tabs). |
 | `default` | boolean | Shown by default before the user picks a custom tab set. |
 
 ```jsonc
@@ -622,6 +669,43 @@ field list. Two shapes:
 When the array a `list` tab needs *is* the whole result of a step — GitHub's issue-comments endpoint
 returns a bare JSON array — point at the step with an empty pointer: `"path": "comments:"`. An empty
 JSON pointer means "the whole document", per RFC 6901.
+
+##### Lazily fetched tabs
+
+**No tab's content is built until the user opens it.** The fetch produces a strip of names; the
+first visit to one asks for its content, and the answer is kept, so the second visit is immediate.
+That is free for a tab whose data is already in hand — the step results the card was built from are
+cached beside the preview — and it is what keeps flattening fifty comment bodies off the path that
+paints a hover card.
+
+A tab whose content is not in hand at all goes further. Mark the step `deferred` and name it from
+the tab:
+
+```jsonc
+"fetch": [
+    { "id": "issue", "url": "…/issue/{{key}}?fields=summary,status,…" },
+    { "id": "comments", "optional": true, "deferred": true,
+      "url": "…/issue/{{key}}/comment?maxResults=50" }
+],
+"tabs": [
+    { "key": "comments", "label": "Comments", "kind": "list",
+      "step": "comments", "path": "comments:/comments", "format": "adf",
+      "itemAuthorPath": "/author/displayName", "itemBodyPath": "/body" }
+]
+```
+
+The card's own fetch skips that step entirely. Opening the tab runs it — and *only* it, against the
+results already in hand, so a deferred step may read an earlier step's result (`{{issue:/id}}`) as
+freely as any other step. A spinner stands in while the request is out.
+
+Two consequences worth knowing:
+
+- A tab with nothing behind it is normally dropped rather than shown empty, and a deferred tab
+  cannot be: whether an issue has comments is not known until the request is made. Such a tab is
+  always offered, and opening it is what finds out.
+- A built tab is written back into the preview it came from, and that preview is the cached one, so
+  the request happens once per cache entry rather than once per visit. A hover after `cacheSeconds`
+  has passed starts again from a fresh fetch and a fresh strip of names.
 
 #### Actions
 

@@ -98,45 +98,62 @@
             <HyperlinkButton x:Name="SourceLink" Padding="0" HorizontalAlignment="Left">
                 <TextBlock x:Name="SourceLinkText" TextWrapping="Wrap" />
             </HyperlinkButton>
-        <TextBlock x:Name="TitleText"
 
-                   FontSize="18"
-                   FontWeight="SemiBold"
-                   IsTextSelectionEnabled="True"
-                   TextWrapping="Wrap">
-            <TextBlock.ContextFlyout>
-                <mtu:TextMenuFlyout />
-            </TextBlock.ContextFlyout>
-        </TextBlock>
+            <!--
+                The ticket and whatever it hangs off, the way Jira's own breadcrumb
+                reads: AT-33 / AT-144, each with its work type's icon. Filled in by
+                _render from the fields a manifest placed here, and empty for every
+                integration that places none.
+            -->
+            <StackPanel x:Name="TicketBreadcrumbHost"
+                        Orientation="Horizontal"
+                        Spacing="4" />
+
+            <TextBlock x:Name="TitleText"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       IsTextSelectionEnabled="True"
+                       TextWrapping="Wrap">
+                <TextBlock.ContextFlyout>
+                    <mtu:TextMenuFlyout />
+                </TextBlock.ContextFlyout>
+            </TextBlock>
+
+            <!--
+                The status badge belongs beside the dropdown that changes it and
+                centred on that dropdown, which is why the form of required fields
+                and the error line sit below this row rather than inside it:
+                centring a badge against a column that grows walks it off the
+                control it describes.
+            -->
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <StackPanel x:Name="TicketStatusHost" VerticalAlignment="Center" />
-        <StackPanel x:Name="ActionRow"
-
-                    Spacing="6"
-                    Visibility="Collapsed">
-            <StackPanel Orientation="Horizontal"
-                        Spacing="6">
-                <ComboBox x:Name="ActionOptions"
-                          x:Uid="LinkPreviewActionOptions"
-                          MinWidth="180"
-                          SelectionChanged="_optionChanged" />
-                <Button x:Name="ApplyButton"
-                        x:Uid="LinkPreviewApplyButton"
-                        VerticalAlignment="Bottom"
-                        Click="_applyClick" />
-                <Button x:Name="UndoButton"
-                        x:Uid="LinkPreviewUndoButton"
-                        VerticalAlignment="Bottom"
-                        Click="_undoClick"
-                        Visibility="Collapsed" />
-                <mux:ProgressRing x:Name="ActionProgress"
-                                  Width="16"
-                                  Height="16"
-                                  MinWidth="0"
-                                  MinHeight="0"
-                                  VerticalAlignment="Bottom"
-                                  IsActive="False"
-                                  Visibility="Collapsed" />
+                <StackPanel x:Name="ActionRow"
+                            Orientation="Horizontal"
+                            Spacing="6"
+                            Visibility="Collapsed">
+                    <ComboBox x:Name="ActionOptions"
+                              x:Uid="LinkPreviewActionOptions"
+                              MinWidth="180"
+                              SelectionChanged="_optionChanged" />
+                    <Button x:Name="ApplyButton"
+                            x:Uid="LinkPreviewApplyButton"
+                            VerticalAlignment="Center"
+                            Click="_applyClick" />
+                    <Button x:Name="UndoButton"
+                            x:Uid="LinkPreviewUndoButton"
+                            VerticalAlignment="Center"
+                            Click="_undoClick"
+                            Visibility="Collapsed" />
+                    <mux:ProgressRing x:Name="ActionProgress"
+                                      Width="16"
+                                      Height="16"
+                                      MinWidth="0"
+                                      MinHeight="0"
+                                      VerticalAlignment="Center"
+                                      IsActive="False"
+                                      Visibility="Collapsed" />
+                </StackPanel>
             </StackPanel>
 
             <StackPanel x:Name="ActionFields"
@@ -147,8 +164,7 @@
                        Opacity="0.8"
                        TextWrapping="Wrap"
                        Visibility="Collapsed" />
-        </StackPanel>
-            </StackPanel>
+
             <StackPanel x:Name="TicketMetadataHost" Orientation="Horizontal" Spacing="8" />
         </StackPanel>
 

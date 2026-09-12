@@ -92,6 +92,10 @@ namespace winrt::TerminalApp::implementation
         void _renderComments(const winrt::Microsoft::Terminal::Control::HyperlinkPreviewTab& tab);
         void _rebuildTabStrip(const winrt::Microsoft::Terminal::Control::HyperlinkPreview& preview);
         void _showTab(int32_t index);
+        // A tab the integration named but did not fill in, asked for on the first
+        // visit to it. Takes the preview by value: it is what the answer is
+        // written into, and it has to outlive the fetch.
+        safe_void_coroutine _requestTab(uint32_t generation, winrt::Microsoft::Terminal::Control::HyperlinkPreview preview, int32_t index, winrt::hstring tabKey);
         void _rebuildActions(const winrt::Microsoft::Terminal::Control::HyperlinkPreview& preview);
         void _updateActionFields();
         void _updateApplyState();
