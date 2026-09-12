@@ -224,7 +224,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <HyperlinkButton x:Uid="Actions_Disclaimer"
                              Margin="-10,0,0,0"
@@ -251,7 +251,19 @@
                   BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                   BorderThickness="1"
                   CornerRadius="{StaticResource OverlayCornerRadius}">
+                <!--
+                    MaxHeight is what makes the page open at once. The page's
+                    ScrollViewer measures with infinite height, so without a
+                    bound the list realizes every command before anything is
+                    drawn; with one, the panel has a viewport and virtualizes.
+                    The bound has to come from here rather than from the
+                    ScrollViewer above: disabling that ScrollViewer's scrolling
+                    also gives the list a height, but it reports an empty
+                    effective viewport to its descendants and the list comes out
+                    populated with nothing at all.
+                -->
                 <ListView x:Name="CommandsListView"
+                          MaxHeight="720"
                           IsItemClickEnabled="True"
                           ItemClick="{x:Bind ViewModel.CmdListItemClicked}"
                           ItemContainerStyle="{StaticResource ActionRowItemContainerStyle}"
