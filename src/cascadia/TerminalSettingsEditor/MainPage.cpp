@@ -520,7 +520,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 // anything -- so the tick also checks for itself and gives up when the
                 // page is no longer in a live tree. A reparent that fires Unloaded
                 // without a Loaded is covered by the same check.
-                if (!page.IsLoaded())
+                // Through the projected FrameworkElement, not the implementation
+                // type: weakThis.get() hands back a com_ptr to the implementation,
+                // which does not carry the projection's own members.
+                const auto element = page.try_as<WUX::FrameworkElement>();
+                if (!element || !element.IsLoaded())
                 {
                     self->_dirtyCheckTimer.Stop();
                     return;
