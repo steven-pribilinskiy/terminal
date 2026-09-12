@@ -31,8 +31,6 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_settings.GlobalSettings(), CiPollIntervalMinutes);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_settings.GlobalSettings(), AylithImprint);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_settings.GlobalSettings(), AylithImprintJsonOnly);
-        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_settings.GlobalSettings(), ActivityLog);
-        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_settings.GlobalSettings(), ActivityLogMaxKilobytes);
         GETSET_BINDABLE_ENUM_SETTING(TextMeasurement, winrt::Microsoft::Terminal::Control::TextMeasurement, _settings.WindowSettingsDefaults().TextMeasurement);
         GETSET_BINDABLE_ENUM_SETTING(AmbiguousWidth, winrt::Microsoft::Terminal::Control::AmbiguousWidth, _settings.WindowSettingsDefaults().AmbiguousWidth);
 

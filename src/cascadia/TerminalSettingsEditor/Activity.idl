@@ -1,0 +1,48 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
+#include "ViewModelHelpers.idl.h"
+
+namespace Microsoft.Terminal.Settings.Editor
+{
+    // One recorded event, as the page draws it. No constructor: the view model
+    // builds these, nothing activates one from outside, so it gets no factory.
+    [default_interface] runtimeclass ActivityEntryViewModel
+    {
+        String Timestamp { get; };
+        String Kind { get; };
+        String Exe { get; };
+        String ExeName { get; };
+        String CommandLine { get; };
+        String WorkingDirectory { get; };
+        String ParentExe { get; };
+        String Reason { get; };
+
+        Boolean HasCommandLine { get; };
+        Boolean HasWorkingDirectory { get; };
+        Boolean HasParent { get; };
+    }
+
+    runtimeclass ActivityViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
+    {
+        ActivityViewModel(Microsoft.Terminal.Settings.Model.CascadiaSettings settings);
+
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, ActivityLog);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, ActivityLogMaxKilobytes);
+
+        Windows.Foundation.Collections.IObservableVector<Microsoft.Terminal.Settings.Editor.ActivityEntryViewModel> Entries { get; };
+
+        String Filter;
+        String StatusText { get; };
+        String LogPath { get; };
+        Boolean HasEntries { get; };
+
+        void Reload();
+    }
+
+    [default_interface] runtimeclass Activity : Windows.UI.Xaml.Controls.Page
+    {
+        Activity();
+        ActivityViewModel ViewModel { get; };
+    }
+}

@@ -10,6 +10,7 @@
 #include "Interaction.h"
 #include "LinkTooltip.h"
 #include "Integrations.h"
+#include "Activity.h"
 #include "Compatibility.h"
 #include "Rendering.h"
 #include "RenderingViewModel.h"
@@ -114,17 +115,27 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _profilesPageVM{ winrt::make<ProfilesPageViewModel>() }
     {
         InitializeComponent();
-        // The shortcuts list owns its scrolling. Letting the page's ScrollViewer
-        // measure it with infinite height disables ListView virtualization.
-        contentFrame().Navigated([weakThis = get_weak()](auto&&, const Navigation::NavigationEventArgs& args) {
-            if (const auto self = weakThis.get())
-            {
-                const bool shortcuts = args.Content().try_as<Editor::Actions>() != nullptr;
-                const auto scroll = self->SettingsMainPage_ScrollViewer();
-                scroll.VerticalScrollBarVisibility(shortcuts ? ScrollBarVisibility::Disabled : ScrollBarVisibility::Auto);
-                scroll.VerticalScrollMode(shortcuts ? ScrollMode::Disabled : ScrollMode::Enabled);
-            }
-        });
+        // The shortcuts list used to be given its scrolling here, by disabling
+        // this ScrollViewer's while the Actions page was up, so the ListView
+        // would be measured with a real height and virtualize instead of
+        // realizing all hundred-odd rows. It did make the page open instantly.
+        // It also emptied it.
+        //
+        // A ScrollViewer whose scrolling is Disabled reports an empty effective
+        // viewport to its descendants, and a virtualizing ItemsStackPanel
+        // intersects its realization window with that - so the list came out
+        // 879x591 with zero realized containers on every visit. Nothing threw;
+        // UIA showed the ViewModel alive (its Add button still navigated) and
+        // the items source populated. The list next door on the Dropdown Menu
+        // page, measured with infinite height, has always rendered fine.
+        //
+        // Actions.xaml bounds the list itself now, with a MaxHeight, which gives
+        // the panel a viewport without anything above it having to change.
+        // Before anything navigates, so the first page in does not drill in when
+        // the user asked for no motion.
+        _pageTransitions = contentFrame().ContentTransitions();
+        _ApplyMotionPreference();
+
         _UpdateBackgroundForMica();
 
         _newTabMenuPageVM = winrt::make<NewTabMenuViewModel>(_settingsClone);
@@ -231,6 +242,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _windowSettingsClone = _settingsClone.WindowSettingsDefaults();
 
         _UpdateBackgroundForMica();
+        _ApplyMotionPreference();
 
         // Seed the provenance mark before anything navigates, so the first page drawn
         // already agrees with the saved setting rather than picking it up only once
@@ -762,6 +774,15 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             {
                 contentFrame().Navigate(xaml_typename<Editor::Compatibility>(), winrt::make<NavigateToPageArgs>(winrt::make<CompatibilityViewModel>(_settingsClone), *this, elementToFocus));
                 _breadcrumbs.Append(winrt::make<Breadcrumb>(vm, RS_(L"Nav_Compatibility/Content"), BreadcrumbSubPage::None));
+            }
+            else if (*clickedItemTag == activityTag)
+            {
+                // A fresh view model per navigation, so the list is re-read
+                // every time the page is opened. The whole point of the page is
+                // "what just happened", and a cached one would answer "what had
+                // happened when you first looked".
+                contentFrame().Navigate(xaml_typename<Editor::Activity>(), winrt::make<NavigateToPageArgs>(winrt::make<ActivityViewModel>(_settingsClone), *this, elementToFocus));
+                _breadcrumbs.Append(winrt::make<Breadcrumb>(vm, RS_(L"Nav_Activity/Content"), BreadcrumbSubPage::None));
             }
             else if (*clickedItemTag == actionsTag)
             {
@@ -1327,6 +1348,46 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     winrt::Windows::UI::Xaml::Media::Brush MainPage::BackgroundBrush()
     {
         return SettingsNav().Background();
+    }
+
+    // globals.motion, applied to the Settings UI.
+    //
+    // TerminalPage::_ApplyMotionPreference resolves the same setting for the
+    // terminal window. This repeats the resolution rather than reading a shared
+    // variable because the Settings UI is a different DLL: a header's inline
+    // static would hand each module its own copy, which is exactly how the
+    // activity log's enable flag came to be false in the module that needed it.
+    // What crosses the boundary is Timeline::AllowDependentAnimations, which is
+    // XAML's own process state.
+    void MainPage::_ApplyMotionPreference()
+    {
+        auto enabled = true;
+        switch (_settingsClone.GlobalSettings().Motion())
+        {
+        case Model::MotionPreference::Full:
+            enabled = true;
+            break;
+        case Model::MotionPreference::Reduced:
+            enabled = false;
+            break;
+        default:
+            try
+            {
+                // disableAnimations is the older boolean this setting
+                // supersedes; under "system" it still forces animations off.
+                enabled = !_windowSettingsClone.DisableAnimations() &&
+                          winrt::Windows::UI::ViewManagement::UISettings{}.AnimationsEnabled();
+            }
+            CATCH_LOG();
+            break;
+        }
+
+        Media::Animation::Timeline::AllowDependentAnimations(enabled);
+
+        // The drill-in page transition is the most visible motion in here, and
+        // it is an independent animation, so AllowDependentAnimations does not
+        // reach it.
+        contentFrame().ContentTransitions(enabled ? _pageTransitions : nullptr);
     }
 
     // If the theme asks for Mica, then drop out our background, so that we

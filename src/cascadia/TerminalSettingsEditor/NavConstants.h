@@ -17,6 +17,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     inline constexpr std::wstring_view integrationsTag{ L"Integrations_Nav" };
     inline constexpr std::wstring_view renderingTag{ L"Rendering_Nav" };
     inline constexpr std::wstring_view compatibilityTag{ L"Compatibility_Nav" };
+    inline constexpr std::wstring_view activityTag{ L"Activity_Nav" };
     inline constexpr std::wstring_view actionsTag{ L"Actions_Nav" };
     inline constexpr std::wstring_view newTabMenuTag{ L"NewTabMenu_Nav" };
     inline constexpr std::wstring_view extensionsTag{ L"Extensions_Nav" };
@@ -39,6 +40,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         std::pair{ colorSchemesTag, L"\xE790" }, /* Color */
         std::pair{ renderingTag, L"\xE7F8" }, /* Device Laptop No Pic */
         std::pair{ compatibilityTag, L"\xEC7A" }, /* Developer Tools */
+        std::pair{ activityTag, L"\xE81C" }, /* History */
         std::pair{ actionsTag, L"\xE765" }, /* Keyboard Classic */
         std::pair{ newTabMenuTag, L"\xE71D" }, /* All Apps */
         std::pair{ extensionsTag, L"\xEA86" }, /* Puzzle */

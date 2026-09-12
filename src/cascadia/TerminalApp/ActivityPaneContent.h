@@ -15,6 +15,8 @@
 #include "ActivityEntry.g.h"
 #include "BasicPaneEvents.h"
 
+#include "../inc/ActivityLogReader.h"
+
 namespace winrt::TerminalApp::implementation
 {
     struct ActivityEntry : ActivityEntryT<ActivityEntry>
@@ -37,10 +39,10 @@ namespace winrt::TerminalApp::implementation
         bool HasWorkingDirectory() const noexcept { return !_cwd.empty(); }
         bool HasParent() const noexcept { return !_parentExe.empty() || !_parentPid.empty(); }
 
-        // Parses one line. Returns nullptr for a line that is not an object --
-        // a torn final line from a process that died mid-write, which an
-        // append-only log should skip rather than refuse to open for.
-        static winrt::com_ptr<ActivityEntry> FromJsonLine(std::string_view line);
+        // Wraps one record from ActivityLogReader.h in the projected type XAML
+        // binds to. The parse itself is shared with the Settings UI's Activity
+        // page, so the two viewers cannot read the same file differently.
+        static winrt::com_ptr<ActivityEntry> From(const ::Microsoft::Terminal::ActivityLog::ReadEntry& read);
 
     private:
         winrt::hstring _timestamp;

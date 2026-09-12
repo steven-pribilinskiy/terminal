@@ -117,6 +117,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         void _UpdateBackgroundForMica();
         void _MoveXamlParsedNavItemsIntoItemSource();
 
+        // globals.motion, applied to this page's own animations.
+        void _ApplyMotionPreference();
+        // What MainPage.xaml asked for, kept so reduced motion can be undone.
+        winrt::Windows::UI::Xaml::Media::Animation::TransitionCollection _pageTransitions{ nullptr };
+
         safe_void_coroutine _UpdateSearchIndex();
 
         winrt::Microsoft::Terminal::Settings::Editor::ProfileViewModel _profileDefaultsVM{ nullptr };

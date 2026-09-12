@@ -122,6 +122,11 @@ $ClassMap = @{
         NavigationParam = "Compatibility_Nav"
         SubPage         = "BreadcrumbSubPage::None"
     }
+    "Microsoft::Terminal::Settings::Editor::Activity" = @{
+        ResourceName    = "Nav_Activity/Content"
+        NavigationParam = "Activity_Nav"
+        SubPage         = "BreadcrumbSubPage::None"
+    }
     "Microsoft::Terminal::Settings::Editor::Actions" = @{
         ResourceName    = "Nav_Actions/Content"
         NavigationParam = "Actions_Nav"

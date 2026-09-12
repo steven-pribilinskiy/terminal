@@ -7,11 +7,10 @@
 #include "ActivityEntry.g.cpp"
 #include "Utils.h"
 
+// ActivityPaneContent.h pulls in ActivityLogReader.h, which brings the log's
+// path, the parse, and the Windows.Data.Json include it needs (not in
+// TerminalApp's pch -- SlotPromotion.h includes it explicitly too).
 #include <ActivityLog.h>
-#include <til/io.h>
-#include <til/u8u16convert.h>
-// Not in TerminalApp's pch -- SlotPromotion.h includes it explicitly too.
-#include <winrt/Windows.Data.Json.h>
 
 using namespace winrt::Windows::Foundation;
 using namespace winrt::Microsoft::Terminal::Settings;
@@ -30,74 +29,20 @@ namespace winrt::TerminalApp::implementation
     // still cheap to parse on the UI thread.
     static constexpr size_t MaxEntries{ 4000 };
 
-    static winrt::hstring _stringField(const Windows::Data::Json::JsonObject& obj, std::wstring_view name)
+    winrt::com_ptr<ActivityEntry> ActivityEntry::From(const ::Microsoft::Terminal::ActivityLog::ReadEntry& read)
     {
-        if (!obj.HasKey(name))
-        {
-            return {};
-        }
-        const auto value{ obj.GetNamedValue(name) };
-        switch (value.ValueType())
-        {
-        case Windows::Data::Json::JsonValueType::String:
-            return value.GetString();
-        case Windows::Data::Json::JsonValueType::Number:
-        {
-            // pid and parentPid are numbers in the file but only ever displayed,
-            // so they are carried as text. Printed as an integer rather than
-            // GetNumber()'s double, which would render 4242 as "4242.000000".
-            const auto number{ value.GetNumber() };
-            return winrt::hstring{ fmt::format(L"{}", static_cast<int64_t>(number)) };
-        }
-        default:
-            return {};
-        }
-    }
-
-    winrt::com_ptr<ActivityEntry> ActivityEntry::FromJsonLine(std::string_view line)
-    {
-        // A line can be torn if a process died mid-append, so a parse failure is
-        // expected rather than exceptional: skip it and keep reading.
-        Windows::Data::Json::JsonObject obj{ nullptr };
-        if (!Windows::Data::Json::JsonObject::TryParse(winrt::hstring{ til::u8u16(line) }, obj) || !obj)
-        {
-            return nullptr;
-        }
-
         auto entry{ winrt::make_self<ActivityEntry>() };
-        entry->_timestamp = _stringField(obj, L"ts");
-        entry->_kind = _stringField(obj, L"kind");
-        entry->_exe = _stringField(obj, L"exe");
-        entry->_commandLine = _stringField(obj, L"commandLine");
-        entry->_cwd = _stringField(obj, L"cwd");
-        entry->_parentExe = _stringField(obj, L"parentExe");
-        entry->_reason = _stringField(obj, L"reason");
-        entry->_pid = _stringField(obj, L"pid");
-        entry->_parentPid = _stringField(obj, L"parentPid");
-
-        // The leaf of the image path, for the list's headline. Falls back to the
-        // whole string when there is no separator, so a bare "wscript.exe" still
-        // shows something.
-        {
-            const std::wstring_view exe{ entry->_exe };
-            const auto slash{ exe.find_last_of(L"\\/") };
-            entry->_exeName = winrt::hstring{ slash == std::wstring_view::npos ? exe : exe.substr(slash + 1) };
-        }
-
-        // One lowercased haystack so the filter box is a single substring test
-        // over everything, rather than the caller having to guess which field a
-        // remembered fragment was in.
-        {
-            std::wstring haystack;
-            for (const auto& part : { entry->_timestamp, entry->_kind, entry->_exe, entry->_commandLine, entry->_cwd, entry->_parentExe, entry->_reason, entry->_pid, entry->_parentPid })
-            {
-                haystack.append(part);
-                haystack.push_back(L' ');
-            }
-            std::transform(haystack.begin(), haystack.end(), haystack.begin(), [](wchar_t c) { return til::tolower_ascii(c); });
-            entry->_searchText = winrt::hstring{ haystack };
-        }
-
+        entry->_timestamp = winrt::hstring{ read.timestamp };
+        entry->_kind = winrt::hstring{ read.kind };
+        entry->_exe = winrt::hstring{ read.exe };
+        entry->_exeName = winrt::hstring{ read.exeName };
+        entry->_commandLine = winrt::hstring{ read.commandLine };
+        entry->_cwd = winrt::hstring{ read.cwd };
+        entry->_parentExe = winrt::hstring{ read.parentExe };
+        entry->_reason = winrt::hstring{ read.reason };
+        entry->_pid = winrt::hstring{ read.pid };
+        entry->_parentPid = winrt::hstring{ read.parentPid };
+        entry->_searchText = winrt::hstring{ read.searchText };
         return entry;
     }
 
@@ -127,23 +72,17 @@ namespace winrt::TerminalApp::implementation
     {
         _all.clear();
 
-        const auto path{ ::Microsoft::Terminal::ActivityLog::Path() };
-        if (path.empty())
+        if (::Microsoft::Terminal::ActivityLog::Path().empty())
         {
             _setStatus(RS_(L"ActivityPaneNoLocation/Text"));
             _applyFilter();
             return;
         }
 
-        // Read the rotated generation first so the combined view runs in order,
-        // then let the cap drop the oldest.
-        auto rotated{ path };
-        rotated.replace_filename(L"activity.1.jsonl");
-
-        std::string contents{ til::io::read_file_as_utf8_string_if_exists(rotated) };
-        contents.append(til::io::read_file_as_utf8_string_if_exists(path));
-
-        if (contents.empty())
+        // Newest first, already parsed. Shared with the Settings UI's Activity
+        // page so the two viewers cannot disagree about the same file.
+        const auto records{ ::Microsoft::Terminal::ActivityLog::ReadRecent(MaxEntries) };
+        if (records.empty())
         {
             _setStatus(::Microsoft::Terminal::ActivityLog::Enabled() ?
                            RS_(L"ActivityPaneEmpty/Text") :
@@ -152,36 +91,10 @@ namespace winrt::TerminalApp::implementation
             return;
         }
 
-        std::vector<winrt::com_ptr<ActivityEntry>> parsed;
-        size_t pos{ 0 };
-        while (pos < contents.size())
+        _all.reserve(records.size());
+        for (const auto& record : records)
         {
-            auto end{ contents.find('\n', pos) };
-            if (end == std::string::npos)
-            {
-                end = contents.size();
-            }
-            auto line{ std::string_view{ contents }.substr(pos, end - pos) };
-            if (!line.empty() && line.back() == '\r')
-            {
-                line.remove_suffix(1);
-            }
-            if (!line.empty())
-            {
-                if (auto entry{ ActivityEntry::FromJsonLine(line) })
-                {
-                    parsed.push_back(std::move(entry));
-                }
-            }
-            pos = end + 1;
-        }
-
-        // Newest first: the reason you opened this is something that just
-        // happened.
-        _all.assign(parsed.rbegin(), parsed.rend());
-        if (_all.size() > MaxEntries)
-        {
-            _all.resize(MaxEntries);
+            _all.push_back(ActivityEntry::From(record));
         }
 
         // fmt::runtime, because the format string comes from resources rather than
