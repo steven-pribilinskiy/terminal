@@ -1,0 +1,23 @@
+<!--
+    Copyright (c) Microsoft Corporation. All rights reserved. Licensed under
+    the MIT License. See LICENSE in the project root for license information.
+-->
+<UserControl x:Class="Microsoft.Terminal.Settings.Editor.HighlightedText"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             IsTabStop="False"
+             mc:Ignorable="d">
+
+    <!--
+        No Style and no brush. The inlines are built in
+        HighlightedText.cpp::_UpdateInlines, and font and foreground are inherited
+        from whatever hosts this, which is what keeps a row of these looking like the
+        plain TextBlocks around them without naming a resource that a virtualizing
+        DataTemplate could fail to resolve.
+    -->
+    <TextBlock x:Name="TextView"
+               VerticalAlignment="Center"
+               TextWrapping="WrapWholeWords" />
+</UserControl>

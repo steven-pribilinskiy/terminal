@@ -2533,6 +2533,18 @@
     <value>Add new shortcut</value>
     <comment>Button label that creates a new action on the actions page.</comment>
   </data>
+  <data name="Actions_SearchBox.PlaceholderText" xml:space="preserve">
+    <value>Search shortcuts, or @ to search key bindings</value>
+    <comment>Hint text inside the box that filters the shortcuts list. Typing matches loosely against shortcut names; a leading "@" matches the key bindings instead. {Locked="@"}</comment>
+  </data>
+  <data name="Actions_SearchBox.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Search shortcuts</value>
+    <comment>Accessible name for the box that filters the shortcuts list.</comment>
+  </data>
+  <data name="Actions_NoSearchResults.Text" xml:space="preserve">
+    <value>No shortcuts match your search.</value>
+    <comment>Shown in place of the shortcuts list when the search box excludes every shortcut.</comment>
+  </data>
   <data name="Actions_ActionComboBox.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
     <value>Action</value>
     <comment>Label for a control that sets the action of a key binding.</comment>

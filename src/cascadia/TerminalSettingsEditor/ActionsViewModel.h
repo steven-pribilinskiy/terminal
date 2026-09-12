@@ -103,9 +103,19 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         VIEW_MODEL_OBSERVABLE_PROPERTY(IInspectable, ProposedShortcutActionName);
         VIEW_MODEL_OBSERVABLE_PROPERTY(Editor::ActionArgsViewModel, ActionArgsVM, nullptr);
+        // Observable rather than a plain property: the row's HighlightedText binds it
+        // OneWay and has to redraw as the user types.
+        VIEW_MODEL_OBSERVABLE_PROPERTY(Windows::Foundation::Collections::IVector<Editor::HighlightedTextRun>, NameHighlights, nullptr);
         WINRT_PROPERTY(Windows::Foundation::Collections::IObservableVector<hstring>, AvailableShortcutActions, nullptr);
         WINRT_PROPERTY(Windows::Foundation::Collections::IObservableVector<Editor::KeyChordViewModel>, KeyChordList, nullptr);
         WINRT_PROPERTY(bool, IsNewCommand, false);
+
+        // The strings the shortcuts filter matches against: the name, and each key
+        // chord on its own. Public because ActionsViewModel does the matching and
+        // reaches these through get_self.
+    public:
+        winrt::hstring FilterNameText();
+        std::vector<winrt::hstring> FilterKeyChordTexts() const;
 
     private:
         winrt::hstring _cachedDisplayName;
@@ -286,6 +296,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         til::typed_event<Editor::CommandViewModel, Editor::KeyChordViewModel> FocusKeyChordContainerRequested;
 
+        winrt::hstring SearchText() const noexcept;
+        void SearchText(const winrt::hstring& value);
+        Windows::Foundation::Collections::IObservableVector<Editor::CommandViewModel> FilteredCommandList() const noexcept;
+        bool FilterMatchedNothing() const noexcept;
+
         WINRT_PROPERTY(Windows::Foundation::Collections::IObservableVector<Editor::CommandViewModel>, CommandList);
         WINRT_OBSERVABLE_PROPERTY(ActionsSubPage, CurrentPage, _propertyChangedHandlers, ActionsSubPage::Base);
 
@@ -295,6 +310,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         Windows::Foundation::Collections::IMap<Model::ShortcutAction, winrt::hstring> _AvailableActionsAndNamesMap;
         Windows::Foundation::Collections::IMap<winrt::hstring, Model::ShortcutAction> _NameToActionMap;
         bool _CommandListDirty{ false };
+
+        // The filter, and what it produced. _FilteredCommandList is what the page
+        // binds; it is a separate collection rather than a narrowing of _CommandList
+        // so that Add, Delete, ReSortCommandList and UpdateSettings keep operating on
+        // the whole set exactly as they did.
+        winrt::hstring _searchText;
+        Windows::Foundation::Collections::IObservableVector<Editor::CommandViewModel> _FilteredCommandList{ nullptr };
+        bool _filterMatchedNothing{ false };
+
+        void _ApplyCommandFilter();
 
         void _MakeCommandVMsHelper();
         void _RegisterCmdVMEvents(com_ptr<implementation::CommandViewModel>& cmdVM);

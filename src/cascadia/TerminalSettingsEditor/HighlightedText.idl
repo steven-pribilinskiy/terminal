@@ -1,0 +1,37 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
+namespace Microsoft.Terminal.Settings.Editor
+{
+    // One matched span inside a string, in the shape fzf reports it: UTF-16 code
+    // unit offsets with BOTH ends inclusive. fzf::matcher pushes
+    // { runStart, utf16Offset - 1 }, so a single matched character is { n, n } and
+    // slicing a run needs End + 1.
+    struct HighlightedTextRun
+    {
+        UInt64 Start;
+        UInt64 End;
+    };
+
+    // A run of text with some of its characters emphasised - the settings editor's
+    // equivalent of TerminalApp's HighlightedTextControl, which cannot be reused
+    // from here because it belongs to a different projection.
+    //
+    // A UserControl rather than a templated Control, unlike the TerminalApp one: it
+    // carries its own XAML and so needs no default Style looked up by TargetType.
+    // These are instantiated inside a DataTemplate in a virtualizing ListView, where
+    // resource lookup is the thing that goes wrong, so having nothing to look up is
+    // worth more than being re-templatable.
+    [default_interface] runtimeclass HighlightedText : Windows.UI.Xaml.Controls.UserControl
+    {
+        HighlightedText();
+
+        String Text;
+        static Windows.UI.Xaml.DependencyProperty TextProperty { get; };
+
+        // Null or empty draws Text with nothing emphasised, which is what an
+        // unfiltered list wants.
+        IVector<HighlightedTextRun> Runs;
+        static Windows.UI.Xaml.DependencyProperty RunsProperty { get; };
+    }
+}

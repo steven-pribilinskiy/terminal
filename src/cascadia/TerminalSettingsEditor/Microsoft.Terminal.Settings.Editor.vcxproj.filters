@@ -60,6 +60,7 @@
     <Page Include="SettingsControlsStyle.xaml" />
     <Page Include="SettingsControlsImplicitStyles.xaml" />
     <Page Include="KeyChordListener.xaml" />
+    <Page Include="HighlightedText.xaml" />
     <Page Include="KeyChordVisual.xaml" />
     <Page Include="NullableColorPicker.xaml" />
     <Page Include="IconPicker.xaml" />
