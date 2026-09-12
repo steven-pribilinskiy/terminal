@@ -155,6 +155,14 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         // The clone's fingerprint as of the last time it matched settings.json: when
         // the editor opened, when Discard rebuilt it, or when a save wrote it out.
+        //
+        // The clone against its own earlier serialization, deliberately, rather than the
+        // clone against _settingsSource. Copy() only has to produce something that
+        // behaves the same, not something that serializes byte-for-byte identically, and
+        // a source-vs-clone comparison would read as "unsaved changes" from the instant
+        // Settings opened if it ever did not. Comparing the clone to itself asks the
+        // narrower question we actually want answered: has anything moved since we last
+        // agreed with the file.
         winrt::hstring _cleanFingerprint;
         bool _unsavedChanges{ false };
         bool _autoSave{ false };

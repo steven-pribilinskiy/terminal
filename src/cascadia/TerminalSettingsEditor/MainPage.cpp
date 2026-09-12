@@ -241,17 +241,23 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         WUX::Controls::ToolTipService::SetToolTip(OpenJsonNavItem(), box_value(RS_(L"Nav_OpenJSON/Content")));
 
         // The footer items are not in the loop above -- it walks MenuItems -- so this
-        // one gets its icon and tooltip the same way Open JSON does. Its Content is the
-        // switch rather than a label, so the row itself has no name to borrow and gets
-        // one explicitly; without it the automation tree shows an unnamed list item
-        // wrapping a named switch.
+        // one gets its icon and tooltip the same way Open JSON does: the tooltip is the
+        // label, because with the pane collapsed the icon is all there is and the
+        // tooltip is the only thing that says what it does. The longer explanation goes
+        // to HelpText, and the switch itself carries it as a tooltip via its x:Uid, so
+        // hovering the row names the setting and hovering the switch explains it.
+        //
+        // Its Content is the switch rather than a label, so the row has no name to
+        // borrow and gets one explicitly; without it the automation tree shows an
+        // unnamed list item wrapping a named switch.
         ShowDescriptionsNavItem().Icon(_fontIconForNavTag(showDescriptionsTag));
         Automation::AutomationProperties::SetName(ShowDescriptionsNavItem(), RS_(L"Nav_ShowDescriptions/OnContent"));
-        WUX::Controls::ToolTipService::SetToolTip(ShowDescriptionsNavItem(), box_value(RS_(L"Nav_ShowDescriptions/[using:Windows.UI.Xaml.Controls]ToolTipService/ToolTip")));
+        WUX::Controls::ToolTipService::SetToolTip(ShowDescriptionsNavItem(), box_value(RS_(L"Nav_ShowDescriptions/OnContent")));
 
         Automation::AutomationProperties::SetHelpText(SaveButton(), RS_(L"Settings_SaveSettingsButton/[using:Windows.UI.Xaml.Controls]ToolTipService/ToolTip"));
         Automation::AutomationProperties::SetHelpText(ResetButton(), RS_(L"Settings_ResetSettingsButton/[using:Windows.UI.Xaml.Controls]ToolTipService/ToolTip"));
         Automation::AutomationProperties::SetHelpText(OpenJsonNavItem(), RS_(L"Nav_OpenJSON/[using:Windows.UI.Xaml.Controls]ToolTipService/ToolTip"));
+        Automation::AutomationProperties::SetHelpText(ShowDescriptionsNavItem(), RS_(L"Nav_ShowDescriptions/[using:Windows.UI.Xaml.Controls]ToolTipService/ToolTip"));
         Automation::AutomationProperties::SetHelpText(AutoSaveSwitch(), RS_(L"Settings_AutoSaveSwitch/[using:Windows.UI.Xaml.Controls]ToolTipService/ToolTip"));
 
         _breadcrumbs = single_threaded_observable_vector<IInspectable>();
@@ -576,6 +582,30 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     {
         if (const auto clickedItemContainer = args.InvokedItemContainer())
         {
+            const auto navString = clickedItemContainer.Tag().try_as<hstring>();
+
+            // Handled ahead of the scroll-to-top below, because this row is a toggle
+            // rather than a destination and snapping the page back to the top because
+            // someone flipped a switch in the footer would be its own small bug.
+            if (navString && *navString == showDescriptionsTag)
+            {
+                // With the pane open, the switch is sitting right there and is the only
+                // thing that flips it: if this flipped it too, a click the switch did
+                // not swallow would be counted twice and cancel itself out.
+                //
+                // Collapsed, the pane draws the item as an icon and never realizes its
+                // content, so there is no switch to click and nothing to double-fire.
+                // The row has to be the control, or the setting is unreachable for as
+                // long as the pane stays narrow - which here is most of the time.
+                // Assigning IsOn raises Toggled, so the one handler still does the work.
+                if (!SettingsNav().IsPaneOpen())
+                {
+                    const auto toggle = ShowDescriptionsSwitch();
+                    toggle.IsOn(!toggle.IsOn());
+                }
+                return;
+            }
+
             if (clickedItemContainer.IsSelected())
             {
                 // Clicked on the selected item.
@@ -588,16 +618,8 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 SettingsMainPage_ScrollViewer().ScrollToVerticalOffset(0);
             }
 
-            if (const auto navString = clickedItemContainer.Tag().try_as<hstring>())
+            if (navString)
             {
-                if (*navString == showDescriptionsTag)
-                {
-                    // Not a destination. The switch inside the row is the only thing
-                    // that flips it -- if this flipped it too, a click that the switch
-                    // did not swallow would be counted twice and cancel itself out.
-                    return;
-                }
-
                 if (*navString == openJsonTag)
                 {
                     const auto window = CoreWindow::GetForCurrentThread();
