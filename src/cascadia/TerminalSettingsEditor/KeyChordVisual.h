@@ -14,13 +14,14 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         KeyChordVisual();
 
         DEPENDENCY_PROPERTY(Control::KeyChord, KeyChord);
+        DEPENDENCY_PROPERTY(Windows::Foundation::Collections::IVector<Editor::HighlightedTextRun>, MatchedRuns);
 
     private:
         static void _InitializeProperties();
         static void _OnKeyChordChanged(const Windows::UI::Xaml::DependencyObject& d, const Windows::UI::Xaml::DependencyPropertyChangedEventArgs& e);
 
         void _UpdateKeyVisuals();
-        void _AddTextKey(const winrt::hstring& text);
+        void _AddTextKey(const winrt::hstring& text, bool emphasised);
         void _AddGlyphKey();
     };
 }

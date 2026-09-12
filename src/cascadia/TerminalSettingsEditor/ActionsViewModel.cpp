@@ -46,6 +46,106 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     // the user meant to type.
     static constexpr wchar_t ChordSearchPrefix{ L'@' };
 
+    // Modifier names the chord tokenizer below recognises, and the short forms people
+    // actually type. Matched longest-first at each position, so "shift" wins over "sh"
+    // and "ctrl" over "ct".
+    static constexpr std::array ChordModifierTokens{
+        std::wstring_view{ L"shift" },
+        std::wstring_view{ L"ctrl" },
+        std::wstring_view{ L"alt" },
+        std::wstring_view{ L"win" },
+        std::wstring_view{ L"ct" },
+        std::wstring_view{ L"sh" },
+    };
+
+    // Splits a key chord query at modifier-name boundaries, so "shaltctrl" reaches fzf
+    // as "sh alt ctrl".
+    //
+    // This is not a second matcher, and it does not add a matching mode: fzf already
+    // ANDs space-separated terms, so "@sh alt ctrl" has always worked typed by hand.
+    // All this decides is where the spaces would have gone, for a user who types the
+    // modifiers the way they say them.
+    //
+    // It is needed because fzf matches each term as an ORDERED subsequence, and the
+    // canonical chord spelling is "ctrl+alt+shift+a" - "shaltctrl" is not a subsequence
+    // of that, in any order fzf will consider. Naming the modifiers in a different
+    // order from the serialization is exactly the case one term cannot express.
+    //
+    // Anything unrecognised is passed through character by character, so a query with
+    // no modifier in it comes out unchanged and stays a single term: "@a" and "@shift"
+    // behave exactly as they did before this existed.
+    static std::wstring _tokenizeChordQuery(const std::wstring_view query)
+    {
+        std::wstring tokenized;
+        tokenized.reserve(query.size() + ChordModifierTokens.size());
+
+        for (size_t pos = 0; pos < query.size();)
+        {
+            std::wstring_view longest;
+            for (const auto& candidate : ChordModifierTokens)
+            {
+                if (candidate.size() > longest.size() &&
+                    query.size() - pos >= candidate.size() &&
+                    til::equals_insensitive_ascii(query.substr(pos, candidate.size()), candidate))
+                {
+                    longest = candidate;
+                }
+            }
+
+            if (longest.empty())
+            {
+                tokenized.push_back(query[pos]);
+                ++pos;
+                continue;
+            }
+
+            // Space before as well as after: a modifier that begins mid-query ends
+            // whatever term was being accumulated ahead of it, which is the whole point
+            // for "ctrlshifta". Runs of spaces cost nothing - ParsePattern skips them.
+            if (!tokenized.empty() && tokenized.back() != L' ')
+            {
+                tokenized.push_back(L' ');
+            }
+            tokenized.append(longest);
+            tokenized.push_back(L' ');
+            pos += longest.size();
+        }
+
+        return tokenized;
+    }
+
+    // fzf's match runs in the shape the projection carries them. Both ends stay
+    // inclusive; only the container changes.
+    static Windows::Foundation::Collections::IVector<Editor::HighlightedTextRun> _toHighlightRuns(const std::vector<fzf::matcher::TextRun>& matchRuns)
+    {
+        if (matchRuns.empty())
+        {
+            return nullptr;
+        }
+
+        std::vector<Editor::HighlightedTextRun> runs;
+        runs.reserve(matchRuns.size());
+        for (const auto& run : matchRuns)
+        {
+            runs.push_back({ static_cast<uint64_t>(run.Start), static_cast<uint64_t>(run.End) });
+        }
+        return single_threaded_vector(std::move(runs));
+    }
+
+    // Clears the per-chord emphasis on every chord of a command. Called whenever the
+    // filter is not matching chords, so a row cannot keep highlights from a previous
+    // query.
+    static void _clearChordHighlights(const Editor::CommandViewModel& cmd)
+    {
+        if (const auto chords = cmd.KeyChordList())
+        {
+            for (const auto& kc : chords)
+            {
+                get_self<KeyChordViewModel>(kc)->MatchedRuns(nullptr);
+            }
+        }
+    }
+
     CommandViewModel::CommandViewModel(const Command& cmd, std::vector<Control::KeyChord> keyChordList, const Editor::ActionsViewModel& actionsPageVM, Windows::Foundation::Collections::IMap<Model::ShortcutAction, winrt::hstring> availableActionsAndNamesMap, Windows::Foundation::Collections::IMap<winrt::hstring, Model::ShortcutAction> nameToActionMap) :
         _command{ cmd },
         _keyChordList{ std::move(keyChordList) },
@@ -191,29 +291,6 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     winrt::hstring CommandViewModel::FilterNameText()
     {
         return DisplayName();
-    }
-
-    // Every chord on this command, each as its own string, in the same spelling the
-    // row displays (KeyChordVisual splits this serialization on '+' to draw its key
-    // caps). Separate strings rather than one joined one so that a subsequence cannot
-    // run across two chords and report a match the user cannot see.
-    std::vector<winrt::hstring> CommandViewModel::FilterKeyChordTexts() const
-    {
-        std::vector<winrt::hstring> texts;
-        if (!_KeyChordList)
-        {
-            return texts;
-        }
-
-        texts.reserve(_KeyChordList.Size());
-        for (const auto& kc : _KeyChordList)
-        {
-            if (auto text = kc.KeyChordText(); !text.empty())
-            {
-                texts.push_back(std::move(text));
-            }
-        }
-        return texts;
     }
 
     winrt::hstring CommandViewModel::FirstKeyChordText() const
@@ -1242,6 +1319,12 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     {
         _currentKeys = newKeys;
         KeyChordText(Model::KeyChordSerialization::ToString(_currentKeys));
+
+        // The runs indexed the old spelling. Dropping them rather than leaving them to
+        // point at whatever is now at those offsets - the next filter pass will recompute
+        // them if the filter is still on chords.
+        MatchedRuns(nullptr);
+
         _NotifyChanges(L"CurrentKeys", L"EditButtonName");
     }
 
@@ -1454,25 +1537,35 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         const auto chordMode = query.starts_with(ChordSearchPrefix);
         const auto needle = chordMode ? query.substr(1) : query;
 
+        // In chord mode the query is split at modifier-name boundaries first. Held in a
+        // local because ParsePattern takes a view over it.
+        const auto chordQuery = chordMode ? _tokenizeChordQuery(needle) : std::wstring{};
+        const auto pattern = fzf::matcher::ParsePattern(chordMode ? std::wstring_view{ chordQuery } : needle);
+
+        // Whether there is anything to match on. Asking the parsed pattern rather than
+        // the raw text catches an empty box, a bare "@", and a query of nothing but
+        // spaces, all of which parse to no terms.
+        //
+        // It has to be caught, because fzf answers an empty pattern with a score of 0
+        // for everything: the name path below would then reorder the whole list on ties,
+        // and the chord path - where a zero score is how "no match" is spelled - would
+        // reject every row and report that nothing matched.
+        const auto filtering = !pattern.terms.empty();
+
         std::vector<Editor::CommandViewModel> result;
         result.reserve(_CommandList.Size());
 
-        if (needle.empty())
+        if (!filtering)
         {
-            // No filter, including a bare "@" - which has chosen a haystack but given
-            // nothing to match yet. fzf answers an empty pattern with a score of 0 for
-            // everything, so going through the scoring path here would reorder the
-            // whole list on ties instead of leaving it in name order.
             for (const auto& cmd : _CommandList)
             {
                 get_self<CommandViewModel>(cmd)->NameHighlights(nullptr);
+                _clearChordHighlights(cmd);
                 result.push_back(cmd);
             }
         }
         else
         {
-            const auto pattern = fzf::matcher::ParsePattern(needle);
-
             struct ScoredCommand
             {
                 int32_t Score;
@@ -1487,12 +1580,21 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
                 if (chordMode)
                 {
+                    // Each chord on its own, best score wins. Matching the chords joined
+                    // into one string would let a subsequence run across two of them, so
+                    // "@ab" would find a row bound to both "a" and "b" and claim it was
+                    // bound to "ab".
                     auto best = 0;
-                    for (const auto& chordText : cmdImpl->FilterKeyChordTexts())
+                    if (const auto chords = cmd.KeyChordList())
                     {
-                        if (const auto match = fzf::matcher::Match(chordText, pattern))
+                        for (const auto& kc : chords)
                         {
-                            best = std::max(best, match->Score);
+                            const auto match = fzf::matcher::Match(kc.KeyChordText(), pattern);
+                            get_self<KeyChordViewModel>(kc)->MatchedRuns(match ? _toHighlightRuns(match->Runs) : nullptr);
+                            if (match)
+                            {
+                                best = std::max(best, match->Score);
+                            }
                         }
                     }
                     if (best <= 0)
@@ -1500,13 +1602,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                         continue;
                     }
 
-                    // Nothing to emphasise in chord mode: what matched is the chord,
-                    // and the chord is drawn as a row of key caps rather than as text.
+                    // The name had nothing to do with this match, so it is drawn plainly;
+                    // the emphasis is on the key caps of the chord that matched, which
+                    // KeyChordVisual draws from the runs set just above.
                     cmdImpl->NameHighlights(nullptr);
                     scored.push_back({ best, cmd });
                 }
                 else
                 {
+                    _clearChordHighlights(cmd);
+
                     const auto name = cmdImpl->FilterNameText();
                     const auto match = fzf::matcher::Match(name, pattern);
                     if (!match)
@@ -1514,13 +1619,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                         continue;
                     }
 
-                    std::vector<Editor::HighlightedTextRun> runs;
-                    runs.reserve(match->Runs.size());
-                    for (const auto& run : match->Runs)
-                    {
-                        runs.push_back({ static_cast<uint64_t>(run.Start), static_cast<uint64_t>(run.End) });
-                    }
-                    cmdImpl->NameHighlights(runs.empty() ? nullptr : single_threaded_vector(std::move(runs)));
+                    cmdImpl->NameHighlights(_toHighlightRuns(match->Runs));
                     scored.push_back({ match->Score, cmd });
                 }
             }
@@ -1542,7 +1641,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             }
         }
 
-        const auto matchedNothing = result.empty() && !needle.empty();
+        const auto matchedNothing = result.empty() && filtering;
 
         _FilteredCommandList = single_threaded_observable_vector(std::move(result));
         _NotifyChanges(L"FilteredCommandList");

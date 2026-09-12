@@ -110,12 +110,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         WINRT_PROPERTY(Windows::Foundation::Collections::IObservableVector<Editor::KeyChordViewModel>, KeyChordList, nullptr);
         WINRT_PROPERTY(bool, IsNewCommand, false);
 
-        // The strings the shortcuts filter matches against: the name, and each key
-        // chord on its own. Public because ActionsViewModel does the matching and
-        // reaches these through get_self.
+        // What the shortcuts filter matches a name against. Public because
+        // ActionsViewModel does the matching and reaches this through get_self; the
+        // chord texts it needs come off KeyChordList, which is already projected.
     public:
         winrt::hstring FilterNameText();
-        std::vector<winrt::hstring> FilterKeyChordTexts() const;
 
     private:
         winrt::hstring _cachedDisplayName;
@@ -258,6 +257,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         VIEW_MODEL_OBSERVABLE_PROPERTY(winrt::hstring, KeyChordText);
         VIEW_MODEL_OBSERVABLE_PROPERTY(Windows::UI::Xaml::Controls::Flyout, AcceptChangesFlyout, nullptr);
         VIEW_MODEL_OBSERVABLE_PROPERTY(int32_t, Index, 0);
+        // Which characters of KeyChordText the "@" filter matched, or null when it is not
+        // filtering on chords. KeyChordVisual turns these into emphasis on the individual
+        // key caps; the offsets line up because KeyChordText and the string that control
+        // splits are both KeyChordSerialization::ToString of the same chord.
+        VIEW_MODEL_OBSERVABLE_PROPERTY(Windows::Foundation::Collections::IVector<Editor::HighlightedTextRun>, MatchedRuns, nullptr);
 
     public:
         til::typed_event<Editor::KeyChordViewModel, Terminal::Control::KeyChord> AddKeyChordRequested;

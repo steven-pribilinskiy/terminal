@@ -1,6 +1,8 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
+import "HighlightedText.idl";
+
 namespace Microsoft.Terminal.Settings.Editor
 {
     [default_interface] runtimeclass KeyChordVisual : Windows.UI.Xaml.Controls.UserControl
@@ -9,5 +11,11 @@ namespace Microsoft.Terminal.Settings.Editor
 
         Microsoft.Terminal.Control.KeyChord KeyChord;
         static Windows.UI.Xaml.DependencyProperty KeyChordProperty { get; };
+
+        // Match runs over the chord's serialization, from the shortcuts filter's "@"
+        // mode. A key cap whose span any run touches is drawn emphasised. Null - the
+        // usual case - draws every cap the same.
+        IVector<HighlightedTextRun> MatchedRuns;
+        static Windows.UI.Xaml.DependencyProperty MatchedRunsProperty { get; };
     }
 }

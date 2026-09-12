@@ -116,6 +116,7 @@
                                           HorizontalAlignment="Right"
                                           VerticalAlignment="Center"
                                           KeyChord="{x:Bind CurrentKeys, Mode=OneWay}"
+                                          MatchedRuns="{x:Bind MatchedRuns, Mode=OneWay}"
                                           Visibility="{x:Bind mtu:Converters.InvertedBooleanToVisibility(IsInEditMode), Mode=OneWay}" />
 
                     <!--  [Edit mode] Editable key chord group  -->

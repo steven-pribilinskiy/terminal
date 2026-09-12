@@ -145,6 +145,11 @@ namespace Microsoft.Terminal.Settings.Editor
     {
         String KeyChordText { get; };
 
+        // Which characters of KeyChordText the "@" shortcuts filter matched, or null
+        // when it is not filtering on chords. KeyChordVisual turns these into emphasis
+        // on the individual key caps.
+        IVector<HighlightedTextRun> MatchedRuns { get; };
+
         // UI side
         Microsoft.Terminal.Control.KeyChord CurrentKeys { get; };
         Microsoft.Terminal.Control.KeyChord ProposedKeys;
