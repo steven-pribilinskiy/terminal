@@ -96,6 +96,27 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
         try
         {
+            // BitmapImage cannot decode SVG, and it fails the way an image
+            // always fails -- silently, leaving the space where the icon should
+            // be. Jira Cloud spells its priority icons .svg
+            // (/images/icons/priorities/medium.svg) while its issue-type icons
+            // are raster avatars, so one field list needs both decoders.
+            std::wstring lowered{ uri };
+            std::transform(lowered.begin(), lowered.end(), lowered.begin(), ::towlower);
+            // The query string is not part of the extension: an avatar URL ends
+            // "...png?size=xsmall", and a .svg can carry one just as easily.
+            if (const auto query = lowered.find(L'?'); query != std::wstring::npos)
+            {
+                lowered.erase(query);
+            }
+            if (lowered.ends_with(L".svg") || lowered.ends_with(L".svgz"))
+            {
+                Imaging::SvgImageSource svg;
+                svg.RasterizePixelHeight(96);
+                svg.UriSource(Windows::Foundation::Uri{ uri });
+                return svg;
+            }
+
             Imaging::BitmapImage image;
             // Pane avatars are 40 DIPs; retain enough detail for high-DPI displays.
             image.DecodePixelHeight(96);

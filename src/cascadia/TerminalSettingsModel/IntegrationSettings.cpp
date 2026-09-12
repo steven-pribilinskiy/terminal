@@ -17,6 +17,50 @@ static constexpr std::string_view TabsKey{ "tabs" };
 
 namespace winrt::Microsoft::Terminal::Settings::Model::implementation
 {
+    // Reads one of the two shapes this key has had.
+    //
+    // The object -- { "updated": false } -- is what we write: one entry per
+    // decision the user actually made, with everything else left to the
+    // manifest's default.
+    //
+    // The array -- [ "summary", "status" ] -- is what every settings.json written
+    // before that carries: the complete set of keys to show, seeded from the
+    // manifest's defaults on the first tick. Its absences mean two different
+    // things at once (turned off, or added to the manifest since) and there is
+    // nothing in the file to tell them apart, so only what it names is carried
+    // over. A field the user had hidden therefore comes back once, at its
+    // default, which is the lesser of the two errors: a key recorded as declined
+    // when it was merely unheard-of can never appear at all.
+    static void ParseOverrides(const Json::Value& json, std::string_view key, IntegrationOverrideMap& target)
+    {
+        const auto value = json.find(key.data(), key.data() + key.size());
+        if (!value || value->isNull())
+        {
+            return;
+        }
+
+        if (value->isObject())
+        {
+            JsonUtils::GetValue(*value, target);
+            return;
+        }
+
+        if (!value->isArray())
+        {
+            return;
+        }
+
+        auto overrides = winrt::single_threaded_map<hstring, bool>();
+        for (const auto& entry : *value)
+        {
+            if (entry.isString())
+            {
+                overrides.Insert(winrt::to_hstring(entry.asString()), true);
+            }
+        }
+        target = std::move(overrides);
+    }
+
     Json::Value IntegrationSettings::ToJson() const
     {
         Json::Value json{ Json::ValueType::objectValue };
@@ -25,8 +69,17 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         {
             JsonUtils::SetValueForKey(json, ValuesKey, _Values);
         }
-        JsonUtils::SetValueForKey(json, FieldsKey, _Fields);
-        JsonUtils::SetValueForKey(json, TabsKey, _Tabs);
+        // An empty map and no map at all mean the same thing now -- every key is
+        // at its manifest default -- so the empty one is not written. That is
+        // also what lets _pruneEmptyEntry recognise an entry holding nothing.
+        if (_Fields && _Fields.Size() > 0)
+        {
+            JsonUtils::SetValueForKey(json, FieldsKey, _Fields);
+        }
+        if (_Tabs && _Tabs.Size() > 0)
+        {
+            JsonUtils::SetValueForKey(json, TabsKey, _Tabs);
+        }
         return json;
     }
 
@@ -35,8 +88,8 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         auto settings = winrt::make_self<IntegrationSettings>();
         JsonUtils::GetValueForKey(json, EnabledKey, settings->_Enabled);
         JsonUtils::GetValueForKey(json, ValuesKey, settings->_Values);
-        JsonUtils::GetValueForKey(json, FieldsKey, settings->_Fields);
-        JsonUtils::GetValueForKey(json, TabsKey, settings->_Tabs);
+        ParseOverrides(json, FieldsKey, settings->_Fields);
+        ParseOverrides(json, TabsKey, settings->_Tabs);
         return settings;
     }
 
@@ -54,18 +107,18 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         }
         if (_Fields)
         {
-            settings->_Fields = winrt::single_threaded_vector<hstring>();
-            for (const auto& field : _Fields)
+            settings->_Fields = winrt::single_threaded_map<hstring, bool>();
+            for (const auto& [key, visible] : _Fields)
             {
-                settings->_Fields.Append(field);
+                settings->_Fields.Insert(key, visible);
             }
         }
         if (_Tabs)
         {
-            settings->_Tabs = winrt::single_threaded_vector<hstring>();
-            for (const auto& tab : _Tabs)
+            settings->_Tabs = winrt::single_threaded_map<hstring, bool>();
+            for (const auto& [key, visible] : _Tabs)
             {
-                settings->_Tabs.Append(tab);
+                settings->_Tabs.Insert(key, visible);
             }
         }
         return *settings;

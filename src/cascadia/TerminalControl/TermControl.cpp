@@ -4049,6 +4049,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     void TermControl::_setHyperlinkPreviewLoading(bool loading)
     {
         if (_filePreviewOperation) { _filePreviewOperation.Cancel(); _filePreviewOperation = nullptr; }
+        HyperlinkCardBreadcrumbHost().Children().Clear();
         HyperlinkCardTitleHost().Children().Clear();
         HyperlinkCardStatusHost().Children().Clear();
         HyperlinkCardMetadataHost().Children().Clear();
@@ -5086,6 +5087,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     // no SharedSizeGroup with which to reach that across separate per-row Grids.
     void TermControl::_fillHyperlinkFields(const Control::HyperlinkPreview& preview)
     {
+        HyperlinkCardBreadcrumbHost().Children().Clear();
         HyperlinkCardTitleHost().Children().Clear();
         HyperlinkCardStatusHost().Children().Clear();
         HyperlinkCardMetadataHost().Children().Clear();
@@ -5271,7 +5273,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 continue;
             }
 
-            if (field.Placement() == L"status" || field.Placement() == L"header")
+            const auto placement = field.Placement();
+            if (placement == L"status" || placement == L"header" || placement == L"breadcrumb")
             {
                 Controls::StackPanel item;
                 item.Orientation(Controls::Orientation::Horizontal);
@@ -5280,6 +5283,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 {
                     Controls::Image icon;
                     icon.Width(16); icon.Height(16);
+                    icon.VerticalAlignment(VerticalAlignment::Center);
                     icon.Source(HyperlinkPreviewHelpers::ImageFromUri(field.IconUri()));
                     item.Children().Append(icon);
                 }
@@ -5304,7 +5308,25 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                     if (field.IsBadge()) badge.Background(HyperlinkPreviewHelpers::BadgeBrush(field.Color()));
                     item.Children().Append(badge);
                 }
-                const auto host = field.Placement() == L"status" ? HyperlinkCardStatusHost() : HyperlinkCardMetadataHost();
+                if (placement == L"breadcrumb")
+                {
+                    // Jira's own separator, and the reason a breadcrumb cannot be
+                    // a run of independent chips: the slash only means something
+                    // between two of them, so it is drawn by whoever arrives
+                    // second rather than declared by either.
+                    const auto trail = HyperlinkCardBreadcrumbHost();
+                    if (trail.Children().Size() > 0)
+                    {
+                        Controls::TextBlock separator;
+                        separator.Text(winrt::hstring{ L"/" });
+                        separator.Opacity(0.5);
+                        separator.VerticalAlignment(VerticalAlignment::Center);
+                        trail.Children().Append(separator);
+                    }
+                    trail.Children().Append(item);
+                    continue;
+                }
+                const auto host = placement == L"status" ? HyperlinkCardStatusHost() : HyperlinkCardMetadataHost();
                 host.Children().Append(item);
                 continue;
             }
@@ -5361,6 +5383,26 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
                 Controls::Grid::SetColumn(badge, 1);
                 cell.Children().Append(badge);
+            }
+            else if (!field.LinkUri().empty())
+            {
+                // A row whose value IS somewhere to go -- a pull request against
+                // the ticket -- is worth clicking, and worth hovering: the
+                // nested preview resolves it with whichever integration claims
+                // it, so a Jira card leads to a GitHub one.
+                Controls::TextBlock text;
+                text.Text(field.Value());
+                text.TextWrapping(TextWrapping::Wrap);
+                text.MaxLines(6);
+
+                Controls::HyperlinkButton link;
+                link.Content(text);
+                link.Padding(Thickness{ 0, 0, 0, 0 });
+                link.HorizontalAlignment(HorizontalAlignment::Left);
+                try { link.NavigateUri(Windows::Foundation::Uri{ field.LinkUri() }); } CATCH_LOG();
+                Control::HyperlinkPreviewHelpers::AttachLinkTooltips(link, _hyperlinkPreviewProvider, _core.Settings(), true, 0);
+                Controls::Grid::SetColumn(link, 1);
+                cell.Children().Append(link);
             }
             else
             {
@@ -5552,8 +5594,37 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         const auto showFields = !tab || kind == Control::HyperlinkPreviewTabKind::Fields;
         const auto showBody = tab && kind == Control::HyperlinkPreviewTabKind::Body;
         const auto showComments = tab && kind == Control::HyperlinkPreviewTabKind::Comments;
+        // A tab the integration handed over as a name only. Asking for its
+        // content is what a first visit does; the ring stands in until it
+        // arrives, and the answer is kept so a second visit is immediate.
+        const auto pending = tab && tab.Pending();
 
-        if (showBody)
+        if (pending)
+        {
+            Controls::ProgressRing ring;
+            ring.Width(16);
+            ring.Height(16);
+            ring.MinWidth(0);
+            ring.MinHeight(0);
+            ring.HorizontalAlignment(HorizontalAlignment::Left);
+            ring.Margin(Thickness{ 0, 4, 0, 4 });
+            ring.IsActive(true);
+
+            if (showComments)
+            {
+                HyperlinkCardComments().Children().Clear();
+                HyperlinkCardComments().Children().Append(ring);
+            }
+            else
+            {
+                HyperlinkCardBody().Visibility(Visibility::Collapsed);
+                HyperlinkCardBodyMarkdown().Content(ring);
+                HyperlinkCardBodyMarkdown().Visibility(Visibility::Visible);
+            }
+
+            _requestHyperlinkTab(_hyperlinkPreviewGeneration, _currentHyperlinkPreview, index, tab.Key());
+        }
+        else if (showBody)
         {
             // A markdown body is rendered, not printed. It used to be shown as its
             // own source on the grounds that the card is small - but small is an
@@ -5586,7 +5657,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             HyperlinkCardBody().Visibility(rendered ? Visibility::Collapsed : Visibility::Visible);
             HyperlinkCardBodyMarkdown().Visibility(rendered ? Visibility::Visible : Visibility::Collapsed);
         }
-        if (showComments)
+        if (showComments && !pending)
         {
             _fillHyperlinkComments(tab);
         }
@@ -5621,6 +5692,64 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 button.IsChecked(isSelected);
                 button.FontWeight(isSelected ? Windows::UI::Text::FontWeights::SemiBold() : Windows::UI::Text::FontWeights::Normal());
                 button.Background(isSelected ? activeBrush : transparentBrush);
+            }
+        }
+    }
+
+    // One tab's content, fetched because the user opened it. Two guards, for two
+    // different races: the generation says the pointer has not moved on to
+    // another link, and the preview itself says an action's refresh has not
+    // replaced the object whose Tabs we are about to write into. The content is
+    // stored even when the user has since switched tabs -- it is the answer to a
+    // question they asked, and coming back to it should cost nothing.
+    safe_void_coroutine TermControl::_requestHyperlinkTab(uint32_t generation, Control::HyperlinkPreview preview, int32_t index, winrt::hstring tabKey)
+    {
+        const auto weakThis{ get_weak() };
+        const auto provider{ _hyperlinkPreviewProvider };
+        const auto dispatcher{ Dispatcher() };
+        if (!provider || !dispatcher || !preview || tabKey.empty() || index < 0)
+        {
+            co_return;
+        }
+
+        auto text = preview.SourceText();
+        if (text.empty())
+        {
+            text = _hoveredUri;
+        }
+        const auto hint = _currentHyperlinkTooltipSettings.integration;
+
+        Control::HyperlinkPreviewTab built{ nullptr };
+        try
+        {
+            built = co_await provider.GetTabAsync(text, hint, tabKey);
+        }
+        CATCH_LOG();
+
+        co_await winrt::resume_foreground(dispatcher);
+
+        const auto self = weakThis.get();
+        if (!self || self->_IsClosing() || self->_hyperlinkPreviewGeneration != generation ||
+            self->_currentHyperlinkPreview != preview || !built)
+        {
+            co_return;
+        }
+
+        const auto tabs = preview.Tabs();
+        if (!tabs || gsl::narrow_cast<uint32_t>(index) >= tabs.Size())
+        {
+            co_return;
+        }
+        tabs.SetAt(gsl::narrow_cast<uint32_t>(index), built);
+
+        if (self->_hyperlinkSelectedTab == index)
+        {
+            self->_showHyperlinkTab(index);
+            // The card just grew by a description or a comment thread, so it has
+            // to be measured and placed for the size it is now.
+            if (self->HyperlinkCard().Visibility() == Visibility::Visible)
+            {
+                self->_showHyperlinkCard();
             }
         }
     }

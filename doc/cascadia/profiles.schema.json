@@ -2634,14 +2634,30 @@
                 "additionalProperties": { "type": "string" }
               },
               "fields": {
-                "description": "Keys of the display fields to show, in order. Omit it to use the manifest's own defaults.",
-                "type": "array",
-                "items": { "type": "string" }
+                "description": "Which display fields to show, keyed by field key: true shows one the manifest hides by default, false hides one it shows. A key that is not mentioned takes the manifest's own default, so a field the manifest gains later appears without being listed here. The older form, an array naming every field to show, is still read; it is rewritten as overrides the first time a box is ticked.",
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": { "type": "boolean" }
+                  },
+                  {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  }
+                ]
               },
               "tabs": {
-                "description": "Keys of the tabs to show, in order. Omit it to use the manifest's own defaults.",
-                "type": "array",
-                "items": { "type": "string" }
+                "description": "Which tabs to show, keyed by tab key, exactly as \"fields\" works: true or false for a decision the user made, and absent for the manifest's own default. The older array form is still read.",
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": { "type": "boolean" }
+                  },
+                  {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  }
+                ]
               }
             }
           }

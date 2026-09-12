@@ -1357,14 +1357,53 @@
                                     rule right.
                                 -->
                                 <StackPanel x:Name="HyperlinkCardTicketHeader" Spacing="6">
+                                    <!--
+                                        The ticket and whatever it hangs off, the way Jira's own
+                                        breadcrumb reads: AT-33 / AT-144, each with its work type's
+                                        icon. _fillHyperlinkFields builds this out of the fields a
+                                        manifest placed here, so it stays empty for every
+                                        integration that places none.
+                                    -->
+                                    <StackPanel x:Name="HyperlinkCardBreadcrumbHost"
+                                                Orientation="Horizontal"
+                                                Spacing="4" />
                                     <StackPanel x:Name="HyperlinkCardTitleHost" />
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <StackPanel x:Name="HyperlinkCardStatusHost" VerticalAlignment="Center" />
-<StackPanel x:Name="HyperlinkCardActionRow"
-                                                Spacing="4"
-                                                Visibility="Collapsed">
-                                        <StackPanel Orientation="Horizontal"
-                                                    Spacing="4">
+                                    <!--
+                                        The status badge belongs beside the dropdown that changes it
+                                        and centred on that dropdown, so the form of required fields
+                                        and the error line go in rows BELOW it rather than in a
+                                        column beside it: centring a badge against a column that
+                                        grows walks it off the control it describes.
+
+                                        A Grid and not two stacked StackPanels, for two reasons. The
+                                        badge is centred on row 0, which holds the dropdown and
+                                        nothing else, whatever appears underneath. And an Auto row
+                                        whose only child is collapsed is zero high, full stop, where
+                                        a StackPanel's Spacing between collapsed children is an
+                                        implementation detail none of this should depend on; the gaps
+                                        here are margins on the rows that come and go.
+                                    -->
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <StackPanel x:Name="HyperlinkCardStatusHost"
+                                                    Grid.Row="0"
+                                                    Grid.Column="0"
+                                                    VerticalAlignment="Center" />
+                                        <StackPanel x:Name="HyperlinkCardActionRow"
+                                                    Grid.Row="0"
+                                                    Grid.Column="1"
+                                                    Orientation="Horizontal"
+                                                    Spacing="4"
+                                                    Visibility="Collapsed">
                                             <!--
                                                 The dropdown opens in a popup of its own, outside the
                                                 card, so the pointer moving onto the list leaves the
@@ -1379,12 +1418,12 @@
                                                       SelectionChanged="_HyperlinkActionOptionChanged" />
                                             <Button x:Name="HyperlinkActionApplyButton"
                                                     x:Uid="HyperlinkActionApplyButton"
-                                                    VerticalAlignment="Bottom"
+                                                    VerticalAlignment="Center"
                                                     AllowFocusOnInteraction="False"
                                                     Click="_HyperlinkActionApplyClick" />
                                             <Button x:Name="HyperlinkActionUndoButton"
                                                     x:Uid="HyperlinkActionUndoButton"
-                                                    VerticalAlignment="Bottom"
+                                                    VerticalAlignment="Center"
                                                     AllowFocusOnInteraction="False"
                                                     Click="_HyperlinkActionUndoClick"
                                                     Visibility="Collapsed" />
@@ -1393,22 +1432,28 @@
                                                               Height="16"
                                                               MinWidth="0"
                                                               MinHeight="0"
-                                                              VerticalAlignment="Bottom"
+                                                              VerticalAlignment="Center"
                                                               IsActive="False"
                                                               Visibility="Collapsed" />
                                         </StackPanel>
 
                                         <!--  One control per field the chosen option said it required.  -->
                                         <StackPanel x:Name="HyperlinkActionFields"
+                                                    Grid.Row="1"
+                                                    Grid.ColumnSpan="2"
+                                                    Margin="0,4,0,0"
                                                     Spacing="4"
                                                     Visibility="Collapsed" />
 
                                         <TextBlock x:Name="HyperlinkActionError"
+                                                   Grid.Row="2"
+                                                   Grid.ColumnSpan="2"
+                                                   Margin="0,4,0,0"
                                                    Opacity="0.8"
                                                    TextWrapping="Wrap"
                                                    Visibility="Collapsed" />
-                                    </StackPanel>
-                                    </StackPanel>
+                                    </Grid>
+
                                     <StackPanel x:Name="HyperlinkCardMetadataHost" Orientation="Horizontal" Spacing="8" />
                                 </StackPanel>
 

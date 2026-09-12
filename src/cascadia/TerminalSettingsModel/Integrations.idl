@@ -64,6 +64,11 @@ namespace Microsoft.Terminal.Settings.Model
         String ItemAvatarPath;
         String ItemBodyPath;
         String ItemTimePath;
+        // The deferred fetch step this tab's content comes from, if any. The
+        // step is skipped by the fetch that paints the card and run when the
+        // tab is first opened. Empty means the content is already in the
+        // results the card was built from, and only the building is deferred.
+        String StepId;
         Boolean DefaultVisible;
     }
 
@@ -194,6 +199,10 @@ namespace Microsoft.Terminal.Settings.Model
         // ending the fetch -- for an endpoint that may not exist on every
         // server, or a probe that is allowed to come back empty.
         Boolean Optional;
+        // Not run by the fetch that paints the card: run later, when a tab
+        // naming this step is first opened. For a payload nobody has asked to
+        // see yet -- a hundred issue comments behind a Comments tab.
+        Boolean Deferred;
     }
 
     // One row of the card's representation of a fetched result.
@@ -207,8 +216,17 @@ namespace Microsoft.Terminal.Settings.Model
         String Path;
         IntegrationFieldKind Kind;
         String IconPath;
+        // A JSON pointer to an ARRAY. The field then renders once per element,
+        // and its own pointers and templates read that element as the step id
+        // "item" -- "item:/url". Empty means one row, as usual.
+        String EachPath;
         String Placement;
         String LinkTemplate;
+        // A URL the result already carries, as a pointer. LinkTemplate builds a
+        // URL out of pieces and percent-encodes each one, which is right for a
+        // key pasted into a query and wrong for a whole href -- a pull request's
+        // own html_url would come back with its scheme escaped.
+        String LinkPath;
         String ColorPath;
         String Color;
         String Format;        // "relativeTime" | "date" | ""
@@ -255,10 +273,16 @@ namespace Microsoft.Terminal.Settings.Model
 
         Boolean Enabled;
         Windows.Foundation.Collections.IMap<String, String> Values;
-        // Keys of the display fields to show; null means the manifest defaults.
-        Windows.Foundation.Collections.IVector<String> Fields;
-        // Keys of the tabs to show; null means the manifest defaults.
-        Windows.Foundation.Collections.IVector<String> Tabs;
+        // Which display fields the user turned on, and which off, by key.
+        //
+        // A key the map does not mention takes the manifest's own default. That
+        // is the whole point of the shape: a field a manifest gains later has
+        // never been offered to anyone, so it arrives at its default instead of
+        // being read as declined -- which is what a list of "the keys to show"
+        // could not express, since absence meant both things at once.
+        Windows.Foundation.Collections.IMap<String, Boolean> Fields;
+        // Same, for tabs.
+        Windows.Foundation.Collections.IMap<String, Boolean> Tabs;
     }
 
     // Discovers manifests: built-ins embedded in this DLL, then

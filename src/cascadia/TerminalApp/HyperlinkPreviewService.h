@@ -37,6 +37,9 @@ namespace winrt::TerminalApp::implementation
 {
     // Defined in HyperlinkPreviewService.cpp.
     struct HyperlinkPreviewSnapshot;
+    // Also defined there: what one run of a plugin's fetch steps produced. Held
+    // only through a shared_ptr, which an incomplete type is enough for.
+    struct HyperlinkPreviewPipeline;
 
     struct HyperlinkPreviewService : winrt::implements<HyperlinkPreviewService, winrt::Microsoft::Terminal::Control::IHyperlinkPreviewProvider>
     {
@@ -58,6 +61,7 @@ namespace winrt::TerminalApp::implementation
         bool CanPreview(const winrt::hstring& text, const winrt::hstring& integrationHint);
         winrt::Windows::Foundation::IAsyncOperation<winrt::Microsoft::Terminal::Control::HyperlinkPreview> GetPreviewAsync(winrt::hstring text, winrt::hstring integrationHint);
         winrt::Windows::Foundation::IAsyncOperation<winrt::Microsoft::Terminal::Control::HyperlinkPreview> RefreshAsync(winrt::hstring text, winrt::hstring integrationHint);
+        winrt::Windows::Foundation::IAsyncOperation<winrt::Microsoft::Terminal::Control::HyperlinkPreviewTab> GetTabAsync(winrt::hstring text, winrt::hstring integrationHint, winrt::hstring tabKey);
         winrt::Windows::Foundation::IAsyncOperation<winrt::Microsoft::Terminal::Control::HyperlinkActionResult> InvokeActionAsync(winrt::hstring text,
                                                                                                                                  winrt::hstring integrationHint,
                                                                                                                                  winrt::hstring actionKey,
@@ -68,6 +72,10 @@ namespace winrt::TerminalApp::implementation
         struct CacheEntry
         {
             winrt::Microsoft::Terminal::Control::HyperlinkPreview Preview{ nullptr };
+            // The step results the preview was built from, kept so a tab opened
+            // later is built from the same answers the card was -- and so only a
+            // deferred step has to be requested at that point.
+            std::shared_ptr<HyperlinkPreviewPipeline> Pipeline;
             std::chrono::steady_clock::time_point Expiry{};
         };
 
@@ -79,7 +87,11 @@ namespace winrt::TerminalApp::implementation
 
         std::shared_ptr<const HyperlinkPreviewSnapshot> _currentSnapshot() const;
         winrt::Microsoft::Terminal::Control::HyperlinkPreview _cacheLookup(const std::wstring& key);
-        void _cacheStore(const std::wstring& key, const winrt::Microsoft::Terminal::Control::HyperlinkPreview& preview, int32_t seconds);
+        std::shared_ptr<HyperlinkPreviewPipeline> _cachedPipeline(const std::wstring& key);
+        void _cacheStore(const std::wstring& key,
+                         const winrt::Microsoft::Terminal::Control::HyperlinkPreview& preview,
+                         std::shared_ptr<HyperlinkPreviewPipeline> pipeline,
+                         int32_t seconds);
         void _cacheErase(const std::wstring& key);
 
         mutable std::mutex _mutex;

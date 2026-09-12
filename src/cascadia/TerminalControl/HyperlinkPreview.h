@@ -69,6 +69,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         WINRT_PROPERTY(hstring, Body);
         WINRT_PROPERTY(hstring, Format);
         WINRT_PROPERTY(Windows::Foundation::Collections::IVector<Control::HyperlinkPreviewComment>, Comments);
+        WINRT_PROPERTY(bool, Pending, false);
     };
 
     struct HyperlinkPreviewActionField : HyperlinkPreviewActionFieldT<HyperlinkPreviewActionField>

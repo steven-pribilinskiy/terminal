@@ -194,12 +194,16 @@ namespace winrt::TerminalApp::implementation
             FilePreviewHost().Content(nullptr);
             HeaderIcon().Content(nullptr);
             IntegrationName().Text(winrt::hstring{});
+            TicketBreadcrumbHost().Children().Clear();
             TicketStatusHost().Children().Clear();
             TicketMetadataHost().Children().Clear();
             TitleText().Text(_sourceText);
             FieldsHost().Children().Clear();
             BodyHost().Children().Clear();
             CommentsHost().Children().Clear();
+            // Shown again for whatever is arriving: _render takes it back down
+            // only for an integration that drew a breadcrumb in its place.
+            SourceLink().Visibility(_compact ? Visibility::Collapsed : Visibility::Visible);
             _rebuildTabStrip(nullptr);
             _rebuildActions(nullptr);
             _setError(winrt::hstring{});
@@ -225,6 +229,7 @@ namespace winrt::TerminalApp::implementation
         {
             HeaderIcon().Content(nullptr);
             IntegrationName().Text(winrt::hstring{});
+            TicketBreadcrumbHost().Children().Clear();
             TicketStatusHost().Children().Clear();
             TicketMetadataHost().Children().Clear();
             TitleText().Text(_sourceText);
@@ -264,12 +269,14 @@ namespace winrt::TerminalApp::implementation
             }
         }
         TitleText().Text(title);
+        TicketBreadcrumbHost().Children().Clear();
         TicketStatusHost().Children().Clear();
         TicketMetadataHost().Children().Clear();
         if (const auto fields = preview.Fields()) for (const auto& field : fields)
         {
-            if (!field || (field.Placement() != L"status" && field.Placement() != L"header")) continue;
-            if (field.Placement() == L"status")
+            const auto placement = field ? field.Placement() : winrt::hstring{};
+            if (!field || (placement != L"status" && placement != L"header" && placement != L"breadcrumb")) continue;
+            if (placement == L"status")
             {
                 Controls::TextBlock text;
                 text.Text(field.Value());
@@ -282,6 +289,19 @@ namespace winrt::TerminalApp::implementation
             }
             else
             {
+                // A breadcrumb reads as one trail, so the slash between two of its
+                // entries is drawn by whichever arrives second rather than declared
+                // by either of them.
+                const auto host = placement == L"breadcrumb" ? TicketBreadcrumbHost() : TicketMetadataHost();
+                if (placement == L"breadcrumb" && host.Children().Size() > 0)
+                {
+                    Controls::TextBlock separator;
+                    separator.Text(winrt::hstring{ L"/" });
+                    separator.Opacity(0.5);
+                    separator.VerticalAlignment(VerticalAlignment::Center);
+                    host.Children().Append(separator);
+                }
+
                 Controls::HyperlinkButton link;
                 Controls::StackPanel content;
                 content.Orientation(Controls::Orientation::Horizontal);
@@ -290,19 +310,25 @@ namespace winrt::TerminalApp::implementation
                 {
                     Controls::Image icon;
                     icon.Width(16); icon.Height(16);
+                    icon.VerticalAlignment(VerticalAlignment::Center);
                     icon.Source(Control::HyperlinkPreviewHelpers::ImageFromUri(field.IconUri()));
                     content.Children().Append(icon);
                 }
                 Controls::TextBlock value; value.Text(field.Value());
                 content.Children().Append(value);
-                if (field.LinkUri().empty()) { TicketMetadataHost().Children().Append(content); continue; }
+                if (field.LinkUri().empty()) { host.Children().Append(content); continue; }
                 link.Content(content);
                 link.Padding(Thickness{ 0 });
                 try { link.NavigateUri(Windows::Foundation::Uri{ field.LinkUri() }); } CATCH_LOG();
                 Control::HyperlinkPreviewHelpers::AttachLinkTooltips(link, _provider, _linkSettings, _compact, _depth);
-                TicketMetadataHost().Children().Append(link);
+                host.Children().Append(link);
             }
         }
+        // The breadcrumb says what the source line says and more, and its own
+        // entry for this ticket opens the same link, so the two are never shown
+        // one above the other.
+        const auto hasBreadcrumb = TicketBreadcrumbHost().Children().Size() > 0;
+        SourceLink().Visibility(_compact || hasBreadcrumb ? Visibility::Collapsed : Visibility::Visible);
         if (title != _title)
         {
             _title = title;
@@ -392,6 +418,7 @@ namespace winrt::TerminalApp::implementation
             // The title already has its own place at the top of the pane, so it is
             // skipped here rather than repeated inside the field list.
             if (field.IsTitle() || field.Placement() == L"header" || field.Placement() == L"status" ||
+                field.Placement() == L"breadcrumb" ||
                 (_compact && ::Microsoft::Terminal::PreviewPresentation::IsZeroCount(field.Value())))
             {
                 continue;
@@ -454,6 +481,25 @@ namespace winrt::TerminalApp::implementation
 
                 Controls::Grid::SetColumn(badge, 1);
                 cell.Children().Append(badge);
+            }
+            else if (!field.LinkUri().empty())
+            {
+                // A row whose value IS somewhere to go -- a pull request against
+                // the ticket -- is worth clicking, and worth hovering: the nested
+                // preview resolves it with whichever integration claims it, so a
+                // Jira row leads to a GitHub card.
+                Controls::TextBlock text;
+                text.Text(field.Value());
+                text.TextWrapping(TextWrapping::Wrap);
+
+                Controls::HyperlinkButton link;
+                link.Content(text);
+                link.Padding(Thickness{ 0 });
+                link.HorizontalAlignment(HorizontalAlignment::Left);
+                try { link.NavigateUri(Windows::Foundation::Uri{ field.LinkUri() }); } CATCH_LOG();
+                Control::HyperlinkPreviewHelpers::AttachLinkTooltips(link, _provider, _linkSettings, _compact, _depth);
+                Controls::Grid::SetColumn(link, 1);
+                cell.Children().Append(link);
             }
             else
             {
@@ -638,12 +684,31 @@ namespace winrt::TerminalApp::implementation
         const auto showFields = !tab || kind == Control::HyperlinkPreviewTabKind::Fields;
         const auto showBody = tab && kind == Control::HyperlinkPreviewTabKind::Body;
         const auto showComments = tab && kind == Control::HyperlinkPreviewTabKind::Comments;
+        // A tab the integration handed over as a name only: its content is asked
+        // for on the first visit, and kept, so the second is immediate.
+        const auto pending = tab && tab.Pending();
 
-        if (showBody)
+        if (pending)
+        {
+            const auto host = showComments ? CommentsHost() : BodyHost();
+            host.Children().Clear();
+
+            Controls::ProgressRing ring;
+            ring.Width(16);
+            ring.Height(16);
+            ring.MinWidth(0);
+            ring.MinHeight(0);
+            ring.HorizontalAlignment(HorizontalAlignment::Left);
+            ring.IsActive(true);
+            host.Children().Append(ring);
+
+            _requestTab(_generation, _preview, index, tab.Key());
+        }
+        else if (showBody)
         {
             _renderBody(tab);
         }
-        if (showComments)
+        else if (showComments)
         {
             _renderComments(tab);
         }
@@ -660,6 +725,57 @@ namespace winrt::TerminalApp::implementation
                 const auto buttonIndex = button.Tag().try_as<int32_t>();
                 button.IsChecked(buttonIndex && *buttonIndex == index);
             }
+        }
+    }
+
+    // One tab's content, fetched because the user opened it. Guarded twice, for
+    // two different races: the generation says the pane has not been retargeted
+    // at another link, and the preview itself says an action's refresh has not
+    // replaced the object whose Tabs this is about to write into. The content is
+    // stored even if the user has since moved to another tab -- it is the answer
+    // to a question they asked, and going back to it should cost nothing.
+    safe_void_coroutine LinkPreviewPaneContent::_requestTab(uint32_t generation, Control::HyperlinkPreview preview, int32_t index, winrt::hstring tabKey)
+    {
+        const auto weakThis{ get_weak() };
+        const auto provider{ _provider };
+        const auto dispatcher{ Dispatcher() };
+        if (!provider || !dispatcher || !preview || tabKey.empty() || index < 0)
+        {
+            co_return;
+        }
+
+        auto text = preview.SourceText();
+        if (text.empty())
+        {
+            text = _sourceText;
+        }
+        const auto hint = _integrationHint;
+
+        Control::HyperlinkPreviewTab built{ nullptr };
+        try
+        {
+            built = co_await provider.GetTabAsync(text, hint, tabKey);
+        }
+        CATCH_LOG();
+
+        co_await wil::resume_foreground(dispatcher);
+
+        const auto self = weakThis.get();
+        if (!self || self->_generation != generation || self->_preview != preview || !built)
+        {
+            co_return;
+        }
+
+        const auto tabs = preview.Tabs();
+        if (!tabs || gsl::narrow_cast<uint32_t>(index) >= tabs.Size())
+        {
+            co_return;
+        }
+        tabs.SetAt(gsl::narrow_cast<uint32_t>(index), built);
+
+        if (self->_selectedTab == index)
+        {
+            self->_showTab(index);
         }
     }
 

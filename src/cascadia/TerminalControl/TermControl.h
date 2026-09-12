@@ -382,6 +382,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         int32_t _hyperlinkSelectedTab{ -1 };
         void _rebuildHyperlinkTabStrip(const Control::HyperlinkPreview& preview);
         void _showHyperlinkTab(int32_t index);
+        // A tab the integration named but did not fill in, asked for on the first
+        // visit to it. Takes the preview by value: it is what the answer is
+        // written into, and it has to outlive the fetch.
+        safe_void_coroutine _requestHyperlinkTab(uint32_t generation, Control::HyperlinkPreview preview, int32_t index, winrt::hstring tabKey);
         void _HyperlinkTabClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
         void _fillHyperlinkFields(const Control::HyperlinkPreview& preview);
         void _fillHyperlinkComments(const Control::HyperlinkPreviewTab& tab);

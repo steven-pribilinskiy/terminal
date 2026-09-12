@@ -71,6 +71,10 @@ namespace Microsoft.Terminal.Control
         String Body;
         String Format;
         Windows.Foundation.Collections.IVector<HyperlinkPreviewComment> Comments;
+        // The tab is a name with nothing behind it yet: the content is fetched
+        // and built by GetTabAsync when the user first opens it, which is what
+        // keeps a hundred comments off the path that paints the card.
+        Boolean Pending;
     }
 
     // A value the far end wants before it will accept an action.
@@ -175,6 +179,11 @@ namespace Microsoft.Terminal.Control
         // Same, but ignores (and replaces) anything cached -- what to call
         // after an action has changed the thing being previewed.
         Windows.Foundation.IAsyncOperation<HyperlinkPreview> RefreshAsync(String text, String integrationHint);
+        // One tab's content, built now. Answers a tab the preview handed over
+        // Pending: the surface asks for it when the user opens that tab, and
+        // the result replaces the shell in the preview's Tabs. Null when
+        // nothing claims the text any more, or when the tab has since gone.
+        Windows.Foundation.IAsyncOperation<HyperlinkPreviewTab> GetTabAsync(String text, String integrationHint, String tabKey);
         // Runs one of the preview's actions. choiceId is the picked option for
         // a Choice action, empty for a Button; fieldValues carries whatever the
         // option said it needed.

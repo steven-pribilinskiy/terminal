@@ -7,8 +7,8 @@ Module Name:
 
 Abstract:
 - The user's configuration of one integration (enabled, non-secret setting
-  values, which display fields to show), persisted under "integrations" in
-  settings.json.
+  values, which display fields and tabs to show), persisted under
+  "integrations" in settings.json.
 
 --*/
 #pragma once
@@ -20,6 +20,9 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
 {
     // The comma in IMap<K, V> would split WINRT_PROPERTY's macro arguments.
     using IntegrationValueMap = Windows::Foundation::Collections::IMap<hstring, hstring>;
+    // Per-key on/off overrides over a manifest's own defaults. A key that is not
+    // in the map has never been decided and takes the manifest's default.
+    using IntegrationOverrideMap = Windows::Foundation::Collections::IMap<hstring, bool>;
 
     struct IntegrationSettings : IntegrationSettingsT<IntegrationSettings>
     {
@@ -33,8 +36,8 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
 
         WINRT_PROPERTY(bool, Enabled, false);
         WINRT_PROPERTY(IntegrationValueMap, Values);
-        WINRT_PROPERTY(Windows::Foundation::Collections::IVector<hstring>, Fields);
-        WINRT_PROPERTY(Windows::Foundation::Collections::IVector<hstring>, Tabs);
+        WINRT_PROPERTY(IntegrationOverrideMap, Fields);
+        WINRT_PROPERTY(IntegrationOverrideMap, Tabs);
     };
 }
 

@@ -52,6 +52,9 @@ namespace
     constexpr std::string_view WhenKey{ "when" };
     constexpr std::string_view UnlessKey{ "unless" };
     constexpr std::string_view OptionalKey{ "optional" };
+    constexpr std::string_view DeferredKey{ "deferred" };
+    constexpr std::string_view StepKey{ "step" };
+    constexpr std::string_view EachKey{ "each" };
 
     constexpr std::string_view PathKey{ "path" };
     constexpr std::string_view IconPathKey{ "iconPath" };
@@ -169,6 +172,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         JsonUtils::GetValueForKey(json, WhenKey, step->_When);
         JsonUtils::GetValueForKey(json, UnlessKey, step->_Unless);
         JsonUtils::GetValueForKey(json, OptionalKey, step->_Optional);
+        JsonUtils::GetValueForKey(json, DeferredKey, step->_Deferred);
 
         ParseAuth(json, step->_AuthType, step->_AuthUser, step->_AuthPassword);
 
@@ -191,8 +195,10 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         JsonUtils::GetValueForKey(json, PathKey, field->_Path);
         JsonUtils::GetValueForKey(json, KindKey, field->_Kind);
         JsonUtils::GetValueForKey(json, IconPathKey, field->_IconPath);
+        JsonUtils::GetValueForKey(json, EachKey, field->_EachPath);
         JsonUtils::GetValueForKey(json, "placement", field->_Placement);
         JsonUtils::GetValueForKey(json, "link", field->_LinkTemplate);
+        JsonUtils::GetValueForKey(json, "linkPath", field->_LinkPath);
         JsonUtils::GetValueForKey(json, ColorPathKey, field->_ColorPath);
         JsonUtils::GetValueForKey(json, ColorKey, field->_Color);
         JsonUtils::GetValueForKey(json, FormatKey, field->_Format);
@@ -233,6 +239,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         JsonUtils::GetValueForKey(json, ItemAvatarPathKey, tab->_ItemAvatarPath);
         JsonUtils::GetValueForKey(json, ItemBodyPathKey, tab->_ItemBodyPath);
         JsonUtils::GetValueForKey(json, ItemTimePathKey, tab->_ItemTimePath);
+        JsonUtils::GetValueForKey(json, StepKey, tab->_StepId);
         JsonUtils::GetValueForKey(json, DefaultKey, tab->_DefaultVisible);
         if (tab->_Label.empty())
         {
